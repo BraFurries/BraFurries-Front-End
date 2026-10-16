@@ -1,0 +1,83 @@
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Parcerias</h2>
+    <div class="flex flex-wrap gap-3">
+      <select [(ngModel)]="status" (change)="loadPartners()"
+              class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
+        <option value="">Todos status</option>
+        <option value="pending">Pendentes</option>
+        <option value="active">Ativos</option>
+        <option value="suspended">Suspensos</option>
+      </select>
+      <select [(ngModel)]="category" (change)="loadPartners()"
+              class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
+        <option value="">Todas categorias</option>
+        <option value="community">Comunidade</option>
+        <option value="creator">Criador</option>
+        <option value="artist">Artista</option>
+        <option value="event">Evento</option>
+        <option value="meet">Meet</option>
+        <option value="discord_server">Servidor Discord</option>
+        <option value="brand">Marca</option>
+        <option value="other">Outro</option>
+      </select>
+      <button type="button" (click)="createPartner()" class="bg-braPurple hover:bg-braDark text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-braPurple/30 transition transform hover:-translate-y-0.5">
+        + Nova Parceria
+      </button>
+    </div>
+  </div>
+
+  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
+  <p *ngIf="successMessage" role="status" class="rounded-xl bg-green-50 p-3 text-sm font-bold text-green-700">{{ successMessage }}</p>
+
+  <div *ngIf="loading" class="bg-white rounded-2xl p-6 border border-gray-100 text-sm text-gray-500">
+    Carregando parcerias...
+  </div>
+
+  <div *ngIf="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div *ngFor="let partner of partners" class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition group relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-braCyan/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+
+      <div class="flex justify-between items-start mb-4 relative">
+        <img [src]="getPartnerImage(partner)" alt="Logo Parceiro" class="w-16 h-16 rounded-2xl shadow-sm">
+        <div class="flex flex-col items-end gap-1">
+          <span class="text-xs font-bold px-3 py-1 rounded-full"
+                [ngClass]="{
+                  'bg-green-100 text-green-700': partner.status === 'active',
+                  'bg-orange-100 text-orange-700': partner.status === 'pending',
+                  'bg-red-100 text-red-700': partner.status === 'suspended'
+                }">
+            {{ getStatusLabel(partner.status) }}
+          </span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-braPurple/10 text-braPurple">
+            {{ getCategoryLabel(partner.category) }}
+          </span>
+        </div>
+      </div>
+
+      <h3 class="text-lg font-bold text-gray-800 font-amaranth">{{ partner.name }}</h3>
+      <p class="text-sm text-gray-500 mb-2">
+        Rep: <span class="font-bold text-gray-700">{{ partner.representativeName || partner.contactName || '-' }}</span>
+      </p>
+      <p *ngIf="partner.description" class="text-sm text-gray-500 mb-4 line-clamp-2">{{ partner.description }}</p>
+
+      <div class="flex items-center justify-between pt-4 border-t border-gray-50">
+        <div>
+          <p class="text-xs text-gray-400">Cliques/Convites</p>
+          <p class="font-bold text-gray-800 text-lg">{{ partner.clicks | number:'1.0-0' }}/{{ partner.invites | number:'1.0-0' }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400">Desde</p>
+          <p class="font-bold text-gray-800 text-sm">{{ formatDate(partner.createdAt) }}</p>
+        </div>
+      </div>
+
+      <div class="mt-4 flex gap-2">
+        <button type="button" (click)="editPartner(partner)" class="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2 rounded-xl text-sm font-bold transition">Editar</button>
+        <button (click)="togglePartnerStatus(partner)" class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl text-sm font-bold transition">
+          {{ partner.status === 'suspended' ? 'Reativar' : 'Suspender' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

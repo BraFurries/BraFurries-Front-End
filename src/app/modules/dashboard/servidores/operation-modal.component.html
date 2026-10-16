@@ -1,0 +1,14 @@
+<div class="operation-backdrop" aria-hidden="true"></div>
+<section class="operation-modal" role="dialog" aria-modal="true" [attr.aria-labelledby]="'operation-modal-title'">
+  <h2 id="operation-modal-title">{{ title }}</h2>
+  <p>{{ message }}</p>
+  @if (details.length) { <ul>@for (detail of details; track detail) { <li>{{ detail }}</li> }</ul> }
+  <footer>
+    @if (state === 'confirmation') {
+      <button type="button" class="secondary-button" [disabled]="busy" (click)="cancel.emit()">Cancelar</button>
+      <button type="button" class="primary-button" [disabled]="busy" (click)="confirm.emit()">{{ busy ? 'Aplicando…' : 'Confirmar' }}</button>
+    } @else {
+      <button type="button" class="primary-button" (click)="close.emit()">Fechar</button>
+    }
+  </footer>
+</section>

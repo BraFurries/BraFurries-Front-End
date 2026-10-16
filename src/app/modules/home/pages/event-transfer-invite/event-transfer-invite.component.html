@@ -1,0 +1,134 @@
+<div class="min-h-screen bg-braDark flex items-center justify-center p-4 relative overflow-hidden">
+    <!-- Efeitos de Fundo -->
+    <div class="absolute inset-0 opacity-20 pointer-events-none">
+        <div class="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-braPurple rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-braCyan rounded-full blur-[120px]"></div>
+    </div>
+
+    <!-- Container Principal -->
+    <div class="bg-white/5 backdrop-blur-xl border border-white/10 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 text-center flex flex-col items-center">
+        
+        <!-- Loading State -->
+        <ng-container *ngIf="isLoading">
+            <div class="py-12 flex flex-col items-center justify-center animate-pulse">
+                <div class="w-16 h-16 bg-white/20 rounded-full mb-4"></div>
+                <h3 class="text-white text-xl font-bold">Verificando convite...</h3>
+            </div>
+        </ng-container>
+
+        <!-- Error / Invalid State -->
+        <ng-container *ngIf="!isLoading && (hasError || !invite)">
+            <div class="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+                ✕
+            </div>
+            <h2 class="text-2xl font-amaranth font-bold text-white mb-3">Convite Inválido ou Expirado</h2>
+            <p class="text-gray-300 font-medium mb-8">
+                Este link de transferência de evento não é mais válido, já foi utilizado, ou você não tem permissão para acessá-lo.
+            </p>
+            <a routerLink="/" class="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl transition border border-white/20 inline-block">
+                Voltar para a Home
+            </a>
+        </ng-container>
+
+        <!-- Rejected State -->
+        <ng-container *ngIf="!isLoading && !hasError && invite && isRejected">
+            <div class="w-20 h-20 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center text-4xl mb-6">
+                ✋
+            </div>
+            <h2 class="text-2xl font-amaranth font-bold text-white mb-3">Convite Recusado</h2>
+            <p class="text-gray-300 font-medium mb-8">
+                Você recusou a titularidade do evento <strong>{{ invite.inviteData.eventName }}</strong>. O organizador atual será notificado.
+            </p>
+            <a routerLink="/" class="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl transition border border-white/20 inline-block">
+                Voltar para a Home
+            </a>
+        </ng-container>
+
+        <!-- Success State -->
+        <ng-container *ngIf="!isLoading && !hasError && invite && isSuccess">
+            <div class="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(34,197,94,0.3)] animate-[bounce_1s_infinite]">
+                🎉
+            </div>
+            <h2 class="text-3xl font-amaranth font-bold text-white mb-3">Parabéns!</h2>
+            <p class="text-gray-300 font-medium mb-8 text-lg">
+                Você é o mais novo dono do evento <strong class="text-braCyan">{{ invite.inviteData.eventName }}</strong>!
+            </p>
+            <p class="text-sm text-gray-400 mb-6 animate-pulse">Redirecionando para o painel de administração...</p>
+        </ng-container>
+
+        <!-- Valid Invite State (Pending) -->
+        <ng-container *ngIf="!isLoading && !hasError && invite && !isSuccess && !isRejected">
+            <div class="w-20 h-20 bg-braPurple rounded-full flex items-center justify-center text-white text-4xl mb-6 shadow-[0_0_40px_rgba(102,51,153,0.6)]">
+                👑
+            </div>
+            
+            <h1 class="text-2xl md:text-3xl font-amaranth font-bold text-white mb-2">Convite de Titularidade</h1>
+            <p class="text-gray-300 font-medium mb-8 leading-relaxed">
+                Você foi convidado para assumir a propriedade total do evento.
+            </p>
+
+            <!-- Card do Evento -->
+            <div class="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20 w-full mb-8 text-left">
+                <div class="mb-4">
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Evento</p>
+                    <p class="text-xl font-bold text-white">{{ invite.inviteData.eventName }}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-black/30 rounded-full flex items-center justify-center font-bold text-white border border-white/10">
+                        {{ invite.inviteData.originalOwnerDisplayName.charAt(0) }}
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Enviado por</p>
+                        <p class="font-bold text-white">{{ invite.inviteData.originalOwnerDisplayName }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wrong User Block -->
+            <div *ngIf="currentUser && currentUser.id !== invite.targetUserId" class="bg-red-500/20 border border-red-500/50 rounded-2xl p-6 w-full mb-6 text-left flex flex-col gap-4">
+                <div class="flex items-start gap-3">
+                    <span class="text-red-500 text-2xl mt-1">🚫</span>
+                    <div>
+                        <h3 class="text-white font-bold text-lg mb-1">Acesso Negado</h3>
+                        <p class="text-sm text-red-100 font-medium leading-snug">
+                            Este convite foi enviado para a conta <strong>{{ invite.targetDisplayName }}</strong>, mas você está logado como <strong>{{ currentUser.name }}</strong>. 
+                            Você não pode aceitar um convite atribuído a outra pessoa.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" class="w-full px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/10 transition-all shadow-sm"
+                    (click)="logoutAndLogin()">
+                    Fazer Login com a Conta Correta
+                </button>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="w-full flex flex-col gap-3" *ngIf="!currentUser || currentUser.id === invite.targetUserId">
+                
+                <ng-container *ngIf="!currentUser">
+                    <button type="button" class="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-braPurple to-braCyan text-white font-bold text-lg shadow-[0_0_20px_rgba(102,51,153,0.4)] hover:shadow-[0_0_30px_rgba(102,51,153,0.6)] transition-all hover:-translate-y-0.5"
+                        (click)="goToLogin()">
+                        Fazer Login para Responder
+                    </button>
+                    <p class="text-sm text-gray-400 font-medium mt-2">Para garantir a segurança, precisamos que você acesse sua conta primeiro.</p>
+                </ng-container>
+
+                <ng-container *ngIf="currentUser">
+                    <button type="button" class="w-full px-6 py-4 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-lg shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all disabled:opacity-50"
+                        [disabled]="isProcessing"
+                        (click)="acceptInvite()">
+                        {{ isProcessing ? 'Processando...' : 'Aceitar Titularidade' }}
+                    </button>
+                    <button type="button" class="w-full px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/10 transition-all disabled:opacity-50"
+                        [disabled]="isProcessing"
+                        (click)="rejectInvite()">
+                        Recusar Convite
+                    </button>
+                </ng-container>
+                
+            </div>
+            
+        </ng-container>
+
+    </div>
+</div>

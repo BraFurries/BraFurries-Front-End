@@ -1,0 +1,8 @@
+.role-selection { margin-top: 1.25rem; }
+.selected-roles { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .7rem; }
+.selected-roles li { display: flex; align-items: center; gap: .55rem; padding: .5rem .55rem .5rem .75rem; border: 1px solid rgba(138,53,148,.16); border-radius: .85rem; background: rgba(138,53,148,.07); color: #56205d; font-size: .85rem; }
+.role-copy { display: grid; gap: .12rem; }.role-copy small { color: #56606f; font-size: .68rem; font-weight: 800; text-transform: uppercase; }.role-copy small.draft { color: #8a3594; }
+.bot-warning { max-width: 12rem; color: #92400e; font-size: .68rem; font-weight: 700; }
+.selected-roles button { color: #b91c1c; font-size: .75rem; font-weight: 800; }
+.empty-roles { margin-top: .7rem; color: #6b7280; font-size: .875rem; }
+.add-role { display: block; margin-top: 1rem; }

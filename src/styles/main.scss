@@ -1,0 +1,14 @@
+/* You can add global styles to this file, and also import other style files */
+
+@use 'abstracts' as *;
+@use 'base' as *;
+@use 'layout' as *;
+@use 'components' as *;
+
+html {
+  scroll-behavior: smooth;
+}
+
+main {
+  scroll-behavior: smooth;
+}

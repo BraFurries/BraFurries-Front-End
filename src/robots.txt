@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://brafurries.com.br/sitemap.xml

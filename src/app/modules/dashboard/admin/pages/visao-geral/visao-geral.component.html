@@ -1,0 +1,101 @@
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Visão Geral</h2>
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold"
+         [ngClass]="{
+           'bg-green-100 text-green-700': overview?.systemStatus === 'operational',
+           'bg-orange-100 text-orange-700': overview?.systemStatus === 'degraded',
+           'bg-red-100 text-red-700': overview?.systemStatus === 'offline',
+           'bg-gray-100 text-gray-600': !overview
+         }">
+      <span class="w-2 h-2 rounded-full"
+            [ngClass]="{
+              'bg-green-500 animate-pulse': overview?.systemStatus === 'operational',
+              'bg-orange-500': overview?.systemStatus === 'degraded',
+              'bg-red-500': overview?.systemStatus === 'offline',
+              'bg-gray-400': !overview
+            }"></span>
+      {{ systemStatusLabel }}
+    </div>
+  </div>
+
+  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
+
+  <div *ngIf="loading" class="bg-white rounded-2xl p-6 border border-gray-100 text-sm text-gray-500">
+    Carregando visão geral...
+  </div>
+
+  <ng-container *ngIf="overview as data">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm font-bold">Total de Usuários</p>
+          <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.metrics.totalUsers | number:'1.0-0' }}</h3>
+          <p class="text-green-500 text-xs mt-2 font-bold">+{{ data.metrics.newUsersWeek | number:'1.0-0' }} essa semana</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">👥</div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm font-bold">Parceiros Ativos</p>
+          <h3 class="text-3xl font-amaranth font-bold text-braCyan mt-1">{{ data.metrics.activePartners | number:'1.0-0' }}</h3>
+          <p class="text-gray-400 text-xs mt-2">{{ data.metrics.pendingPartners | number:'1.0-0' }} em análise</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-braCyan/10 flex items-center justify-center text-braCyan text-xl">🤝</div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm font-bold">Status do Coddy</p>
+          <h3 class="text-2xl font-amaranth font-bold text-green-500 mt-1">{{ botStatusLabel }}</h3>
+          <p class="text-gray-400 text-xs mt-2">Ping: {{ data.metrics.botPingMs }}ms</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 text-xl">🤖</div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm font-bold">Alcance do Coddy</p>
+          <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.metrics.botReachedUsers | number:'1.0-0' }}</h3>
+          <p class="text-gray-400 text-[11px] mt-2 font-bold leading-tight">
+            em <span class="text-braCyan">{{ data.metrics.botServers | number:'1.0-0' }} servidores</span><br>
+            <span class="text-green-500">+{{ data.metrics.serverGrowthWeek | number:'1.0-0' }} nessa semana</span>
+          </p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">🌍</div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+      <h3 class="text-lg font-amaranth font-bold text-gray-800 mb-4">Atividades Recentes</h3>
+      <div class="space-y-4">
+        <div *ngFor="let activity of data.recentActivities" class="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+               [ngClass]="{
+                 'bg-red-100 text-red-500': activity.type === 'ban' || activity.type === 'mute',
+                 'bg-green-100 text-green-500': activity.type === 'partner',
+                 'bg-orange-100 text-orange-500': activity.type === 'alert',
+                 'bg-gray-100 text-gray-500': activity.type === 'system'
+               }">
+            <span *ngIf="activity.type === 'ban'">🔨</span>
+            <span *ngIf="activity.type === 'mute'">🔇</span>
+            <span *ngIf="activity.type === 'partner'">🤝</span>
+            <span *ngIf="activity.type === 'alert'">⚠️</span>
+            <span *ngIf="activity.type === 'system'">⚙️</span>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm text-gray-800">
+              <span class="font-bold">{{ activity.targetName }}</span> - {{ activity.reason }}
+            </p>
+            <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+              <span>{{ formatDate(activity.createdAt) }}</span>
+              <span>•</span>
+              <span>por <span class="font-bold">{{ activity.adminName }}</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

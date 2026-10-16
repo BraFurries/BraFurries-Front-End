@@ -1,0 +1,123 @@
+<ng-container [ngSwitch]="type">
+
+    <div *ngSwitchCase="'text'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <input type="text"
+            class="w-full px-6 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braCyan focus:bg-white transition-all font-semibold text-braDark"
+            [placeholder]="placeholder" 
+            [value]="value"
+            (input)="handleChange($event)"
+            [required]="required" 
+            [disabled]="disabled"
+            [mask]="maskPattern ? maskPattern : null">
+    </div>
+
+    <div *ngSwitchCase="'password'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <div class="relative flex items-center">
+            <input [type]="hidden ? 'password' : 'text'"
+                class="w-full pl-6 pr-14 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braCyan focus:bg-white transition-all font-semibold text-braDark"
+                [placeholder]="placeholder" 
+                [value]="value"
+                (input)="handleChange($event)"
+                [required]="required" 
+                [disabled]="disabled">
+            <button type="button" tabindex="-1" (click)="hidden = !hidden" class="absolute right-4 text-gray-400 hover:text-braCyan focus:outline-none transition-colors">
+                <mat-icon>{{hidden ? 'visibility_off' : 'visibility'}}</mat-icon>
+            </button>
+        </div>
+    </div>
+
+    <div *ngSwitchCase="'longText'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <textarea 
+            class="w-full px-6 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braCyan focus:bg-white transition-all font-semibold text-braDark min-h-[120px] resize-y custom-scrollbar"
+            [placeholder]="placeholder" 
+            [value]="value"
+            (input)="handleChange($event)"
+            [required]="required"
+            [disabled]="disabled">
+        </textarea>
+    </div>
+
+    <div *ngSwitchCase="'number'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <input type="number" 
+            class="w-full px-6 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braCyan focus:bg-white transition-all font-semibold text-braDark"
+            [placeholder]="placeholder"
+            [value]="value"
+            (input)="handleChange($event)"
+            [required]="required"
+            [disabled]="disabled">
+    </div>
+
+    <div *ngSwitchCase="'price'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <div class="relative flex items-center">
+            <span class="absolute left-6 text-gray-400 font-bold">$</span>
+            <input type="number" 
+                class="w-full pl-10 pr-14 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braCyan focus:bg-white transition-all font-semibold text-braDark"
+                [placeholder]="placeholder"
+                [value]="value"
+                (input)="handleChange($event)"
+                [required]="required"
+                [disabled]="disabled">
+            <span class="absolute right-6 text-gray-400 font-bold">.00</span>
+        </div>
+    </div>
+
+    <div *ngSwitchCase="'date'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <mat-form-field appearance="outline" class="w-full">
+            <input matInput [matDatepicker]="picker"
+                [placeholder]="placeholder"
+                [value]="value" 
+                (dateChange)="handleChange($event)"
+                [required]="required"
+                [disabled]="disabled">
+            <mat-datepicker-toggle matIconSuffix [for]="picker" class="text-braCyan"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+    </div>
+
+    <div *ngSwitchCase="'select'" class="w-full">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">{{label}}</label>
+        <mat-form-field appearance="outline" class="w-full">
+            <mat-select 
+                [placeholder]="placeholder"
+                [value]="value"
+                (selectionChange)="handleChange($event)"
+                [required]="required"
+                [disabled]="disabled">
+                <mat-option [value]="opt.value" *ngFor="let opt of options; trackBy: trackByValue">
+                    {{opt.label}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+    </div>
+
+    <div *ngSwitchCase="'radio'" class="w-full py-2">
+        <label *ngIf="label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-4">{{label}}</label>
+        <mat-radio-group
+            class="flex flex-wrap gap-4"
+            [value]="value"
+            (change)="handleChange($event)"
+            [required]="required"
+            [disabled]="disabled">
+            <mat-radio-button class="text-sm font-semibold text-gray-700" [value]="opt.value" *ngFor="let opt of options; trackBy: trackByValue">
+                {{opt.label}}
+            </mat-radio-button>
+        </mat-radio-group>
+    </div>
+
+    <div *ngSwitchCase="'checkbox'" class="w-full py-2">
+        <mat-checkbox color="primary" class="text-sm font-semibold text-gray-700"
+            [checked]="value"
+            (change)="handleChange($event)"
+            [required]="required"
+            [disabled]="disabled">
+            {{label}}
+        </mat-checkbox>
+    </div>
+
+</ng-container>

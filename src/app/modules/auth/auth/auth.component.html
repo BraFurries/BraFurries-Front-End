@@ -1,0 +1,28 @@
+<div class="bg-gray-50 min-h-screen flex items-center justify-center relative overflow-hidden font-archivo py-6">
+    <div class="fixed inset-0 bg-pattern z-0 pointer-events-none"></div>
+    <div class="blob bg-braPurple top-[-10%] left-[-10%]"></div>
+    <div class="blob bg-braCyan bottom-[-10%] right-[-10%]"></div>
+
+    <div class="relative z-10 w-full max-w-md px-4">
+        <div class="w-full bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-2xl p-8 md:p-12 relative z-10 border border-white/50 text-center">
+            <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif"
+                alt="Logo BraFurries"
+                class="w-24 h-24 object-contain mx-auto mb-6 drop-shadow-[0_0_10px_#45bced90]">
+
+            <ng-container *ngIf="!errorMessage; else callbackError">
+                <div class="w-10 h-10 border-4 border-braCyan border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                <h1 class="text-3xl font-amaranth font-bold text-braDark italic mb-2">Conectando sua conta</h1>
+                <p class="text-gray-500 text-sm font-semibold uppercase tracking-widest">Finalizando autenticacao segura</p>
+            </ng-container>
+
+            <ng-template #callbackError>
+                <h1 class="text-3xl font-amaranth font-bold text-braDark italic mb-3">Login nao concluido</h1>
+                <p class="text-sm font-semibold text-red-500 mb-6">{{ errorMessage }}</p>
+                <a routerLink="/login"
+                    class="inline-flex items-center justify-center bg-braDark text-white font-amaranth font-bold px-6 py-3 rounded-2xl shadow-xl hover:bg-braPurple transition-all">
+                    Voltar ao login
+                </a>
+            </ng-template>
+        </div>
+    </div>
+</div>

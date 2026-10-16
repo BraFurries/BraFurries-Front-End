@@ -1,0 +1,8 @@
+# The public repository is exported from the audited source tree, not cloned.
+# Keep internal design explorations in the private archive.
+src/assets/design-examples/ export-ignore
+# Local deployment caches are never source.
+.firebase/ export-ignore
+# Migration-only tooling stays in the private source archive.
+scripts/export-public-snapshot.ps1 export-ignore
+docs/public-repository-migration.md export-ignore

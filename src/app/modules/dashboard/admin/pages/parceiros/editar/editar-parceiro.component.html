@@ -1,0 +1,18 @@
+<div class="mx-auto max-w-5xl space-y-5">
+  <button type="button" (click)="back()" class="text-sm font-bold text-braPurple hover:underline">← Voltar para parcerias</button>
+  <p *ngIf="errorMessage" role="alert" class="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{{ errorMessage }}</p>
+  <div *ngIf="loading" class="rounded-2xl bg-white p-6 text-gray-500">Carregando parceria...</div>
+  <div *ngIf="notFound" class="rounded-2xl border border-gray-100 bg-white p-8 text-center"><h1 class="font-amaranth text-2xl font-bold">Parceria não encontrada</h1><button type="button" (click)="back()" class="mt-4 font-bold text-braPurple">Voltar à listagem</button></div>
+  <ng-container *ngIf="!loading && !notFound && partner as current">
+    <header><h1 class="font-amaranth text-3xl font-bold text-gray-800">Editar parceria</h1><p class="mt-1 text-gray-500">Atualize os dados de {{ current.name }}.</p></header>
+    <p *ngIf="successMessage" role="status" class="rounded-xl bg-green-50 p-3 font-semibold text-green-700">{{ successMessage }}</p>
+    <section class="grid gap-4 sm:grid-cols-3">
+      <div class="rounded-2xl bg-white p-4 shadow-sm"><p class="text-xs text-gray-500">Parceria desde</p><strong>{{ formatDate(current.createdAt) }}</strong></div>
+      <div class="rounded-2xl bg-white p-4 shadow-sm"><p class="text-xs text-gray-500">Cliques</p><strong>{{ current.clicks | number:'1.0-0' }}</strong></div>
+      <div class="rounded-2xl bg-white p-4 shadow-sm"><p class="text-xs text-gray-500">Convites</p><strong>{{ current.invites | number:'1.0-0' }}</strong></div>
+    </section>
+    <app-parceiro-form [partner]="current" [submitting]="submitting" submitLabel="Salvar alterações" (submitted)="save($event)" (cancelled)="back()"></app-parceiro-form>
+    <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5"><h2 class="font-amaranth text-xl font-bold">Status da parceria</h2><p class="my-2 text-sm text-gray-700">Suspender é reversível e não exclui os dados da parceria.</p><button type="button" (click)="confirmStatus()" [disabled]="statusSubmitting" class="rounded-xl bg-amber-600 px-4 py-2.5 font-bold text-white disabled:opacity-60">{{ statusSubmitting ? 'Atualizando...' : (current.status === 'suspended' ? 'Reativar parceria' : 'Suspender parceria') }}</button></section>
+    <section class="rounded-2xl border border-red-200 bg-red-50 p-5"><h2 class="font-amaranth text-xl font-bold text-red-800">Zona de perigo</h2><p class="my-2 text-sm text-red-700">A exclusão permanente não poderá ser desfeita.</p><button type="button" (click)="confirmDelete()" [disabled]="deleting" class="rounded-xl bg-red-700 px-4 py-2.5 font-bold text-white disabled:opacity-60">{{ deleting ? 'Excluindo...' : 'Excluir parceria permanentemente' }}</button></section>
+  </ng-container>
+</div>

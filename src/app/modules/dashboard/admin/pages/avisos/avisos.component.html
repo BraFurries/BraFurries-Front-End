@@ -1,0 +1,70 @@
+<div class="max-w-4xl mx-auto space-y-6">
+  <div>
+    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Central de Avisos</h2>
+    <p class="text-gray-500 text-sm mt-1">Dispare mensagens oficiais para o Discord e Telegram diretamente pelo painel.</p>
+  </div>
+
+  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
+
+  <div *ngIf="result" class="bg-white rounded-2xl p-4 border border-gray-100 text-sm">
+    <p class="font-bold text-gray-800">Envio: {{ result.status }}</p>
+    <div *ngFor="let item of result.results" class="text-gray-500">
+      {{ item.destination }}: {{ item.status }} <span *ngIf="item.error">- {{ item.error }}</span>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100">
+    <div *ngIf="loading" class="text-sm text-gray-500">Carregando configuração de avisos...</div>
+
+    <form *ngIf="!loading" class="space-y-6">
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-2">Plataformas de Destino</label>
+        <div class="flex flex-wrap gap-4">
+          <label *ngFor="let destination of config?.destinations"
+                 class="flex items-center gap-2 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition w-full sm:w-auto"
+                 [ngClass]="{ 'opacity-50': !destination.enabled }">
+            <input type="checkbox" [(ngModel)]="selectedDestinations[destination.id]" [name]="destination.id"
+                   [disabled]="!destination.enabled"
+                   class="w-4 h-4 text-braPurple rounded focus:ring-braPurple">
+            <span class="font-bold text-gray-700">{{ destination.label }} ({{ destination.targetName }})</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-2">Título do Aviso</label>
+        <input type="text" placeholder="Ex: Manutenção Programada" [(ngModel)]="title" name="title"
+               class="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl focus:ring-braPurple focus:border-braPurple block p-3 transition">
+      </div>
+
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-2">Mensagem</label>
+        <textarea rows="5" placeholder="Escreva seu anúncio aqui. Suporta formatação markdown padrão..."
+                  [(ngModel)]="message" name="message"
+                  class="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl focus:ring-braPurple focus:border-braPurple block p-3 transition resize-none"></textarea>
+      </div>
+
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-2">Anexar Imagem (Opcional)</label>
+        <label class="block border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:bg-gray-50 hover:border-braPurple transition cursor-pointer group">
+          <input type="file" class="hidden" [accept]="config?.allowedImageTypes?.join(',')" (change)="onImageSelected($event)">
+          <div class="text-3xl mb-2 group-hover:scale-110 transition-transform">📸</div>
+          <p class="text-sm font-bold text-gray-600">{{ image?.name || 'Clique para selecionar uma imagem' }}</p>
+          <p class="text-xs text-gray-400 mt-1">
+            {{ config?.allowedImageTypes?.join(', ') }} até {{ config?.maxImageSizeMb }}MB
+          </p>
+        </label>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <button type="button" (click)="cancel()" class="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition">
+          Cancelar
+        </button>
+        <button type="button" (click)="sendAnnouncement()" [disabled]="sending"
+                class="px-6 py-2.5 rounded-xl font-bold text-white bg-braPurple hover:bg-braDark shadow-lg shadow-braPurple/30 transition transform hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-50">
+          <span>🚀</span> {{ sending ? 'Enviando...' : 'Disparar Aviso' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

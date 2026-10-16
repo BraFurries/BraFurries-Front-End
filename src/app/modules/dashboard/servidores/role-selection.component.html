@@ -1,0 +1,24 @@
+<div class="role-selection">
+  <p class="field-label">{{ label }}</p>
+  @if (description) { <p class="help">{{ description }}</p> }
+  @if (selectedRoles.length) {
+    <ul class="selected-roles">
+      @for (role of selectedRoles; track role.id) {
+        <li class="role-chip">
+          <span class="role-copy"><strong>{{ role.name }}</strong><small [class.draft]="roleState(role) === 'Não salvo'">{{ roleState(role) }}</small></span>
+          @if (showBotEditability && !role.editableByBot) { <span class="bot-warning" title="O Coddy não pode gerenciar este cargo por posição ou configuração.">Coddy não pode gerenciar</span> }
+          <button type="button" [attr.aria-label]="'Remover ' + role.name" (click)="removeRole.emit(role.id)">Remover</button>
+        </li>
+      }
+    </ul>
+  } @else { <p class="empty-roles">Nenhum cargo selecionado.</p> }
+  <label class="add-role">
+    <span class="field-label">Adicionar cargo</span>
+    <select class="field-control" (change)="select($event)">
+      <option value="">Selecione um cargo…</option>
+      @for (role of availableRoles; track role.id) {
+        <option [value]="role.id">{{ role.name }}{{ showBotEditability && !role.editableByBot ? ' · não editável pelo Coddy' : '' }}</option>
+      }
+    </select>
+  </label>
+</div>

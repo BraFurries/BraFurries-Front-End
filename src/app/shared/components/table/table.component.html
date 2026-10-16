@@ -1,0 +1,48 @@
+<div class="container">
+    <div class="table-header">
+        <div class="header-column-content">
+            <div class="header-column" *ngFor="let c of columns"
+                (click)="sortColumn(c)">
+                <p> <strong>{{ c.name }} 
+                    <ng-container *ngIf="sortable">
+                        <mat-icon *ngIf="appliedSort?.prop == c.prop && appliedSort?.direction == 'asc'">arrow_upward</mat-icon>
+                        <mat-icon *ngIf="appliedSort?.prop == c.prop && appliedSort?.direction == 'desc'">arrow_downward</mat-icon>
+                    </ng-container>
+                </strong> </p>
+            </div>
+        </div>
+        <div class="header-column actions-header" *ngIf="hasEdit || hasDelete || hasView">
+        </div>
+    </div>
+
+    <div class="table-content">
+        <article class="row" *ngFor="let e of data">
+            <div class="row-content">
+                <div class="column element" *ngFor="let c of columns">
+                    <p>{{ e[c.prop] ?? '' }}</p>
+                </div>
+            </div>
+            <div class="actions" *ngIf="hasEdit || hasDelete || hasView">
+                <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="opções">
+                    <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #menu="matMenu">
+                    <button *ngIf="hasView" mat-menu-item
+                    [routerLink]="[redirectURL, e.id]">
+                        <mat-icon>visibility</mat-icon>
+                        <span>Visualizar</span>
+                    </button>
+                    <button *ngIf="hasEdit" mat-menu-item
+                    (click)="editFunction.emit(e.id)">
+                        <mat-icon>edit</mat-icon>
+                        <span>Editar</span>
+                    </button>
+                    <button *ngIf="hasDelete" mat-menu-item (click)="confirmDelete(e.id)">
+                        <mat-icon style="color: red;">delete</mat-icon>
+                        <span>Excluir</span>
+                    </button>
+                </mat-menu>
+            </div>
+        </article>
+    </div>
+</div>

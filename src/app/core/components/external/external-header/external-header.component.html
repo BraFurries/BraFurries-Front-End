@@ -1,0 +1,45 @@
+<nav
+  class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-200/70 shadow-sm transition-all duration-300">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center gap-4 relative">
+
+    <!-- Logo e Marca -->
+    <a routerLink="/" class="flex items-center gap-1.5 no-underline group" aria-label="BraFurries, página inicial">
+      <div
+        class="w-[50px] h-[50px] rounded-full flex justify-center items-center border border-transparent transition-colors duration-200 bg-[url('/assets/images/logo-Brafurries/brafurries-icon-low.avif')] bg-no-repeat bg-center bg-contain group-hover:border-braCyan group-hover:bg-braCyan max-[550px]:hidden">
+      </div>
+
+      <span
+        class="font-bold text-[32px] leading-none font-amaranth text-braDark italic max-[550px]:hidden">BraFurries</span>
+
+      <img src="../../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif"
+        class="hidden max-[550px]:block h-[50px] w-auto transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_8px_rgba(69,188,237,0.6)]"
+        alt="BraFurries" width="50" height="50" />
+    </a>
+
+    <!-- Links de Navegação -->
+    <div class="hidden min-[831px]:flex items-center gap-6">
+      <a routerLink="/sobre" class="no-underline font-bold text-sm font-archivo text-gray-500 transition-colors duration-200 hover:text-braPurple">Sobre</a>
+      <a routerLink="/comunidade" class="no-underline font-bold text-sm font-archivo text-gray-500 transition-colors duration-200 hover:text-braCyan">Comunidade</a>
+      <a routerLink="/coddy" class="no-underline font-bold text-sm font-archivo text-gray-500 transition-colors duration-200 hover:text-braMagenta">Coddy</a>
+    </div>
+
+    <!-- Botões -->
+    <div class="flex items-center gap-4">
+      <a href="https://patreon.com/BraFurries"
+        class="hidden min-[991px]:flex items-center gap-2 font-bold text-sm font-archivo text-braDark bg-braYellow/20 px-4 py-2 rounded-xl transition-colors duration-200 hover:bg-braYellow">💛
+        Apoie o Projeto</a>
+
+      <a routerLink="/login"
+        class="inline-flex items-center justify-center font-bold text-base font-amaranth text-white bg-braPurple px-6 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-[0_10px_20px_rgba(138,53,148,0.35)] max-[500px]:px-4">
+        <span class="max-[500px]:hidden">Painel do Membro</span>
+        <span class="hidden max-[500px]:inline">Painel</span>
+      </a>
+    </div>
+
+    <!-- Aba "Apoie" para dispositivos menores (<990px) -->
+    <a href="https://patreon.com/BraFurries"
+      class="min-[991px]:hidden absolute -bottom-[32px] right-6 flex items-center gap-1.5 font-bold text-sm font-archivo text-braDark bg-braYellow px-4 py-1.5 rounded-b-xl shadow-md transition-transform duration-200 hover:translate-y-1">
+      💛 Apoie
+    </a>
+  </div>
+</nav>

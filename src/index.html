@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SEO Padrão (Essencial para o Google e Indentação de Páginas) -->
+  <title>Brafurries - A Comunidade Furry Brasileira</title>
+  <meta name="description"
+    content="Conheça a BraFurries, uma das maiores comunidades furry brasileira para conversar, participar de eventos, fazer amizades e acompanhar novidades do fandom.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://brafurries.com.br">
+
+  <!-- Open Graph / Facebook / Telegram / WhatsApp -->
+  <meta property="og:title" content="Brafurries - A Comunidade Furry Brasileira">
+  <meta property="og:description"
+    content="Conheça a BraFurries, uma das maiores comunidades furry brasileira para conversar, participar de eventos, fazer amizades e acompanhar novidades do fandom.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://brafurries.com.br">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:image" content="https://brafurries.com.br/assets/images/logo-Brafurries/brafurries-sticker.avif">
+
+  <!-- Configurações de Funcionamento e Ícones -->
+  <base href="/">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <!-- Fontes externas: mantidas fora do caminho crítico de renderização. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Amaranth:ital,wght@0,400;0,700;1,400;1,700&family=Archivo:ital,wght@0,100..900;1,100..900&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Amaranth:ital,wght@0,400;0,700;1,400;1,700&family=Archivo:ital,wght@0,100..900;1,100..900&display=swap">
+  </noscript>
+
+  <!-- Google Analytics: preservado, mas carregado após o conteúdo crítico. -->
+  <script>
+    window.addEventListener('load', function () {
+      window.setTimeout(function () {
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-024JB2HR9G';
+        script.onload = function () {
+          window.dataLayer = window.dataLayer || [];
+          function gtag() { window.dataLayer.push(arguments); }
+          gtag('js', new Date());
+          gtag('config', 'G-024JB2HR9G');
+        };
+        document.head.appendChild(script);
+      }, 0);
+    }, { once: true });
+  </script>
+</head>
+
+<body class="mat-typography">
+  <app-root></app-root>
+</body>
+
+</html>

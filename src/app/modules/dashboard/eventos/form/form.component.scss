@@ -1,0 +1,115 @@
+.bg-pattern {
+  background-image: radial-gradient(#262626 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.03;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+:host ::ng-deep {
+  .bf-mat-field {
+    --mat-form-field-container-height: 50px;
+    --mat-form-field-container-vertical-padding: 0;
+    --mat-datepicker-calendar-date-selected-state-background-color: #45bced;
+    width: 100%;
+
+    .mat-mdc-text-field-wrapper {
+      min-height: 50px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+      padding: 0 0.875rem;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .mat-mdc-form-field-flex {
+      min-height: 50px;
+      align-items: center;
+    }
+
+    .mat-mdc-form-field-infix {
+      min-height: auto;
+      padding-block: 0;
+    }
+
+    .mdc-text-field__input,
+    .mat-mdc-select-value-text,
+    .mat-mdc-select-placeholder {
+      color: #262626;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .mdc-notched-outline,
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+
+    .mat-mdc-icon-button,
+    .mat-mdc-select-arrow-wrapper,
+    .mat-datepicker-toggle-default-icon {
+      color: #64748b;
+    }
+
+    .mat-datepicker-toggle {
+      margin-right: -0.25rem;
+    }
+
+    &:hover .mat-mdc-text-field-wrapper {
+      border-color: #d1d5db;
+    }
+
+    &.mat-focused .mat-mdc-text-field-wrapper {
+      border-color: transparent;
+      box-shadow: 0 0 0 2px rgba(var(--bf-field-focus-rgb), 1);
+    }
+  }
+
+  .bf-mat-field-cyan {
+    --bf-field-focus-rgb: 69, 188, 237;
+  }
+
+  .bf-mat-field-yellow {
+    --bf-field-focus-rgb: 254, 191, 16;
+  }
+
+  .bf-mat-field-green {
+    --bf-field-focus-rgb: 34, 197, 94;
+  }
+
+  .bf-prefix-field .mat-mdc-form-field-infix {
+    padding-left: 0.25rem;
+  }
+
+  .bf-prefix {
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 700;
+    padding-inline: 0.1rem 0.5rem;
+  }
+
+  .bf-select-panel {
+    border-radius: 1rem;
+  }
+}

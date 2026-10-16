@@ -1,0 +1,12 @@
+# BraFurries
+
+BraFurries é uma comunidade furry brasileira.
+
+- Página inicial: https://brafurries.com.br/
+- Sobre: https://brafurries.com.br/sobre
+- Comunidade: https://brafurries.com.br/comunidade
+- Coddy: https://brafurries.com.br/coddy
+- Documentação do Coddy: https://brafurries.com.br/coddy/docs
+- Regras: https://brafurries.com.br/regras
+- Termos de uso: https://brafurries.com.br/tos
+- Privacidade: https://brafurries.com.br/privacidade

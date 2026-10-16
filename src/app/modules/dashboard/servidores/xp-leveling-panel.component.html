@@ -1,0 +1,371 @@
+<section class="space-y-6">
+  @if (loading) {
+    <section class="state-card compact">
+      <div class="spinner"></div>
+      <p>Carregando configuração e simulando a curva atual no Coddy…</p>
+    </section>
+  } @else if (error && !draft) {
+    <section class="state-card compact">
+      <p class="error-message">{{ error }}</p>
+    </section>
+  } @else if (draft) {
+    <header class="card">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="eyebrow">XP & Leveling</p>
+          <h3>Progressão por servidor</h3>
+          <p class="help max-w-3xl">
+            Esta configuração pertence somente a este servidor Discord. Alterar a curva não apaga nem recalcula o XP acumulado:
+            o Coddy apenas reconcilia o nível correspondente ao mesmo total de XP.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="rounded-full px-3 py-1 text-sm font-bold"
+            [class.bg-green-100]="draft.text.enabled" [class.text-green-700]="draft.text.enabled"
+            [class.bg-gray-100]="!draft.text.enabled" [class.text-gray-500]="!draft.text.enabled">
+            Texto {{ draft.text.enabled ? 'ON' : 'OFF' }}
+          </span>
+          <span class="rounded-full px-3 py-1 text-sm font-bold"
+            [class.bg-green-100]="draft.voice.enabled" [class.text-green-700]="draft.voice.enabled"
+            [class.bg-gray-100]="!draft.voice.enabled" [class.text-gray-500]="!draft.voice.enabled">
+            Voz {{ draft.voice.enabled ? 'ON' : 'OFF' }}
+          </span>
+        </div>
+      </div>
+      @if (reconciliationMessage) {
+        <p class="warning mt-4">{{ reconciliationMessage }}</p>
+      }
+      @if (persisted?.runtimeRefreshPending) {
+        <p class="warning mt-4">A configuração foi persistida, mas o último refresh imediato do runtime não foi confirmado.</p>
+      }
+    </header>
+
+    <section class="content-grid">
+      <article class="card">
+        <p class="eyebrow">Fontes de XP</p>
+        <h3>Texto</h3>
+        <div class="flex items-center gap-2 mt-4">
+          <label class="flex items-center gap-3">
+            <input type="checkbox" [(ngModel)]="draft.text.enabled" (ngModelChange)="onDraftChanged()">
+            <span><strong>Ganhar XP por mensagens</strong><br><small class="help">Os canais bloqueados já configurados continuam respeitados.</small></span>
+          </label>
+          <span class="info-tooltip" tabindex="0" role="note" aria-label="Ativa ou desativa o ganho de XP por mensagens elegíveis neste servidor." data-tooltip="Ativa ou desativa o ganho de XP por mensagens elegíveis neste servidor.">?</span>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 mt-5">
+          <label><span class="field-title">XP mínimo por mensagem <span class="info-tooltip" tabindex="0" role="note" aria-label="Menor quantidade de XP que uma mensagem elegível pode conceder." data-tooltip="Menor quantidade de XP que uma mensagem elegível pode conceder.">?</span></span>
+            <input class="field-control" type="number" min="0" max="1000000"
+              [(ngModel)]="draft.text.baseMin" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">XP máximo por mensagem <span class="info-tooltip" tabindex="0" role="note" aria-label="Maior quantidade de XP que uma mensagem elegível pode conceder." data-tooltip="Maior quantidade de XP que uma mensagem elegível pode conceder.">?</span></span>
+            <input class="field-control" type="number" min="0" max="1000000"
+              [(ngModel)]="draft.text.baseMax" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Cooldown mínimo (segundos) <span class="info-tooltip" tabindex="0" role="note" aria-label="Menor intervalo sorteado antes de uma nova mensagem poder conceder XP." data-tooltip="Menor intervalo sorteado antes de uma nova mensagem poder conceder XP.">?</span></span>
+            <input class="field-control" type="number" min="0" max="86400"
+              [(ngModel)]="draft.text.cooldownMinSeconds" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Cooldown máximo (segundos) <span class="info-tooltip" tabindex="0" role="note" aria-label="Maior intervalo sorteado antes de uma nova mensagem poder conceder XP." data-tooltip="Maior intervalo sorteado antes de uma nova mensagem poder conceder XP.">?</span></span>
+            <input class="field-control" type="number" min="0" max="86400"
+              [(ngModel)]="draft.text.cooldownMaxSeconds" (ngModelChange)="onDraftChanged()">
+          </label>
+        </div>
+        <p class="help mt-3">A cada ganho elegível, o Coddy sorteia dentro dos intervalos acima. O buffer assíncrono atual continua sendo usado.</p>
+      </article>
+
+      <article class="card">
+        <p class="eyebrow">Fontes de XP</p>
+        <h3>Voz</h3>
+        <div class="flex items-center gap-2 mt-4">
+          <label class="flex items-center gap-3">
+            <input type="checkbox" [(ngModel)]="draft.voice.enabled" (ngModelChange)="onDraftChanged()">
+            <span><strong>Ganhar XP em voz</strong><br><small class="help">Desativar é explícito; não depende de XP/minuto igual a zero.</small></span>
+          </label>
+          <span class="info-tooltip" tabindex="0" role="note" aria-label="Ativa ou desativa o ganho de XP durante sessões de voz elegíveis." data-tooltip="Ativa ou desativa o ganho de XP durante sessões de voz elegíveis.">?</span>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 mt-5">
+          <label><span class="field-title">XP por minuto <span class="info-tooltip" tabindex="0" role="note" aria-label="XP base acumulado por minuto elegível em canal de voz." data-tooltip="XP base acumulado por minuto elegível em canal de voz.">?</span></span>
+            <input class="field-control" type="number" min="0" max="1000000"
+              [(ngModel)]="draft.voice.xpPerMinute" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Bônus social (%) <span class="info-tooltip" tabindex="0" role="note" aria-label="Percentual adicional aplicado ao XP de voz quando há pessoas humanas suficientes na sala." data-tooltip="Percentual adicional aplicado ao XP de voz quando há pessoas humanas suficientes na sala.">?</span></span>
+            <input class="field-control" type="number" min="0" step="0.01"
+              [ngModel]="voiceSocialBonusPercent" (ngModelChange)="setVoiceSocialBonusPercent($event)">
+          </label>
+          <label><span class="field-title">Humanos mínimos para bônus <span class="info-tooltip" tabindex="0" role="note" aria-label="Quantidade mínima de pessoas humanas na sala para ativar o bônus social." data-tooltip="Quantidade mínima de pessoas humanas na sala para ativar o bônus social.">?</span></span>
+            <input class="field-control" type="number" min="2" max="1000"
+              [(ngModel)]="draft.voice.socialBonusMinHumans" (ngModelChange)="onDraftChanged()">
+          </label>
+        </div>
+        <p class="help mt-3">
+          Exemplo: 20% aplica multiplicador 1,20x quando a sala atinge a quantidade mínima de pessoas humanas.
+          Elegibilidade de mute/deaf/AFK permanece no runtime.
+        </p>
+      </article>
+    </section>
+
+    <section class="card">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="eyebrow">Progressão</p>
+          <h3>Curva de níveis</h3>
+          <p class="help">A simulação abaixo vem do mesmo <code>core/levels.py</code> que calcula o nível real.</p>
+        </div>
+        <button type="button" class="secondary-button" (click)="simulate()" [disabled]="simulating">
+          {{ simulating ? 'Simulando…' : 'Simular alterações' }}
+        </button>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-3 mt-5">
+        <label><span class="field-title">Crescimento base <span class="help">(k)</span> <span class="info-tooltip" tabindex="0" role="note" aria-label="Escala principal da curva. Valores maiores aumentam o XP necessário em todos os níveis." data-tooltip="Escala principal da curva. Valores maiores aumentam o XP necessário em todos os níveis.">?</span></span>
+          <input class="field-control" type="number" min="0.001" step="0.001"
+            [(ngModel)]="draft.progression.k" (ngModelChange)="onDraftChanged()">
+        </label>
+        <label><span class="field-title">Curvatura <span class="help">(p)</span> <span class="info-tooltip" tabindex="0" role="note" aria-label="Expoente da curva. Controla quanto a exigência de XP acelera conforme o nível aumenta." data-tooltip="Expoente da curva. Controla quanto a exigência de XP acelera conforme o nível aumenta.">?</span></span>
+          <input class="field-control" type="number" min="1" step="0.001"
+            [(ngModel)]="draft.progression.p" (ngModelChange)="onDraftChanged()">
+        </label>
+        <label><span class="field-title">Crescimento linear <span class="help">(b)</span> <span class="info-tooltip" tabindex="0" role="note" aria-label="Componente linear somado à curva. Acrescenta XP proporcionalmente ao número do nível." data-tooltip="Componente linear somado à curva. Acrescenta XP proporcionalmente ao número do nível.">?</span></span>
+          <input class="field-control" type="number" min="0" step="0.001"
+            [(ngModel)]="draft.progression.b" (ngModelChange)="onDraftChanged()">
+        </label>
+      </div>
+
+      <div class="formula-card mt-5">
+        <div>
+          <p class="eyebrow">Fórmula usada</p>
+          <p class="formula-expression">
+            XP<sub>total</sub>(n) = ⌊k × n<sup>p</sup> + b × n⌋
+          </p>
+          <p class="help">n é o nível desejado e o resultado é arredondado para baixo.</p>
+        </div>
+        <div class="formula-current">
+          <span>Com os valores atuais</span>
+          <strong>
+            ⌊{{ draft.progression.k }} × n<sup>{{ draft.progression.p }}</sup>
+            + {{ draft.progression.b }} × n⌋
+          </strong>
+          <small>XP do próximo nível = XP total do nível seguinte − XP total do nível atual.</small>
+        </div>
+      </div>
+
+      @if (simulationStale) {
+        <p class="warning mt-4">A curva foi alterada. Simule novamente para visualizar o impacto antes de salvar.</p>
+      }
+      @if (simulationError) {
+        <p class="error-message mt-4">{{ simulationError }}</p>
+      }
+
+      @if (simulation) {
+        @if (significantCurveImpact && dirty) {
+          <div class="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+            <strong>Atenção: esta curva muda bastante a progressão.</strong>
+            <p class="mt-1 text-sm">Confira os marcos antes de salvar. O XP acumulado não será destruído.</p>
+          </div>
+        }
+
+        <div class="xp-chart mt-6 rounded-2xl border border-gray-200 bg-white p-4">
+          <div class="chart-heading">
+            <span>XP total necessário</span>
+            <span>Nível</span>
+          </div>
+          <svg viewBox="0 0 600 205" class="h-64 w-full" role="img"
+            aria-label="Curva simulada de XP total por nível, com níveis e referências de XP">
+            @for (tick of graphXpTicks(); track tick.value) {
+              <line x1="72" [attr.y1]="tick.y" x2="588" [attr.y2]="tick.y"
+                stroke="currentColor" opacity=".10"></line>
+              <text x="64" [attr.y]="tick.y + 4" text-anchor="end" fill="currentColor"
+                class="chart-tick-label">{{ formatXp(tick.value) }}</text>
+            }
+
+            @for (level of graphLevelTicks; track level) {
+              <line [attr.x1]="graphLevelX(level)" y1="16" [attr.x2]="graphLevelX(level)" y2="170"
+                stroke="currentColor" opacity=".06"></line>
+              <text [attr.x]="graphLevelX(level)" y="194" text-anchor="middle" fill="currentColor"
+                class="chart-tick-label">{{ level }}</text>
+            }
+
+            <line x1="72" y1="170" x2="588" y2="170" stroke="currentColor" opacity=".22"></line>
+            <line x1="72" y1="16" x2="72" y2="170" stroke="currentColor" opacity=".22"></line>
+            <polyline [attr.points]="graphPolyline()" fill="none" stroke="currentColor" stroke-width="4"
+              stroke-linecap="round" stroke-linejoin="round"></polyline>
+          </svg>
+        </div>
+
+        <div class="mt-5 overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-gray-200">
+                <th class="py-2 pr-4">Nível</th>
+                <th class="py-2 pr-4">XP total</th>
+                <th class="py-2 pr-4">XP desde o anterior</th>
+                <th class="py-2">Impacto vs. atual</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (level of milestones; track level) {
+                <tr class="border-b border-gray-100">
+                  <td class="py-3 pr-4 font-bold">{{ level }}</td>
+                  <td class="py-3 pr-4">{{ formatXp(point(level)?.totalXp) }}</td>
+                  <td class="py-3 pr-4">{{ formatXp(point(level)?.xpFromPreviousLevel) }}</td>
+                  <td class="py-3">
+                    @if (impactPercent(level) !== null && impactPercent(level) !== 0) {
+                      <span [class.text-red-600]="(impactPercent(level) ?? 0) > 0"
+                        [class.text-green-700]="(impactPercent(level) ?? 0) < 0">
+                        {{ (impactPercent(level) ?? 0) > 0 ? '+' : '' }}{{ impactPercent(level) }}%
+                        <span class="text-gray-400">({{ formatXp(baselinePoint(level)?.totalXp) }} → {{ formatXp(point(level)?.totalXp) }})</span>
+                      </span>
+                    } @else {
+                      <span class="text-gray-400">sem mudança</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="content-grid">
+      <article class="card">
+        <p class="eyebrow">Ganho de XP</p>
+        <h3>Multiplicador global</h3>
+        <label class="mt-4 block"><span class="field-title">Multiplicador <span class="info-tooltip" tabindex="0" role="note" aria-label="Multiplica o XP base concedido pelas fontes ativas. 1,0 mantém o valor original." data-tooltip="Multiplica o XP base concedido pelas fontes ativas. 1,0 mantém o valor original.">?</span></span>
+          <input class="field-control" type="number" min="0.001" step="0.001"
+            [(ngModel)]="draft.advanced.multiplier" (ngModelChange)="onDraftChanged()">
+        </label>
+        <p class="help mt-2">1.0x mantém o ganho base. O runtime aplica este multiplicador às fontes atuais.</p>
+
+        @if (draft.advanced.dailyCombo || draft.advanced.comboMultiplier) {
+          <div class="mt-5 rounded-xl bg-gray-50 p-4">
+            <strong>Combo legado</strong>
+            <p class="help mt-1">
+              Configurado: {{ draft.advanced.dailyCombo ?? '—' }} / {{ draft.advanced.comboMultiplier ?? '—' }}x.
+              As fontes atuais de texto e voz não alimentam combo_count, então esta V1 não permite editar essa política como se estivesse ativa.
+            </p>
+          </div>
+        }
+      </article>
+
+      <article class="card">
+        <p class="eyebrow">Limites diários</p>
+        <h3>Caps</h3>
+        <div class="grid gap-4 mt-4">
+          <label><span class="field-title">Texto <span class="info-tooltip" tabindex="0" role="note" aria-label="Limite máximo de XP por texto que um membro pode ganhar por dia. Zero significa sem limite." data-tooltip="Limite máximo de XP por texto que um membro pode ganhar por dia. Zero significa sem limite.">?</span></span>
+            <input class="field-control" type="number" min="0"
+              [(ngModel)]="draft.limits.textDailyCapXp" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Voz <span class="info-tooltip" tabindex="0" role="note" aria-label="Limite máximo de XP por voz que um membro pode ganhar por dia. Zero significa sem limite." data-tooltip="Limite máximo de XP por voz que um membro pode ganhar por dia. Zero significa sem limite.">?</span></span>
+            <input class="field-control" type="number" min="0"
+              [(ngModel)]="draft.limits.voiceDailyCapXp" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Global <span class="info-tooltip" tabindex="0" role="note" aria-label="Limite diário combinado de XP considerando todas as fontes. Zero significa sem limite." data-tooltip="Limite diário combinado de XP considerando todas as fontes. Zero significa sem limite.">?</span></span>
+            <input class="field-control" type="number" min="0"
+              [(ngModel)]="draft.limits.globalDailyCapXp" (ngModelChange)="onDraftChanged()">
+          </label>
+        </div>
+        <p class="help mt-3"><strong>0 = sem limite</strong>, preservando a semântica atual da XP policy.</p>
+      </article>
+    </section>
+
+    <section class="card">
+      <p class="eyebrow">Level-up</p>
+      <h3>Aviso de novo nível</h3>
+      <div class="flex items-center gap-2 mt-4">
+        <label class="flex items-center gap-3">
+          <input type="checkbox" [(ngModel)]="draft.levelUp.enabled" (ngModelChange)="onDraftChanged()">
+          <span>Enviar aviso quando o membro subir de nível</span>
+        </label>
+        <span class="info-tooltip" tabindex="0" role="note" aria-label="Quando ativo, o Coddy envia a mensagem configurada ao detectar uma subida de nível." data-tooltip="Quando ativo, o Coddy envia a mensagem configurada ao detectar uma subida de nível.">?</span>
+      </div>
+
+      <div class="grid gap-5 lg:grid-cols-2 mt-5">
+        <div>
+          <label><span class="field-title">Canal preferencial <span class="info-tooltip" tabindex="0" role="note" aria-label="Canal usado para avisos de level-up. Sem seleção, o canal de origem é usado como fallback." data-tooltip="Canal usado para avisos de level-up. Sem seleção, o canal de origem é usado como fallback.">?</span></span>
+            <select class="field-control" [(ngModel)]="draft.levelUp.channelId" (ngModelChange)="onDraftChanged()">
+              <option [ngValue]="null">Usar canal de origem como fallback</option>
+              @for (channel of messageChannels; track channel.id) {
+                <option [value]="channel.id"># {{ channel.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="mt-4 block"><span class="field-title">Mensagem <span class="info-tooltip" tabindex="0" role="note" aria-label="Template enviado no level-up. Os placeholders listados abaixo são substituídos pelo Coddy." data-tooltip="Template enviado no level-up. Os placeholders listados abaixo são substituídos pelo Coddy.">?</span></span>
+            <textarea class="field-control min-h-32" maxlength="1800"
+              [(ngModel)]="draft.levelUp.message" (ngModelChange)="onDraftChanged()"
+              placeholder="🎉 {member} subiu para o nível {new_level}!"></textarea>
+          </label>
+          <div class="mt-3 flex flex-wrap gap-2">
+            @for (placeholder of draft.levelUpPlaceholders; track placeholder) {
+              <code class="rounded bg-gray-100 px-2 py-1 text-xs">{{ placeholder }}</code>
+            }
+          </div>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+          <p class="eyebrow">Preview</p>
+          <p class="mt-3 whitespace-pre-wrap">{{ levelUpPreview() }}</p>
+          <p class="help mt-4">O preview é visual. O envio real continua passando pela sanitização de mentions do Coddy.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <button type="button" class="flex w-full items-center justify-between text-left" (click)="advancedOpen = !advancedOpen">
+        <span><span class="eyebrow">Avançado</span><strong class="block mt-1">Política de voz e ciclo de membro</strong></span>
+        <span>{{ advancedOpen ? '▲' : '▼' }}</span>
+      </button>
+      @if (advancedOpen) {
+        <div class="grid gap-4 md:grid-cols-2 mt-5">
+          <label><span class="field-title">Primeira janela de redução (min) <span class="info-tooltip" tabindex="0" role="note" aria-label="Tempo contínuo em voz antes de aplicar o primeiro fator de redução de XP." data-tooltip="Tempo contínuo em voz antes de aplicar o primeiro fator de redução de XP.">?</span></span>
+            <input class="field-control" type="number" min="1"
+              [(ngModel)]="draft.voice.diminishingWindow1Minutes" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Segunda janela de redução (min) <span class="info-tooltip" tabindex="0" role="note" aria-label="Tempo contínuo em voz antes de aplicar o segundo fator de redução de XP." data-tooltip="Tempo contínuo em voz antes de aplicar o segundo fator de redução de XP.">?</span></span>
+            <input class="field-control" type="number" min="1"
+              [(ngModel)]="draft.voice.diminishingWindow2Minutes" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Fator após a primeira janela <span class="info-tooltip" tabindex="0" role="note" aria-label="Multiplicador aplicado ao XP de voz após ultrapassar a primeira janela." data-tooltip="Multiplicador aplicado ao XP de voz após ultrapassar a primeira janela.">?</span></span>
+            <input class="field-control" type="number" min="0" step="0.01"
+              [(ngModel)]="draft.voice.diminishingFactor2" (ngModelChange)="onDraftChanged()">
+          </label>
+          <label><span class="field-title">Fator após a segunda janela <span class="info-tooltip" tabindex="0" role="note" aria-label="Multiplicador aplicado ao XP de voz após ultrapassar a segunda janela." data-tooltip="Multiplicador aplicado ao XP de voz após ultrapassar a segunda janela.">?</span></span>
+            <input class="field-control" type="number" min="0" step="0.01"
+              [(ngModel)]="draft.voice.diminishingFactor3" (ngModelChange)="onDraftChanged()">
+          </label>
+        </div>
+        <p class="help mt-3">
+          Exemplo atual: após {{ draft.voice.diminishingWindow1Minutes }} min → fator {{ draft.voice.diminishingFactor2 }};
+          após {{ draft.voice.diminishingWindow2Minutes }} min → fator {{ draft.voice.diminishingFactor3 }}.
+        </p>
+        <div class="flex items-center gap-2 mt-5">
+          <label class="flex items-center gap-3">
+            <input type="checkbox" [(ngModel)]="draft.advanced.clearOnExit" (ngModelChange)="onDraftChanged()">
+            <span>Limpar progresso ao sair do servidor <strong class="text-red-600">(cuidado)</strong></span>
+          </label>
+          <span class="info-tooltip" tabindex="0" role="note" aria-label="Quando ativo, remove o progresso de XP do membro ao sair deste servidor." data-tooltip="Quando ativo, remove o progresso de XP do membro ao sair deste servidor.">?</span>
+        </div>
+      }
+    </section>
+
+    @if (error) {
+      <p class="error-message">{{ error }}</p>
+    }
+    @if (saveMessage) {
+      <p class="save-status success">{{ saveMessage }}</p>
+    }
+
+    <footer class="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+      <div>
+        <strong>{{ dirty ? 'Alterações não salvas' : 'Configuração sincronizada' }}</strong>
+        @if (simulationStale) {
+          <p class="text-sm text-amber-700">Simule a nova curva antes de salvar.</p>
+        }
+      </div>
+      <div class="flex gap-2">
+        <button type="button" class="secondary-button" (click)="resetDraft()" [disabled]="!dirty || saving">Descartar</button>
+        <button type="button" class="primary-button" (click)="save()" [disabled]="!canSave">
+          {{ saving ? 'Salvando…' : 'Salvar XP & Leveling' }}
+        </button>
+      </div>
+    </footer>
+  }
+</section>

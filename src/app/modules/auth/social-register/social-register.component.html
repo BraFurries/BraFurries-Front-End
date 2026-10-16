@@ -1,0 +1,68 @@
+<div class="bg-gray-50 min-h-screen flex items-center justify-center relative overflow-hidden font-archivo py-6">
+    <div class="fixed inset-0 bg-pattern z-0 pointer-events-none"></div>
+    <div class="blob bg-braPurple top-[-10%] left-[-10%]"></div>
+    <div class="blob bg-braCyan bottom-[-10%] right-[-10%]"></div>
+    <div class="blob bg-braYellow top-[20%] right-[10%] opacity-10"></div>
+
+    <div class="relative z-10 w-full max-w-lg px-4">
+        <div class="w-full bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-2xl p-8 md:p-12 relative z-10 border border-white/50">
+            <div class="flex flex-col items-center text-center mb-8">
+                <a href="/" class="w-20 h-20 flex justify-center items-center group mb-4">
+                    <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif"
+                        alt="Logo BraFurries"
+                        class="w-full h-full object-contain transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_#45bced90] group-hover:scale-105">
+                </a>
+                <h2 class="text-3xl font-amaranth font-bold text-braDark italic mb-2">Finalize seu cadastro</h2>
+                <p class="text-gray-500 text-sm font-semibold uppercase tracking-widest">
+                    Conta {{ provider || 'social' }} conectada
+                </p>
+            </div>
+
+            <form class="space-y-4" [formGroup]="registerForm" (ngSubmit)="completeRegistration()">
+                <div *ngIf="email">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">E-mail confirmado</label>
+                    <div class="w-full bg-gray-100 border border-gray-200 text-gray-500 font-semibold rounded-2xl px-5 py-4">
+                        {{ email }}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">Como quer ser chamado?</label>
+                    <app-input-wrapper
+                        formControlName="displayName"
+                        placeholder="Seu nome ou apelido"
+                        [required]="true"
+                        class="input"
+                    ></app-input-wrapper>
+                </div>
+
+                <p *ngIf="errorMessage" class="px-4 text-sm font-semibold text-red-500">
+                    {{ errorMessage }}
+                </p>
+
+                <div class="pt-2 px-4">
+                    <div class="flex items-start gap-3 group">
+                        <input type="checkbox" id="terms" formControlName="termsAgreement"
+                            class="mt-1 w-4 h-4 bg-white border border-gray-300 rounded focus:ring-2 focus:ring-braMagenta focus:outline-none accent-braMagenta cursor-pointer transition-all">
+
+                        <label for="terms" class="text-[11px] font-bold text-gray-500 cursor-pointer select-none leading-tight">
+                            Eu li e concordo com os <a href="/tos" target="_blank" class="text-braMagenta hover:underline">Termos de Uso</a> e a <a href="/privacidade" target="_blank" class="text-braMagenta hover:underline">Politica de Privacidade</a> da comunidade.
+                        </label>
+                    </div>
+                </div>
+
+                <button
+                    type="submit"
+                    [disabled]="isSubmitting"
+                    class="w-full bg-braDark text-white font-amaranth font-bold text-lg py-4 rounded-2xl shadow-xl hover:bg-braMagenta transform hover:scale-[1.02] mt-4 active:scale-95 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 disabled:hover:bg-braDark">
+                    {{ isSubmitting ? 'Finalizando...' : 'Concluir cadastro' }}
+                </button>
+            </form>
+
+            <p class="text-center mt-8 text-xs font-bold text-gray-400">
+                Quer usar outra conta?
+                <a href="/login" class="text-braCyan hover:underline">Voltar ao login</a>
+            </p>
+        </div>
+    </div>
+</div>

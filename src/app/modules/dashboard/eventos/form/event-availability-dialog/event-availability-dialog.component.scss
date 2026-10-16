@@ -1,0 +1,15 @@
+/* Remove defaults from angular material dialog container */
+.availability-dialog-panel {
+  .mdc-dialog__surface {
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 2rem !important;
+    overflow: visible !important;
+  }
+}
+
+app-event-availability-dialog {
+  display: block;
+  width: 100%;
+}

@@ -1,0 +1,253 @@
+<div class="dashboard-shell bg-gray-50 font-archivo text-gray-800 flex overflow-hidden transition-all duration-700 ease-in-out"
+    [ngClass]="{'blur-md scale-95 opacity-50': isLoggingOut}">
+
+    <div *ngIf="isMobileMenuOpen" (click)="closeMobileMenu()"
+        class="fixed inset-0 bg-black/60 z-[60] md:hidden backdrop-blur-sm transition-opacity cursor-pointer">
+    </div>
+
+    <aside class="dashboard-sidebar w-60 bg-braDark text-white flex flex-col shadow-2xl z-[70] fixed inset-y-0 left-0 transform transition-transform duration-300 md:relative"
+        [ngClass]="isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'">
+        <div class="shrink-0 flex flex-col items-center text-center mt-3">
+            <a routerLink="/" class="w-24 h-24 flex justify-center items-center group">
+                <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif" alt="Logo BraFurries"
+                    class="w-full h-full object-contain transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_#45bced90] group-hover:scale-105">
+            </a>
+        </div>
+
+        <div class="shrink-0 px-2 mt-4 relative" *ngIf="currentUser" #userMenuContainer>
+            <button (click)="toggleUserMenu()"
+                class="w-full flex items-center justify-between bg-gray-800/70 hover:bg-braPurple/20 p-2 rounded-2xl transition duration-300 border border-gray-700/70 hover:border-braPurple/40 shadow-sm"
+                [ngClass]="{'bg-braPurple/20 border-braPurple/40': isUserMenuOpen}">
+                <div class="flex items-center gap-2 overflow-hidden flex-1">
+                    <img *ngIf="currentUser.profileImageUrl; else userAvatarFallback" [src]="currentUser.profileImageUrl"
+                        alt="Avatar" class="w-9 h-9 object-cover rounded-xl shadow-sm shrink-0">
+                    <ng-template #userAvatarFallback>
+                        <span class="w-9 h-9 rounded-xl shadow-sm shrink-0 bg-braPurple text-white font-amaranth font-bold flex items-center justify-center">{{ userInitial() }}</span>
+                    </ng-template>
+                    <div class="flex flex-col items-start text-left flex-1 min-w-0 pr-1">
+                        <span class="font-amaranth font-bold text-white text-sm truncate w-full">{{ currentUser.name }}</span>
+                        <span class="text-[10px] text-gray-300 truncate w-full">{{ currentUser.email }}</span>
+                    </div>
+                </div>
+                <span class="text-gray-400 text-[10px] shrink-0 transition-transform duration-300"
+                    [ngClass]="{'rotate-180': isUserMenuOpen}">▼</span>
+            </button>
+
+            <div *ngIf="isUserMenuOpen"
+                class="absolute top-full left-2 right-2 mt-2 bg-gray-900 rounded-xl shadow-2xl border border-gray-700 z-50 overflow-hidden flex flex-col font-amaranth">
+                <a routerLink="/painel/perfil" (click)="isUserMenuOpen = false"
+                    class="flex items-center px-4 py-3 hover:bg-gray-800 transition text-sm font-bold text-white">
+                    <span class="mr-3">👤</span> Meu Perfil
+                </a>
+                <div class="h-px bg-gray-800 w-full"></div>
+                <button (click)="logout()"
+                    class="flex items-center px-4 py-3 hover:bg-red-500/10 text-red-400 hover:text-red-300 transition text-sm font-bold w-full text-left">
+                    <span class="mr-3">🚪</span> Sair
+                </button>
+            </div>
+        </div>
+
+        <div class="shrink-0 px-2 mt-2 relative" #communityMenuContainer>
+            <button type="button" (click)="toggleCommunityMenu()"
+                [disabled]="!communities.length"
+                class="w-full flex items-center justify-between rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-left shadow-sm transition hover:border-braPurple/40 hover:shadow-md disabled:cursor-default disabled:opacity-60">
+                <div class="flex min-w-0 items-center gap-2">
+                    <ng-container *ngIf="activeCommunity as community; else noCommunity">
+                        <img *ngIf="communityImageUrl(community) as imageUrl; else activeCommunityFallback"
+                            [src]="imageUrl"
+                            [alt]="'Foto de ' + community.name"
+                            (error)="markCommunityImageFailed(community)"
+                            class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-black/5">
+                        <ng-template #activeCommunityFallback>
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-braPurple/10 font-amaranth text-sm font-bold text-braPurple">
+                                {{ communityInitial(community) }}
+                            </span>
+                        </ng-template>
+                    </ng-container>
+                    <ng-template #noCommunity>
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">🌐</span>
+                    </ng-template>
+
+                    <span class="min-w-0 leading-tight">
+                        <span class="block truncate font-amaranth text-sm font-bold text-gray-900">
+                            {{ activeCommunity?.name || (contextLoading ? 'Carregando...' : 'Sem Community') }}
+                        </span>
+                        <span class="block text-[10px] font-medium text-gray-400">Community atual</span>
+                    </span>
+                </div>
+
+                <svg *ngIf="communities.length" viewBox="0 0 20 20" fill="none" aria-hidden="true"
+                    class="h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200"
+                    [ngClass]="{'rotate-180': isCommunityMenuOpen}">
+                    <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <div *ngIf="isCommunityMenuOpen"
+                class="absolute left-2 right-2 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                <div class="max-h-64 overflow-y-auto py-1">
+                    <button *ngFor="let community of communities" type="button"
+                        (click)="selectCommunity(community.communityId)"
+                        class="flex w-full items-center gap-2 border-l-4 border-transparent px-2.5 py-2 text-left transition hover:bg-braPurple/20"
+                        [ngClass]="{
+                            'border-braPurple bg-braPurple/25': community.communityId === activeCommunity?.communityId
+                        }">
+                        <img *ngIf="communityImageUrl(community) as imageUrl; else communityFallback"
+                            [src]="imageUrl"
+                            [alt]="'Foto de ' + community.name"
+                            (error)="markCommunityImageFailed(community)"
+                            class="h-7 w-7 shrink-0 rounded-md object-cover ring-1"
+                            [ngClass]="community.communityId === activeCommunity?.communityId
+                                ? 'ring-braPurple/30'
+                                : 'ring-black/5'">
+                        <ng-template #communityFallback>
+                            <span
+                                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-amaranth text-xs font-bold"
+                                [ngClass]="community.communityId === activeCommunity?.communityId
+                                    ? 'bg-braPurple/10 text-braPurple'
+                                    : 'bg-gray-100 text-gray-500'">
+                                {{ communityInitial(community) }}
+                            </span>
+                        </ng-template>
+
+                        <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                            <span class="block truncate font-amaranth text-sm font-bold"
+                                [ngClass]="community.communityId === activeCommunity?.communityId
+                                    ? 'text-braPurple'
+                                    : 'text-gray-800'">
+                                {{ community.name }}
+                            </span>
+                            <span *ngIf="community.communityId === activeCommunity?.communityId"
+                                class="shrink-0 rounded-full bg-braPurple px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                Atual
+                            </span>
+                        </span>
+                    </button>
+                </div>
+
+                <div class="h-px bg-gray-100"></div>
+                <button type="button" (click)="manageCommunities()"
+                    class="flex w-full items-center gap-2 px-2.5 py-2.5 text-left text-xs font-bold text-gray-500 transition hover:bg-braPurple/20 hover:text-braPurple">
+                    <span class="text-sm">⚙️</span>
+                    <span>Gerenciar Communities</span>
+                </button>
+            </div>
+
+            <p *ngIf="contextError" class="mt-2 px-2 text-xs text-red-300">{{ contextError }}</p>
+        </div>
+
+        <nav class="dashboard-nav flex-1 px-2 space-y-2 mt-4 pb-4 text-sm">
+            <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mb-2 tracking-widest">Navegação</p>
+            <a routerLink="/painel" class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath === '/painel'
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">🏠</span> Início
+            </a>
+
+            <a routerLink="/painel/eventos" class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/painel/eventos')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">📅</span> Eventos
+            </a>
+
+            <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mt-4 mb-2 tracking-widest">Community</p>
+
+            <a *ngIf="showMembersMenu" [routerLink]="scopedLink('membros')"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/membros')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">🧑‍🤝‍🧑</span> Membros
+            </a>
+
+            <a *ngIf="showTeamsMenu" [routerLink]="scopedLink('times')"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/times')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">👥</span> Times
+            </a>
+
+            <a *ngIf="showCommunityAccessMenu" [routerLink]="scopedLink('acessos')"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/acessos')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">🔐</span> Acessos
+            </a>
+
+            <a *ngIf="showActivityMenu" [routerLink]="scopedLink('atividade')"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/atividade')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">🕘</span> Atividade
+            </a>
+
+            <a *ngIf="showCoddyMenu" [routerLink]="scopedLink('coddy')"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/coddy')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">🤖</span> Coddy
+            </a>
+
+            <a routerLink="/painel/comunidades"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath === '/painel/comunidades'
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">🌐</span> Gerenciar Communities
+            </a>
+
+            <a href="https://discord.com/oauth2/authorize?client_id=1106756281420759051"
+                target="_blank" rel="noopener noreferrer"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40">
+                <span class="mr-3">➕</span> Adicionar o Coddy
+            </a>
+
+            <ng-container *ngIf="showAdminMenu">
+                <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mt-4 mb-2 tracking-widest">Administração</p>
+                <a routerLink="/painel/admin"
+                    class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                    [ngClass]="activePath.includes('/painel/admin')
+                    ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                    : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                    <span class="mr-3">⚙️</span> Administração
+                </a>
+            </ng-container>
+        </nav>
+    </aside>
+
+    <main class="flex-1 relative h-full overflow-hidden flex flex-col w-full">
+        <header class="md:hidden flex items-center justify-between bg-braDark text-white p-4 shadow-md z-10 shrink-0">
+            <button (click)="toggleMobileMenu()" class="p-2 focus:outline-none hover:bg-gray-800 rounded-lg transition" aria-label="Abrir menu">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+            <div class="flex items-center gap-3">
+                <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif" alt="Logo BraFurries" class="w-8 h-8 object-contain">
+                <span class="font-amaranth font-bold text-lg">{{ activeCommunity?.name || 'BraFurries' }}</span>
+            </div>
+            <div class="w-10"></div>
+        </header>
+
+        <div class="flex-1 overflow-auto w-full relative">
+            <router-outlet></router-outlet>
+        </div>
+    </main>
+</div>
+
+<div *ngIf="isLoggingOut"
+    class="logout-overlay fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-braDark/90 backdrop-blur-sm">
+    <div class="relative">
+        <div class="absolute inset-0 bg-braPurple/20 blur-xl rounded-full animate-pulse"></div>
+        <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif" alt="Logo"
+            class="relative w-36 h-36 logout-logo mb-6 drop-shadow-[0_0_15px_#8a359490]">
+    </div>
+    <h2 class="text-white font-amaranth text-4xl font-bold logout-text tracking-wide">Até logo!</h2>
+    <p class="text-braCyan font-archivo mt-3 logout-subtext text-lg">Encerrando sessão...</p>
+</div>

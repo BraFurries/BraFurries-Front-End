@@ -1,0 +1,83 @@
+<app-external-header></app-external-header>
+
+<div class="bg-gray-50 font-archivo text-gray-800 overflow-x-hidden min-h-screen">
+    
+    <div class="fixed inset-0 bg-pattern pointer-events-none z-0 opacity-50"></div>
+    <div class="absolute top-[-5%] left-[-5%] w-96 h-96 bg-braYellow rounded-full mix-blend-multiply filter blur-[120px] opacity-20 z-0 pointer-events-none"></div>
+
+    <section class="relative pt-32 pb-20 lg:pt-40 lg:pb-32 z-10">
+        <div class="max-w-3xl mx-auto px-6">
+            
+            <div class="text-center mb-10">
+                <span class="bg-braYellow/20 text-braDark text-xs font-bold px-4 py-2 rounded-full uppercase tracking-widest mb-4 inline-flex items-center gap-2">
+                    <span>⚖️</span> Moderação Global
+                </span>
+                <h1 class="text-4xl md:text-5xl font-amaranth font-bold text-braDark italic mb-4">Contestação de Punição</h1>
+                <p class="text-gray-500 font-medium">Acreditamos em justiça e em ouvir todos os lados.</p>
+            </div>
+
+            <div class="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border border-gray-100">
+                
+                <div class="bg-braYellow/10 border-l-4 border-braYellow p-5 rounded-r-2xl mb-8">
+                    <p class="text-sm text-gray-700 font-medium leading-relaxed">
+                        Se você foi banido globalmente ou de um servidor parceiro e acredita que houve um engano, ou se deseja uma segunda chance após reconhecer o erro, preencha o formulário abaixo. Nossa equipe analisará as provas e o histórico com total imparcialidade.
+                    </p>
+                </div>
+
+                <form class="space-y-6">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Plataforma</label>
+                            <select class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braYellow font-semibold text-gray-600 cursor-pointer">
+                                <option>Discord</option>
+                                <option>Telegram</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Seu ID ou Usuário</label>
+                            <input type="text" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braYellow transition-all font-semibold text-braDark" placeholder="Ex: fernando_dev ou 123456789">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Em qual servidor a punição ocorreu?</label>
+                        <input type="text" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braYellow transition-all font-semibold text-braDark" placeholder="Nome do servidor (se souber)">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Sua Defesa / Justificativa</label>
+                        <p class="text-[10px] text-gray-400 font-semibold ml-1 mb-2">Explique o contexto da situação detalhadamente. Seja honesto e direto.</p>
+                        <textarea rows="5" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braYellow transition-all font-semibold text-braDark resize-none custom-scrollbar" placeholder="Escreva sua justificativa aqui..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">Links para Provas (Opcional)</label>
+                        <input type="text" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-braYellow transition-all font-semibold text-braDark" placeholder="Link do Imgur, Printscreen, etc.">
+                    </div>
+
+                    <div class="pt-4">
+                        <label class="flex items-start cursor-pointer group">
+                            <input type="checkbox" class="mt-1 w-4 h-4 text-braYellow bg-gray-100 border-gray-300 rounded focus:ring-braYellow cursor-pointer accent-braYellow">
+                            <span class="ml-3 text-xs font-semibold text-gray-500 leading-relaxed">
+                                Entendo que enviar falsas evidências ou abusar deste formulário resultará na perda permanente do direito de apelação em toda a rede BraFurries.
+                            </span>
+                        </label>
+                    </div>
+
+                    <button type="button" class="w-full bg-braDark text-white font-amaranth font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-braYellow hover:text-braDark transition-all duration-300 mt-4">
+                        Enviar Contestação
+                    </button>
+
+                </form>
+
+                <div class="mt-8 text-center border-t border-gray-100 pt-6">
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Tempo estimado de análise: Até 72 horas</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+</div>
+
+<app-external-footer></app-external-footer>

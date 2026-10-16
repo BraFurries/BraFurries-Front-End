@@ -1,0 +1,602 @@
+<main class="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
+    <div class="absolute inset-0 bg-pattern pointer-events-none z-0"></div>
+
+    <!-- HEADER MINIMALISTA -->
+    <header
+        class="bg-white/80 backdrop-blur-md px-6 md:px-10 h-20 md:h-24 flex justify-between items-center border-b border-gray-200 relative z-20 shrink-0">
+        <div>
+            <h1 class="text-xl md:text-3xl font-amaranth font-bold text-braDark italic flex items-center gap-2">
+                Olá, {{ userName }}! <span class="text-lg md:text-2xl">🐾</span>
+            </h1>
+            <p class="text-[10px] md:text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">Que bom ter você
+                por aqui hoje.
+            </p>
+        </div>
+
+        <div
+            class="hidden min-[500px]:flex w-10 h-10 md:w-12 md:h-12 rounded-full bg-braPurple text-white items-center justify-center font-bold text-base md:text-lg shadow-md border-2 border-white uppercase overflow-hidden">
+            @if (userProfileImageUrl) {
+            <img [src]="userProfileImageUrl" alt="Profile" class="w-full h-full object-cover">
+            } @else {
+            {{ userInitial }}
+            }
+        </div>
+    </header>
+
+    <!-- ÁREA DE SCROLL (Apenas o conteúdo, abaixo do header) -->
+    <div class="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
+        <!-- DASHBOARD GRID -->
+        <div class="max-w-[1400px] mx-auto w-full pb-20 pt-0 xl:pt-10 xl:p-10">
+
+            <!-- Grid de 3 Colunas (Bento Box) adaptado para Mobile -->
+            <div class="flex flex-col xl:grid xl:grid-cols-3 gap-0 xl:gap-8">
+
+                <!-- ESQUERDA (Wrapper 'contents' no mobile, coluna normal no desktop para evitar espaço na row) -->
+                <div class="contents xl:block xl:order-1 xl:col-span-2 xl:space-y-8">
+
+                    <!-- 1. BANNERS (Ocupa 2 colunas, gruda no topo no mobile) -->
+                    <div class="order-1 xl:order-none flex flex-col gap-8">
+
+
+
+                        <!-- Plantões ou Banner Explorar -->
+                        @if (isLoading) {
+                        <!-- Banner de Loading (estilo novas aventuras) -->
+                        <section
+                            class="bg-gradient-to-r from-braCyan/5 to-braPurple/5 border border-x-0 xl:border-x border-gray-100 rounded-none xl:rounded-[2.5rem] p-8 xl:p-10 shadow-sm relative overflow-hidden flex flex-col items-center justify-center gap-4 min-h-[170px]">
+                            <div
+                                class="absolute -left-10 -top-10 w-32 h-32 bg-braCyan/10 rounded-full blur-2xl pointer-events-none animate-pulse">
+                            </div>
+                            <div
+                                class="absolute right-10 -bottom-10 w-32 h-32 bg-braPurple/10 rounded-full blur-2xl pointer-events-none animate-pulse">
+                            </div>
+
+                            <div class="relative z-10 flex flex-col items-center gap-3">
+                                <svg class="animate-spin h-8 w-8 text-braCyan" xmlns="http://www.w3.org/2000/svg"
+                                    fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                        stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                    </path>
+                                </svg>
+                                <span class="font-bold text-gray-400">Preparando suas informações...</span>
+                            </div>
+                        </section>
+                        } @else if (dashboardData?.nextManagedEvent) {
+                        <!-- Plantões (Destaque Principal) -->
+                        <div
+                            class="bg-braDark rounded-none xl:rounded-[2.5rem] p-6 xl:p-10 shadow-2xl relative overflow-hidden group">
+                            <!-- Brilho de fundo -->
+                            <div
+                                class="absolute left-1/2 bottom-0 w-3/4 h-32 bg-braCyan/20 rounded-full blur-3xl pointer-events-none -translate-x-1/2 translate-y-1/2">
+                            </div>
+
+                            <div
+                                class="flex flex-col xl:flex-row justify-between items-center gap-4 mb-8 relative z-10">
+                                <h2
+                                    class="text-xl md:text-2xl font-amaranth font-bold text-white flex items-center justify-center xl:justify-start gap-2 md:gap-3 italic text-center xl:text-left">
+                                    <span class="text-braCyan text-2xl md:text-3xl shrink-0">🛡️</span> Meus Plantões e
+                                    Responsabilidades
+                                </h2>
+                                <a routerLink="/painel/eventos/gerenciar"
+                                    class="bg-braMagenta/20 hover:bg-braMagenta text-braMagenta hover:text-white border border-braMagenta/30 text-[10px] font-bold px-4 py-2 rounded-full uppercase tracking-widest transition cursor-pointer flex items-center gap-1.5">
+                                    Ver meus eventos <span aria-hidden="true">&rarr;</span>
+                                </a>
+                            </div>
+
+                            <!-- Card de Plantão Interno -->
+                            <div
+                                class="bg-white/10 border border-white/10 rounded-3xl p-4 md:p-6 flex items-center justify-between gap-4 hover:bg-white/15 transition cursor-pointer relative z-10 backdrop-blur-sm min-h-[104px]">
+                                <div class="flex items-center gap-5">
+                                    <div
+                                        class="w-14 h-14 bg-braCyan/20 rounded-2xl flex items-center justify-center border border-braCyan/30 shrink-0 text-xl overflow-hidden">
+                                        @if (dashboardData?.nextManagedEvent!.eventLogoUrl) {
+                                        <img [src]="dashboardData?.nextManagedEvent!.eventLogoUrl" alt="Event Logo"
+                                            class="w-full h-full object-cover">
+                                        } @else {
+                                        🎫
+                                        }
+                                    </div>
+                                    <div>
+                                        <h3 class="text-white font-bold text-base md:text-lg leading-tight mb-2">{{
+                                            dashboardData?.nextManagedEvent!.eventName }}</h3>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <span
+                                                class="bg-braCyan text-braDark px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(69,188,237,0.3)]">
+                                                ⏰ {{ dashboardData?.nextManagedEvent!.startingDatetime | date:'EEEE,
+                                                HH:mm'
+                                                }}
+                                            </span>
+                                            <span class="flex items-center gap-1 text-xs font-bold text-gray-300">
+                                                📍 {{ dashboardData?.nextManagedEvent!.point }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div
+                                    class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white shrink-0 group-hover:bg-braCyan group-hover:text-braDark transition-colors">
+                                    →
+                                </div>
+                            </div>
+                        </div>
+                        } @else {
+                        <!-- Banner Pronto para novas aventuras (Sem Plantão) -->
+                        <section
+                            class="bg-gradient-to-r from-braCyan/10 to-braPurple/10 border border-x-0 xl:border-x border-braCyan/20 rounded-none xl:rounded-[2.5rem] p-6 xl:p-10 shadow-sm relative overflow-hidden flex flex-col xl:flex-row items-center justify-between gap-4 xl:gap-6">
+                            <!-- Bolhas decorativas -->
+                            <div
+                                class="absolute -left-10 -top-10 w-32 h-32 bg-braCyan/20 rounded-full blur-2xl pointer-events-none">
+                            </div>
+                            <div
+                                class="absolute right-10 -bottom-10 w-32 h-32 bg-braPurple/20 rounded-full blur-2xl pointer-events-none">
+                            </div>
+
+                            <div class="relative z-10 text-center xl:text-left">
+                                <h2 class="text-xl md:text-2xl font-amaranth font-bold text-braDark italic mb-2">Pronto
+                                    para novas
+                                    aventuras?</h2>
+                                <p class="text-gray-600 font-medium text-sm max-w-md mx-auto xl:mx-0">Você não possui
+                                    plantões no
+                                    momento.
+                                    Que tal dar uma olhada na agenda, descobrir novas comunidades ou criar o seu próprio
+                                    meet?</p>
+                            </div>
+
+                            <div class="relative z-10 flex gap-3 shrink-0 w-full xl:w-auto">
+                                <a routerLink="/painel/eventos"
+                                    class="flex-1 xl:flex-none text-center bg-white text-braDark font-bold px-6 py-3 rounded-xl text-sm hover:bg-gray-50 transition shadow-sm border border-gray-200">
+                                    Explorar
+                                </a>
+                                <a routerLink="/painel/eventos/novo"
+                                    class="flex-1 xl:flex-none text-center bg-braDark text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-braPurple transition shadow-lg">
+                                    Criar Evento
+                                </a>
+                            </div>
+                        </section>
+                        }
+
+                        @if (dashboardData && !dashboardData.discord.connected && showDiscordWarning) {
+                        <!-- Alerta Discord (Estilo Card Suave) -->
+                        <div
+                            class="mx-6 xl:mx-0 bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-3xl p-5 xl:p-6 flex flex-col xl:flex-row justify-between items-center gap-4 shadow-sm relative overflow-hidden group">
+                            <!-- Fundo de padrão sutil -->
+                            <button (click)="dismissDiscordWarning()" title="Ocultar aviso"
+                                class="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 flex items-center justify-center rounded-full text-[#5865F2]/60 hover:text-[#5865F2] hover:bg-[#5865F2]/10 transition z-20">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+
+                            <div
+                                class="absolute right-0 top-0 w-32 h-32 bg-[#5865F2]/10 rounded-full blur-2xl pointer-events-none">
+                            </div>
+                            <div
+                                class="flex flex-col xl:flex-row items-center gap-4 relative z-10 text-center xl:text-left mt-2 xl:mt-0">
+                                <div
+                                    class="w-12 h-12 bg-[#5865F2] rounded-2xl flex items-center justify-center text-white text-xl shadow-md shrink-0">
+                                    <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                                        <path
+                                            d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-amaranth font-bold text-braDark text-lg">Conecte sua conta do
+                                        Discord</h3>
+                                    <p class="text-xs font-semibold text-gray-500 mt-0.5">Veja seus cargos e acesse
+                                        recursos exclusivos.</p>
+                                </div>
+                            </div>
+                            <button
+                                class="w-full xl:w-auto bg-[#5865F2] text-white font-bold px-6 py-3 rounded-xl text-sm hover:brightness-110 transition shadow-md whitespace-nowrap relative z-10 mt-2 xl:mt-0 xl:mr-8">
+                                Conectar Discord
+                            </button>
+                        </div>
+                        }
+
+                    </div>
+
+                    <!-- 3. EVENTOS (Ordem 3 no mobile, após a sidebar) -->
+                    <div class="order-3 xl:order-none px-4 xl:px-0 mt-8 xl:mt-0">
+                        <div class="flex flex-row justify-between items-center mb-6 px-2 gap-2">
+                            <h2
+                                class="text-lg sm:text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic leading-tight flex-1">
+                                <span class="text-braPurple text-xl md:text-2xl shrink-0">🗓️</span> Próximos Eventos e
+                                Meets
+                            </h2>
+                            <a routerLink="/painel/eventos"
+                                class="hidden min-[901px]:block text-[10px] sm:text-xs font-bold text-braPurple hover:underline uppercase tracking-widest shrink-0 text-right">Ver
+                                agenda completa &gt;</a>
+                        </div>
+
+                        <!-- Grid de Eventos e Meets -->
+                        <ng-template #eventCard let-event="event">
+                            <!-- Evento Dinâmico -->
+                            <div [routerLink]="['/painel/eventos', event.id]"
+                                class="bg-white border border-gray-100 rounded-3xl p-4 xl:p-5 shadow-md hover:shadow-lg transition flex items-center gap-3 md:gap-4 relative overflow-hidden group cursor-pointer">
+                                @if (event.partnerEvent) {
+                                <div
+                                    class="absolute top-0 right-0 bg-braYellow/10 text-braYellow text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest border-b border-l border-braYellow/20">
+                                    Parceiro • {{ event.isEvent ? 'Evento' : 'Meet' }}
+                                </div>
+                                } @else {
+                                <div
+                                    class="absolute top-0 right-0 bg-braCyan/10 text-braCyan text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest border-b border-l border-braCyan/20">
+                                    {{ event.isEvent ? 'Evento' : 'Meet' }}
+                                </div>
+                                }
+
+                                <div
+                                    class="w-14 h-14 md:w-16 md:h-16 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col items-center justify-center shrink-0 group-hover:border-braCyan transition overflow-hidden">
+                                    @if (event.eventLogoUrl) {
+                                    <img [src]="event.eventLogoUrl" alt="Logo" class="w-full h-full object-cover">
+                                    } @else {
+                                    <span class="text-[9px] md:text-[10px] font-bold text-braCyan uppercase">{{
+                                        event.startingDatetime
+                                        |
+                                        date:'MMM' }}</span>
+                                    <span class="text-lg md:text-xl font-black text-braDark leading-none mt-1">{{
+                                        event.startingDatetime | date:'dd' }}</span>
+                                    }
+                                </div>
+                                <div class="flex-1 mt-2">
+                                    <h4 class="font-amaranth font-bold text-braDark text-base md:text-lg leading-tight">
+                                        {{
+                                        event.eventName }}</h4>
+                                    <p
+                                        class="text-[10px] md:text-[11px] font-bold text-gray-400 mt-1 flex items-center gap-1 line-clamp-1">
+                                        🗓️ {{ formatEventDate(event.startingDatetime, event.endingDatetime) }} • {{
+                                        event.point }}</p>
+                                </div>
+                            </div>
+                        </ng-template>
+
+                        @if (isLoading) {
+                        <div class="grid grid-cols-1 gap-4">
+                            <div
+                                class="bg-white border border-gray-100 rounded-3xl p-6 xl:p-8 shadow-sm flex justify-center items-center min-h-[150px]">
+                                <div class="flex items-center gap-3 text-braPurple font-bold">
+                                    <svg class="animate-spin h-6 w-6 text-braPurple" xmlns="http://www.w3.org/2000/svg"
+                                        fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                        </path>
+                                    </svg>
+                                    <span>Carregando próximos eventos...</span>
+                                </div>
+                            </div>
+                        </div>
+                        } @else if (leftColumnList.length === 0 && rightColumnList.length === 0) {
+                        <div class="grid grid-cols-1 gap-4">
+                            <div
+                                class="text-center text-sm font-semibold text-gray-400 py-8 bg-white border border-gray-100 rounded-3xl border-dashed">
+                                Nenhum evento ou meet programado.
+                            </div>
+                        </div>
+                        } @else {
+                        <div class="grid grid-cols-1 gap-8" [class.lg:grid-cols-2]="rightColumnList.length > 0">
+                            <!-- Coluna Principal (Esquerda) -->
+                            <div class="space-y-4">
+                                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest pl-2">{{
+                                    leftColumnTitle }}</h3>
+                                <div class="grid grid-cols-1 gap-4">
+                                    @for (event of leftColumnList; track event.id) {
+                                    <ng-container
+                                        *ngTemplateOutlet="eventCard; context: { event: event }"></ng-container>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Coluna Secundária (Direita) -->
+                            @if (rightColumnList.length > 0) {
+                            <div class="space-y-4">
+                                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest pl-2">{{
+                                    rightColumnTitle }}</h3>
+                                <div class="grid grid-cols-1 gap-4">
+                                    @for (event of rightColumnList; track event.id) {
+                                    <ng-container
+                                        *ngTemplateOutlet="eventCard; context: { event: event }"></ng-container>
+                                    }
+                                </div>
+                            </div>
+                            }
+                        </div>
+                        }
+
+                        @if (!isLoading) {
+                        <!-- Botão Ver mais no final da lista (mobile) -->
+                        <div class="mt-8 min-[901px]:hidden px-2">
+                            <a routerLink="/painel/eventos"
+                                class="block w-full text-center bg-braPurple/10 text-braPurple font-bold px-4 py-3.5 rounded-xl text-xs uppercase tracking-widest hover:bg-braPurple/20 transition shadow-sm">
+                                Ver mais
+                            </a>
+                        </div>
+                        }
+                    </div>
+                </div> <!-- Fim ESQUERDA -->
+
+                <!-- 2. LADO DIREITO (Wrapper 'contents' no mobile, coluna normal no desktop) -->
+                <div class="contents xl:block xl:order-2 xl:col-span-1 xl:row-span-2 xl:space-y-8">
+
+                    <!-- Painel Principal (Ordem 2 no mobile) -->
+                    <div class="order-2 xl:order-none mt-8 xl:mt-0 w-full">
+                        @if (dashboardData?.servers?.length) {
+                        <!-- Painel do Servidor com Toggle embutido -->
+                        <div
+                            class="bg-white rounded-none xl:rounded-[2.5rem] border-y border-x-0 xl:border-x border-gray-100 shadow-sm overflow-hidden">
+
+                            <!-- Toggle / Tabs com Scroll Horizontal e Setas -->
+                            <div class="relative flex items-center border-b border-gray-100 bg-gray-50 group">
+                                <!-- Seta Esquerda -->
+                                <button (click)="tabScroll.scrollLeft = tabScroll.scrollLeft - 150"
+                                    class="absolute left-0 bg-gradient-to-r from-gray-50 via-gray-50 to-transparent pr-5 pl-4 h-full z-10 text-gray-400 hover:text-braDark flex items-center justify-center transition opacity-0 group-hover:opacity-100 hidden sm:flex">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                            d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+
+                                <!-- Scroll Container -->
+                                <div #tabScroll
+                                    class="flex flex-1 overflow-x-auto scroll-smooth whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                    <!-- Aba 1: Visão Global -->
+                                    <button (click)="togglePanelView('global')"
+                                        class="px-6 py-4 text-xs font-bold uppercase tracking-widest transition flex-1"
+                                        [class.text-braDark]="activePanelView === 'global'"
+                                        [class.border-b-2]="activePanelView === 'global'"
+                                        [class.border-braPurple]="activePanelView === 'global'"
+                                        [class.bg-white]="activePanelView === 'global'"
+                                        [class.text-gray-400]="activePanelView !== 'global'"
+                                        [class.hover:text-braDark]="activePanelView !== 'global'">
+                                        Visão Global
+                                    </button>
+
+                                    <!-- Aba 2: Servidor -->
+                                    <button (click)="togglePanelView('server')"
+                                        class="px-6 py-4 text-xs font-bold uppercase tracking-widest transition flex-1"
+                                        [class.text-braDark]="activePanelView === 'server'"
+                                        [class.border-b-2]="activePanelView === 'server'"
+                                        [class.border-braPurple]="activePanelView === 'server'"
+                                        [class.bg-white]="activePanelView === 'server'"
+                                        [class.text-gray-400]="activePanelView !== 'server'"
+                                        [class.hover:text-braDark]="activePanelView !== 'server'">
+                                        Servidor
+                                    </button>
+
+                                    <!-- Aba 3: Meu Status -->
+                                    <button (click)="togglePanelView('user')"
+                                        class="px-6 py-4 text-xs font-bold uppercase tracking-widest transition flex-1"
+                                        [class.text-braDark]="activePanelView === 'user'"
+                                        [class.border-b-2]="activePanelView === 'user'"
+                                        [class.border-braPurple]="activePanelView === 'user'"
+                                        [class.bg-white]="activePanelView === 'user'"
+                                        [class.text-gray-400]="activePanelView !== 'user'"
+                                        [class.hover:text-braDark]="activePanelView !== 'user'">
+                                        Meu Status
+                                    </button>
+                                </div>
+
+                                <!-- Seta Direita -->
+                                <button (click)="tabScroll.scrollLeft = tabScroll.scrollLeft + 150"
+                                    class="absolute right-0 bg-gradient-to-l from-gray-50 via-gray-50 to-transparent pl-5 pr-4 h-full z-10 text-gray-400 hover:text-braDark flex items-center justify-center transition opacity-0 group-hover:opacity-100 hidden sm:flex">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                            d="M9 5l7 7-7 7">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="p-6 xl:p-8">
+                                @if (activePanelView === 'global') {
+                                <h3
+                                    class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                                    🌐 Visão Global
+                                </h3>
+
+                                <div class="space-y-5">
+                                    @for (stat of dashboardData?.analytics; track $index) {
+                                    <div
+                                        class="flex justify-between items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{
+                                            stat.name
+                                            }}</span>
+                                        <span class="font-bold text-braDark text-lg">{{ getDisplayValue(stat.data)
+                                            }}</span>
+                                    </div>
+                                    }
+                                    @if (dashboardData?.analytics?.length === 0) {
+                                    <div class="text-center text-sm font-semibold text-gray-400 py-4">
+                                        Nenhuma estatística global disponível.
+                                    </div>
+                                    }
+                                </div>
+                                } @else if (activePanelView === 'server') {
+                                <div class="relative z-20 -mx-6 xl:-mx-8 -mt-6 xl:-mt-8 mb-6 bg-white border-b border-gray-100">
+                                    <button (click)="isServerDropdownOpen = !isServerDropdownOpen" 
+                                            class="w-full flex items-center justify-between px-6 xl:px-8 py-5 transition-colors group focus:outline-none hover:bg-gray-50">
+                                        <span class="font-amaranth font-bold text-xl italic text-braDark truncate pr-4 text-left">
+                                            {{ dashboardData?.servers?.[selectedServerIndex]?.name || 'Selecione um servidor' }}
+                                        </span>
+                                        <div class="pointer-events-none flex items-center text-braDark shrink-0 transition-transform duration-200"
+                                             [class.rotate-180]="isServerDropdownOpen">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </button>
+                                    
+                                    @if (isServerDropdownOpen) {
+                                    <!-- Backdrop para fechar clicando fora -->
+                                    <div class="fixed inset-0 z-10" (click)="isServerDropdownOpen = false"></div>
+                                    
+                                    <!-- Lista Customizada Edge-to-Edge -->
+                                    <div class="absolute top-full left-0 right-0 bg-white shadow-xl border-b border-gray-100 overflow-hidden z-20 max-h-64 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div class="flex flex-col">
+                                            @for (server of dashboardData?.servers; track $index) {
+                                            <button (click)="selectServer($index)"
+                                                    class="w-full text-left px-6 xl:px-8 py-4 flex items-center justify-between transition-colors focus:outline-none border-b border-gray-50 last:border-0"
+                                                    [ngClass]="selectedServerIndex === $index ? 'bg-braPurple/5 text-braPurple' : 'hover:bg-gray-50 text-gray-700'">
+                                                <span class="font-amaranth font-bold text-base md:text-lg italic truncate">{{ server.name }}</span>
+                                                @if (selectedServerIndex === $index) {
+                                                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                                </svg>
+                                                }
+                                            </button>
+                                            }
+                                        </div>
+                                    </div>
+                                    }
+                                </div>
+
+                                <div class="space-y-5">
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-3">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total
+                                            de
+                                            Membros</span>
+                                        <span class="font-bold text-braDark text-lg">{{
+                                            getDisplayValue(dashboardData?.servers?.[selectedServerIndex]?.totalMembers)
+                                            }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-3">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Novos
+                                            (7d)</span>
+                                        <span
+                                            class="font-bold text-green-500 bg-green-50 px-2 py-1 rounded-lg text-sm">{{
+                                            getDisplayValue(dashboardData?.servers?.[selectedServerIndex]?.newMembers7D)
+                                            }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pb-2">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Engajamento</span>
+                                        <span
+                                            class="font-bold text-braCyan bg-braCyan/10 px-2 py-1 rounded-lg text-sm">{{
+                                            getDisplayValue(dashboardData?.servers?.[selectedServerIndex]?.engagement)
+                                            }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- <button
+                                    class="w-full mt-8 bg-braPurple text-white font-bold py-3.5 rounded-xl text-sm shadow-md hover:brightness-110 transition">
+                                    Ver Painel Completo
+                                </button> -->
+                                } @else {
+                                <h3
+                                    class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                                    🏆 Meu Status
+                                </h3>
+
+                                <div class="space-y-5">
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-3">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nível
+                                            Global</span>
+                                        <span class="font-bold text-braCyan text-lg">Lvl {{
+                                            getDisplayValue(dashboardData?.myStatus?.level) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-3">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Eventos
+                                            Freq.</span>
+                                        <span class="font-bold text-braDark text-lg">{{
+                                            getDisplayValue(dashboardData?.myStatus?.eventsAtended) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pb-2">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Última
+                                            Badge</span>
+                                        <span
+                                            class="font-bold text-braYellow bg-braYellow/10 px-2 py-1 rounded-lg text-sm">{{
+                                            getDisplayValue(dashboardData?.myStatus?.lastBadge) }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- <button
+                                    class="w-full mt-8 bg-braPurple text-white font-bold py-3.5 rounded-xl text-sm shadow-md hover:brightness-110 transition">
+                                    Ver Minhas Conquistas
+                                </button> -->
+                                }
+                            </div>
+                        </div>
+                        } @else {
+                        <!-- Meu Status (Sem Servidor) -->
+                        <div
+                            class="bg-white rounded-none xl:rounded-[2.5rem] border-y border-x-0 xl:border-x border-gray-100 shadow-sm overflow-hidden">
+                            <div class="p-6 xl:p-8">
+                                <h3
+                                    class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                                    🏆 Meu Status
+                                </h3>
+
+                                <div class="space-y-5">
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-3">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nível
+                                            Global</span>
+                                        <span class="font-bold text-braCyan text-lg">Lvl {{
+                                            getDisplayValue(dashboardData?.myStatus?.level) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-3">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Eventos
+                                            Freq.</span>
+                                        <span class="font-bold text-braDark text-lg">{{
+                                            getDisplayValue(dashboardData?.myStatus?.eventsAtended) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pb-2">
+                                        <span
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Última
+                                            Badge</span>
+                                        <span
+                                            class="font-bold text-braYellow bg-braYellow/10 px-2 py-1 rounded-lg text-sm">{{
+                                            getDisplayValue(dashboardData?.myStatus?.lastBadge) }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- <button
+                                    class="w-full mt-8 bg-braPurple text-white font-bold py-3.5 rounded-xl text-sm shadow-md hover:brightness-110 transition">
+                                    Ver Minhas Conquistas
+                                </button> -->
+                            </div>
+                        </div>
+                        }
+                    </div>
+
+                    <!-- Suas Comunidades (Ordem 4 no mobile) -->
+                    <div class="order-4 xl:order-none mt-8 xl:mt-0 w-full">
+                        <div
+                            class="bg-white rounded-none xl:rounded-[2.5rem] border-y border-x-0 xl:border-x border-gray-100 shadow-sm p-6 xl:p-8">
+                            <h3
+                                class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                                🏛️ Suas Comunidades
+                            </h3>
+
+                            <div
+                                class="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 transition cursor-pointer border border-transparent hover:border-gray-100">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-braCyan text-white flex items-center justify-center font-bold shadow-md shrink-0">
+                                    BF
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-braDark leading-tight">BraFurries Principal</h4>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">2
+                                        Eventos
+                                        Internos</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</main>

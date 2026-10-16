@@ -1,0 +1,69 @@
+@use "sass:map";
+
+
+$font-heading:  "Amaranth", sans-serif !default;
+$font-body:     "Archivo",   sans-serif !default;
+
+
+$weight-extra-bold: 800 !default;
+$weight-bold:       700 !default;
+$weight-medium:     500 !default;
+$weight-regular:    400 !default;
+
+$heading-01:   $weight-extra-bold 36px 1.3 $font-heading;
+$heading-02:   $weight-bold       34px 1.3 $font-heading;
+$heading-03:   $weight-bold       32px 1.3 $font-heading;
+$heading-04:   $weight-bold       24px 1.3 $font-heading;
+$heading-05:   $weight-regular    24px 1.3 $font-heading;
+$heading-06:   $weight-regular    20px 1.3 $font-heading;
+$heading-07:   $weight-bold       20px 1.3 $font-heading;
+
+$subtitle-01:  $weight-bold       16px 1.3 $font-body;
+$subtitle-02:  $weight-regular    16px 1.3 $font-body;
+$subtitle-03:  $weight-bold       14px 1.3 $font-body;
+
+$paragraph-01: $weight-regular    14px 1.3 $font-body;
+$paragraph-02: $weight-bold       12px 1.3 $font-body;
+$paragraph-03: $weight-regular    12px 1.5 $font-body;
+$paragraph-04: $weight-bold       10px 1.5 $font-body;
+$paragraph-05: $weight-regular    10px 1.5 $font-body;
+
+
+$colors: (
+  brand: (
+    black: (
+      darker:   #040404, // C74 M68 Y66 K89
+      original: #262626, // C71 M65 Y64 K69
+      lighter:  #959393  // C44 M37 Y37 K2
+    ),
+    purple: (
+      darker:   #5f2469, // C72 M100 Y25 K18
+      original: #8a3594, // C54 M95 Y0  K0
+      lighter:  #c088bc  // C23 M53 Y0  K0
+    ),
+    cyan: (
+      darker:   #1697d4, // C76 M27 Y0  K0
+      original: #45bced, // C62 M6  Y0  K0
+      lighter:  #9bd6f0  // C36 M2  Y0  K0
+    ),
+    yellow: (
+      darker:   #a0782c, // C33 M49 Y100 K13
+      original: #febf10, // C0  M27 Y100 K0
+      lighter:  #ffd86d  // C0  M14 Y68  K0
+    ),
+    magenta: (
+      darker:   #df186c, // C7  M100 Y33  K0
+      original: #ee4092, // C0  M89  Y3   K0
+      lighter:  #f499c1  // C0  M51  Y0   K0
+    )
+  ),
+  neutral: (
+    // tons de preto/branco do logo BW
+    k90: #262626,
+    k60: #4F4F4F,
+    k40: #9E9E9E,
+    k20: #D8D8D8,
+    k10: #F5F5F5,
+    k05: #FAFAFA
+  )
+);

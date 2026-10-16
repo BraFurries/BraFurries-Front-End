@@ -1,0 +1,80 @@
+<div class="bg-gray-50 font-archivo text-gray-800 flex min-h-screen selection:bg-braPurple selection:text-white">
+  <main class="flex-1 relative overflow-y-auto">
+    <div class="absolute inset-0 bg-pattern z-0 pointer-events-none opacity-60"></div>
+    <div class="relative z-10 w-full mx-auto pt-4 px-8">
+      <header><h2 class="text-3xl font-amaranth font-bold text-braDark">Meu Perfil</h2><p class="text-sm font-semibold text-gray-500 mt-1">Acompanhe seus dados e sua jornada nas comunidades.</p></header>
+    </div>
+
+    <div class="relative z-10 p-6 md:p-10 max-w-7xl mx-auto w-full flex flex-col gap-6 pb-20">
+      <div *ngIf="profileLoading" class="bg-white rounded-[2rem] border border-gray-100 p-8 text-gray-500">Carregando seu perfil...</div>
+      <div *ngIf="profileError" class="bg-red-50 text-red-700 rounded-2xl border border-red-100 p-5">{{ profileError }}</div>
+
+      <ng-container *ngIf="profile as member">
+        <section class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+          <div class="absolute right-0 top-0 w-64 h-64 bg-braCyan/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="relative shrink-0">
+            <img *ngIf="member.profileImageUrl; else avatarFallback" [src]="member.profileImageUrl" [alt]="member.displayName || member.username || 'Avatar do perfil'" class="w-32 h-32 object-cover bg-braDark rounded-3xl shadow-xl border-4 border-white" />
+            <ng-template #avatarFallback><div class="w-32 h-32 bg-braDark rounded-3xl shadow-xl flex items-center justify-center text-braCyan text-5xl font-amaranth font-bold border-4 border-white">{{ profileInitial() }}</div></ng-template>
+            <div class="mt-3 flex flex-col items-center gap-2"><label class="cursor-pointer text-xs font-bold text-braPurple hover:text-braDark" [class.opacity-50]="profileImageUploading || profileImageDeleting">{{ profileImageUploading ? 'Enviando foto...' : 'Alterar foto' }}<input #profileImageInput type="file" class="hidden" accept="image/jpeg,image/png,image/webp" [disabled]="profileImageUploading || profileImageDeleting" (change)="onProfileImageSelected($event)" /></label><button *ngIf="member.profileImageUrl" type="button" class="text-xs font-bold text-red-600 disabled:opacity-50" [disabled]="profileImageUploading || profileImageDeleting" (click)="removeProfileImage()">{{ profileImageDeleting ? 'Removendo foto...' : 'Remover foto' }}</button><p *ngIf="profileImageError" class="text-xs text-red-700 text-center">{{ profileImageError }}</p></div>
+          </div>
+          <div class="flex-1 text-center md:text-left">
+            <div *ngIf="!editingDisplayName; else displayNameEditor" class="flex items-center gap-2 justify-center md:justify-start mb-4"><h3 class="text-3xl font-amaranth font-bold text-braDark">{{ member.displayName || member.username || 'Perfil' }}</h3><button type="button" class="text-xs font-bold text-braPurple hover:text-braDark" (click)="startDisplayNameEdit()">Editar</button></div>
+            <ng-template #displayNameEditor><div class="mb-4 flex flex-wrap gap-2 justify-center md:justify-start"><input type="text" [(ngModel)]="displayNameDraft" maxlength="32" [disabled]="displayNameSaving" aria-label="Nome de exibição" class="border border-gray-200 rounded-xl px-3 py-2 text-sm" /><button type="button" [disabled]="displayNameSaving" (click)="saveDisplayName()" class="px-3 py-2 bg-braPurple text-white text-xs font-bold rounded-xl disabled:opacity-50">{{ displayNameSaving ? 'Salvando...' : 'Salvar' }}</button><button type="button" [disabled]="displayNameSaving" (click)="cancelDisplayNameEdit()" class="px-3 py-2 text-xs font-bold text-gray-600">Cancelar</button><p *ngIf="displayNameError" class="w-full text-xs text-red-700">{{ displayNameError }}</p></div></ng-template>
+            <div class="flex flex-wrap justify-center md:justify-start gap-3 text-xs font-semibold text-gray-500 mb-4">
+              <span *ngIf="member.birthday" class="bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">🎂 {{ member.birthday | date:'longDate' }}</span>
+              <span class="bg-braPurple/5 text-braPurple px-3 py-1.5 rounded-lg border border-braPurple/10">🐺 {{ member.communityCount }} comunidade{{ member.communityCount === 1 ? '' : 's' }}</span>
+              <span *ngIf="member.firstKnownCommunity.state === 'AVAILABLE'" class="bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">Vínculo comunitário mais antigo registrado: {{ member.firstKnownCommunity.communityName }} · {{ member.firstKnownCommunity.memberSince | date:'shortDate' }}</span>
+            </div>
+            <div class="flex flex-wrap justify-center md:justify-start gap-3">
+              <ng-container *ngIf="member.discord.state === 'AVAILABLE'; else discordAmbiguous"><span class="text-xs font-bold bg-[#5865F2]/10 text-[#5865F2] px-3 py-1.5 rounded-xl">Discord: {{ accountLabel(member.discord) }}</span></ng-container>
+              <ng-template #discordAmbiguous><span *ngIf="member.discord.state === 'AMBIGUOUS'" class="text-xs font-bold bg-gray-100 text-gray-500 px-3 py-1.5 rounded-xl">Discord: vínculo não pôde ser determinado</span></ng-template>
+              <ng-container *ngIf="member.telegram.state === 'AVAILABLE'; else telegramAmbiguous"><span class="text-xs font-bold bg-[#26A5E4]/10 text-[#26A5E4] px-3 py-1.5 rounded-xl">Telegram: {{ accountLabel(member.telegram) }}</span></ng-container>
+              <ng-template #telegramAmbiguous><span *ngIf="member.telegram.state === 'AMBIGUOUS'" class="text-xs font-bold bg-gray-100 text-gray-500 px-3 py-1.5 rounded-xl">Telegram: vínculo não pôde ser determinado</span></ng-template>
+            </div>
+          </div>
+        </section>
+
+        <section *ngIf="member.communities.length === 0" class="bg-white rounded-[2rem] border border-gray-100 p-8 text-center text-gray-500">Você ainda não possui vínculos comunitários registrados.</section>
+        <ng-container *ngIf="member.communities.length > 0">
+          <div class="flex items-center gap-4 overflow-x-auto pb-2 custom-scrollbar"><span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0">Ver dados de:</span>
+            <button *ngFor="let community of member.communities" class="px-6 py-2.5 rounded-full font-bold text-sm" [ngClass]="selectedCommunityId === community.communityId ? 'bg-braPurple text-white shadow-md shrink-0' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50 shrink-0'" (click)="selectCommunity(community.communityId)">{{ community.communityName }}</button>
+          </div>
+          <div *ngIf="contextLoading" class="bg-white rounded-[2rem] border border-gray-100 p-6 text-gray-500">Carregando dados da comunidade...</div>
+          <div *ngIf="contextError" class="bg-red-50 text-red-700 rounded-2xl border border-red-100 p-5">{{ contextError }}</div>
+
+          <ng-container *ngIf="context as data">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h4 class="font-amaranth font-bold text-braPurple text-xl mb-5">📅 Minha jornada</h4>
+                <ng-container [ngSwitch]="data.membership.state">
+                  <div *ngSwitchCase="'AVAILABLE'" class="space-y-3 text-sm">
+                    <p *ngIf="data.membership.memberSince"><b>Membro desde:</b> {{ data.membership.memberSince | date:'shortDate' }}</p><p *ngIf="data.membership.lastJoinDate"><b>Última entrada registrada:</b> {{ data.membership.lastJoinDate | date:'shortDate' }}</p>
+                    <p *ngIf="data.membership.approved !== null"><b>Aprovado:</b> {{ data.membership.approved ? 'Sim' : 'Não' }}</p><p *ngIf="data.membership.approvedAt"><b>Aprovado em:</b> {{ data.membership.approvedAt | date:'shortDate' }}</p>
+                    <p *ngIf="data.membership.present !== null"><b>Status:</b> {{ data.membership.present ? 'Presente' : (data.membership.leftAt ? 'Saiu' : 'Não informado') }}</p><p *ngIf="data.membership.vip">VIP</p><p *ngIf="data.membership.partner">Parceiro</p>
+                  </div>
+                  <p *ngSwitchCase="'AMBIGUOUS'" class="text-sm text-gray-500">Não foi possível determinar estes dados com segurança.</p><p *ngSwitchDefault class="text-sm text-gray-500">Sem registros nesta comunidade.</p>
+                </ng-container>
+              </section>
+              <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h4 class="font-amaranth font-bold text-braCyan text-xl mb-5">✨ Progressão</h4>
+                <ng-container [ngSwitch]="data.progression.state"><div *ngSwitchCase="'AVAILABLE'" class="space-y-2"><p class="text-3xl font-black text-braDark">Nível {{ data.progression.level }}</p><p class="text-sm text-gray-500">{{ data.progression.totalXp }} XP total</p></div><p *ngSwitchCase="'AMBIGUOUS'" class="text-sm text-gray-500">Não foi possível determinar a progressão com segurança.</p><p *ngSwitchDefault class="text-sm text-gray-500">Sem dados de progressão nesta comunidade.</p></ng-container>
+              </section>
+              <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h4 class="font-amaranth font-bold text-braYellow text-xl mb-5">💰 Economia local</h4>
+                <ng-container [ngSwitch]="data.economy.state"><p *ngSwitchCase="'AVAILABLE'" class="text-4xl font-black text-braDark">{{ data.economy.balance }}</p><p *ngSwitchCase="'AMBIGUOUS'" class="text-sm text-gray-500">Dados de economia indisponíveis com segurança.</p><p *ngSwitchDefault class="text-sm text-gray-500">Sem dados de economia nesta comunidade.</p></ng-container>
+              </section>
+              <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 lg:col-span-2">
+                <h4 class="font-amaranth font-bold text-braPurple text-xl mb-5">🎒 Inventário</h4>
+                <p *ngIf="data.inventory.length === 0" class="text-sm text-gray-500">Nenhum item registrado nesta comunidade.</p>
+                <div *ngIf="data.inventory.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3"><div *ngFor="let item of data.inventory" class="flex gap-3 bg-gray-50 rounded-xl p-3"><img *ngIf="item.imageUrl" [src]="item.imageUrl" [alt]="item.name" class="w-10 h-10 object-cover rounded-lg" /><div *ngIf="!item.imageUrl" class="w-10 h-10 bg-braPurple/10 text-braPurple rounded-lg flex items-center justify-center">◆</div><div><p class="font-bold text-sm">{{ item.name }} <span *ngIf="item.quantity !== null">×{{ item.quantity }}</span></p><p *ngIf="item.validUntil" class="text-xs text-gray-500">Válido até {{ item.validUntil | date:'shortDate' }}</p><p *ngIf="item.service" class="text-xs text-braPurple">Serviço</p></div></div></div>
+              </section>
+              <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100"><h4 class="font-amaranth font-bold text-braMagenta text-xl mb-5">🛡️ Moderação</h4><div class="space-y-2 text-sm"><p>Advertências: <b>{{ data.moderation.activeWarnings }} ativas · {{ data.moderation.totalWarnings }} total</b></p><p>Bans: <b>{{ data.moderation.activeBans }} ativos · {{ data.moderation.totalBans }} total</b></p></div></section>
+            </div>
+
+            <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100"><h4 class="font-amaranth font-bold text-braMagenta text-xl mb-4">Histórico de moderação</h4><p *ngIf="moderationLoading" class="text-sm text-gray-500">Carregando histórico...</p><p *ngIf="moderationError" class="text-sm text-red-700">{{ moderationError }}</p><p *ngIf="moderationPage && moderationPage.items.length === 0" class="text-sm text-gray-500">Nenhum registro de moderação nesta comunidade.</p><div *ngFor="let item of moderationPage?.items" class="border-t border-gray-100 py-3 text-sm"><b>{{ item.type === 'warn' ? 'Advertência' : 'Ban' }}</b> · {{ item.reason }} <span class="text-gray-500">{{ item.occurredAt | date:'shortDate' }} · {{ item.status }}</span><span *ngIf="item.validUntil"> · válido até {{ item.validUntil | date:'shortDate' }}</span><span *ngIf="item.canAppeal !== null"> · {{ item.canAppeal ? 'pode recorrer' : 'sem recurso' }}</span><p *ngIf="item.revocationReason" class="text-gray-500">Revogação: {{ item.revocationReason }}</p></div><div *ngIf="moderationPage && moderationPage.totalPages > 1" class="flex justify-end gap-3 pt-4"><button (click)="previousModerationPage()" [disabled]="moderationPage.page <= 1">Anterior</button><span class="text-sm">Página {{ moderationPage.page }} de {{ moderationPage.totalPages }}</span><button (click)="nextModerationPage()" [disabled]="moderationPage.page >= moderationPage.totalPages">Próxima</button></div></section>
+          </ng-container>
+        </ng-container>
+      </ng-container>
+    </div>
+  </main>
+</div>

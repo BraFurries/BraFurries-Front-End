@@ -1,0 +1,126 @@
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Painel de Controle: Coddy 🤖</h2>
+    <div class="flex gap-2">
+      <a routerLink="detalhes" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-bold transition inline-flex items-center gap-2 cursor-pointer">
+        Ver detalhes
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
+
+  <div class="bg-braDark rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+    <div class="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+    
+    <div *ngIf="loading" class="relative z-10 flex items-center gap-3 text-gray-300">
+      <div class="w-5 h-5 border-2 border-gray-400 border-t-white rounded-full animate-spin"></div>
+      Carregando status do bot...
+    </div>
+    
+    <div *ngIf="!loading && botStatus" class="relative z-10 space-y-8">
+      <!-- Status Header -->
+      <div class="flex items-center gap-4 border-b border-white/10 pb-6">
+        <div class="flex-1">
+          <p class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">Status do Sistema</p>
+          <div class="flex items-center gap-3">
+            <span class="px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide flex items-center gap-2"
+                  [ngClass]="{
+                    'bg-green-500/20 text-green-400': botStatus.status === 'online',
+                    'bg-red-500/20 text-red-400': botStatus.status === 'offline',
+                    'bg-yellow-500/20 text-yellow-400': botStatus.status === 'degraded',
+                    'bg-blue-500/20 text-blue-400': botStatus.status === 'restarting'
+                  }">
+              <span class="w-2 h-2 rounded-full" 
+                    [ngClass]="{
+                      'bg-green-400 animate-pulse': botStatus.status === 'online',
+                      'bg-red-400': botStatus.status === 'offline',
+                      'bg-yellow-400': botStatus.status === 'degraded',
+                      'bg-blue-400 animate-pulse': botStatus.status === 'restarting'
+                    }"></span>
+              {{ botStatus.status }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Metrics -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div>
+          <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Uptime
+          </p>
+          <p class="text-2xl font-bold font-amaranth">{{ formatUptime(botStatus.uptimeSeconds !== null ? botStatus.uptimeSeconds : undefined) }}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>
+            Memória RAM
+          </p>
+          <p class="text-2xl font-bold font-amaranth text-braCyan">
+            {{ botStatus.memoryUsedMb ?? '-' }}MB / {{ botStatus.memoryLimitMb ?? '-' }}MB
+          </p>
+        </div>
+        <div>
+          <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+            Uso de CPU
+          </p>
+          <p class="text-2xl font-bold font-amaranth text-green-400">{{ botStatus.cpuUsagePercent ?? '-' }}%</p>
+        </div>
+        <div>
+          <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            Latência (Ping)
+          </p>
+          <p class="text-2xl font-bold font-amaranth text-orange-400">{{ botStatus.pingMs ?? '-' }}ms</p>
+        </div>
+      </div>
+
+      <!-- Secondary Metrics -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-white/5">
+        <div class="bg-white/5 rounded-xl p-3">
+          <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Servidores</p>
+          <p class="text-lg font-bold">{{ botStatus.guilds ?? 'Indisponível' }}</p>
+        </div>
+        <div class="bg-white/5 rounded-xl p-3">
+          <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Usuários Alcançados</p>
+          <p class="text-lg font-bold">{{ botStatus.users ?? 'Indisponível' }}</p>
+        </div>
+        <div class="bg-white/5 rounded-xl p-3">
+          <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Cogs (Módulos)</p>
+          <p class="text-lg font-bold">{{ botStatus.cogsLoaded ?? 'Indisponível' }}</p>
+        </div>
+        <div class="bg-white/5 rounded-xl p-3">
+          <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Comandos</p>
+          <p class="text-lg font-bold">{{ botStatus.commandsLoaded ?? 'Indisponível' }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TODO: Para implementação futura de gerenciamento de módulos real
+  <div>
+    <h3 class="text-lg font-amaranth font-bold text-gray-800 mb-4">Gerenciamento de Módulos</h3>
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+      <div *ngFor="let module of modules" class="p-5 flex items-center justify-between hover:bg-gray-50 transition">
+        <div>
+          <h4 class="font-bold text-gray-800">{{ module.name }}</h4>
+          <p class="text-sm text-gray-500 mt-0.5">{{ module.description }}</p>
+        </div>
+
+        <button (click)="toggleModule(module)"
+                class="w-14 h-7 rounded-full relative transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-braPurple"
+                [ngClass]="module.enabled ? 'bg-braPurple' : 'bg-gray-200'">
+          <span class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform duration-300 ease-in-out shadow-sm"
+                [ngClass]="module.enabled ? 'translate-x-7' : 'translate-x-0'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+  -->
+</div>

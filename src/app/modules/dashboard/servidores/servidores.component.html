@@ -1,0 +1,925 @@
+<main class="min-h-full bg-gray-50 font-archivo text-gray-800">
+  <div class="max-w-[1240px] mx-auto px-4 py-6 sm:px-6 md:px-10 md:py-10 pb-16">
+    @if (isLoading) {
+      <section class="state-card">
+        <div class="spinner"></div>
+        <p>Buscando seus servidores com Coddy…</p>
+      </section>
+    } @else if (loadError) {
+      <section class="state-card">
+        <div class="text-4xl">⚠️</div>
+        <h1>Não foi possível carregar os servidores</h1>
+        <button
+          type="button"
+          (click)="loadManagedServers()"
+          class="primary-button"
+        >
+          Tentar novamente
+        </button>
+      </section>
+    } @else if (invalidGuild) {
+      <section class="state-card">
+        <div class="text-4xl">🔎</div><h1>Servidor não encontrado</h1>
+        <p>Servidor não encontrado ou você não possui mais permissão para gerenciá-lo.</p>
+        <button type="button" (click)="backToServers()" class="primary-button">Voltar aos servidores</button>
+      </section>
+    } @else if (servers.length && selectedServer) {
+      <header class="mb-6">
+        <p class="eyebrow">Discord</p>
+        <h1 class="page-title">Configurações do Coddy</h1>
+        <p class="help">Gerencie o Coddy na rede Discord selecionada desta Community.</p>
+      </header>
+      <section class="server-hero">
+        <div class="server-avatar overflow-hidden">
+          @if (hasServerIcon($any(selectedServer))) {
+            <img [src]="selectedServer.iconUrl" [alt]="'Ícone de ' + selectedServer.name" class="h-full w-full object-cover" (error)="markServerIconFailed($any(selectedServer))" />
+          } @else {
+            {{ serverInitials($any(selectedServer)) }}
+          }
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="eyebrow text-gray-300">Discord</p>
+          <h2>{{ selectedServer.name }}</h2>
+          <p>
+            {{ formatMemberCount(selectedServer.memberCount) }} membros
+            · {{ selectedServer.botOnline ? 'Coddy online' : 'Coddy offline' }}
+          </p>
+        </div>
+        @if (servers.length > 1) {
+          <label class="w-full lg:w-96">
+            <span class="field-label text-gray-300">Rede Discord</span>
+            <select
+              id="managed-server"
+              [value]="selectedServerId"
+              (change)="selectServer($event)"
+              class="server-select field-control"
+            >
+              @for (item of servers; track item.guildId) {
+                <option [value]="item.guildId">
+                  {{ item.name }} · {{ formatMemberCount(item.memberCount) }} membros
+                </option>
+              }
+            </select>
+          </label>
+        }
+      </section>
+      <nav class="section-tabs" role="tablist">
+        @for (section of sections; track section.id) {
+          <button
+            type="button"
+            [class.active]="activeSection === section.id"
+            (click)="selectSection(section.id)"
+          >
+            <span>{{ section.icon }}</span
+            >{{ section.label }} @if (section.status === 'coming-soon') { <span class="coming-soon">Em breve</span> }
+          </button>
+        }
+      </nav>
+      @if (activeSection === 'backups') {
+        <app-backup-management-panel
+          [guildId]="selectedServerId"
+          (dirtyChange)="backupDirty = $event"
+          (savingChange)="backupSaving = $event"
+        ></app-backup-management-panel>
+      } @else if (activeSection === 'themes') {
+        <app-theme-management-panel
+          [guildId]="selectedServerId"
+          (dirtyChange)="themeDirty = $event"
+          (savingChange)="themeSaving = $event"
+        ></app-theme-management-panel>
+      } @else if (configurationLoading) {
+        <section class="state-card compact">
+          <div class="spinner"></div>
+          <p>Carregando recursos reais do Discord…</p>
+        </section>
+      } @else if (configurationError) {
+        <section class="state-card compact">
+          <p class="error-message">{{ configurationError }}</p>
+          <button
+            type="button"
+            (click)="loadConfiguration()"
+            class="primary-button"
+          >
+            Tentar novamente
+          </button>
+        </section>
+      } @else if (resources && portaria && staff) {
+        @if (activeSection === "overview") {
+          <section class="content-grid overview-grid">
+            <article class="card protection-card lg:col-span-2">
+              <p class="eyebrow">Proteção do servidor</p>
+              <h3>{{ protectionStatus === 'complete' ? 'Proteção completa' : protectionStatus === 'partial' ? 'Proteção parcial' : protectionStatus === 'limited' ? 'Proteção limitada' : 'Status de proteção indisponível' }}</h3>
+              <p class="help">{{ protectionStatus === 'complete' ? 'O Coddy possui permissão de Administrador e seu cargo está acima dos demais cargos do servidor.' : protectionStatus === 'partial' ? 'O Coddy possui as permissões necessárias, mas existem cargos acima dele. Isso pode impedir a proteção contra algumas ações sensíveis.' : protectionStatus === 'limited' ? 'O Coddy não possui permissão de Administrador e pode não conseguir impedir ou reverter ações sensíveis.' : 'O status de proteção ainda não está disponível para esta versão do Coddy.' }}</p>
+              @if (protectionStatus !== 'unknown') {
+              <div class="protection-checklist">
+                <span>{{ resources.botCapabilities.hasAdministrator ? '✓' : '✕' }} Permissão de Administrador</span>
+                <span>{{ resources.botCapabilities.roleHierarchyOk ? '✓' : '✕' }} Hierarquia de cargos</span>
+              </div>
+              @if (!resources.botCapabilities.hasAdministrator) { <p class="warning">Conceda a permissão Administrador ao cargo do Coddy.</p> }
+              @if (!resources.botCapabilities.roleHierarchyOk) {
+                <p class="warning">Mova o cargo do Coddy acima dos cargos listados.</p>
+                @if (resources.botCapabilities.botTopRole) { <p class="help">Cargo mais alto do Coddy: {{ resources.botCapabilities.botTopRole.name }}</p> }
+                <p class="help"><strong>{{ (resources.botCapabilities.rolesAboveBot ?? []).length }} cargos acima do Coddy</strong></p>
+                <div class="blocker-list">@for (role of (resources.botCapabilities.rolesAboveBot ?? []).slice(0, 4); track role.id) { <span>&#64;{{ role.name }} @if (role.managed) { · gerenciado }</span> }</div>
+              }
+              }
+            </article>
+            <aside class="card"><p class="eyebrow">Recursos do servidor</p><h3>Recursos</h3><p>{{ resources.roles.length }} cargos · {{ resources.channels.length }} canais · {{ resources.categories.length }} categorias</p>@if (resources.botCapabilities.missingPermissions.length) { <p class="warning">Operações estruturais: faltam {{ resources.botCapabilities.missingPermissions.join(', ') }}</p> }</aside>
+          </section>
+          <section class="overview-section"><p class="eyebrow">Configurações do Coddy</p><div class="overview-cards">
+            <button type="button" class="overview-card" (click)="requestOverviewSection('portaria')"><strong>🚪 Portaria</strong><span>{{ portaria.ambiguous ? 'Atenção · múltiplas Portarias encontradas' : portaria.configured ? 'Configurada' : 'Não configurada' }}</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('cargos-automaticos')"><strong>⚙️ Cargos automáticos</strong><span>{{ autoJoinRoles?.enabled ? 'Ativados' : 'Desativados' }} · {{ autoJoinRoles?.roles?.length ?? 0 }} cargos configurados@if (autoJoinRoles?.warnings?.length) { · Atenção }</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('logs')"><strong>📜 Logs</strong><span>@if (logsError) { Não foi possível verificar } @else if (logs) { {{ activeLogsCount }} de {{ logs.logs.length }} ativos@if (logsHaveProblems) { · Atenção } } @else { Verificando… }</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('moderation-access')"><strong>🛡️ Moderação & Acesso</strong><span>{{ staff.roleIds.length }} cargos da staff · moderação colaborativa e bypasses</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('backups')"><strong>💾 Backups</strong><span>Snapshots estruturais, retenção e restore com preflight</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('vip')"><strong>💎 VIP</strong><span>Cargos, prefixo, faixa e proteção de cores</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('channels')"><strong>#️⃣ Canais</strong><span>{{ textChannels.length }} canais textuais disponíveis</span></button>
+            <button type="button" class="overview-card" (click)="requestOverviewSection('ai')"><strong>🤖 IA</strong><span>Modelo, credencial, canais e bypass administrativo</span></button>
+          </div></section>
+        } @else if (activeSection === "channels" && serverChannels) {
+          <section class="space-y-5">
+            <article class="card">
+              <p class="eyebrow">Canais</p><h3>Mensagens de aniversário</h3>
+              <p class="help">O Coddy envia as felicitações para um único canal.</p>
+              <label><span class="field-label">Canal</span><select class="field-control" [(ngModel)]="birthdayChannelId"><option [ngValue]="null">Nenhum canal selecionado</option>@if (channelMissing(birthdayChannelId)) { <option [ngValue]="birthdayChannelId">{{ channelLabel(birthdayChannelId) }}</option> } @for (channel of textChannels; track channel.id) { <option [value]="channel.id"># {{ channel.name }}</option> }</select></label>
+              @if (channelMissing(birthdayChannelId)) { <p class="warning">O canal de aniversário salvo não existe mais no servidor.</p> }
+              <button type="button" class="primary-button mt-4" [disabled]="mutationInFlight" (click)="saveBirthdayChannel()">Salvar aniversário</button>
+            </article>
+          </section>
+        } @else if (activeSection === "bump" && bumpDraft) {
+          <section class="space-y-5">
+            <article class="card">
+              <p class="eyebrow">DISBOARD</p><h3>Canal de Bump</h3><p class="help">Canal onde o Coddy reconhece bumps válidos do DISBOARD, atualiza o último bump, reinicia o timer e processa a recompensa individual.</p>
+              <label><span class="field-label">Canal</span><select class="field-control" [(ngModel)]="bumpDraft.processing.channelId"><option [ngValue]="null">Nenhum canal</option>@for (option of bumpChannelOptions(bumpDraft.processing.channelId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label>
+              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpProcessing()">{{ bumpSaveState.processing === 'saving' ? 'Salvando…' : 'Salvar Canal de Bump' }}</button>
+              @if (bumpSaveState.processing === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.processing === 'error') { <p class="error-message">{{ bumpSaveError.processing }}</p> }
+            </article>
+            <article class="card">
+              <p class="eyebrow">Alertas</p><h3>Aviso de próximo bump</h3>
+              <label class="toggle-row"><input type="checkbox" [(ngModel)]="bumpDraft.warning.enabled"> Ativar avisos</label>
+              <p class="help">Um bump reinicia a contagem. Se ninguém der bump, o Coddy avisa novamente a cada duas horas.</p>
+              <label><span class="field-label">Canal do aviso</span><select class="field-control" [(ngModel)]="bumpDraft.warning.targetChannelId"><option [ngValue]="null">Nenhum canal</option>@for (option of bumpChannelOptions(bumpDraft.warning.targetChannelId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label>
+              <label class="mt-4 block"><span class="field-label">Mensagens (uma por linha)</span><textarea class="field-control" rows="4" [ngModel]="warningMessagesText()" (ngModelChange)="updateWarningMessages($event)"></textarea></label>
+              <div class="flex flex-wrap gap-x-5 gap-y-3 mt-4 p-3 rounded-xl text-gray-600 bg-gray-50 text-sm"><span>Próximo aviso: <strong>{{ warningTimestamp(bumpDraft.operational.warningNextAt) }}</strong></span><span>Último bump: <strong>{{ warningTimestamp(bumpDraft.operational.warningLastBumpAt) }}</strong></span></div>
+              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpWarning()">{{ bumpSaveState.warning === 'saving' ? 'Salvando…' : 'Salvar avisos' }}</button>
+              @if (bumpSaveState.warning === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.warning === 'error') { <p class="error-message">{{ bumpSaveError.warning }}</p> }
+            </article>
+            <article class="card">
+              <p class="eyebrow">Recompensa individual</p><h3>Cargo e moedas</h3><p class="help">As duas recompensas são independentes e são enviadas juntas somente nesta configuração.</p>
+              <label class="toggle-row"><input type="checkbox" [(ngModel)]="bumpDraft.individualReward.role.enabled"> Conceder cargo temporário</label>
+              <div class="form-grid"><label><span class="field-label">Cargo</span><select class="field-control" [(ngModel)]="bumpDraft.individualReward.role.roleId"><option [ngValue]="null">Nenhum cargo</option>@for (option of bumpRoleOptionsFor(bumpDraft.individualReward.role.roleId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label><label><span class="field-label">Duração (minutos)</span><input class="field-control" type="number" min="0" [(ngModel)]="bumpDraft.individualReward.role.durationMinutes"></label></div>
+              <label class="mt-4 block"><span class="field-label">Mensagem</span><textarea class="field-control" rows="3" [(ngModel)]="bumpDraft.individualReward.role.message"></textarea></label>
+              <label class="toggle-row"><input type="checkbox" [(ngModel)]="bumpDraft.individualReward.coins.enabled"> Conceder moedas</label>
+              <label class="mt-3 block"><span class="field-label">Quantidade de moedas</span><input class="field-control" type="number" min="0" [(ngModel)]="bumpDraft.individualReward.coins.amount"></label>
+              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpIndividualReward()">{{ bumpSaveState.individual === 'saving' ? 'Salvando…' : 'Salvar recompensa individual' }}</button>
+              @if (bumpSaveState.individual === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.individual === 'error') { <p class="error-message">{{ bumpSaveError.individual }}</p> }
+            </article>
+            <article class="card">
+              <p class="eyebrow">Ranking mensal</p><h3>Recompensas por posição</h3><p class="help">O ranking mensal possui canal de origem independente do Canal de Bump.</p>
+              <label class="toggle-row"><input type="checkbox" [(ngModel)]="bumpDraft.monthlyRanking.enabled"> Ativar ranking mensal</label>
+              <div class="form-grid"><label><span class="field-label">Canal de origem</span><select class="field-control" [(ngModel)]="bumpDraft.monthlyRanking.sourceChannelId"><option [ngValue]="null">Nenhum canal</option>@for (option of bumpChannelOptions(bumpDraft.monthlyRanking.sourceChannelId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label><label><span class="field-label">Cargo compartilhado</span><select class="field-control" [(ngModel)]="bumpDraft.monthlyRanking.roleId"><option [ngValue]="null">Nenhum cargo</option>@for (option of bumpRoleOptionsFor(bumpDraft.monthlyRanking.roleId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label></div>
+              <div class="grid gap-3 mt-4 md:grid-cols-3">@for (tier of monthlyTiers; track tier.position) { <div class="grid gap-2 p-3 border border-gray-200 rounded-xl bg-gray-50"><strong>{{ tier.position }}º lugar</strong><label class="grid gap-1"><span class="field-label">Dias de cargo</span><input class="field-control" type="number" min="0" [(ngModel)]="tier.roleDurationDays"></label><label class="grid gap-1"><span class="field-label">Moedas</span><input class="field-control" type="number" min="0" [(ngModel)]="tier.coins"></label></div> }</div>
+              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpMonthlyRanking()">{{ bumpSaveState.monthly === 'saving' ? 'Salvando…' : 'Salvar ranking mensal' }}</button>
+              @if (bumpSaveState.monthly === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.monthly === 'error') { <p class="error-message">{{ bumpSaveError.monthly }}</p> }
+            </article>
+          </section>
+        } @else if (activeSection === "moderation-access" && moderationAccess && collaborativeDraft) {
+          <section class="space-y-5">
+            <article class="card">
+              <p class="eyebrow">Moderação & Acesso</p>
+              <h3>Cargos da staff</h3>
+              <p class="help">Cargos reais do Discord considerados staff pelo Coddy. Os cargos internos da área Equipes continuam independentes.</p>
+              <app-role-selection
+                [roles]="orderedRoles"
+                [selectedRoleIds]="staffRoleDraft"
+                [persistedRoleIds]="persistedStaffRoleIds"
+                label="Cargos da staff selecionados"
+                description="Selecione somente cargos pertencentes a esta guild."
+                [showBotEditability]="true"
+                [showPersistenceState]="true"
+                (addRole)="addRole(staffRoleDraft, $event)"
+                (removeRole)="removeRole(staffRoleDraft, $event)"
+              ></app-role-selection>
+              @if (pendingStaffRemovals.length) {
+                <div class="pending-changes" aria-live="polite">
+                  <strong>Remoções pendentes</strong>
+                  @for (role of pendingStaffRemovals; track role.id) {
+                    <span>{{ role.name }} será removido <button type="button" (click)="restoreStaffRole(role.id)">Desfazer</button></span>
+                  }
+                </div>
+              }
+              <button type="button" class="primary-button mt-5"
+                [disabled]="mutationInFlight || !staffRolesDirty"
+                (click)="saveStaffRoles()">Salvar cargos da staff</button>
+              @if (!staffRolesDirty && !mutationInFlight) { <p class="save-hint">Nenhuma alteração pendente.</p> }
+            </article>
+
+            <article class="card">
+              <p class="eyebrow">Moderação colaborativa</p>
+              <h3>Moderação por reação</h3>
+              <p class="help">O runtime atual conta reações de membros não-bot. Mensagens publicadas por membros com cargo da staff ficam protegidas.</p>
+              <label class="toggle-row">
+                <input type="checkbox" [(ngModel)]="collaborativeDraft.enabled" />
+                Ativar moderação colaborativa
+              </label>
+              <div class="form-grid mt-4">
+                <label>
+                  <span class="field-label">Emoji monitorado</span>
+                  <input class="field-control" maxlength="64" [(ngModel)]="collaborativeDraft.emoji" placeholder="🧹" />
+                </label>
+                <label>
+                  <span class="field-label">Quantidade mínima de reações</span>
+                  <input class="field-control" type="number" min="1" [(ngModel)]="collaborativeDraft.minReactions" />
+                </label>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 mt-4">
+                <strong>Quem pode participar</strong>
+                <p class="help mt-1">Todos os membros da guild, exceto bots. Esta regra vem do runtime atual e não é uma whitelist configurável nesta entrega.</p>
+              </div>
+              <button type="button" class="primary-button mt-4"
+                [disabled]="mutationInFlight || !collaborativeDirty"
+                (click)="saveCollaborativeModeration()">Salvar moderação colaborativa</button>
+            </article>
+
+            <article class="card">
+              <p class="eyebrow">Portaria</p>
+              <h3>Bypasses da Portaria</h3>
+              <p class="help">Crie regras persistentes por convite ou conta Discord. A API valida o alvo contra esta guild antes de salvar.</p>
+              @if (!bypassPortariaEnabled) {
+                <p class="warning mt-3">A Portaria está desativada. Os bypasses continuam configurados, mas não produzem efeito até a Portaria ser ativada novamente.</p>
+              }
+              <div class="form-grid mt-4">
+                <label>
+                  <span class="field-label">Tipo</span>
+                  <select class="field-control" [(ngModel)]="bypassDraft.type">
+                    <option value="invite">Convite</option>
+                    <option value="account">Usuário / conta Discord</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">{{ bypassDraft.type === 'invite' ? 'Convite' : 'ID da conta Discord' }}</span>
+                  <input class="field-control" [(ngModel)]="bypassDraft.value"
+                    [placeholder]="bypassDraft.type === 'invite' ? 'discord.gg/codigo ou codigo' : 'Snowflake Discord'" />
+                </label>
+                @if (bypassDraft.type === 'account') {
+                  <label>
+                    <span class="field-label">Modo de acesso</span>
+                    <select class="field-control" [(ngModel)]="bypassDraft.accessMode">
+                      <option value="completo">Completo</option>
+                      <option value="provisorio">Provisório</option>
+                    </select>
+                  </label>
+                  <label class="toggle-row">
+                    <input type="checkbox" [(ngModel)]="bypassDraft.requiresForm" />
+                    Ainda exige ficha
+                  </label>
+                }
+                <label>
+                  <span class="field-label">Expira em (opcional)</span>
+                  <input class="field-control" type="datetime-local" [(ngModel)]="bypassDraft.expiresAt" />
+                </label>
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="bypassDraft.active" />
+                  Criar ativo
+                </label>
+              </div>
+              <div class="flex flex-wrap gap-3 mt-4">
+                <button type="button" class="primary-button"
+                  [disabled]="mutationInFlight || bypassesLoading || !bypassDraft.value.trim()"
+                  (click)="createPortariaBypass()">Adicionar bypass</button>
+                @if (bypassDraftDirty) {
+                  <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="resetBypassDraft()">Limpar rascunho</button>
+                }
+              </div>
+
+              <div class="mt-6 space-y-3">
+                @if (bypassesLoading) {
+                  <p class="help">Carregando bypasses…</p>
+                } @else if (bypassesError) {
+                  <p class="error-message">{{ bypassesError }}</p>
+                  <button type="button" class="secondary-button" (click)="loadPortariaBypasses()">Tentar novamente</button>
+                } @else {
+                  @for (bypass of portariaBypasses; track bypass.type + ':' + bypass.id) {
+                    <div class="rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-3">
+                      <div class="flex-1 min-w-0">
+                        <strong>{{ bypass.type === 'invite' ? 'Convite' : 'Conta Discord' }} · {{ bypass.value }}</strong>
+                        <p class="help">
+                          {{ bypass.expired ? 'Expirado' : bypass.effective ? 'Ativo' : bypass.active ? 'Configurado · sem efeito' : 'Inativo' }}
+                          · {{ formatBypassExpiration(bypass.expiresAt) }}
+                          @if (bypass.type === 'account') {
+                            · {{ bypass.accessMode === 'provisorio' ? 'Acesso provisório' : 'Acesso completo' }}
+                            · {{ bypass.requiresForm ? 'exige ficha' : 'sem ficha' }}
+                          }
+                        </p>
+                      </div>
+                      <button type="button" class="secondary-button" [disabled]="mutationInFlight || bypassesLoading || bypass.expired"
+                        (click)="togglePortariaBypass(bypass)">{{ bypass.active ? 'Desativar' : 'Ativar' }}</button>
+                      <button type="button" class="danger-link" [disabled]="mutationInFlight || bypassesLoading"
+                        (click)="removePortariaBypass(bypass)">Remover</button>
+                    </div>
+                  } @empty {
+                    <p class="help">Nenhum bypass configurado nesta guild.</p>
+                  }
+                }
+              </div>
+            </article>
+          </section>
+        } @else if (activeSection === "cargos-automaticos" && autoJoinRoles) {
+          <section class="space-y-5">
+            <article class="card">
+              <p class="eyebrow">Configuração do Coddy</p>
+              <h3>Cargos automáticos</h3>
+              <p class="help">Estes cargos são adicionados automaticamente aos novos membros quando eles entram no servidor.</p>
+              <div class="mt-4 flex flex-wrap items-center gap-3">
+                <strong>Atribuição automática: {{ autoJoinRoles.enabled ? 'Ativada' : 'Desativada' }}</strong>
+                <button type="button" class="secondary-button" [disabled]="mutationInFlight || (autoJoinRoles.enabled && !!autoJoinRoles.portariaVisitorRoleId)" (click)="updateAutomaticEnabled(!autoJoinRoles.enabled)">
+                  {{ autoJoinRoles.enabled ? 'Desativar' : 'Ativar' }}
+                </button>
+              </div>
+              @if (autoJoinRoles.enabled && autoJoinRoles.portariaVisitorRoleId) { <p class="warning mt-3">Não é possível desativar enquanto o cargo Visitante estiver sendo usado pela Portaria.</p> }
+            </article>
+            @for (warning of autoJoinRoles.warnings; track warning.code) {
+              <article class="card warning-card"><h3>Configuração da Portaria incompleta</h3><p class="help">{{ warning.message }}</p>
+                @if (warning.code === 'PORTARIA_VISITOR_NOT_AUTO_JOIN' && autoJoinRoles.portariaVisitorRoleId) { <button type="button" class="primary-button mt-3" [disabled]="mutationInFlight" (click)="repairPortariaVisitorAutoJoin()">{{ portariaVisitorAlreadyAutoJoined ? 'Ativar atribuição automática' : 'Adicionar e ativar' }}</button> }
+              </article>
+            }
+            <article class="card"><h3>Adicionar cargo automático</h3><div class="flex flex-wrap gap-3 mt-3"><select class="field-control flex-1" [(ngModel)]="autoJoinRoleId"><option value="">Selecione um cargo</option>@for (role of availableAutoJoinRoles; track role.id) { <option [value]="role.id">{{ role.name }}</option> }</select><button type="button" class="primary-button" [disabled]="mutationInFlight || !autoJoinRoleId" (click)="addAutomaticRole()">+ Adicionar</button></div></article>
+            <article class="card"><h3>Cargos configurados</h3><div class="space-y-3 mt-4">@for (role of autoJoinRoles.roles; track role.id) { <div class="rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-3"><div class="flex-1"><strong>{{ role.missing ? 'Cargo removido do Discord' : role.name }}</strong><p class="help">@if (role.missing) { ID: {{ role.id }} } @else if (role.protectedRole) { Protegido pela Portaria. Este cargo é necessário para o fluxo de entrada. } @else { Adicionado automaticamente quando alguém entra. }</p></div>@if (role.protectedRole) { <span class="warning">🔒 Protegido pela Portaria</span> } @else { <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="removeAutomaticRole(role.id)">Remover da entrada</button> }</div> } @empty { <p class="help">Nenhum cargo automático configurado.</p> }</div></article>
+          </section>
+        } @else if (activeSection === "portaria") {
+          <section class="space-y-5">
+            @if (portaria.configured && !portaria.ambiguous && selectedFlow) {
+              <article class="card">
+                <p class="eyebrow">Status</p>
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3>{{ portaria.config.enabled ? 'Portaria ativa' : 'Portaria desativada' }}</h3>
+                    <p class="help mt-1">
+                      Quando desativada, aprovação não define se um membro presente está pendente.
+                      Quem entrou sem exigir aprovação não vira pendente retroativamente ao reativar a Portaria.
+                    </p>
+                  </div>
+                  <label class="toggle-row">
+                    <input
+                      type="checkbox"
+                      [checked]="portaria.config.enabled"
+                      [disabled]="mutationInFlight"
+                      (change)="updatePortariaEnabled($any($event.target).checked)" />
+                    Portaria ativa
+                  </label>
+                </div>
+                <div class="flex flex-wrap gap-3 mt-4">
+                  <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="repairPortaria({ operation: 'visitor-isolation' })">Atualizar isolamento do Visitante</button>
+                  <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="repairPortaria({ operation: 'portaria-repair-roles' })">Reparar cargos</button>
+                  <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="repairPortaria({ operation: 'portaria-repair-structure' })">Reparar estrutura</button>
+                  <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="preparePermissionsRepair()">Reparar permissões</button>
+                </div>
+              </article>
+            }
+            <article class="card">
+              <p class="eyebrow">Portaria</p>
+              <h3>Cargos funcionais</h3>
+              <p class="help">Esta é a única superfície para configurar os cargos funcionais da Portaria.</p>
+              <div class="form-grid">
+                @for (field of [
+                  { key: "visitanteRoleId", label: "Cargo Visitante" },
+                  { key: "acessoProvisorioRoleId", label: "Acesso provisório" },
+                  { key: "maior18RoleId", label: "Cargo +18" },
+                  { key: "menor18RoleId", label: "Cargo -18" }
+                ]; track field.key) {
+                  <label><span class="field-label">{{ field.label }}</span>
+                    <select class="field-control" [(ngModel)]="$any(portariaRoleDraft)[field.key]">
+                      <option [ngValue]="null">Nenhum</option>
+                      @for (role of orderedRoles; track role.id) {
+                        <option [value]="role.id" [disabled]="!role.editableByBot">{{ role.name }}{{ !role.editableByBot ? ' · não gerenciável pelo Coddy' : '' }}</option>
+                      }
+                    </select>
+                    <button type="button" class="secondary-button mt-2" [disabled]="mutationInFlight || portariaRolesDirty"
+                      (click)="createRoleForField(field.key)">+ Criar</button>
+                  </label>
+                }
+              </div>
+              <button type="button" class="primary-button mt-5" [disabled]="mutationInFlight || !portariaRolesDirty"
+                (click)="savePortariaRoles()">Salvar cargos da Portaria</button>
+              @if (visitorAutoJoinCleanupRoleId) {
+                <div class="warning mt-5">
+                  <strong>Decida o que fazer com o Visitante anterior</strong>
+                  <p class="mt-2">{{ visitorAutoJoinCleanupRoleName }} ainda está nos cargos automáticos. Como ele também pode ter sido configurado independentemente da Portaria, não foi removido automaticamente.</p>
+                  <div class="flex flex-wrap gap-3 mt-3">
+                    <button type="button" class="secondary-button" [disabled]="mutationInFlight" (click)="keepPreviousVisitorAutoJoin()">Manter como cargo automático</button>
+                    <button type="button" class="primary-button" [disabled]="mutationInFlight" (click)="removePreviousVisitorAutoJoin()">Remover da entrada</button>
+                  </div>
+                </div>
+              }
+            </article>
+            @if (portaria.ambiguous) {
+              <article class="card warning-card">
+                <h3>Mais de uma Portaria encontrada</h3>
+                <p class="help">Escolha explicitamente qual flow editar.</p>
+                <select
+                  class="field-control mt-4"
+                  [value]="selectedFlow?.id ?? ''"
+                  (change)="selectFlow($event)"
+                >
+                  <option value="">Selecione…</option>
+                  @for (flow of portaria.flows; track flow.id) {
+                    <option [value]="flow.id">
+                      #{{ flow.id }} · {{ flow.name }}
+                    </option>
+                  }
+                </select>
+              </article>
+            } @else if (!portaria.configured) {
+              <article class="card">
+                <h3>Portaria ainda não configurada</h3>
+                <p class="help">Escolha usar o template seguro do Coddy ou ligar recursos existentes.</p>
+                <div class="flex gap-3">
+                  <button type="button" class="secondary-button" [class.active]="portariaCreationMode === 'template'" (click)="portariaCreationMode = 'template'">Criar pelo template</button>
+                  <button type="button" class="secondary-button" [class.active]="portariaCreationMode === 'manual'" (click)="portariaCreationMode = 'manual'">Configurar estrutura existente</button>
+                </div>
+                @if (portariaCreationMode === 'template') {
+                <div class="form-grid">
+                  <label
+                    ><span class="field-label">Cargo Visitante</span
+                    ><input
+                      class="field-control"
+                      [(ngModel)]="visitorRoleName" /></label>
+                  <label><span class="field-label">Categoria</span><input class="field-control" [(ngModel)]="portariaCategoryName" /></label>
+                </div>
+                <label class="toggle-row"><input type="checkbox" [(ngModel)]="createApproved" /> Criar canal aprovados</label>
+                <label class="toggle-row"><input type="checkbox" [(ngModel)]="createRejected" /> Criar canal reprovados</label>
+                } @else {
+                <div class="form-grid">
+                  <label><span class="field-label">Cargo Visitante</span><select class="field-control" [(ngModel)]="manualVisitorRoleId">@for (role of orderedRoles; track role.id) { <option [value]="role.id">{{ role.name }}</option> }</select><button type="button" class="secondary-button mt-2" (click)="createFunctionalRole('visitor')">+ Criar</button></label>
+                  <label><span class="field-label">Canal de entrada</span><select class="field-control" [(ngModel)]="manualWelcomeChannelId">@for (channel of textChannels; track channel.id) { <option [value]="channel.id"># {{ channel.name }}</option> }</select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('entry')">+ Criar</button></label>
+                  <label><span class="field-label">Canal de fichas</span><select class="field-control" [(ngModel)]="manualTargetChannelId">@for (channel of textChannels; track channel.id) { <option [value]="channel.id"># {{ channel.name }}</option> }</select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('target')">+ Criar</button></label>
+                  <label><span class="field-label">Aprovados (opcional)</span><select class="field-control" [(ngModel)]="manualApprovedChannelId"><option [ngValue]="undefined">Usar fichas</option>@for (channel of textChannels; track channel.id) { <option [value]="channel.id"># {{ channel.name }}</option> }</select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('approved')">+ Criar</button></label>
+                  <label><span class="field-label">Reprovados (opcional)</span><select class="field-control" [(ngModel)]="manualRejectedChannelId"><option [ngValue]="undefined">Usar fichas</option>@for (channel of textChannels; track channel.id) { <option [value]="channel.id"># {{ channel.name }}</option> }</select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('rejected')">+ Criar</button></label>
+                </div>
+                }
+                <app-role-selection
+                  [roles]="orderedRoles"
+                  [selectedRoleIds]="portariaStaffRoleIds"
+                  label="Cargos com acesso à Portaria"
+                  description="Os cargos da equipe vêm pré-selecionados. Remova os que não devem enxergar os canais internos da Portaria."
+                  selectedStateLabel="Planejado"
+                  (addRole)="addRole(portariaStaffRoleIds, $event)"
+                  (removeRole)="removeRole(portariaStaffRoleIds, $event)"
+                ></app-role-selection>
+                <button
+                  type="button"
+                  (click)="preparePortaria()"
+                  [disabled]="mutationInFlight"
+                  class="primary-button mt-5"
+                >
+                  Configurar Portaria
+                </button>
+              </article>
+            } @else if (selectedFlow) {
+              <article class="card">
+                <p class="eyebrow">Entrada</p>
+                <h3>Configurações de entrada</h3>
+                <section class="rounded-xl border border-gray-200 p-4 mb-4">
+                  <h4 class="font-bold">Acesso inicial</h4>
+                  <p class="help mb-3">Define o cargo recebido enquanto o membro ainda passa pela Portaria.</p>
+                  <p class="help">Os cargos Visitante, Acesso provisório, +18 e -18 são configurados no card de cargos funcionais acima.</p>
+                </section>
+                <section class="rounded-xl border border-gray-200 p-4 mb-4">
+                  <h4 class="font-bold">Requisitos para enviar ficha</h4>
+                  <p class="help mb-3">Define as regras para enviar uma ficha.</p>
+                <div class="form-grid">
+                  <label class="toggle-row"
+                    ><input
+                      type="checkbox"
+                      [(ngModel)]="
+                        portaria.config.aprovacaoAcessoProvisorioAtivo
+                      "
+                    />
+                    Conceder Carteirinha Provisória ao aprovar</label
+                  ><label
+                    ><span class="field-label">Duração da Carteirinha (dias)</span
+                    ><input
+                      type="number"
+                      min="1"
+                      class="field-control"
+                      [(ngModel)]="
+                        portaria.config.aprovacaoAcessoProvisorioDuracaoDias
+                      " /></label
+                  ><label class="toggle-row"
+                    ><input
+                      type="checkbox"
+                      [(ngModel)]="portaria.config.idadeMinimaContaFichaAtiva"
+                    />
+                    Exigir idade mínima da conta do Discord</label
+                  ><label
+                    ><span class="field-label">Conta do Discord com pelo menos (dias)</span
+                    ><input
+                      type="number"
+                      min="0"
+                      class="field-control"
+                      [(ngModel)]="
+                        portaria.config.idadeMinimaContaFichaDias
+                       " [disabled]="!portaria.config.idadeMinimaContaFichaAtiva" /></label>
+                </div></section>
+                <section class="rounded-xl border border-gray-200 p-4 mb-4"><h4 class="font-bold">Carteirinha provisória</h4><p class="help mb-3">Configura o acesso temporário concedido durante o processo da Portaria.</p><div class="form-grid"><label class="toggle-row"
+                    ><input
+                      type="checkbox"
+                      [(ngModel)]="
+                        portaria.config.idadeMinimaContaAcessoProvisorioAtiva
+                      "
+                    />
+                    Exigir idade mínima da conta para receber a Carteirinha</label
+                  ><label
+                    ><span class="field-label"
+                      >Conta do Discord com pelo menos (dias)</span
+                    ><input
+                      type="number"
+                      min="0"
+                      class="field-control"
+                      [(ngModel)]="
+                        portaria.config.idadeMinimaContaAcessoProvisorioDias
+                       " [disabled]="!portaria.config.idadeMinimaContaAcessoProvisorioAtiva" /></label>
+                </div></section>
+                <section class="rounded-xl border border-gray-200 p-4 mb-4"><h4 class="font-bold">Faixa etária</h4><p class="help mb-3">Define os cargos usados para separar membros por idade e as regras mínimas de idade do servidor.</p><div class="form-grid"><label class="toggle-row"
+                    ><input
+                      type="checkbox"
+                      [(ngModel)]="
+                        portaria.config.idadeMinimaEntradaServidorAtiva
+                      "
+                    />
+                    Exigir idade mínima para entrar no servidor</label
+                  ><label
+                    ><span class="field-label">Idade mínima (anos)</span
+                    ><input
+                      type="number"
+                      min="0"
+                      class="field-control"
+                      [(ngModel)]="
+                        portaria.config.idadeMinimaEntradaServidorAnos
+                      "
+                   [disabled]="!portaria.config.idadeMinimaEntradaServidorAtiva" /></label>
+                </div></section>
+                <button
+                  type="button"
+                  (click)="saveEntry()"
+                  [disabled]="mutationInFlight"
+                  [disabled]="mutationInFlight"
+                  class="primary-button mt-5"
+                >
+                  Salvar entrada
+                </button>
+              </article>
+              <article class="card">
+                <p class="eyebrow">Formulário</p>
+                <div class="flex justify-between">
+                  <h3>Perguntas</h3>
+                  <button
+                    type="button"
+                    (click)="addQuestion()"
+                    [disabled]="portaria.questions.length >= 5"
+                    class="secondary-button"
+                  >
+                    + Adicionar
+                  </button>
+                </div>
+                <label class="toggle-row"
+                  ><input
+                    type="checkbox"
+                    [(ngModel)]="portaria.config.formularioPortariaAtivo"
+                  />
+                  Formulário ativo</label
+                >
+                @for (
+                  question of portaria.questions;
+                  track $index;
+                  let index = $index
+                ) {
+                  <div class="question-row">
+                    <input
+                      class="field-control"
+                      [(ngModel)]="question.label"
+                      placeholder="Pergunta"
+                    /><input
+                      class="field-control"
+                      [(ngModel)]="question.placeholder"
+                      placeholder="Placeholder"
+                    /><label
+                      ><input type="checkbox" [(ngModel)]="question.required" />
+                      obrigatória</label
+                    ><button
+                      type="button"
+                      (click)="removeQuestion(index)"
+                      class="danger-link"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                }
+                <button
+                  type="button"
+                  (click)="saveForm()"
+                  [disabled]="mutationInFlight"
+                  [disabled]="mutationInFlight"
+                  class="primary-button mt-5"
+                >
+                  Salvar formulário
+                </button>
+              </article>
+              <article class="card">
+                <p class="eyebrow">Publicação</p>
+                <h3>Publicar acesso ao formulário</h3>
+                <p class="help">Publique a mensagem que os novos membros usarão para abrir o formulário.</p>
+                <label class="block mt-4">
+                  <span class="field-label">Canal de publicação</span>
+                  <select class="field-control" [(ngModel)]="publicationChannelId">
+                    <option value="" disabled>Selecione um canal…</option>
+                    @for (channel of textChannels; track channel.id) {
+                      <option [value]="channel.id"># {{ channel.name }}</option>
+                    }
+                  </select>
+                </label>
+                <p class="help mt-2">O Coddy enviará uma mensagem com um botão para abrir este formulário.</p>
+                <label class="block mt-4"><input type="checkbox" [(ngModel)]="publicationCustomizeMessage"> Personalizar mensagem</label>
+                @if (publicationCustomizeMessage) {
+                  <label class="block mt-2"><span class="field-label">Mensagem</span><textarea class="field-control" [(ngModel)]="publicationMessage" maxlength="2000"></textarea><span class="help">{{ publicationMessage.length }} / 2000</span></label>
+                } @else { <p class="help mt-2">Se desativado, uma nova publicação usa a mensagem padrão e uma publicação existente mantém o texto atual.</p> }
+                <label class="block mt-4"><input type="checkbox" [(ngModel)]="publicationCustomizeButton"> Personalizar texto do botão</label>
+                @if (publicationCustomizeButton) {
+                  <label class="block mt-2"><span class="field-label">Texto do botão</span><input class="field-control" [(ngModel)]="publicationButtonText" maxlength="80"><span class="help">{{ publicationButtonText.length }} / 80</span></label>
+                  @if (!publicationButtonText.trim()) {
+                    <p class="warning mt-2">Informe um texto para o botão ou desative a personalização.</p>
+                  }
+                }
+                <div class="card mt-4">
+                  <p class="eyebrow">Prévia aproximada</p>
+                  @if (publicationCustomizeMessage ? publicationMessage : defaultPortariaPublicationMessage) {
+                    <p class="whitespace-pre-line">{{ publicationCustomizeMessage ? publicationMessage : defaultPortariaPublicationMessage }}</p>
+                  }
+                  <button type="button" class="secondary-button">{{ publicationCustomizeButton ? publicationButtonText : 'Abrir formulário' }}</button>
+                  @if (!publicationCustomizeMessage || !publicationCustomizeButton) {
+                    <p class="help mt-2">Os valores padrão são apenas uma referência para nova publicação; uma publicação existente preserva os campos não personalizados.</p>
+                  }
+                </div>
+                @if (portariaPublicationHasUnsavedChanges) {
+                  <p class="warning mt-3">Salve as alterações da Portaria ou do formulário antes de publicar.</p>
+                }
+                <button
+                  type="button"
+                  (click)="publishPortariaFlow()"
+                  [disabled]="!canPublishPortariaFlow"
+                  class="primary-button mt-5"
+                >
+                  Publicar acesso ao formulário
+                </button>
+              </article>
+              <article class="card">
+                <p class="eyebrow">Resultado</p>
+                <h3>Destinos da análise</h3>
+                <div class="form-grid">
+                  <label
+                    ><span class="field-label">Fichas</span
+                    ><select
+                      class="field-control"
+                      [(ngModel)]="$any(selectedFlow).targetChannelId"
+                    >
+                      @for (channel of textChannels; track channel.id) {
+                        <option [value]="channel.id">
+                          # {{ channel.name }}
+                        </option>
+                      }
+                    </select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('target')">+ Criar</button></label
+                  ><label
+                    ><span class="field-label">Aprovadas</span
+                    ><select
+                      class="field-control"
+                      [(ngModel)]="$any(selectedFlow).approvedTargetChannelId"
+                    >
+                      <option [ngValue]="undefined">Usar fichas</option>
+                      @for (channel of textChannels; track channel.id) {
+                        <option [value]="channel.id">
+                          # {{ channel.name }}
+                        </option>
+                      }
+                    </select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('approved')">+ Criar</button></label
+                  ><label
+                    ><span class="field-label">Reprovadas</span
+                    ><select
+                      class="field-control"
+                      [(ngModel)]="$any(selectedFlow).rejectedTargetChannelId"
+                    >
+                      <option [ngValue]="undefined">Usar fichas</option>
+                      @for (channel of textChannels; track channel.id) {
+                        <option [value]="channel.id">
+                          # {{ channel.name }}
+                        </option>
+                      }
+                    </select><button type="button" class="secondary-button mt-2" (click)="createFunctionalChannel('rejected')">+ Criar</button></label
+                  >
+                </div>
+                <label class="toggle-row"
+                  ><input
+                    type="checkbox"
+                    [(ngModel)]="$any(selectedFlow).rejectionFeedbackEnabled"
+                  />
+                  Solicitar motivo ao reprovar</label
+                ><button
+                  type="button"
+                  (click)="saveResult()"
+                  [disabled]="mutationInFlight"
+                  [disabled]="mutationInFlight"
+                  class="primary-button mt-5"
+                >
+                  Salvar resultado
+                </button>
+                <div class="mt-6 border-t border-red-100 pt-4">
+                  <p class="help mb-3">Ação destrutiva: remove este formulário e as suas publicações, preservando canais e cargos.</p>
+                  <button type="button" (click)="deleteSelectedFlow()" [disabled]="mutationInFlight" class="secondary-button border-red-300 bg-red-50 text-red-700 hover:bg-red-100">Excluir formulário</button>
+                </div>
+              </article>
+            }
+            @if (!portaria.configured && portariaCreationMode === 'template') { <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: portariaPreview }"></ng-container> }
+          </section>
+        } @else if (activeSection === "logs") {
+          <section class="space-y-5">
+            <article class="card">
+              <p class="eyebrow">Logs</p>
+              <h3>Logs do servidor</h3>
+              <p class="help">Escolha quais eventos o Coddy deve registrar e onde cada log será enviado.</p>
+            </article>
+            @if (logsError) { <article class="state-card compact"><p class="error-message">{{ logsError }}</p><button type="button" class="secondary-button" (click)="loadLogs()">Tentar novamente</button></article> }
+            @for (log of orderedLogs; track log.type) {
+              <article class="card">
+                <div class="flex flex-wrap items-center justify-between gap-3"><div><h3>{{ log.label }}</h3><p class="help">{{ log.type === 'call' ? 'Registra as sessões de call do servidor.' : 'Registros operacionais deste evento.' }}</p></div><label class="toggle-row"><input type="checkbox" [checked]="logDrafts[log.type].enabled" (change)="updateLogEnabled(log, $any($event.target).checked)" /> Ativado</label></div>
+                @if (log.target?.missing) { <div class="warning mt-4"><strong>⚠️ Destino indisponível</strong><p>O canal ou tópico configurado não existe mais ou não está acessível ao Coddy.</p></div> }
+                @if (log.target && !log.target.missing && log.target.writable === false) { <div class="warning mt-4"><strong>⚠️ Destino sem permissão</strong><p>Este destino ainda existe, mas o Coddy não consegue enviar logs nele com as permissões atuais.</p></div> }
+                <label class="block mt-4"><span class="field-label">Destino</span><select class="field-control" [ngModel]="logDrafts[log.type].targetId" (ngModelChange)="updateLogTarget(log, $event)"><option [ngValue]="null" disabled>Sem destino configurado</option>@for (target of logOptions(log); track target.id) { <option [ngValue]="target.id" [disabled]="target.disabled">{{ target.label }}</option> }</select></label>
+                @if (isLogDirty(log)) { <p class="help mt-3">Alterações não salvas</p> }
+                @if (logDrafts[log.type].error) { <p class="error-message mt-3">{{ logDrafts[log.type].error }}</p> }
+                <div class="flex flex-wrap gap-3 mt-4"><button type="button" class="primary-button" [disabled]="!isLogDirty(log) || logDrafts[log.type].saving || (logDrafts[log.type].enabled && !logDrafts[log.type].targetId)" (click)="saveLog(log)">{{ logDrafts[log.type].saving ? 'Salvando…' : 'Salvar alterações' }}</button><button type="button" class="secondary-button" [disabled]="!logDrafts[log.type].targetId || logDrafts[log.type].testing" (click)="testLog(log)">{{ logDrafts[log.type].testing ? 'Enviando…' : 'Enviar log de teste' }}</button></div>
+              </article>
+            }
+          </section>
+        } @else if (activeSection === "private-area") {
+          <section class="space-y-5">
+            <article class="card">
+              <p class="eyebrow">Preview reutilizável</p>
+              <h3>Área exclusiva para cargos</h3>
+              <div class="form-grid">
+                <label
+                  ><span class="field-label">Categoria</span
+                  ><input
+                    class="field-control"
+                    [(ngModel)]="privateCategoryName" /></label
+                ><label
+                  ><span class="field-label">Canais separados por vírgula</span
+                  ><input
+                    class="field-control"
+                    [(ngModel)]="privateChannelNames"
+                /></label>
+              </div>
+              <app-role-selection
+                [roles]="orderedRoles"
+                [selectedRoleIds]="privateAllowedRoleIds"
+                label="Cargos permitidos"
+                description="Os cargos da equipe vêm pré-selecionados, mas você pode removê-los desta área. Apenas os cargos selecionados terão acesso."
+                selectedStateLabel="Planejado"
+                (addRole)="addRole(privateAllowedRoleIds, $event)"
+                (removeRole)="removeRole(privateAllowedRoleIds, $event)"
+              ></app-role-selection>
+              <p class="help">O preview abaixo é atualizado localmente enquanto você edita. É uma simulação e nada será aplicado ao Discord.</p>
+              <button type="button" class="primary-button mt-5" (click)="createPrivateArea()" [disabled]="mutationInFlight || !privateAllowedRoleIds.length">
+                {{ mutationInFlight ? 'Criando área…' : 'Criar área privada' }}
+              </button>
+            </article>
+            <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
+          </section>
+        } @else if (activeSection === 'vip') {
+          <app-vip-configuration-panel
+            [guildId]="selectedServerId"
+            [resources]="resources"
+            (dirtyChange)="vipDirty = $event"
+            (savingChange)="vipSaving = $event"
+          ></app-vip-configuration-panel>
+        } @else if (activeSection === 'ai') {
+          <app-ai-configuration-panel
+            [guildId]="selectedServerId"
+            [channels]="resources.channels"
+            (dirtyChange)="aiDirty = $event"
+            (savingChange)="aiSaving = $event"
+          ></app-ai-configuration-panel>
+        } @else if (activeSection === 'leveling') {
+          <app-xp-leveling-panel
+            [guildId]="selectedServerId"
+            [channels]="resources.channels"
+            (dirtyChange)="xpDirty = $event"
+            (savingChange)="xpSaving = $event"
+          ></app-xp-leveling-panel>
+        } @else if (activeSection === 'economy' || activeSection === 'tickets') {
+          <section class="state-card compact">
+            <div class="text-4xl">{{ activeSectionDetails?.icon }}</div>
+            <span class="coming-soon">Em breve</span><h3>{{ activeSectionDetails?.label }}</h3>
+            <p>{{ activeSection === 'economy' ? 'Configurações de moeda, ganhos, recompensas e recursos econômicos serão gerenciadas aqui.' : 'Configurações de atendimento, categorias e fluxos de tickets serão gerenciadas aqui.' }}</p>
+          </section>
+        }
+        @if (saveState === "saving") {
+          <p class="save-status">Salvando…</p>
+        } @else if (saveState === "saved") {
+          <p class="save-status success">Salvo.</p>
+        } @else if (saveState === "error") {
+          <p class="error-message">
+            {{ saveError }}
+            <button type="button" (click)="retrySave()">
+              Tentar novamente
+            </button>
+          </p>
+        }
+        @if (pendingConfirmation) {
+          <app-operation-modal state="confirmation" [title]="pendingConfirmation.title" [message]="pendingConfirmation.summary" [busy]="mutationInFlight" (confirm)="confirmPending()" (cancel)="cancelPending()"></app-operation-modal>
+        }
+        @if (operationModal) {
+          <app-operation-modal [state]="operationModal.state" [title]="operationModal.title" [message]="operationModal.message" [details]="operationModal.details" (close)="closeOperationModal()"></app-operation-modal>
+        }
+        @if (pendingNavigation) { <section class="navigation-confirmation" role="dialog" aria-modal="true" aria-label="Alterações não salvas"><h3>Você possui alterações não salvas.</h3><p>Escolha continuar editando ou descartar as alterações antes de navegar.</p><div><button type="button" class="secondary-button" [disabled]="mutationInFlight || bumpMutationInFlight || xpSaving || aiSaving || vipSaving || backupSaving" (click)="continueEditing()">Continuar editando</button><button type="button" class="primary-button" [disabled]="mutationInFlight || bumpMutationInFlight || xpSaving || aiSaving || vipSaving || backupSaving" (click)="discardAndNavigate()">Descartar alterações</button></div></section> }
+      }
+      <ng-template #previewTemplate let-preview>
+        @if (preview) {
+          <article class="card preview-card">
+            <div class="flex justify-between">
+              <div>
+                <p class="eyebrow">Simulação local</p>
+                <h3>
+                  {{
+                    preview.type === "portaria" ? "PORTARIA" : "ÁREA PRIVADA"
+                  }}
+                </h3>
+              </div>
+              <span class="preview-badge">SIMULAÇÃO</span>
+            </div>
+            <ul class="plan-tree">
+              @for (role of preview.creates.roles; track role.name) {
+                <li>+ Cargo {{ role.name }}</li>
+              }
+              @for (
+                category of preview.creates.categories;
+                track category.name
+              ) {
+                <li>+ Categoria {{ category.name }}</li>
+              }
+              @for (channel of preview.creates.channels; track channel.name) {
+                <li class="ml-5">├── #{{ channel.name }}</li>
+              }
+            </ul>
+            @if (preview.permissionChanges.length) {
+              <h4>Permissões planejadas</h4>
+              <ul class="permission-list">
+                @for (change of preview.permissionChanges; track $index) {
+                  <li>
+                    <strong>{{ previewTargetLabel(change.target) }}</strong>:
+                    {{ previewSubjectLabel(change.subject) }}
+                    <span class="permission-chip" [class.allow]="change.effect === 'allow'">
+                      Visualizar: {{ change.effect === "allow" ? "permitido" : "negado" }}
+                    </span>
+                  </li>
+                }
+              </ul>
+            }
+            @if (preview.affectedExistingResources.length) {
+              <h4>Isolamento afetaria</h4>
+              <ul>
+                @for (
+                  item of preview.affectedExistingResources;
+                  track item.id
+                ) {
+                  <li>
+                    {{ item.type === "category" ? "Categoria" : "#" }}
+                    {{ item.name }}
+                  </li>
+                }
+              </ul>
+            }
+            @if (preview.warnings.length) {
+              <div class="warning">
+                @for (warning of preview.warnings; track warning) {
+                  <p>{{ warning }}</p>
+                }
+              </div>
+            }
+            <button
+              type="button"
+              disabled
+              class="primary-button opacity-50 mt-5"
+            >
+              Aplicar estrutura — disponível em breve
+            </button>
+          </article>
+        }
+      </ng-template>
+    } @else {
+      <section class="state-card">
+        <div class="text-4xl">🤖</div>
+        <h1>Nenhum servidor por aqui</h1>
+        <p>Esta Community não possui uma rede Discord administrável por você.</p>
+      </section>
+    }
+  </div>
+</main>

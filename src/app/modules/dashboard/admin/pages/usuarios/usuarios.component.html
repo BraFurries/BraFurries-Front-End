@@ -1,0 +1,127 @@
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Gestão de Usuários</h2>
+
+    <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+      <div class="relative flex-1 sm:w-64">
+        <input type="text" placeholder="Nome, @usuário, e-mail ou Discord User ID..." [(ngModel)]="search" (keyup.enter)="applyFilters()"
+               class="w-full bg-white border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 pl-10 shadow-sm transition">
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</div>
+      </div>
+      <select [(ngModel)]="status" (change)="applyFilters()"
+              class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
+        <option value="">Todos status</option>
+        <option value="active">Ativos</option>
+        <option value="banned">Banidos</option>
+      </select>
+      <select [(ngModel)]="role" (change)="applyFilters()"
+              class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
+        <option value="">Todos cargos</option>
+        <option value="member">Membros</option>
+        <option value="supporter">Apoiadores</option>
+        <option value="moderator">Moderadores</option>
+        <option value="admin">Administradores</option>
+      </select>
+      <button (click)="applyFilters()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2.5 rounded-xl transition shadow-sm">
+        ⚙️ Filtros
+      </button>
+    </div>
+  </div>
+
+  <p class="-mt-3 text-xs text-gray-500">Use o Discord User ID completo para localizar exatamente a conta vinculada ao Discord.</p>
+
+  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
+
+  <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+    <div *ngIf="loading" class="p-6 text-sm text-gray-500">Carregando usuários...</div>
+
+    <div *ngIf="!loading" class="overflow-x-auto">
+      <table class="w-full text-sm text-left text-gray-500">
+        <thead class="text-xs text-gray-400 uppercase bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider">ID</th>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider">Usuário</th>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider">Discord</th>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider">Cargo</th>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider">Status</th>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider">Data de Entrada</th>
+            <th scope="col" class="px-6 py-4 font-bold tracking-wider text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users" class="bg-white border-b border-gray-50 hover:bg-gray-50/50 transition">
+            <td class="px-6 py-4 font-mono text-xs font-bold text-gray-500">#{{ user.id }}</td>
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-3">
+                <img [src]="getUserAvatar(user)" alt="Avatar" class="w-8 h-8 rounded-full">
+                <div>
+                  <span class="font-bold text-gray-800">{{ user.name }}</span>
+                  <p *ngIf="user.email" class="text-xs text-gray-400">{{ user.email }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 text-gray-600">
+              <span *ngIf="user.discordAmbiguous" class="text-xs font-bold text-yellow-700">Múltiplos vínculos</span>
+              <ng-container *ngIf="!user.discordAmbiguous">{{ user.discordUsername ? '@' + user.discordUsername : '-' }}</ng-container>
+            </td>
+            <td class="px-6 py-4">
+              <span class="bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full border border-gray-200">
+                {{ getRoleLabel(user.role) }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-xs font-bold px-2.5 py-1 rounded-full"
+                    [ngClass]="{
+                      'bg-green-100 text-green-700': user.status === 'active',
+                      'bg-red-100 text-red-700': user.status === 'banned',
+                      'bg-orange-100 text-orange-700': user.status === 'muted'
+                    }">
+                {{ getStatusLabel(user.status) }}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-gray-500">{{ formatDate(user.joinedAt) }}</td>
+            <td class="px-6 py-4 text-right">
+              <a [routerLink]="[user.id]" class="text-gray-400 hover:text-braPurple transition px-2" aria-label="Abrir ficha administrativa">✏️</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div *ngIf="!loading && pagination" class="p-4 border-t border-gray-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between text-sm text-gray-500">
+      <span>Mostrando página {{ pagination.page }} de {{ pagination.totalPages || 1 }} - {{ pagination.totalItems | number:'1.0-0' }} usuários</span>
+
+      <div class="flex flex-wrap items-center gap-1">
+        <button (click)="firstPage()" [disabled]="pagination.page <= 1"
+                class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          « Primeira
+        </button>
+        <button (click)="previousPage()" [disabled]="pagination.page <= 1"
+                class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          ‹ Anterior
+        </button>
+
+        <label class="flex items-center gap-2 px-2">
+          <span>Página</span>
+          <input type="number"
+                 min="1"
+                 [max]="pagination.totalPages || 1"
+                 [(ngModel)]="pageInput"
+                 (keyup.enter)="goToPage(pageInput)"
+                 (change)="goToPage(pageInput)"
+                 class="w-16 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-gray-700 focus:border-braPurple focus:ring-braPurple">
+          <span>de {{ pagination.totalPages || 1 }}</span>
+        </label>
+
+        <button (click)="nextPage()" [disabled]="pagination.page >= pagination.totalPages"
+                class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          Próxima ›
+        </button>
+        <button (click)="lastPage()" [disabled]="pagination.totalPages <= 0 || pagination.page >= pagination.totalPages"
+                class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          Última »
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

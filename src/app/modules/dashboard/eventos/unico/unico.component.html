@@ -1,0 +1,918 @@
+<main class="flex-1 flex flex-col relative bg-white overflow-hidden h-full">
+    <div class="absolute inset-0 bg-pattern pointer-events-none"></div>
+
+    <!-- TELA DE CARREGAMENTO -->
+    <div *ngIf="isLoading"
+        class="flex-1 flex flex-col items-center justify-center min-h-[calc(100dvh-120px)] w-full bg-gray-50/80 backdrop-blur-md transition-opacity duration-500">
+        <div class="relative w-36 h-36 flex items-center justify-center mb-2">
+            <div class="absolute inset-0 border-[5px] border-braCyan/20 rounded-full"></div>
+            <div class="absolute inset-0 border-[5px] border-braCyan border-t-transparent rounded-full animate-spin">
+            </div>
+            <div class="absolute inset-0 flex items-center justify-center text-6xl animate-pulse">🐾</div>
+        </div>
+        <div class="text-center mt-4">
+            <h2 class="text-3xl font-amaranth font-bold text-braDark tracking-wide animate-pulse italic">Farejando
+                detalhes...</h2>
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2 animate-pulse">Carregando o evento
+            </p>
+        </div>
+    </div>
+
+    <div *ngIf="hasError && !isLoading"
+        class="flex-1 flex flex-col items-center justify-center relative z-10 px-10 text-center">
+        <div
+            class="w-32 h-32 bg-red-50 rounded-[2.5rem] flex items-center justify-center text-6xl mb-6 shadow-sm border border-red-100">
+            😿
+        </div>
+        <h2 class="text-4xl font-amaranth font-bold text-braDark italic mb-4">Poxa, evento não encontrado!</h2>
+        <p class="text-gray-500 font-medium max-w-md mx-auto mb-8">
+            Não conseguimos carregar as informações que você pediu. O evento pode ter sido cancelado, o link está
+            quebrado ou a internet deu uma tropeçada.
+        </p>
+        <button
+            class="bg-braDark text-white font-amaranth font-bold text-lg px-8 py-4 rounded-2xl shadow-lg hover:bg-braPurple hover:scale-105 transition-all"
+            routerLink="/painel/eventos">
+            Voltar para Eventos
+        </button>
+    </div>
+
+    <ng-container *ngIf="!isLoading && !hasError">
+        <div class="bg-braDark text-white px-4 py-3 md:px-10 md:py-4 flex flex-row justify-between items-center sticky top-0 z-30 shadow-xl gap-3"
+            *ngIf="isStaff || isAdmin">
+            <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+                <span class="bg-braYellow text-braDark text-[9px] md:text-[10px] font-bold px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase">Modo
+                    Gestão</span>
+                <p class="hidden min-[1050px]:block text-sm font-semibold opacity-80 leading-snug">Você possui permissões administrativas neste evento.</p>
+            </div>
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar w-full justify-end">
+                <ng-container *ngIf="isAdmin">
+                    <ng-container *ngIf="evento?.approved === null">
+                        <button type="button" [disabled]="isUpdatingApproval"
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            (click)="aprovarEvento()">
+                            Aprovar Evento
+                        </button>
+                        <button type="button" [disabled]="isUpdatingApproval"
+                            class="bg-braMagenta hover:bg-opacity-80 text-white font-bold px-4 py-2 rounded-xl text-xs transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            (click)="reprovarEvento()">
+                            Reprovar
+                        </button>
+                    </ng-container>
+                    <button type="button" [disabled]="isUpdatingPartner"
+                        class="bg-braYellow text-braDark font-bold px-4 py-2 rounded-xl text-xs hover:brightness-110 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        *ngIf="!eventoParceiro" (click)="toggleParceria()">
+                        Tornar Parceiro
+                    </button>
+                    <button type="button" [disabled]="isUpdatingPartner"
+                        class="bg-braYellow text-braDark font-bold px-4 py-2 rounded-xl text-xs hover:brightness-110 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        *ngIf="eventoParceiro" (click)="toggleParceria()">
+                        Remover Parceria
+                    </button>
+                </ng-container>
+                <ng-container *ngIf="isStaff || isAdmin">
+                    <button type="button" [matMenuTriggerFor]="optionsMenu"
+                        class="bg-braCyan text-braDark font-bold px-4 py-2 rounded-xl text-xs hover:brightness-110 transition flex items-center gap-1 shadow-sm">
+                        Opções <span class="text-[10px]">▼</span>
+                    </button>
+                    <mat-menu #optionsMenu="matMenu" class="rounded-2xl">
+                        <a mat-menu-item [routerLink]="['/painel/eventos', evento?.id, 'editar']"
+                            class="font-bold text-braDark">
+                            <span class="mr-2 text-lg">✏️</span> Editar Evento
+                        </a>
+                        <button mat-menu-item *ngIf="isEventCreator(evento)" (click)="abrirDialogTransferencia()"
+                            class="font-bold text-braDark">
+                            <span class="mr-2 text-lg">👑</span> Transferir Titularidade
+                        </button>
+                        <button mat-menu-item *ngIf="isAdmin && !isEventCreator(evento)"
+                            (click)="abrirDialogVerTitularidade()" class="font-bold text-braDark">
+                            <span class="mr-2 text-lg">🛡️</span> Ver Titularidade
+                        </button>
+                    </mat-menu>
+                </ng-container>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col relative bg-white overflow-y-auto custom-scrollbar">
+            <div class="absolute inset-0 bg-pattern pointer-events-none"></div>
+
+            <div *ngIf="!isLoading && !hasError"
+                class="h-56 md:h-64 bg-braDark relative flex items-start pt-4 md:pt-0 md:items-center justify-center overflow-hidden shrink-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-braPurple/50 to-braCyan/50 opacity-40"></div>
+                <div
+                    class="relative z-10 w-40 h-40 bg-white rounded-[2.5rem] shadow-2xl flex items-center justify-center overflow-hidden border-4 border-white">
+                    <span class="font-amaranth font-bold text-braDark text-2xl"><img [src]="evento?.eventLogoUrl"
+                            [alt]="'Logo do evento '+evento?.eventName || 'Logo do evento'"></span>
+                </div>
+            </div>
+
+            <div class="px-0 pt-0 pb-6 md:p-10 max-w-6xl mx-auto w-full relative z-10 -mt-6 md:-mt-16">
+                <div
+                    class="bg-white rounded-none md:rounded-[3rem] p-4 md:p-8 shadow-xl md:border md:border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 md:gap-6">
+                    <div class="w-full">
+                        <div class="flex items-center gap-2 mb-2">
+                            <ng-container *ngIf="isAdmin">
+                                <ng-container [ngSwitch]="evento?.approved">
+                                    <span
+                                        class="bg-green-100 text-gray-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest"
+                                        *ngSwitchCase="null">
+                                        Pendente
+                                    </span>
+                                    <span
+                                        class="bg-green-100 text-green-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest"
+                                        *ngSwitchCase="true">
+                                        Aprovado
+                                    </span>
+                                    <span
+                                        class="bg-red-100 text-red-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest"
+                                        *ngSwitchCase="false">
+                                        Reprovado
+                                    </span>
+                                </ng-container>
+                            </ng-container>
+                            <span
+                                class="bg-braYellow text-braDark text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest"
+                                *ngIf="eventoParceiro">⭐ Parceiro</span>
+                        </div>
+                        <h1 class="text-2xl md:text-4xl font-amaranth font-bold text-braDark leading-tight italic">{{
+                            evento?.eventName || "Evento" }}</h1>
+                        <p class="text-braCyan font-bold uppercase tracking-widest text-xs md:text-sm mt-1">{{ evento?.city || "-"
+                            }}, {{ evento?.localeAbbrev || "-" }} • {{ evento?.pointName || "-" }}</p>
+                    </div>
+
+                    <div class="bg-gray-50 px-4 py-3 md:px-8 md:py-6 rounded-2xl md:rounded-[2.5rem] border border-gray-100 flex items-center justify-between md:block shrink-0 w-full xl:w-auto text-left md:text-center">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest md:mb-3">Organizado por</p>
+                        <div class="flex items-center gap-2 md:justify-center">
+                            <div
+                                class="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-braPurple flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                {{ evento?.host?.displayName?.charAt(0) || 'H' }}
+                            </div>
+                            <span class="font-bold text-sm md:text-base text-braDark truncate max-w-[120px] md:max-w-none">{{ evento?.host?.displayName || "Host Desconhecido"
+                                }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-[550px]:px-0 px-4 md:px-10 pb-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10 relative z-10">
+
+                <div class="lg:col-span-2 space-y-6 md:space-y-10 flex flex-col">
+                    <!-- Botões de Ação (Mobile Only) -->
+                    <div class="lg:hidden flex flex-col sm:flex-row gap-3 w-full max-[550px]:px-4">
+                        <a *ngIf="evento?.ticketUrl" [href]="evento?.ticketUrl" target="_blank"
+                            rel="noopener noreferrer"
+                            class="flex-1 block text-center bg-braCyan text-braDark font-amaranth font-bold py-4 rounded-2xl hover:scale-105 transition shadow-lg text-lg">
+                            {{ (evento?.price ?? 0) > 0 ? "Comprar Ingresso" : "Ver Ingresso" }}
+                        </a>
+
+                        <ng-container *ngIf="!evento?.ticketUrl">
+                            <a *ngIf="evento?.website" [href]="evento?.website" target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex-1 block text-center bg-braCyan text-braDark font-amaranth font-bold py-4 rounded-2xl hover:scale-105 transition shadow-lg text-lg">
+                                Ir para o Site
+                            </a>
+
+                            <a *ngIf="evento?.groupChatLink" [href]="evento?.groupChatLink" target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex-1 block text-center bg-braDark text-white font-amaranth font-bold py-4 rounded-2xl shadow-lg border border-braPurple/50 hover:scale-105 hover:bg-braPurple transition text-lg">
+                                Entrar no Grupo
+                            </a>
+                        </ng-container>
+                    </div>
+
+                    <section class="bg-white max-[550px]:p-6 p-8 max-[550px]:rounded-none rounded-[2.5rem] max-[550px]:border-x-0 border border-gray-100 shadow-sm space-y-6"
+                        *ngIf="evento?.description">
+                        <h2 class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic">
+                            <span class="text-braPurple">📝</span> Sobre o Evento
+                        </h2>
+                        <p class="text-gray-600 leading-relaxed font-medium">
+                            {{ evento?.description || "Sem descrição para este evento." }}
+                        </p>
+                    </section>
+
+                    <section class="bg-white max-[550px]:p-6 p-8 max-[550px]:rounded-none rounded-[2.5rem] max-[550px]:border-x-0 border border-gray-100 shadow-sm space-y-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <h2 class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic">
+                                <span class="text-braYellow text-2xl md:text-3xl">⏰</span> Agenda do Evento
+                            </h2>
+
+                            <div *ngIf="editingSchedule" [formGroup]="scheduleForm"
+                                class="flex items-center justify-between bg-gray-50 p-3 px-5 rounded-2xl border border-gray-100">
+                                <div class="mr-6">
+                                    <p class="font-bold text-sm text-braDark">Evento de um único dia</p>
+                                </div>
+                                <label for="isSingleDay"
+                                    class="relative inline-flex items-center cursor-pointer shrink-0">
+                                    <input type="checkbox" id="isSingleDay" formControlName="isSingleDay"
+                                        class="sr-only peer">
+                                    <div
+                                        class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-braYellow/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-braYellow">
+                                    </div>
+                                </label>
+                            </div>
+
+                            <button *ngIf="canEditSchedule && !editingSchedule" type="button"
+                                class="text-xs font-bold text-braYellow bg-braYellow/10 px-4 py-2 rounded-xl hover:bg-braYellow hover:text-braDark transition shrink-0"
+                                (click)="toggleScheduleEditing()">
+                                Gerenciar Agenda
+                            </button>
+                        </div>
+
+                        <div [ngSwitch]="editingSchedule">
+                            <form *ngSwitchCase="true" [formGroup]="scheduleForm" class="space-y-4"
+                                (ngSubmit)="salvarAgenda()">
+                                <div class="rounded-3xl border border-braYellow/20 bg-braYellow/5 overflow-hidden">
+                                    <!-- Layout de Múltiplos Dias -->
+                                    <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-braYellow/10"
+                                        *ngIf="!scheduleForm.get('isSingleDay')?.value">
+                                        <div class="p-6">
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-4">Início do
+                                                Evento</p>
+                                            <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                                                <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                    class="bf-mat-field bf-mat-field-cyan w-full">
+                                                    <input matInput [matDatepicker]="scheduleStartPicker"
+                                                        formControlName="startDate" placeholder="Selecione a data"
+                                                        readonly>
+                                                    <mat-datepicker-toggle matIconSuffix
+                                                        [for]="scheduleStartPicker"></mat-datepicker-toggle>
+                                                    <mat-datepicker #scheduleStartPicker></mat-datepicker>
+                                                </mat-form-field>
+
+                                                <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                    class="bf-mat-field bf-mat-field-cyan w-full">
+                                                    <mat-select formControlName="startTime" placeholder="Hora"
+                                                        panelClass="bf-select-panel">
+                                                        <mat-option *ngFor="let option of timeOptions"
+                                                            [value]="option.value">{{ option.label }}</mat-option>
+                                                    </mat-select>
+                                                </mat-form-field>
+                                            </div>
+                                        </div>
+
+                                        <div class="p-6">
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-4">Encerramento
+                                            </p>
+                                            <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                                                <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                    class="bf-mat-field bf-mat-field-cyan w-full">
+                                                    <input matInput [matDatepicker]="scheduleEndPicker"
+                                                        formControlName="endDate" placeholder="Selecione a data"
+                                                        readonly>
+                                                    <mat-datepicker-toggle matIconSuffix
+                                                        [for]="scheduleEndPicker"></mat-datepicker-toggle>
+                                                    <mat-datepicker #scheduleEndPicker></mat-datepicker>
+                                                </mat-form-field>
+
+                                                <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                    class="bf-mat-field bf-mat-field-cyan w-full">
+                                                    <mat-select formControlName="endTime" placeholder="Hora"
+                                                        panelClass="bf-select-panel">
+                                                        <mat-option *ngFor="let option of timeOptions"
+                                                            [value]="option.value">{{ option.label }}</mat-option>
+                                                    </mat-select>
+                                                </mat-form-field>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Layout de Único Dia -->
+                                    <div class="grid divide-y lg:divide-y-0 lg:divide-x divide-braYellow/10"
+                                        style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));"
+                                        *ngIf="scheduleForm.get('isSingleDay')?.value">
+                                        <div class="p-6">
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-4">Data do Evento
+                                            </p>
+                                            <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                class="bf-mat-field bf-mat-field-cyan w-full">
+                                                <input matInput [matDatepicker]="scheduleStartPickerSingle"
+                                                    formControlName="startDate" placeholder="Selecione a data" readonly>
+                                                <mat-datepicker-toggle matIconSuffix
+                                                    [for]="scheduleStartPickerSingle"></mat-datepicker-toggle>
+                                                <mat-datepicker #scheduleStartPickerSingle></mat-datepicker>
+                                            </mat-form-field>
+                                        </div>
+                                        <div class="p-6">
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-4">Início</p>
+                                            <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                class="bf-mat-field bf-mat-field-cyan w-full">
+                                                <mat-select formControlName="startTime" placeholder="Hora"
+                                                    panelClass="bf-select-panel">
+                                                    <mat-option *ngFor="let option of timeOptions"
+                                                        [value]="option.value">{{ option.label }}</mat-option>
+                                                </mat-select>
+                                            </mat-form-field>
+                                        </div>
+                                        <div class="p-6">
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-4">Término</p>
+                                            <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                                                class="bf-mat-field bf-mat-field-cyan w-full">
+                                                <mat-select formControlName="endTime" placeholder="Hora"
+                                                    panelClass="bf-select-panel">
+                                                    <mat-option *ngFor="let option of timeOptions"
+                                                        [value]="option.value">{{ option.label }}</mat-option>
+                                                </mat-select>
+                                            </mat-form-field>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end gap-3">
+                                    <button type="button"
+                                        class="bg-gray-100 text-gray-600 font-bold px-5 py-2 rounded-xl text-sm hover:bg-gray-200 transition"
+                                        (click)="toggleScheduleEditing()">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" [disabled]="isSavingSchedule"
+                                        class="bg-braYellow text-braDark font-bold px-5 py-2 rounded-xl text-sm hover:brightness-105 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                                        {{ isSavingSchedule ? 'Salvando...' : 'Salvar Agenda' }}
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div *ngSwitchDefault class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <!-- Layout de Múltiplos Dias -->
+                                <ng-container *ngIf="!isSingleDayEvent">
+                                    <div class="bg-gray-50 p-4 md:p-6 rounded-2xl md:rounded-3xl border-l-[6px] md:border-l-8 border-braYellow">
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase">Início do Evento</p>
+                                        <p class="text-xl md:text-2xl font-amaranth font-bold text-braDark mt-1">{{
+                                            (evento?.startingDatetime | date:'dd/MMM/yyyy')?.replace('.', '') }}</p>
+                                        <p class="text-xs md:text-sm font-bold text-braDark/60">às {{ evento?.startingDatetime |
+                                            date:'HH:mm' }}h</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 md:p-6 rounded-2xl md:rounded-3xl border-l-[6px] md:border-l-8 border-braDark">
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase">Encerramento</p>
+                                        <p class="text-xl md:text-2xl font-amaranth font-bold text-braDark mt-1">{{
+                                            (evento?.endingDatetime | date:'dd/MMM/yyyy')?.replace('.', '') }}</p>
+                                        <p class="text-xs md:text-sm font-bold text-braDark/60">às {{ evento?.endingDatetime |
+                                            date:'HH:mm' }}h</p>
+                                    </div>
+                                </ng-container>
+
+                                <!-- Layout de Único Dia -->
+                                <ng-container *ngIf="isSingleDayEvent">
+                                    <div class="bg-gray-50 p-4 md:p-6 rounded-2xl md:rounded-3xl border-l-[6px] md:border-l-8 border-braYellow flex flex-col">
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase">Data do Evento</p>
+                                        <p class="text-xl md:text-2xl font-amaranth font-bold text-braDark mt-1">{{
+                                            (evento?.startingDatetime | date:'dd/MMM/yyyy')?.replace('.', '') }}</p>
+                                        <p class="text-xs md:text-sm font-bold opacity-0 select-none" aria-hidden="true">-</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 md:p-6 rounded-2xl md:rounded-3xl border-l-[6px] md:border-l-8 border-braDark">
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase">Horário</p>
+                                        <p class="text-xl md:text-2xl font-amaranth font-bold text-braDark mt-1">{{
+                                            evento?.startingDatetime | date:'HH:mm' }}h</p>
+                                        <p class="text-xs md:text-sm font-bold text-braDark/60">até às {{ evento?.endingDatetime |
+                                            date:'HH:mm' }}h</p>
+                                    </div>
+                                </ng-container>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="lg:hidden bg-white max-[550px]:p-6 p-8 max-[550px]:rounded-none rounded-[2.5rem] max-[550px]:border-x-0 border border-gray-100 shadow-sm">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="text-2xl">📍</span>
+                            <h3 class="font-amaranth font-bold text-xl text-braDark italic">Como Chegar</h3>
+                        </div>
+
+                        <p class="font-bold text-braDark">{{ evento?.pointName || "Local não informado" }}</p>
+                        <p class="text-sm text-gray-500 mt-1">{{ evento?.address || "Endereço não informado" }}</p>
+
+                        <div class="mt-6">
+                            <button
+                                class="w-full bg-gray-50 text-braDark font-bold py-3 rounded-xl text-xs hover:bg-gray-100 transition border border-gray-200">
+                                Abrir no Google Maps
+                            </button>
+                        </div>
+                    </div>
+
+                    <section class="bg-white max-[550px]:p-6 p-8 max-[550px]:rounded-none rounded-[2.5rem] max-[550px]:border-x-0 border border-gray-100 shadow-sm space-y-6">
+                        <div class="flex justify-between items-center flex-wrap gap-4">
+                            <h2 class="text-xl md:text-2xl font-amaranth font-bold text-braDark flex items-center gap-2 italic">
+                                <span class="text-braCyan">🐾</span> Equipe do Evento
+                            </h2>
+
+                            <div class="flex items-center gap-3">
+                                <button *ngIf="editingStaff && canManageStaff"
+                                    class="text-xs font-bold text-white bg-braCyan px-4 py-2 rounded-xl hover:brightness-105 transition shadow-sm flex items-center gap-2"
+                                    (click)="abrirAddStaffModal()"> <span>➕</span> Adicionar Membro
+                                </button>
+
+                                <button *ngIf="canManageStaff"
+                                    class="text-xs font-bold text-braCyan bg-braCyan/10 px-4 py-2 rounded-xl hover:bg-braCyan hover:text-braDark transition"
+                                    (click)="toggleStaffEditing()">
+                                    {{ editingStaff ? 'Cancelar' : 'Gerenciar Equipe' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div [ngSwitch]="editingStaff">
+                            <ng-container *ngSwitchCase="true">
+                                <div *ngIf="isLoadingStaffPermissions"
+                                    class="rounded-3xl border border-gray-100 bg-gray-50 p-6 text-sm font-bold text-gray-500">
+                                    Carregando permissões da equipe...
+                                </div>
+
+                                <div *ngIf="hasStaffPermissionsError && !isLoadingStaffPermissions"
+                                    class="rounded-3xl border border-red-100 bg-red-50 p-6 text-sm font-bold text-red-500">
+                                    Não foi possível carregar as permissões da equipe.
+                                </div>
+
+                                <div class="rounded-3xl border border-gray-50 overflow-hidden">
+                                    <div *ngIf="!isLoadingStaffPermissions && !hasStaffPermissionsError"
+                                        class="w-full overflow-x-auto custom-scrollbar">
+                                        <table class="w-full text-left min-w-[600px]">
+                                            <thead class="bg-gray-50 font-archivo">
+                                                <tr>
+                                                    <th
+                                                        class="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                        Membro</th>
+                                                    <th
+                                                        class="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                                                        Agenda</th>
+                                                    <th
+                                                        class="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                                                        Editar</th>
+                                                    <th
+                                                        class="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                                                        Equipe</th>
+                                                    <th class="px-6 py-4 text-right"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-50 font-archivo">
+                                                <tr *ngFor="let staff of staffPermissionRows">
+
+                                                    <td class="px-6 py-4">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="font-bold text-braDark">{{ staff.displayName
+                                                                }}</span>
+
+                                                            <span *ngIf="staffIsHost(staff)"
+                                                                class="bg-braYellow/10 text-braYellow border border-braYellow/20 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest shrink-0">
+                                                                Dono
+                                                            </span>
+                                                            <input *ngIf="!staffIsHost(staff)"
+                                                                type="text"
+                                                                class="bg-gray-100 text-gray-600 border border-gray-200 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest shrink-0 outline-none focus:border-braCyan focus:bg-white w-28"
+                                                                [value]="staff.cargo || ''"
+                                                                (input)="staff.cargo = $any($event.target).value"
+                                                                placeholder="Cargo">
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="px-6 py-4 text-center">
+                                                        <input type="checkbox" class="w-4 h-4 accent-braCyan"
+                                                            [checked]="staff.mngAgenda"
+                                                            (change)="staff.mngAgenda = $any($event.target).checked"
+                                                            [disabled]="staffIsHost(staff) || staff.isSaving">
+                                                    </td>
+                                                    <td class="px-6 py-4 text-center">
+                                                        <input type="checkbox" class="w-4 h-4 accent-braPurple"
+                                                            [checked]="staff.editEvent"
+                                                            (change)="staff.editEvent = $any($event.target).checked"
+                                                            [disabled]="staffIsHost(staff) || staff.isSaving">
+                                                    </td>
+                                                    <td class="px-6 py-4 text-center">
+                                                        <input type="checkbox" class="w-4 h-4 accent-braMagenta"
+                                                            [checked]="staff.mngStaff"
+                                                            (change)="staff.mngStaff = $any($event.target).checked"
+                                                            [disabled]="staffIsHost(staff) || staff.isSaving">
+                                                    </td>
+                                                    <td class="px-6 py-4 text-right whitespace-nowrap flex items-center justify-end gap-3">
+                                                        <span class="text-braCyan font-bold text-xs cursor-pointer hover:underline"
+                                                              *ngIf="!staffIsHost(staff)"
+                                                              (click)="!staff.isSaving && salvarStaff(staff)"
+                                                              [class.opacity-50]="staff.isSaving">
+                                                            {{ staff.isSaving ? 'Salvando...' : 'Salvar' }}
+                                                        </span>
+                                                        <span class="text-gray-300" *ngIf="!staffIsHost(staff)">|</span>
+                                                        <span class="text-braMagenta font-bold text-xs cursor-pointer hover:underline"
+                                                              *ngIf="!staffIsHost(staff)"
+                                                              (click)="abrirRemoveStaffModal(staff)">
+                                                            Remover
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </ng-container>
+
+                            <ng-container *ngSwitchDefault>
+                                <div class="flex flex-wrap gap-4">
+                                    <div class="flex items-center gap-3 bg-gray-50 p-3 pr-6 rounded-full border border-gray-100"
+                                        *ngFor="let staff of evento?.staffs">
+                                        <div
+                                            class="w-12 h-12 bg-braDark rounded-full flex items-center justify-center text-white font-bold text-xl">
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-sm text-braDark">{{ staff.displayName }}</p>
+                                            <p class="text-[10px] font-bold text-braCyan uppercase tracking-widest">{{
+                                                staff.cargo }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </ng-container>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="space-y-6 md:space-y-8">
+                    <div class="bg-braDark max-[550px]:p-6 p-8 max-[550px]:rounded-none rounded-[3rem] text-white shadow-xl relative overflow-hidden">
+                        <div class="relative z-10">
+                            <div class="text-center space-y-2 mb-8">
+                                <p class="text-[10px] font-bold text-braCyan uppercase tracking-[0.2em] mb-4">
+                                    Investimento</p>
+                                <ng-container *ngIf="(evento?.price ?? 0) > 0; else freeEvent">
+                                    <h3 class="text-4xl font-amaranth font-bold text-braYellow">R$ {{( evento?.price ??
+                                        0 )| number:'1.0':'pt-BR'}}{{ (evento?.maxPrice ?? 0) != 0 ? "" : ",00"}} <span
+                                            class="text-sm font-archivo text-gray-400 whitespace-nowrap"
+                                            *ngIf="(evento?.maxPrice ?? 0) > 0 && (evento?.price ?? 0) <= (evento?.maxPrice ?? 0)">
+                                            - R$ {{ (evento?.maxPrice ?? 0)| number:'1.0':'pt-BR' }}</span></h3>
+                                    <p class="text-[10px] text-gray-400 font-bold uppercase mt-2 italic">{{
+                                        evento?.priceConfirmed ? "Preço Confirmado ✓" : "Preço não confirmado" }}</p>
+                                </ng-container>
+                                <ng-template #freeEvent>
+                                    <h3 class="text-4xl font-amaranth font-bold text-braYellow">Gratuito</h3>
+                                </ng-template>
+                            </div>
+
+                            <div class="mt-8 space-y-3">
+                                <a *ngIf="evento?.ticketUrl" [href]="evento?.ticketUrl" target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="block text-center w-full bg-braCyan text-braDark font-amaranth font-bold py-4 rounded-2xl hover:scale-105 transition shadow-lg">
+                                    {{ (evento?.price ?? 0) > 0 ? "Comprar Ingresso" : "Ver Ingresso" }}
+                                </a>
+
+                                <ng-container *ngIf="!evento?.ticketUrl">
+                                    <a *ngIf="evento?.website" [href]="evento?.website" target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="block text-center w-full bg-braCyan text-braDark font-amaranth font-bold py-4 rounded-2xl hover:scale-105 transition shadow-lg">
+                                        Ir para o Site
+                                    </a>
+
+                                    <a *ngIf="evento?.groupChatLink" [href]="evento?.groupChatLink" target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="block text-center w-full bg-white/10 border border-white/20 text-white font-amaranth font-bold py-4 rounded-2xl hover:bg-white/15 transition">
+                                        Entrar no Grupo
+                                    </a>
+                                </ng-container>
+                            </div>
+                        </div>
+                        <div
+                            class="absolute bottom-0 right-0 w-32 h-32 bg-braPurple opacity-10 rounded-full translate-x-10 translate-y-10">
+                        </div>
+                    </div>
+
+                    <div class="hidden lg:block bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="text-2xl">📍</span>
+                            <h3 class="font-amaranth font-bold text-xl text-braDark italic">Como Chegar</h3>
+                        </div>
+
+                        <p class="font-bold text-braDark">{{ evento?.pointName || "Local não informado" }}</p>
+                        <p class="text-sm text-gray-500 mt-1">{{ evento?.address || "Endereço não informado" }}</p>
+
+                        <div class="mt-6">
+                            <button
+                                class="w-full bg-gray-50 text-braDark font-bold py-3 rounded-xl text-xs hover:bg-gray-100 transition border border-gray-200">
+                                Abrir no Google Maps
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </ng-container>
+    <!-- Dialog: Transferir Titularidade (Dono) -->
+    <div *ngIf="showTransferDialog"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-braDark/80 backdrop-blur-sm p-4 transition-opacity">
+        <div
+            class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-braDark p-6 text-center relative overflow-hidden shrink-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-braPurple/50 to-braCyan/50 opacity-40"></div>
+                <h3 class="relative z-10 text-xl font-amaranth font-bold text-white italic">👑 Transferir Propriedade</h3>
+                <button type="button" class="absolute top-4 right-4 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"
+                    (click)="fecharDialogTransferencia()">
+                    <span class="font-bold text-sm">✕</span>
+                </button>
+            </div>
+
+            <div class="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                <div class="bg-gray-50 rounded-2xl p-4 border border-gray-200 flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 bg-braPurple rounded-full flex items-center justify-center text-white font-bold text-xl">
+                        {{ evento?.host?.displayName?.charAt(0) || 'H' }}
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Titular Atual</p>
+                        <p class="font-bold text-braDark">{{ evento?.host?.displayName }}</p>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email do Novo Titular</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">📧</span>
+                        <input type="email" [formControl]="transferTargetControl"
+                            placeholder="Digite o email do usuário..."
+                            class="w-full bg-white border-2 border-gray-100 text-braDark text-sm rounded-xl focus:ring-0 focus:border-braPurple block pl-10 p-3.5 transition-all outline-none font-medium">
+                    </div>
+                </div>
+
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3 text-red-600">
+                    <span class="text-xl">⚠️</span>
+                    <p class="text-xs font-medium leading-relaxed">
+                        <strong class="font-bold">Atenção:</strong> Ao transferir este evento, você perderá os acessos
+                        absolutos de dono. Esta ação não pode ser desfeita por você.
+                    </p>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Para confirmar,
+                        digite: <span class="text-braDark">{{ evento?.eventName }}</span></label>
+                    <input type="text" [formControl]="transferEventNameConfirmationControl" placeholder="Nome do evento"
+                        class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-0 focus:border-red-400 block p-3.5 transition-all outline-none font-medium">
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-6 flex justify-end gap-3 border-t border-gray-100 shrink-0">
+                <button type="button"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200 transition"
+                    (click)="fecharDialogTransferencia()">
+                    Cancelar
+                </button>
+                <button type="button"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm bg-red-500 text-white hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    [disabled]="transferEventNameConfirmationControl.value !== evento?.eventName || !transferTargetControl.value || isTransferring"
+                    (click)="enviarTransferencia(false)">
+                    {{ isTransferring ? 'Transferindo...' : 'Transferir Evento' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog: Ver Titularidade (Admin) -->
+    <div *ngIf="showViewOwnershipDialog"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-braDark/80 backdrop-blur-sm p-4 transition-opacity">
+        <div
+            class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-braDark p-6 text-center relative overflow-hidden shrink-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-braPurple/50 to-braCyan/50 opacity-40"></div>
+                <h3 class="relative z-10 text-xl font-amaranth font-bold text-white italic">🛡️ Detalhes de Titularidade</h3>
+                <button type="button" class="absolute top-4 right-4 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"
+                    (click)="fecharDialogVerTitularidade()">
+                    <span class="font-bold text-sm">✕</span>
+                </button>
+            </div>
+
+            <div class="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                <div class="bg-gray-50 rounded-3xl border border-gray-200 flex flex-col">
+                    <ng-container *ngTemplateOutlet="reliabilityCard; context: { reliability: currentOwnerReliability, loading: isLoadingCurrentOwnerReliability, title: 'Titular Atual' }"></ng-container>
+
+                    <ng-container *ngIf="showAdminTransferForm && (newOwnerReliability || isLoadingNewOwnerReliability)">
+                        <div class="border-t border-gray-200"></div>
+                        <ng-container *ngTemplateOutlet="reliabilityCard; context: { reliability: newOwnerReliability, loading: isLoadingNewOwnerReliability, title: 'Novo Titular (Verificação)' }"></ng-container>
+                    </ng-container>
+                </div>
+
+                <ng-container *ngIf="showAdminTransferForm">
+
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Buscar Novo Titular (Moderação)</label>
+                        <div class="relative flex">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">🔍</span>
+                            <input type="text" [formControl]="transferTargetControl"
+                                placeholder="Buscar usuário por ID ou Email..."
+                                class="w-full bg-white border-2 border-gray-100 border-r-0 text-braDark text-sm rounded-l-xl focus:ring-0 focus:border-braCyan block pl-10 p-3.5 transition-all outline-none font-medium">
+                            <button type="button" class="bg-braCyan text-white font-bold px-4 rounded-r-xl hover:brightness-105 transition flex items-center justify-center shrink-0 border-2 border-braCyan shadow-sm z-10"
+                                (click)="buscarNovoTitularAdmin()">
+                                Buscar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Justificativa da
+                            Ação (Log Interno)</label>
+                        <textarea rows="2" [formControl]="transferReasonControl" placeholder="Motivo da transferência forçada..."
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-0 focus:border-braCyan block p-3.5 transition-all outline-none font-medium resize-none"></textarea>
+                    </div>
+                </ng-container>
+
+                <div *ngIf="!showAdminTransferForm" class="flex justify-center pt-2">
+                    <button type="button" class="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-bold px-6 py-3 rounded-2xl transition flex items-center gap-2 text-sm"
+                        (click)="showAdminTransferForm = true">
+                        <span>⚠️</span> Moderação: Forçar Transferência
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-6 flex justify-end gap-3 border-t border-gray-100 shrink-0" *ngIf="showAdminTransferForm">
+                <button type="button"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200 transition"
+                    (click)="showAdminTransferForm = false">
+                    Cancelar
+                </button>
+                <button type="button"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm bg-braDark text-white hover:bg-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    [disabled]="!newOwnerReliability || isTransferring"
+                    (click)="enviarTransferencia(true)">
+                    {{ isTransferring ? 'Processando...' : 'Confirmar Transferência' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog: Confirmação de Transferência -->
+    <div *ngIf="showConfirmTransferDialog"
+        class="fixed inset-0 z-[110] flex items-center justify-center bg-braDark/90 backdrop-blur-md p-4 transition-opacity">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-red-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-red-500 p-6 text-center relative overflow-hidden shrink-0">
+                <h3 class="relative z-10 text-xl font-amaranth font-bold text-white italic">⚠️ Confirmar Ação Crítica</h3>
+            </div>
+            
+            <div class="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                <p class="text-center text-braDark font-medium leading-relaxed">
+                    Você está prestes a transferir a propriedade absoluta do evento <strong class="text-black">{{ evento?.eventName }}</strong>.
+                </p>
+                
+                <div class="bg-gray-50 rounded-2xl p-4 border border-gray-200 flex flex-col gap-3">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500 font-bold">De:</span>
+                        <span class="text-red-500 font-bold line-through">{{ evento?.host?.displayName }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500 font-bold">Para:</span>
+                        <span class="text-green-600 font-bold">{{ pendingTransferIsAdmin ? newOwnerReliability?.user?.displayName : transferTargetControl.value }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-6 flex flex-col gap-3 border-t border-gray-100 shrink-0">
+                <button type="button" #cancelBtn autofocus
+                    class="w-full px-5 py-4 rounded-xl font-bold text-base bg-braDark text-white hover:bg-black transition focus:ring-4 focus:ring-braPurple/30 outline-none"
+                    (click)="fecharConfirmTransferDialog()">
+                    Não, Cancelar
+                </button>
+                <button type="button"
+                    class="w-full px-5 py-3 rounded-xl font-bold text-sm text-red-600 bg-red-50 hover:bg-red-100 transition disabled:opacity-50"
+                    [disabled]="isTransferring"
+                    (click)="confirmarTransferencia()">
+                    {{ isTransferring ? 'Transferindo...' : 'Sim, Transferir' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template: Card de Confiabilidade -->
+    <ng-template #reliabilityCard let-reliability="reliability" let-loading="loading" let-title="title">
+        <div *ngIf="loading" class="p-6 flex justify-center items-center h-28">
+            <span class="animate-pulse font-bold text-gray-400">Buscando informações do usuário...</span>
+        </div>
+        <div *ngIf="!loading && reliability" class="p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ title }}</p>
+                <span class="text-[9px] font-bold px-2 py-1 rounded-md uppercase"
+                    [ngClass]="{
+                        'bg-green-100 text-green-700': reliability.reliability.score >= 80,
+                        'bg-yellow-100 text-yellow-700': reliability.reliability.score >= 50 && reliability.reliability.score < 80,
+                        'bg-red-100 text-red-700': reliability.reliability.score < 50
+                    }">
+                    Score: {{ reliability.reliability.score }} / 100
+                </span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-braPurple rounded-full flex items-center justify-center text-white font-bold text-2xl shrink-0">
+                    {{ reliability.user.displayName.charAt(0) || 'U' }}
+                </div>
+                <div class="overflow-hidden">
+                    <p class="font-bold text-lg text-braDark truncate">{{ reliability.user.displayName }}</p>
+                    <p class="text-xs font-bold text-braCyan mt-0.5 truncate">ID: {{ reliability.user.id }} | {{ reliability.user.email }}</p>
+                </div>
+            </div>
+            
+            <div *ngIf="reliability.moderation.totalBans > 0 || reliability.moderation.activeWarnings > 0 || reliability.reliability.signals.length > 0" 
+                class="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+                <p class="text-[10px] font-bold text-red-600 uppercase tracking-widest mb-2 flex items-center gap-1"><span>⚠️</span> Alertas de Segurança</p>
+                <p *ngIf="reliability.moderation.totalBans > 0" class="text-xs text-red-700 font-medium">• {{ reliability.moderation.totalBans }} banimento(s) ({{ reliability.moderation.activeBans }} ativo(s))</p>
+                <p *ngIf="reliability.moderation.activeWarnings > 0" class="text-xs text-red-700 font-medium">• {{ reliability.moderation.activeWarnings }} advertência(s) ativa(s)</p>
+                <ng-container *ngIf="reliability.reliability.signals.length > 0">
+                    <p *ngFor="let signal of reliability.reliability.signals" class="text-xs text-red-700 font-medium">• {{ signal.split('_').join(' ') | uppercase }}</p>
+                </ng-container>
+            </div>
+        </div>
+        <div *ngIf="!loading && !reliability" class="bg-red-50 p-6 flex justify-center items-center h-28">
+            <span class="font-bold text-red-500">Usuário não encontrado.</span>
+        </div>
+    </ng-template>
+
+    <!-- Dialog: Adicionar Staff -->
+    <div *ngIf="showAddStaffModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-braDark/80 backdrop-blur-sm p-4 transition-opacity">
+        <div class="bg-white w-full max-w-lg rounded-3xl shadow-xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-6 flex justify-between items-center bg-gray-50 border-b border-gray-100 shrink-0">
+                <h2 class="text-lg font-archivo font-bold text-braDark flex items-center gap-2">
+                    <span class="text-braCyan">➕</span> Adicionar Membro à Equipe
+                </h2>
+                <button class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                    (click)="fecharAddStaffModal()">
+                    ✕
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                <!-- Informações Básicas -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Usuário (E-mail ou ID)</label>
+                        <input type="text" [formControl]="staffTargetControl" placeholder="ex: usuario@email.com ou 1234"
+                            class="w-full bg-white border border-gray-200 text-braDark text-sm rounded-xl focus:ring-0 focus:border-braCyan block p-3 transition-all outline-none font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Cargo</label>
+                        <input type="text" [formControl]="staffCargoControl" placeholder="ex: Co-organizador, Voluntário..."
+                            class="w-full bg-white border border-gray-200 text-braDark text-sm rounded-xl focus:ring-0 focus:border-braCyan block p-3 transition-all outline-none font-medium">
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- Permissões -->
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Permissões Específicas</label>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition">
+                            <input type="checkbox" [formControl]="staffMngAgendaControl" class="w-5 h-5 accent-braCyan rounded border-gray-300">
+                            <div>
+                                <p class="text-sm font-bold text-braDark group-hover:text-braCyan transition">Gerenciar Agenda</p>
+                                <p class="text-[10px] text-gray-400 font-medium">Pode adicionar, editar ou remover itens do cronograma do evento.</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition">
+                            <input type="checkbox" [formControl]="staffEditEventControl" class="w-5 h-5 accent-braPurple rounded border-gray-300">
+                            <div>
+                                <p class="text-sm font-bold text-braDark group-hover:text-braPurple transition">Editar Informações do Evento</p>
+                                <p class="text-[10px] text-gray-400 font-medium">Pode alterar descrição, imagens, links e regras gerais.</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition">
+                            <input type="checkbox" [formControl]="staffMngStaffControl" class="w-5 h-5 accent-braMagenta rounded border-gray-300">
+                            <div>
+                                <p class="text-sm font-bold text-braDark group-hover:text-braMagenta transition">Gerenciar Equipe (Staff)</p>
+                                <p class="text-[10px] text-gray-400 font-medium">Pode convidar novos membros e alterar permissões da equipe atual.</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-6 flex justify-end gap-3 border-t border-gray-100 shrink-0">
+                <button type="button"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200 transition"
+                    (click)="fecharAddStaffModal()">
+                    Cancelar
+                </button>
+                <button type="button"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm bg-braCyan text-white hover:brightness-105 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    [disabled]="isAddingStaff || !staffTargetControl.value || !staffCargoControl.value"
+                    (click)="adicionarStaff()">
+                    {{ isAddingStaff ? 'Adicionando...' : 'Adicionar à Equipe' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog: Confirmação de Remoção de Staff -->
+    <div *ngIf="showRemoveStaffModal"
+        class="fixed inset-0 z-[110] flex items-center justify-center bg-braDark/90 backdrop-blur-md p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl border border-red-100 overflow-hidden flex flex-col">
+            <div class="bg-red-500 p-5 text-center shrink-0">
+                <h3 class="text-lg font-archivo font-bold text-white">⚠️ Remover da Equipe?</h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <p class="text-center text-braDark font-medium text-sm leading-relaxed">
+                    Você está prestes a remover <strong class="text-red-600">{{ staffToRemove?.displayName }}</strong> da organização do evento.
+                </p>
+                <p class="text-center text-gray-500 text-xs font-medium">Esta ação não pode ser desfeita. Eles perderão o acesso de moderação imediatamente.</p>
+            </div>
+
+            <div class="bg-gray-50 p-5 flex flex-col gap-2 border-t border-gray-100 shrink-0">
+                <button type="button" #cancelRemoveBtn autofocus
+                    class="w-full px-5 py-3 rounded-xl font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition outline-none focus:ring-2 focus:ring-gray-400"
+                    (click)="fecharRemoveStaffModal()">
+                    Cancelar
+                </button>
+                <button type="button"
+                    class="w-full px-5 py-3 rounded-xl font-bold text-sm text-red-600 hover:bg-red-50 transition border border-red-100 disabled:opacity-50"
+                    [disabled]="isRemovingStaff"
+                    (click)="removerStaff()">
+                    {{ isRemovingStaff ? 'Removendo...' : 'Sim, Remover' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+</main>

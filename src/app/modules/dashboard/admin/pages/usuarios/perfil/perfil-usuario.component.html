@@ -1,0 +1,517 @@
+<section class="space-y-6">
+  <button type="button" (click)="goBack()" class="text-sm font-bold text-gray-500 hover:text-braPurple">← Voltar para usuários</button>
+
+  <div *ngIf="loading" class="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm" aria-live="polite">
+    <div class="h-5 w-52 animate-pulse rounded bg-gray-200"></div>
+    <div class="mt-5 grid gap-3 md:grid-cols-3">
+      <div class="h-24 animate-pulse rounded-2xl bg-gray-100"></div>
+      <div class="h-24 animate-pulse rounded-2xl bg-gray-100"></div>
+      <div class="h-24 animate-pulse rounded-2xl bg-gray-100"></div>
+    </div>
+    <p class="mt-5 text-sm text-gray-500">Carregando ficha administrativa…</p>
+  </div>
+
+  <div *ngIf="errorMessage && !profile" class="rounded-2xl bg-red-50 p-6 font-bold text-red-700" role="alert">
+    <p>{{ errorMessage }}</p>
+    <button type="button" class="mt-4" (click)="load()">Tentar novamente</button>
+  </div>
+
+  <ng-container *ngIf="!loading && profile as data">
+    <header class="overflow-hidden rounded-3xl bg-braDark p-6 text-white shadow-lg md:p-8">
+      <div class="flex flex-wrap items-center gap-5">
+        <img *ngIf="data.identity.avatarUrl; else initials" [src]="data.identity.avatarUrl" [alt]="data.identity.displayName" class="h-24 w-24 rounded-3xl border-4 border-white/10 object-cover" />
+        <ng-template #initials><span class="grid h-24 w-24 place-items-center rounded-3xl bg-braPurple text-2xl font-bold">{{ data.identity.displayName.slice(0, 2).toUpperCase() }}</span></ng-template>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold uppercase tracking-[.2em] text-gray-400">Ficha administrativa</p>
+          <h1 class="mt-1 break-words font-amaranth text-3xl font-bold italic md:text-4xl">{{ data.identity.displayName }}</h1>
+          <p class="mt-2 text-sm text-gray-300">User #{{ data.identity.id }} · {{ data.identity.username || 'Sem username' }}</p>
+          <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+            <span class="rounded-full bg-white/10 px-3 py-1">{{ roleLabel(data.identity.role) }}</span>
+            <span class="rounded-full px-3 py-1" [ngClass]="data.identity.status === 'banned' ? 'bg-red-500/20 text-red-100' : 'bg-green-500/20 text-green-100'">{{ statusLabel(data.identity.status) }}</span>
+            <span *ngIf="identity" class="rounded-full bg-braCyan/20 px-3 py-1 text-cyan-100">{{ identity.confirmedAccounts.length }} conta(s) confirmada(s)</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+      <nav class="flex gap-2 overflow-x-auto text-sm font-bold" aria-label="Seções da ficha">
+        <button *ngFor="let tab of tabs" type="button" class="whitespace-nowrap rounded-xl px-3 py-2"
+          [hidden]="tab.id === 'administracao' && !canManageLinks"
+          [disabled]="tab.local && !selectedCommunityId"
+          [attr.aria-current]="activeTab === tab.id ? 'page' : null"
+          [ngClass]="activeTab === tab.id ? 'bg-braPurple text-white' : 'hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'"
+          (click)="selectTab(tab.id)">{{ tab.label }}<span *ngIf="tab.local && !selectedCommunityId"> 🔒</span></button>
+      </nav>
+      <label class="flex shrink-0 items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+        Contexto
+        <select class="form-control min-w-56 normal-case" [ngModel]="selectedCommunityId ?? 'global'" (ngModelChange)="selectCommunity($event)">
+          <option value="global">Visão global</option>
+          <option *ngFor="let community of communityOptions" [ngValue]="community.id">{{ community.name }} · #{{ community.id }}</option>
+        </select>
+      </label>
+    </div>
+
+    <p *ngIf="errorMessage" class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700" role="alert">{{ errorMessage }}</p>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="summary-card"><span>Conhecido desde</span><strong>{{ formatDate(data.firstKnownAt) }}</strong><small>{{ data.firstKnownCommunity?.name || 'Primeira comunidade não disponível' }}</small></article>
+      <article class="summary-card"><span>Comunidades</span><strong>{{ data.communities.length }}</strong><small>{{ approvedMembershipsLabel() }}</small></article>
+      <article class="summary-card"><span>Moderação direta</span><strong>{{ data.moderation.activeWarnings }} warn(s)</strong><small>{{ data.moderation.activeBans }} ban(s) ativo(s)</small></article>
+      <article class="summary-card"><span>Confiabilidade</span><strong>{{ reliability ? reliability.reliability.score + '/100' : 'Indisponível' }}</strong><small>{{ reliability ? reliabilityLevelLabel(reliability.reliability.level) : 'Sem resumo calculado' }}</small></article>
+    </div>
+
+    <article *ngIf="activeTab === 'resumo'" id="conta" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Conta e plataformas</p><h2>Quem é este User?</h2></div><span class="section-number">01</span></div>
+      <div class="mt-6 grid gap-6 lg:grid-cols-2">
+        <dl class="data-list">
+          <div><dt>User ID</dt><dd>#{{ data.identity.id }}</dd></div>
+          <div><dt>Nome</dt><dd>{{ data.identity.displayName }}</dd></div>
+          <div><dt>Username</dt><dd>{{ data.identity.username || 'Não disponível' }}</dd></div>
+          <div><dt>E-mail</dt><dd>{{ data.identity.email || 'Não disponível' }}</dd></div>
+          <div><dt>Aniversário</dt><dd>{{ formatDate(data.identity.birthDate) }}</dd></div>
+          <div><dt>Cadastro +18</dt><dd>{{ booleanLabel(data.identity.plus18) }}</dd></div>
+          <div><dt>Data verificada</dt><dd>{{ booleanLabel(data.identity.birthdayVerified) }}</dd></div>
+          <div><dt>Locale</dt><dd>{{ data.identity.localeAmbiguous ? 'Cadastro legado ambíguo' : (data.identity.localeAbbrev || 'Não disponível') }}<small *ngIf="data.identity.localeName" class="block text-gray-500">{{ data.identity.localeName }}</small></dd></div>
+        </dl>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="platform-card"><span>Discord</span><strong>{{ data.identity.discordAmbiguous ? 'Cadastro legado ambíguo' : (data.identity.discordUsername || 'Não vinculado') }}</strong><small *ngIf="identity">{{ discordLabel(confirmedAccountFor(data.identity.id)) }}</small></div>
+          <div class="platform-card"><span>Telegram</span><strong>{{ data.identity.telegramAmbiguous ? 'Cadastro legado ambíguo' : (data.identity.telegramUsername || 'Não vinculado') }}</strong><small>{{ telegramLinkStatusLabel() }}</small></div>
+        </div>
+      </div>
+    </article>
+
+    <article *ngIf="activeTab === 'identidade' && !identity" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Rastreabilidade administrativa</p><h2>Contas vinculadas</h2></div><span class="section-number">02</span></div>
+      <p class="mt-5 rounded-xl bg-yellow-50 p-4 text-sm font-bold text-yellow-800">{{ identityLoadError || 'Dados de identidade indisponíveis no momento.' }}</p>
+    </article>
+
+    <article id="identidades" *ngIf="activeTab === 'identidade' && identity as identityData" class="section-card scroll-mt-4">
+      <div class="section-heading">
+        <div><p class="eyebrow">Rastreabilidade administrativa</p><h2>Contas vinculadas</h2><p class="section-copy">Contas confirmadas pertencem ao mesmo cluster. Nenhuma conta recebe papel hierárquico; vínculos não transferem histórico, credenciais, roles, permissões, XP ou economia.</p></div>
+        <span class="section-number">02</span>
+      </div>
+      <p *ngIf="identityMessage" class="mt-4 rounded-xl bg-gray-50 p-3 text-sm font-bold text-gray-700" aria-live="polite">{{ identityMessage }}</p>
+
+      <div class="mt-6 grid gap-5 lg:grid-cols-2">
+        <section>
+          <h3 class="font-bold text-gray-900">Contas confirmadas</h3>
+          <p class="mt-1 text-xs text-gray-500">Todas participam do mesmo cluster e do histórico agregado, com origem preservada.</p>
+          <div *ngFor="let account of identityData.confirmedAccounts" class="mt-3 rounded-2xl border border-green-100 bg-green-50 p-4">
+            <strong>User #{{ account.userId }} · {{ account.displayName || account.username || 'Sem nome' }}</strong><p class="mt-1 text-sm text-gray-600">{{ discordLabel(account) }}</p>
+          </div>
+          <div class="mt-5 border-t border-green-100 pt-4">
+            <h4 class="font-bold text-gray-900">Vínculos confirmados</h4>
+            <p class="mt-1 text-xs text-gray-500">Arestas diretas do cluster, preservadas para auditoria e revogação sem definir conta principal.</p>
+            <p *ngIf="!identityData.confirmedLinks.length" class="mt-3 text-sm text-gray-500">Nenhum vínculo confirmado direto registrado.</p>
+            <div *ngFor="let link of identityData.confirmedLinks" class="mt-3 rounded-2xl border border-green-200 bg-white p-4">
+              <strong>{{ linkLabel(link) }}</strong><p class="mt-1 text-sm text-gray-600">{{ discordLabel(link.userA) }} ↔ {{ discordLabel(link.userB) }}</p><p class="mt-2 text-xs text-gray-500">{{ link.source }} · {{ formatDate(link.createdAt) }} · por User #{{ link.createdByUserId || 'sistema' }}</p><p class="mt-1 text-sm">{{ link.reason || 'Sem contexto registrado' }}</p>
+              <button *ngIf="canManageLinks" type="button" class="mt-3" [disabled]="identityActionLoading" (click)="revokeLink(link)">Revogar vínculo</button>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h3 class="font-bold text-gray-900">Vínculos suspeitos</h3>
+          <p class="mt-1 text-xs text-gray-500">Contexto administrativo separado; não integra o cluster confirmado.</p>
+          <p *ngIf="!identityData.suspectedLinks.length" class="mt-3 text-sm text-gray-500">Nenhum vínculo suspeito.</p>
+          <div *ngFor="let link of identityData.suspectedLinks" class="mt-3 rounded-2xl border border-yellow-200 bg-yellow-50 p-4">
+            <strong>{{ linkLabel(link) }}</strong><p class="mt-1 text-sm text-gray-600">{{ discordLabel(link.userA) }} ↔ {{ discordLabel(link.userB) }}</p><p class="mt-2 text-xs text-gray-500">{{ link.source }} · {{ formatDate(link.createdAt) }} · por User #{{ link.createdByUserId || 'sistema' }}</p><p class="mt-1 text-sm">{{ link.reason || 'Sem contexto registrado' }}</p>
+            <div *ngIf="canManageLinks" class="mt-3 flex flex-wrap gap-2"><button type="button" [disabled]="identityActionLoading" (click)="confirmLink(link)">Confirmar vínculo</button><button type="button" [disabled]="identityActionLoading" (click)="revokeLink(link)">Revogar vínculo</button></div>
+          </div>
+        </section>
+      </div>
+
+      <section *ngIf="canManageLinks" class="mt-7 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+        <h3 class="font-bold text-gray-900">Registrar vínculo entre contas</h3><p class="mt-1 text-sm text-gray-500">Confira ambas as pontas do vínculo e registre o contexto obrigatório.</p>
+
+        <form class="mt-4" (ngSubmit)="searchLinkTargets()">
+          <label for="identity-user-search" class="block text-sm font-bold">Pesquisar conta cadastrada</label>
+          <p class="mt-1 text-xs text-gray-500">Busque pelo nome, username Discord ou ID Discord. Depois confira o User antes de vincular.</p>
+          <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input id="identity-user-search" type="text" name="identity-user-search"
+              [(ngModel)]="linkSearchTerm" (ngModelChange)="onLinkSearchTermChange()"
+              autocomplete="off" class="form-control min-w-0 flex-1"
+              placeholder="Nome, @username ou Discord ID" />
+            <button type="submit" [disabled]="identityActionLoading || linkSearchLoading">
+              {{ linkSearchLoading ? 'Pesquisando…' : 'Pesquisar contas' }}
+            </button>
+          </div>
+        </form>
+        <p *ngIf="linkSearchError" class="mt-3 text-sm font-bold text-red-700" role="alert">{{ linkSearchError }}</p>
+        <div *ngIf="linkSearchPerformed" class="mt-3 space-y-2" aria-live="polite">
+          <p class="text-xs text-gray-600">
+            {{ linkSearchTotal }} resultado(s) no cadastro.
+            <span *ngIf="linkSearchTotal > 20">Exibindo os primeiros 20; refine a pesquisa para encontrar outras contas.</span>
+          </p>
+          <p *ngIf="!linkSearchResults.length" class="text-sm text-gray-600">Nenhuma outra conta encontrada. Para uma conta sem cadastro, use o Discord User ID abaixo.</p>
+          <button *ngFor="let candidate of linkSearchResults" type="button"
+            class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left disabled:opacity-50"
+            [disabled]="identityActionLoading || isAlreadyLinkedCandidate(candidate.id)"
+            (click)="selectLinkSearchResult(candidate)">
+            <span class="min-w-0">
+              <strong class="block break-words text-gray-900">User #{{ candidate.id }} · {{ candidate.name }}</strong>
+              <span class="block break-words text-xs text-gray-600">
+                {{ candidate.discordUsername ? '@' + candidate.discordUsername : 'Discord não informado' }}
+                <span *ngIf="candidate.discordAmbiguous"> · múltiplas contas Discord</span>
+              </span>
+            </span>
+            <span class="shrink-0 text-xs font-bold text-braPurple">
+              {{ isAlreadyLinkedCandidate(candidate.id) ? 'Já vinculada' : 'Selecionar' }}
+            </span>
+          </button>
+        </div>
+        <div class="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
+          <label class="text-sm font-bold">
+            Ou informe o User ID interno
+            <input type="number" min="1" [(ngModel)]="linkTargetId" (ngModelChange)="onLinkTargetIdChange()" class="form-control" />
+          </label>
+          <button type="button" class="self-end" [disabled]="identityActionLoading || !linkTargetId" (click)="previewLinkTarget()">Buscar por User ID</button>
+        </div>
+
+        <div class="mt-7 border-t border-gray-200 pt-6">
+          <h4 class="font-bold text-gray-900">Vincular por Discord User ID</h4>
+          <p class="mt-1 text-sm text-gray-500">
+            Use quando a conta Discord ainda não possui User na plataforma ou quando você só conhece o snowflake.
+            A busca consulta o Discord pelo Coddy sem exigir presença em um servidor.
+          </p>
+          <p *ngIf="discordLinkError" class="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700" role="alert">{{ discordLinkError }}</p>
+          <div class="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+            <label class="text-sm font-bold">
+              Discord User ID
+              <input
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                pattern="[0-9]*"
+                [(ngModel)]="discordLinkId"
+                (ngModelChange)="onDiscordLinkIdChange()"
+                class="form-control"
+                placeholder="Ex.: 123456789012345678"
+              />
+            </label>
+            <button
+              type="button"
+              class="self-end"
+              [disabled]="identityActionLoading || !discordLinkId.trim()"
+              (click)="previewDiscordIdentity()"
+            >
+              Buscar no Discord
+            </button>
+          </div>
+        </div>
+      </section>
+    </article>
+
+    <div
+      *ngIf="linkPreviewModalOpen && linkPreview as preview"
+      class="admin-modal-backdrop"
+      role="presentation"
+      (click)="closeExistingIdentityModals()"
+    >
+      <section
+        class="admin-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="existing-link-preview-title"
+        (click)="$event.stopPropagation()"
+      >
+        <p class="eyebrow">Etapa 1 de 2</p>
+        <h2 id="existing-link-preview-title" class="mt-1 text-xl">Confira o User relacionado</h2>
+        <p class="mt-2 text-sm text-gray-600">
+          Revise as duas identidades antes de iniciar qualquer vínculo.
+        </p>
+
+        <div class="mt-5 grid gap-3 md:grid-cols-2">
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <span class="eyebrow">User da ficha</span>
+            <strong class="mt-1 block">User #{{ identity?.requestedUserId }}</strong>
+            <p class="mt-1 text-sm text-gray-600">{{ discordLabel(confirmedAccountFor(identity?.requestedUserId || userId)) }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <span class="eyebrow">User encontrado</span>
+            <strong class="mt-1 block">User #{{ preview.userId }} · {{ preview.displayName || preview.username || 'Sem nome' }}</strong>
+            <p class="mt-1 text-sm text-gray-600">{{ discordLabel(preview) }}</p>
+            <p *ngIf="preview.email" class="mt-1 break-all text-xs text-gray-500">{{ preview.email }}</p>
+          </div>
+        </div>
+
+        <p
+          *ngIf="existingLinkAlreadyConfirmed()"
+          class="mt-4 rounded-xl bg-yellow-50 p-4 text-sm font-bold text-yellow-800"
+        >
+          Este User já pertence ao cluster confirmado desta ficha.
+        </p>
+
+        <div class="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" [disabled]="identityActionLoading" (click)="closeExistingIdentityModals()">Cancelar</button>
+          <button
+            type="button"
+            class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            [disabled]="identityActionLoading || existingLinkAlreadyConfirmed()"
+            (click)="continueExistingIdentityLink()"
+          >
+            Confirmar vínculo
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      *ngIf="linkConfirmModalOpen && linkPreview as preview"
+      class="admin-modal-backdrop"
+      role="presentation"
+      (click)="closeExistingIdentityModals()"
+    >
+      <section
+        class="admin-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="existing-link-confirm-title"
+        (click)="$event.stopPropagation()"
+      >
+        <p class="eyebrow">Etapa 2 de 2 · ação sensível</p>
+        <h2 id="existing-link-confirm-title" class="mt-1 text-xl">Confirmar vínculo entre Users</h2>
+
+        <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <strong>Revise o impacto antes de confirmar.</strong>
+          <p class="mt-2">
+            Você está prestes a relacionar o User #{{ identity?.requestedUserId }} ao User #{{ preview.userId }}.
+          </p>
+          <p *ngIf="linkStatus === 'CONFIRMED'" class="mt-2">
+            Como vínculo CONFIRMED, os Users passam a integrar o mesmo cluster global de identidade.
+            Warns passam a ser considerados em conjunto dentro da mesma Community e bans podem ser propagados
+            entre contas confirmadas presentes na mesma guild.
+          </p>
+          <p *ngIf="linkStatus === 'SUSPECTED'" class="mt-2">
+            Como vínculo SUSPECTED, a relação será apenas contexto administrativo e não entrará no cluster confirmado,
+            na soma de warns nem na propagação de bans.
+          </p>
+          <p class="mt-2">
+            Credenciais, cargos, XP, economia e registros históricos não são transferidos entre Users.
+          </p>
+        </div>
+
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+          <label class="text-sm font-bold">
+            Classificação
+            <select [(ngModel)]="linkStatus" class="form-control">
+              <option value="CONFIRMED">Confirmada</option>
+              <option value="SUSPECTED">Suspeita</option>
+            </select>
+          </label>
+          <label class="text-sm font-bold">
+            Motivo / contexto administrativo
+            <textarea [(ngModel)]="linkReason" maxlength="500" rows="3" class="form-control"></textarea>
+          </label>
+        </div>
+
+        <div class="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" [disabled]="identityActionLoading" (click)="closeExistingIdentityModals()">Cancelar</button>
+          <button
+            type="button"
+            class="rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            [disabled]="identityActionLoading || !linkReason.trim()"
+            (click)="createLink()"
+          >
+            {{ identityActionLoading ? 'Confirmando…' : (linkStatus === 'SUSPECTED' ? 'Confirmar vínculo suspeito' : 'Confirmar ação sensível') }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      *ngIf="discordPreviewModalOpen && discordPreview as preview"
+      class="admin-modal-backdrop"
+      role="presentation"
+      (click)="closeDiscordIdentityModals()"
+    >
+      <section
+        class="admin-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discord-preview-title"
+        (click)="$event.stopPropagation()"
+      >
+        <p class="eyebrow">Etapa 1 de 2</p>
+        <h2 id="discord-preview-title" class="mt-1 text-xl">Confira a conta Discord</h2>
+        <p class="mt-2 text-sm text-gray-600">
+          Confirme visualmente que esta é a conta que você pretende relacionar ao User #{{ userId }}.
+        </p>
+
+        <div class="mt-5 flex items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+          <img
+            *ngIf="preview.avatarUrl"
+            [src]="preview.avatarUrl"
+            alt=""
+            class="h-16 w-16 rounded-full object-cover"
+          />
+          <div class="min-w-0">
+            <strong class="block break-words text-gray-900">{{ preview.displayName || preview.username }}</strong>
+            <span class="block break-words text-sm text-gray-600">&#64;{{ preview.username }}</span>
+            <span class="mt-1 block break-all text-xs font-bold text-gray-500">Discord ID {{ preview.discordUserId }}</span>
+            <span *ngIf="preview.bot" class="mt-2 inline-block rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-bold text-yellow-800">Conta bot</span>
+          </div>
+        </div>
+
+        <div class="mt-4 rounded-xl p-4 text-sm" [ngClass]="preview.existingUserId ? 'bg-blue-50 text-blue-900' : 'bg-green-50 text-green-900'">
+          <ng-container *ngIf="preview.existingUserId; else newDiscordUser">
+            Esta conta já corresponde ao User #{{ preview.existingUserId }}
+            <span *ngIf="preview.existingUserDisplayName"> ({{ preview.existingUserDisplayName }})</span>.
+            <strong *ngIf="preview.alreadyInConfirmedCluster" class="mt-1 block">Ela já pertence ao cluster confirmado desta ficha.</strong>
+          </ng-container>
+          <ng-template #newDiscordUser>
+            Esta conta ainda não está registrada na plataforma. Na confirmação final será criado um novo User próprio para ela e o Discord ID será associado a esse novo User.
+          </ng-template>
+        </div>
+
+        <div class="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" [disabled]="identityActionLoading" (click)="closeDiscordIdentityModals()">Cancelar</button>
+          <button
+            type="button"
+            class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            [disabled]="identityActionLoading || preview.alreadyInConfirmedCluster"
+            (click)="continueDiscordIdentityLink()"
+          >
+            {{ preview.alreadyInConfirmedCluster ? 'Já vinculada' : 'Confirmar vínculo' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      *ngIf="discordConfirmModalOpen && discordPreview as preview"
+      class="admin-modal-backdrop"
+      role="presentation"
+      (click)="closeDiscordIdentityModals()"
+    >
+      <section
+        class="admin-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discord-confirm-title"
+        (click)="$event.stopPropagation()"
+      >
+        <p class="eyebrow">Etapa 2 de 2 · ação sensível</p>
+        <h2 id="discord-confirm-title" class="mt-1 text-xl">Confirmar identidade vinculada</h2>
+
+        <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <strong>Revise antes de confirmar.</strong>
+          <p class="mt-2">
+            Ao concluir, o Discord {{ preview.discordUserId }}
+            <ng-container *ngIf="preview.existingUserId; else willCreateUser">
+              será relacionado por vínculo CONFIRMED ao User #{{ userId }} através do User #{{ preview.existingUserId }} já existente.
+            </ng-container>
+            <ng-template #willCreateUser>
+              originará um novo User na plataforma, que será relacionado por vínculo CONFIRMED ao User #{{ userId }}.
+            </ng-template>
+          </p>
+          <p class="mt-2">
+            O vínculo é global entre os Users. Informações administrativas das contas passam a ser correlacionadas,
+            mas moderação continua isolada por Community. Warns são agregados somente dentro da mesma Community e
+            bans podem alcançar contas confirmadas presentes na guild. Credenciais, cargos, XP, economia e registros
+            históricos não são transferidos entre Users.
+          </p>
+        </div>
+
+        <label class="mt-5 block text-sm font-bold">
+          Motivo / contexto administrativo
+          <textarea
+            [(ngModel)]="discordLinkReason"
+            maxlength="500"
+            rows="3"
+            class="form-control"
+            placeholder="Descreva por que estas contas pertencem à mesma identidade."
+          ></textarea>
+        </label>
+        <p *ngIf="discordLinkError" class="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700" role="alert">{{ discordLinkError }}</p>
+
+        <div class="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" [disabled]="identityActionLoading" (click)="closeDiscordIdentityModals()">Cancelar</button>
+          <button
+            type="button"
+            class="rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            [disabled]="identityActionLoading || !discordLinkReason.trim()"
+            (click)="confirmDiscordIdentityLink()"
+          >
+            {{ identityActionLoading ? 'Confirmando…' : 'Confirmar ação sensível' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <article *ngIf="activeTab === 'comunidades'" id="comunidades" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Presença e contexto</p><h2>Comunidades conhecidas</h2><p class="section-copy">Primeira comunidade: {{ data.firstKnownCommunity?.name || 'Não disponível' }} · desde {{ formatDate(data.firstKnownAt) }}</p></div><span class="section-number">03</span></div>
+      <div *ngIf="data.communities.length; else noCommunities" class="mt-6 grid gap-4 md:grid-cols-2">
+        <div *ngFor="let community of data.communities" class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
+          <div class="flex flex-wrap items-start justify-between gap-3"><div><strong class="text-gray-900">{{ community.name }}</strong><p class="mt-1 text-sm text-gray-600">{{ presenceLabel(community.isPresent) }}</p></div><span class="rounded-full px-2.5 py-1 text-xs font-bold" [ngClass]="community.status === 'banned' ? 'bg-red-100 text-red-700' : community.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'">{{ community.status === 'banned' ? 'Banido' : community.status === 'approved' ? 'Aprovado' : 'Pendente' }}</span></div>
+          <dl class="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt>Entrada</dt><dd>{{ formatDate(community.memberSince) }}</dd></div><div><dt>Último ingresso</dt><dd>{{ formatDate(community.lastJoinDate) }}</dd></div><div><dt>Aprovação</dt><dd>{{ formatDate(community.approvedAt) }}</dd></div><div><dt>Saída</dt><dd>{{ formatDate(community.leftAt) }}</dd></div></dl>
+          <dl class="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt>Convite</dt><dd>{{ community.inviteLinkUsed || 'Não informado' }}</dd></div><div><dt>Convidado por</dt><dd>{{ community.invitedBy || 'Não informado' }}</dd></div><div><dt>Menção de aniversário</dt><dd>{{ booleanLabel(community.birthdayMentionable) }}</dd></div><div><dt>Registro legado</dt><dd>#{{ community.statusRecordId }}</dd></div></dl>
+          <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold"><span *ngIf="community.vip" class="rounded-full bg-braPurple/10 px-2.5 py-1 text-braPurple">VIP</span><span *ngIf="community.partner" class="rounded-full bg-braCyan/15 px-2.5 py-1 text-cyan-800">Partner</span><span *ngIf="community.discordActive" class="rounded-full bg-green-100 px-2.5 py-1 text-green-700">Discord ativo</span><span *ngIf="community.guildId" class="rounded-full bg-gray-200 px-2.5 py-1 text-gray-600">Guild {{ community.guildId }}</span></div>
+        </div>
+      </div>
+      <ng-template #noCommunities><p class="mt-5 text-sm text-gray-500">Nenhuma comunidade conhecida no banco atual.</p></ng-template>
+    </article>
+
+    <article *ngIf="activeTab === 'eventos'" id="eventos" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Participação</p><h2>Eventos</h2><p class="section-copy">Resumo objetivo de eventos próprios e participação como staff.</p></div><span class="section-number">04</span></div>
+      <p *ngIf="reliabilityError" class="mt-5 rounded-xl bg-yellow-50 p-4 text-sm font-bold text-yellow-800">{{ reliabilityError }}</p>
+      <div *ngIf="reliability as dossier" class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="metric-card"><span>Eventos próprios</span><strong>{{ dossier.events.ownedEvents }}</strong><small>{{ dossier.events.ownedApprovedEvents }} aprovados · {{ dossier.events.ownedPendingEvents }} pendentes · {{ dossier.events.ownedRejectedEvents }} rejeitados</small></div>
+        <div class="metric-card"><span>Eventos partner</span><strong>{{ dossier.events.ownedPartnerEvents }}</strong><small>Entre os eventos próprios</small></div>
+        <div class="metric-card"><span>Atuação como staff</span><strong>{{ dossier.events.staffEvents }}</strong><small>{{ dossier.events.managedEvents }} eventos gerenciados no total</small></div>
+        <div class="metric-card"><span>Permissões de staff</span><strong>{{ dossier.events.staffEventsWithManageStaff + dossier.events.staffEventsWithEditEvent + dossier.events.staffEventsWithManageAgenda }}</strong><small>{{ dossier.events.staffEventsWithManageStaff }} staff · {{ dossier.events.staffEventsWithEditEvent }} edição · {{ dossier.events.staffEventsWithManageAgenda }} agenda</small></div>
+      </div>
+    </article>
+
+    <article *ngIf="activeTab === 'moderacao'" id="moderacao" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Histórico e proveniência</p><h2>Moderação</h2><p class="section-copy">A visão agregada inclui somente identidades confirmadas. Suspeitas permanecem separadas.</p></div><span class="section-number">05</span></div>
+      <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div class="metric-card"><span>Warns ativos</span><strong>{{ data.moderation.activeWarnings }}</strong><small>{{ data.moderation.totalWarnings }} no histórico direto</small></div><div class="metric-card"><span>Bans ativos</span><strong>{{ data.moderation.activeBans }}</strong><small>{{ data.moderation.totalBans }} no histórico direto</small></div><div class="metric-card"><span>Bans expirados</span><strong>{{ data.moderation.expiredBans }}</strong><small>Registros preservados</small></div><div class="metric-card"><span>Bans revogados</span><strong>{{ data.moderation.revokedBans }}</strong><small>Registros preservados</small></div></div>
+
+      <p *ngIf="!selectedCommunityId" class="mt-6 rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-700">Selecione uma comunidade no contexto acima para consultar o histórico confirmado. A API mantém a moderação isolada por comunidade.</p>
+      <p *ngIf="identityHistoryError" class="mt-6 rounded-xl bg-yellow-50 p-4 text-sm font-bold text-yellow-800">{{ identityHistoryError }}</p>
+      <section *ngIf="identityHistory && identity" class="mt-8">
+        <h3 class="text-lg font-bold text-gray-900">Histórico do cluster confirmado</h3>
+        <div class="mt-4 flex flex-wrap gap-3 rounded-2xl bg-gray-50 p-4">
+          <button *ngFor="let type of ['all', 'warn', 'ban', 'note']" type="button" class="rounded-lg px-3 py-2 text-xs font-bold" [ngClass]="moderationTypeFilter === type ? 'bg-braPurple text-white' : 'bg-white text-gray-700'" (click)="setModerationType($any(type))">{{ type === 'all' ? 'Todos' : type === 'warn' ? 'Warns' : type === 'ban' ? 'Bans' : 'Notas' }}</button>
+          <span class="self-center text-xs font-bold text-gray-600">Comunidade: {{ identityHistory.communityId }}</span>
+        </div>
+        <div *ngFor="let source of sourceUsers()" class="mt-4 rounded-2xl border border-gray-100 p-4"><h4 class="font-bold">User #{{ source.userId }} — {{ discordLabel(source) }}</h4><p *ngIf="!warningsFor(source.userId).length && !bansFor(source.userId).length && !notesFor(source.userId).length" class="mt-2 text-sm text-gray-500">Nenhum registro nesta conta.</p><div *ngFor="let warning of warningsFor(source.userId)" class="history-record bg-yellow-50"><strong>Warn · {{ formatDate(warning.date) }}</strong><p>{{ warning.reason }}</p><small>Origem: User #{{ warning.sourceUserId }} · Discord {{ warning.sourceDiscordIds.join(', ') || 'desconhecido' }} · {{ warning.communityName }}</small></div><div *ngFor="let ban of bansFor(source.userId)" class="history-record bg-red-50"><strong>Ban · {{ formatDate(ban.date) }}</strong><p>{{ ban.reason }}</p><small>Origem: User #{{ ban.sourceUserId }} · Discord {{ ban.sourceDiscordIds.join(', ') || 'desconhecido' }} · {{ ban.communityName }}</small></div><div *ngFor="let note of notesFor(source.userId)" class="history-record bg-blue-50"><strong>Nota administrativa</strong><p>{{ note.note }}</p><small>Origem: User #{{ note.sourceUserId }} · Discord {{ note.sourceDiscordIds.join(', ') || 'desconhecido' }} · autor {{ note.authorName || ('User #' + note.authorUserId) }}</small></div></div>
+        <section *ngIf="identity.suspectedLinks.length" class="mt-5 rounded-2xl border border-yellow-200 bg-yellow-50 p-4"><h4 class="font-bold">Vínculos suspeitos — contexto separado</h4><p class="mt-1 text-sm">O histórico destas contas não foi incluído acima.</p><p *ngFor="let link of identity.suspectedLinks" class="mt-2 text-sm">{{ linkLabel(link) }} — {{ link.reason }}</p></section>
+      </section>
+
+      <section class="mt-8 border-t border-gray-100 pt-7">
+        <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="text-lg font-bold text-gray-900">Histórico direto da conta consultada</h3><p class="text-sm text-gray-500">Warns e bans paginados do User #{{ data.identity.id }}.</p></div><span *ngIf="moderationLoading" class="text-sm font-bold text-braPurple">Carregando página…</span></div>
+        <p *ngIf="moderationError" class="mt-4 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700" role="alert">{{ moderationError }}</p>
+        <p *ngIf="!data.moderation.records.length" class="mt-4 text-sm text-gray-500">Nenhum warn ou ban registrado.</p>
+        <div *ngFor="let record of data.moderation.records" class="history-record bg-gray-50"><strong>{{ record.type === 'warn' ? 'Warn' : 'Ban' }} · {{ banStatusLabel(record.status) }}</strong><p>{{ record.reason }}</p><small>{{ record.communityName || 'Comunidade não disponível' }} · Por {{ record.moderator || 'não disponível' }} · {{ formatDate(record.occurredAt) }}</small><small *ngIf="record.status === 'revoked'" class="block">Revogado em {{ formatDate(record.revokedAt) }} por {{ record.revokedByName || 'Responsável não identificado' }}. {{ record.revocationReason || 'Motivo não informado' }}</small></div>
+        <div *ngIf="data.moderation.pagination.totalPages > 1" class="mt-5 flex items-center justify-end gap-3"><span class="text-xs font-bold text-gray-500">Página {{ data.moderation.pagination.page }} de {{ data.moderation.pagination.totalPages }}</span><button type="button" [disabled]="moderationLoading || data.moderation.pagination.page <= 1" (click)="loadModerationPage(data.moderation.pagination.page - 1)">Anterior</button><button type="button" [disabled]="moderationLoading || data.moderation.pagination.page >= data.moderation.pagination.totalPages" (click)="loadModerationPage(data.moderation.pagination.page + 1)">Próxima</button></div>
+      </section>
+    </article>
+
+    <p *ngIf="contextLoading && activeTabIsLocal" class="rounded-2xl bg-white p-5 text-sm font-bold text-braPurple shadow-sm" aria-live="polite">Carregando contexto da comunidade…</p>
+    <p *ngIf="contextError && activeTabIsLocal" class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700" role="alert">{{ contextError }} <button type="button" class="ml-2 underline" (click)="loadContext()">Tentar novamente</button></p>
+
+    <app-admin-user-community-context class="block" *ngIf="activeTabIsLocal && context as local" [activeTab]="activeTab" [context]="local" [discordMember]="discordMember" [discordMemberError]="discordMemberError" />
+
+    <article *ngIf="activeTab === 'confiabilidade'" id="confiabilidade" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Sinais auxiliares</p><h2>Confiabilidade</h2><p class="section-copy">O score é um resumo do contrato atual, não uma verdade absoluta nem autorização para punições automáticas.</p></div><span class="section-number">06</span></div>
+      <p *ngIf="reliabilityError" class="mt-5 rounded-xl bg-yellow-50 p-4 text-sm font-bold text-yellow-800">{{ reliabilityError }}</p>
+      <div *ngIf="reliability as dossier" class="mt-6 grid gap-6 lg:grid-cols-[220px_1fr]">
+        <div class="rounded-3xl bg-braDark p-6 text-white"><span class="text-xs font-bold uppercase tracking-widest text-gray-400">Score atual</span><strong class="mt-3 block text-4xl">{{ dossier.reliability.score }}<small class="text-lg text-gray-400">/100</small></strong><span class="mt-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-bold">{{ reliabilityLevelLabel(dossier.reliability.level) }}</span></div>
+        <div class="grid gap-4 sm:grid-cols-2"><div class="metric-card"><span>Moderação</span><strong>{{ dossier.moderation.activeWarnings }} warns · {{ dossier.moderation.activeBans }} bans ativos</strong><small>{{ dossier.moderation.warnedServers }} comunidades com warns · média {{ dossier.moderation.averageWarningsPerWarnedServer }}</small></div><div class="metric-card"><span>Comunidades</span><strong>{{ dossier.communities.memberships }} vínculos</strong><small>{{ dossier.communities.vipMemberships }} VIP · {{ dossier.communities.partnerMemberships }} partner · {{ dossier.communities.bannedMemberships }} banidos</small></div><div class="metric-card"><span>Contas externas</span><strong>{{ dossier.account.linkedDiscord ? 'Discord vinculado' : 'Discord não vinculado' }}</strong><small>{{ dossier.account.linkedTelegram ? 'Telegram vinculado' : 'Telegram não vinculado' }}</small></div><div class="metric-card"><span>Eventos</span><strong>{{ dossier.events.ownedApprovedEvents }} próprios aprovados</strong><small>{{ dossier.events.staffEvents }} participações como staff</small></div></div>
+        <div class="lg:col-start-2"><h3 class="font-bold text-gray-900">Sinais usados no resumo</h3><p *ngIf="!dossier.reliability.signals.length" class="mt-2 text-sm text-gray-500">Nenhum sinal adicional retornado.</p><div class="mt-3 flex flex-wrap gap-2"><span *ngFor="let signal of dossier.reliability.signals" class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700">{{ reliabilitySignalLabel(signal) }}</span></div></div>
+      </div>
+    </article>
+
+    <article *ngIf="canManageLinks && activeTab === 'administracao'" id="administracao" class="section-card scroll-mt-4">
+      <div class="section-heading"><div><p class="eyebrow">Ações suportadas</p><h2>Administração da plataforma</h2><p class="section-copy">Somente o cargo da plataforma pode ser alterado aqui. Ban e mute globais não são oferecidos porque exigem contexto de moderação por comunidade.</p></div><span class="section-number">07</span></div>
+      <div class="mt-6 max-w-2xl rounded-2xl border border-gray-200 bg-gray-50 p-5">
+        <label class="text-sm font-bold">Cargo da plataforma<select [(ngModel)]="selectedRole" (ngModelChange)="onRoleChange()" class="form-control"><option *ngFor="let role of roles" [ngValue]="role.value">{{ role.label }}</option></select></label>
+        <p class="mt-3 text-sm text-gray-500">Atual: <strong>{{ roleLabel(data.identity.role) }}</strong>. A API valida ROLE_ADMIN e é a autoridade da alteração.</p>
+        <label class="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" [(ngModel)]="roleConfirmed" class="mt-1" /><span>Confirmo que revisei o User e o novo cargo antes de aplicar.</span></label>
+        <p *ngIf="roleMessage" class="mt-4 rounded-xl p-3 text-sm font-bold" [ngClass]="roleMessageIsError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" aria-live="polite">{{ roleMessage }}</p>
+        <button type="button" class="mt-4" [disabled]="roleActionLoading || selectedRole === data.identity.role" (click)="updateRole()">{{ roleActionLoading ? 'Atualizando…' : 'Alterar cargo' }}</button>
+      </div>
+    </article>
+  </ng-container>
+</section>

@@ -1,0 +1,10 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer utilities {
+  .bg-pattern {
+    background-image: radial-gradient(circle at 1px 1px, rgba(38, 38, 38, 0.08) 1px, transparent 0);
+    background-size: 28px 28px;
+  }
+}

@@ -1,0 +1,169 @@
+<section class="mx-auto max-w-6xl p-6 md:p-10">
+  <div>
+    <h1 class="font-amaranth text-3xl font-bold text-braDark">Acessos da Community</h1>
+    <p class="mt-2 max-w-3xl text-gray-600">
+      Configure capabilities organizacionais sem depender das permissões do Discord.
+      O servidor e as integrações continuam sendo domínios separados.
+    </p>
+  </div>
+
+  <p *ngIf="errorMessage" class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+    {{ errorMessage }}
+  </p>
+
+  <ng-container *ngIf="selectedCommunityId !== null && selectedAccess">
+    <div class="mt-6 rounded-2xl border border-braPurple/20 bg-braPurple/5 p-4 text-sm text-gray-700">
+      <strong>{{ selectedAccess.owner ? 'Owner' : 'Community Admin' }}</strong>
+      <span *ngIf="selectedAccess.owner">
+        · Você pode configurar capabilities e é o único que pode adicionar ou remover Community Admins.
+      </span>
+      <span *ngIf="!selectedAccess.owner">
+        · Você pode configurar capabilities operacionais, mas não pode adicionar ou remover Community Admins.
+      </span>
+    </div>
+
+    <div *ngIf="loadingTargets" class="mt-8 rounded-2xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+      Carregando membros, cargos e catálogo de capabilities...
+    </div>
+
+    <div *ngIf="!loadingTargets" class="mt-8 grid gap-8 xl:grid-cols-2">
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 class="font-amaranth text-2xl font-bold text-braDark">Acessos diretos</h2>
+          <p class="mt-1 text-sm text-gray-500">
+            Grants individuais valem para toda a Community. Capabilities hierárquicas de Time não são concedidas aqui.
+          </p>
+        </div>
+
+        <form class="mt-5 flex gap-2" (ngSubmit)="searchMembers()">
+          <input
+            [(ngModel)]="memberSearch"
+            name="access-member-search"
+            placeholder="Buscar membro..."
+            class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2">
+          <button
+            type="submit"
+            [disabled]="!!savingKey"
+            class="rounded-xl border border-gray-300 px-4 py-2 font-bold text-gray-700 disabled:opacity-50">
+            Buscar
+          </button>
+        </form>
+
+        <p *ngIf="memberTotal > members.length" class="mt-2 text-xs text-gray-400">
+          Mostrando {{ members.length }} de {{ memberTotal }} resultados. Refine a busca para encontrar outra pessoa.
+        </p>
+
+        <div class="mt-4 max-h-72 space-y-2 overflow-y-auto">
+          <button
+            *ngFor="let member of members"
+            type="button"
+            (click)="selectMember(member)"
+            [disabled]="!!savingKey"
+            class="w-full rounded-xl border p-3 text-left transition disabled:opacity-50"
+            [ngClass]="selectedMember?.userId === member.userId ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 hover:border-braPurple/30'">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate font-bold text-braDark">{{ member.displayName }}</p>
+                <p class="truncate text-xs text-gray-500">
+                  {{ member.username ? '@' + member.username : 'Sem username' }}
+                </p>
+              </div>
+              <span class="shrink-0 text-xs font-bold text-gray-500">{{ memberStatusLabel(member) }}</span>
+            </div>
+          </button>
+
+          <p *ngIf="!members.length" class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
+            Nenhum membro encontrado.
+          </p>
+        </div>
+
+        <div *ngIf="selectedMember" class="mt-6 border-t border-gray-100 pt-5">
+          <h3 class="font-amaranth text-xl font-bold text-braDark">{{ selectedMember.displayName }}</h3>
+          <p class="mt-1 text-sm text-gray-500">
+            Configure apenas os acessos adicionais necessários para esta pessoa.
+          </p>
+
+          <p *ngIf="loadingMemberGrants" class="mt-4 text-sm text-gray-500">Carregando grants...</p>
+
+          <div *ngIf="!loadingMemberGrants" class="mt-4 space-y-3">
+            <label
+              *ngFor="let definition of directDefinitions()"
+              class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+              <input
+                type="checkbox"
+                class="mt-1"
+                [checked]="hasDirect(definition.code)"
+                [disabled]="!!savingKey"
+                (change)="toggleDirect(definition)">
+              <span>
+                <span class="block font-bold text-braDark">{{ capabilityLabel(definition.code) }}</span>
+                <span *ngIf="capabilityHelp(definition)" class="mt-1 block text-xs text-gray-500">
+                  {{ capabilityHelp(definition) }}
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 class="font-amaranth text-2xl font-bold text-braDark">Acessos por cargo</h2>
+          <p class="mt-1 text-sm text-gray-500">
+            As capabilities do cargo são herdadas por quem ocupa esse cargo. Poderes de Time respeitam somente os cargos abaixo dele.
+          </p>
+        </div>
+
+        <div class="mt-5 max-h-72 space-y-2 overflow-y-auto">
+          <button
+            *ngFor="let role of roles"
+            type="button"
+            (click)="selectRole(role)"
+            [disabled]="!!savingKey"
+            class="w-full rounded-xl border p-3 text-left transition disabled:opacity-50"
+            [ngClass]="selectedRole?.id === role.id ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 hover:border-braPurple/30'">
+            <div class="flex items-center justify-between gap-3">
+              <span class="font-bold text-braDark">{{ role.name }}</span>
+              <span *ngIf="!role.active" class="rounded-full bg-gray-100 px-2 py-1 text-xs font-bold text-gray-500">
+                Inativo
+              </span>
+            </div>
+            <p *ngIf="role.description" class="mt-1 text-xs text-gray-500">{{ role.description }}</p>
+          </button>
+
+          <p *ngIf="!roles.length" class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
+            Nenhum cargo interno cadastrado.
+          </p>
+        </div>
+
+        <div *ngIf="selectedRole" class="mt-6 border-t border-gray-100 pt-5">
+          <h3 class="font-amaranth text-xl font-bold text-braDark">{{ selectedRole.name }}</h3>
+          <p *ngIf="!selectedRole.active" class="mt-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+            O cargo está inativo. As capabilities podem permanecer configuradas, mas não concedem autoridade enquanto ele estiver inativo.
+          </p>
+
+          <p *ngIf="loadingRoleGrants" class="mt-4 text-sm text-gray-500">Carregando grants...</p>
+
+          <div *ngIf="!loadingRoleGrants" class="mt-4 space-y-3">
+            <label
+              *ngFor="let definition of roleDefinitions()"
+              class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+              <input
+                type="checkbox"
+                class="mt-1"
+                [checked]="hasRole(definition.code)"
+                [disabled]="!!savingKey"
+                (change)="toggleRole(definition)">
+              <span>
+                <span class="block font-bold text-braDark">{{ capabilityLabel(definition.code) }}</span>
+                <span *ngIf="capabilityHelp(definition)" class="mt-1 block text-xs text-gray-500">
+                  {{ capabilityHelp(definition) }}
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+</section>

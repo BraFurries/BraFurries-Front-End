@@ -1,0 +1,111 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="space-y-6" novalidate>
+  <section class="partner-section">
+    <h2>Informações principais</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <label>Nome <span aria-hidden="true">*</span><input formControlName="name" autocomplete="organization" maxlength="64"></label>
+      <label>Categoria <span aria-hidden="true">*</span><select formControlName="category"><option [ngValue]="null">Selecione</option><option *ngFor="let item of categories" [value]="item.value">{{ item.label }}</option></select></label>
+      <p *ngIf="hasError('name','required') || hasError('name','whitespace')" class="field-error md:col-span-2">Informe um nome válido.</p>
+      <label>Status<select formControlName="status"><option *ngFor="let item of statuses" [value]="item.value">{{ item.label }}</option></select><small *ngIf="partner">Use a ação administrativa abaixo para alterar o status.</small></label>
+      <label class="md:col-span-2">Descrição<textarea formControlName="description" rows="5" maxlength="2048"></textarea></label>
+    </div>
+  </section>
+
+  <section *ngIf="form.controls.category.value as category" class="partner-section">
+    <h2>Origem da parceria</h2>
+    <ng-container *ngIf="supportsExisting(category); else manualOnly">
+      <p class="mb-4 text-sm text-gray-500">Vincule a parceria a um registro que já existe na BraFurries ou mantenha a ficha independente.</p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="origin-option" [class.origin-option-active]="originMode === 'existing'">
+          <input type="radio" name="partner-origin" [checked]="originMode === 'existing'" (change)="setOriginMode('existing')">
+          <span><strong>Já cadastrado na BraFurries</strong><small>Busque e vincule um registro existente.</small></span>
+        </label>
+        <label class="origin-option" [class.origin-option-active]="originMode === 'manual'">
+          <input type="radio" name="partner-origin" [checked]="originMode === 'manual'" (change)="setOriginMode('manual')">
+          <span><strong>Cadastro manual / externo</strong><small>Use apenas os dados desta parceria.</small></span>
+        </label>
+      </div>
+
+      <div *ngIf="originMode === 'existing'" class="mt-5 space-y-3">
+        <label>
+          {{ candidateSearchPlaceholder() }}
+          <input [formControl]="searchControl" type="search" autocomplete="off" [placeholder]="candidateSearchPlaceholder()" aria-label="Buscar registro para vincular">
+        </label>
+
+        <div *ngIf="selectedCandidate" class="selected-resource" role="status">
+          <div class="flex min-w-0 items-center gap-3">
+            <img *ngIf="selectedCandidate.imageUrl" [src]="selectedCandidate.imageUrl" [alt]="'Imagem de ' + selectedCandidate.name" class="h-12 w-12 rounded-xl object-cover">
+            <div *ngIf="!selectedCandidate.imageUrl" class="resource-placeholder" aria-hidden="true">{{ selectedCandidate.name.charAt(0) }}</div>
+            <div class="min-w-0">
+              <p class="truncate font-bold text-gray-800">Vinculado a: {{ selectedResourceLabel() }}</p>
+              <p *ngIf="selectedCandidate.subtitle" class="truncate text-xs text-gray-500">{{ selectedCandidate.subtitle }}</p>
+            </div>
+          </div>
+          <button type="button" class="secondary-button" (click)="applySelectedPrefill()">Aplicar dados do registro</button>
+        </div>
+
+        <p *ngIf="candidateLoading" class="text-sm text-gray-500" role="status">Buscando registros...</p>
+        <div *ngIf="candidateError" class="flex flex-wrap items-center gap-2" role="alert">
+          <p class="field-error">{{ candidateError }}</p>
+          <button *ngIf="candidateError.includes('carregar')" type="button" class="text-sm font-bold text-braPurple hover:underline" (click)="retryCandidateSearch()">Tentar novamente</button>
+        </div>
+        <p *ngIf="!candidateLoading && !candidateError && candidateResults.length === 0 && searchControl.value.trim()" class="text-sm text-gray-500">Nenhum resultado encontrado.</p>
+
+        <div *ngIf="!candidateLoading && candidateResults.length > 0" class="candidate-list" role="group" aria-label="Registros encontrados">
+          <button *ngFor="let candidate of candidateResults" type="button" class="candidate-item" (click)="selectCandidate(candidate)" [attr.aria-label]="'Vincular ' + candidate.name">
+            <img *ngIf="candidate.imageUrl" [src]="candidate.imageUrl" [alt]="''" class="h-11 w-11 rounded-xl object-cover">
+            <div *ngIf="!candidate.imageUrl" class="resource-placeholder" aria-hidden="true">{{ candidate.name.charAt(0) }}</div>
+            <span class="min-w-0 text-left"><strong class="block truncate">{{ candidate.name }}</strong><small *ngIf="candidate.subtitle" class="block truncate text-gray-500">{{ candidate.subtitle }}</small></span>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="originMode === 'manual' && category === 'discord_server'" class="mt-5">
+        <label>Discord Guild ID <span class="font-normal text-gray-400">(opcional)</span><input [formControl]="discordGuildIdControl" type="text" inputmode="numeric" maxlength="32" placeholder="123456789012345678"><small>Se o servidor não estiver cadastrado na BraFurries, informe o ID do Discord para manter a referência externa.</small><span *ngIf="discordGuildIdControl.touched && discordGuildIdControl.invalid" class="field-error">Informe um Guild ID decimal positivo, sem zero à esquerda.</span></label>
+      </div>
+    </ng-container>
+    <ng-template #manualOnly><p class="text-sm text-gray-500">Esta categoria usa cadastro manual. Preencha os dados da parceria abaixo.</p></ng-template>
+  </section>
+
+  <section class="partner-section">
+    <h2>Imagem da parceria</h2>
+    <p class="mb-3 text-sm text-gray-500">Enviar um arquivo é recomendado; a URL manual continua disponível.</p>
+    <div class="grid gap-4 md:grid-cols-2">
+      <label>Enviar imagem<input type="file" accept="image/jpeg,image/png,image/webp" (change)="onImageFileSelected($event)" aria-label="Enviar imagem da parceria"><small>JPEG, PNG ou WebP, até 5 MB.</small></label>
+      <p *ngIf="imageFileError" class="field-error">{{ imageFileError }}</p>
+      <label>URL manual da imagem/logo<input formControlName="imageUrl" type="url" placeholder="https://..." maxlength="1024"><span *ngIf="hasError('imageUrl','url')" class="field-error">Use uma URL HTTP ou HTTPS.</span></label>
+      <div *ngIf="imagePreview() as preview" class="flex items-center gap-3"><img [src]="preview" alt="Prévia do logo da parceria" class="h-20 w-20 rounded-xl object-cover"><span class="text-sm text-gray-500">Prévia da imagem</span></div>
+      <p *ngIf="imageFile" class="text-sm text-braPurple">O arquivo selecionado substituirá a imagem atual ao salvar.</p>
+      <button *ngIf="partner?.imageUrl && !imageFile" type="button" class="secondary-button" (click)="markImageForRemoval()">Remover imagem</button>
+      <p *ngIf="removeImage" class="text-sm text-red-600">A imagem será removida ao salvar.</p>
+    </div>
+  </section>
+
+  <section class="partner-section">
+    <h2>Representante</h2><p class="mb-3 text-sm text-gray-500">Vincule uma pessoa cadastrada na BraFurries como representante desta parceria.</p>
+    <label>Buscar usuário<input [formControl]="representativeSearchControl" type="search" autocomplete="off" placeholder="Buscar usuário por nome, usuário ou e-mail" aria-label="Buscar representante"></label>
+    <div *ngIf="selectedRepresentative" class="selected-resource mt-3"><div class="flex gap-3"><img *ngIf="selectedRepresentative.avatarUrl" [src]="selectedRepresentative.avatarUrl" alt="" class="h-12 w-12 rounded-xl object-cover"><div><strong>{{ selectedRepresentative.name }}</strong><p *ngIf="selectedRepresentative.email">{{ selectedRepresentative.email }}</p><small *ngIf="selectedRepresentative.discordUsername">Discord: {{ selectedRepresentative.discordUsername }}</small><small *ngIf="selectedRepresentative.telegramUsername" class="block">Telegram: {{ selectedRepresentative.telegramUsername }}</small></div></div><button type="button" class="secondary-button" (click)="unlinkRepresentative()">Desvincular representante</button></div>
+    <p *ngIf="representativeSearchLoading" class="text-sm text-gray-500">Buscando...</p><p *ngIf="representativeSearchError" class="field-error">{{ representativeSearchError }}</p>
+    <p *ngIf="representativeSearchCompleted && !representativeSearchLoading && !representativeSearchError && representativeCandidates.length === 0" class="text-sm text-gray-500">Nenhum usuário encontrado.</p>
+    <div *ngIf="representativeCandidates.length" class="candidate-list mt-3"><button *ngFor="let user of representativeCandidates" type="button" class="candidate-item" (click)="selectRepresentative(user)" [attr.aria-label]="'Selecionar ' + user.name"><img *ngIf="user.avatarUrl" [src]="user.avatarUrl" alt="" class="h-11 w-11 rounded-xl object-cover"><span class="min-w-0 text-left"><strong class="block">{{ user.name }}</strong><small *ngIf="user.email" class="block">{{ user.email }}</small><small *ngIf="user.discordUsername">Discord: {{ user.discordUsername }}</small><small *ngIf="user.telegramUsername" class="block">Telegram: {{ user.telegramUsername }}</small></span></button></div>
+  </section>
+
+  <section class="partner-section"><h2>Contato adicional</h2><p class="mb-3 text-sm text-gray-500">Independente da conta do representante. Outras redes podem ser adicionadas nos links externos.</p><div class="grid gap-4 md:grid-cols-2"><label>Site<input formControlName="websiteUrl" type="url" placeholder="https://..." maxlength="1024"><span *ngIf="hasError('websiteUrl','url')" class="field-error">Use uma URL HTTP ou HTTPS.</span></label><label>Nome de contato adicional<input formControlName="contactName" autocomplete="name" maxlength="128"></label><label>E-mail de contato adicional<input formControlName="contactEmail" type="email" autocomplete="email" maxlength="255"><span *ngIf="hasError('contactEmail','email')" class="field-error">Informe um e-mail válido.</span></label></div></section>
+
+  <section class="partner-section">
+    <div class="flex items-center justify-between gap-3"><h2>Links externos</h2><button type="button" (click)="addLink()" class="secondary-button">+ Adicionar link</button></div>
+    <div formArrayName="links" class="mt-4 space-y-4">
+      <div *ngFor="let group of links.controls; let i = index" [formGroupName]="i" class="grid gap-3 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_2fr_auto]">
+        <label>Tipo<select formControlName="type"><option *ngIf="!isKnownLinkType(group.get('type')?.value)" [value]="group.get('type')?.value">{{ group.get('type')?.value }}</option><option *ngFor="let type of linkTypeOptions" [value]="type.value">{{ type.label }}</option></select></label>
+        <label>Label<input formControlName="label" maxlength="128"></label>
+        <label>URL<input formControlName="url" type="url" placeholder="https://..." maxlength="1024"><span *ngIf="linkHasError(i)" class="field-error">Use uma URL HTTP ou HTTPS.</span></label>
+        <button type="button" (click)="removeLink(i)" class="self-end text-sm font-bold text-red-600" [attr.aria-label]="'Remover link ' + (i + 1)">Remover</button>
+      </div>
+    </div>
+    <p *ngIf="links.length === 0" class="mt-3 text-sm text-gray-500">Nenhum link adicional.</p>
+  </section>
+
+  <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+    <button type="button" (click)="cancelled.emit()" [disabled]="submitting" class="secondary-button">Cancelar</button>
+    <button type="submit" [disabled]="submitting" class="primary-button">{{ submitting ? 'Salvando...' : submitLabel }}</button>
+  </div>
+</form>

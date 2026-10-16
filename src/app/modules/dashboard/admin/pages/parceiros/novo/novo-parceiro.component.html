@@ -1,0 +1,7 @@
+<div class="mx-auto max-w-5xl space-y-5">
+  <button type="button" (click)="back()" class="text-sm font-bold text-braPurple hover:underline">← Voltar para parcerias</button>
+  <header><h1 class="font-amaranth text-3xl font-bold text-gray-800">Nova parceria</h1><p class="mt-1 text-gray-500">Cadastre um novo parceiro da BraFurries.</p></header>
+  <p *ngIf="errorMessage" role="alert" class="rounded-xl bg-red-50 p-3 font-semibold text-red-700">{{ errorMessage }}</p>
+  <p *ngIf="successMessage" role="status" class="rounded-xl bg-green-50 p-3 font-semibold text-green-700">{{ successMessage }}</p>
+  <app-parceiro-form [submitting]="submitting" submitLabel="Criar parceria" (submitted)="create($event)" (cancelled)="back()"></app-parceiro-form>
+</div>

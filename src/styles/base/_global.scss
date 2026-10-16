@@ -1,0 +1,6 @@
+@use 'abstracts' as abs;
+
+h1,h2,h3,h4,h5,h6,p,div,button,
+mat-button,mat-icon,mat-label {
+  // color: abs.getColor(brand,purple,original);
+}

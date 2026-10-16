@@ -1,0 +1,616 @@
+<div class="backup-panel">
+  @if (loading) {
+    <section class="card"><p>Carregando Backups…</p></section>
+  } @else if (error && !settingsDraft && !catalog) {
+    <section class="card error-card">
+      <strong>Não foi possível carregar Backups.</strong>
+      <p>{{ error }}</p>
+      <button type="button" class="secondary-button" (click)="load()">Tentar novamente</button>
+    </section>
+  } @else {
+    <section class="card backup-intro">
+      <div>
+        <span class="eyebrow">Backup estrutural</span>
+        <h3>Estrutura suportada pelo Coddy</h3>
+        <p>
+          O snapshot salva cargos, canais/categorias suportados e permission overwrites de
+          <strong>cargos</strong>. O estado é capturado ao vivo pelo Coddy para esta guild.
+        </p>
+      </div>
+      <div class="coverage-note">
+        <strong>Não incluído nesta versão</strong>
+        <p>
+          Mensagens, histórico, membros, DMs, bots/integrations, emojis/stickers,
+          atribuições de cargos aos membros e overwrites específicos de usuários.
+        </p>
+      </div>
+      <div class="role-limit-overview" role="note">
+        <strong>Restaurar cargos tem limite imposto pelo Discord</strong>
+        <p>
+          Cada servidor pode criar até 250 cargos em uma janela móvel de 48 horas.
+          Cargos criados manualmente ou por outros bots também entram nessa conta.
+          Gerar backups não consome essa cota; restaurar pode consumi-la ao criar novos cargos.
+        </p>
+        <p>
+          Não é um limite de uma restauração a cada 48 horas: atualizar ou reutilizar
+          cargos existentes não exige novas criações. Excluir cargos não recupera a cota consumida.
+        </p>
+      </div>
+    </section>
+
+    @if (settingsDraft) {
+      <section class="card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Backups automáticos</span>
+            <h3>Periodicidade</h3>
+          </div>
+          @if (dirty) { <span class="dirty-badge">Alterações não salvas</span> }
+        </div>
+
+        <label class="toggle-line">
+          <input
+            type="checkbox"
+            [(ngModel)]="settingsDraft.periodicEnabled"
+            (ngModelChange)="onSettingsChanged()"
+          />
+          <span>Ativar backups automáticos</span>
+        </label>
+
+        <div class="settings-grid">
+          <label>
+            <span>Frequência</span>
+            <select
+              [(ngModel)]="settingsDraft.frequency"
+              (ngModelChange)="onSettingsChanged()"
+              [disabled]="!settingsDraft.periodicEnabled"
+            >
+              <option value="daily">Diária</option>
+              <option value="weekly">Semanal</option>
+              <option value="monthly">Mensal</option>
+            </select>
+            <small>O scanner periódico executa quando detectar que a frequência venceu.</small>
+          </label>
+
+          <div class="policy-note">
+            <strong>Política fixa: 1 manual + 1 automático</strong>
+            <small>
+              Um novo snapshot substitui o anterior do mesmo tipo. Desligar o automático
+              não apaga o último snapshot periódico.
+            </small>
+          </div>
+        </div>
+
+        @if (settingsMessage) { <p class="success-message">{{ settingsMessage }}</p> }
+        @if (error) { <p class="error-message">{{ error }}</p> }
+
+        <div class="actions">
+          <button
+            type="button"
+            class="secondary-button"
+            [disabled]="!dirty || settingsSaving"
+            (click)="resetSettings()"
+          >
+            Descartar
+          </button>
+          <button
+            type="button"
+            class="primary-button"
+            [disabled]="!dirty || settingsSaving"
+            (click)="saveSettings()"
+          >
+            {{ settingsSaving ? 'Salvando…' : 'Salvar configurações' }}
+          </button>
+        </div>
+      </section>
+    }
+
+    <section class="card">
+      <div class="card-heading">
+        <div>
+          <span class="eyebrow">Backup manual</span>
+          <h3>Criar snapshot agora</h3>
+        </div>
+      </div>
+      <div class="create-row">
+        <label>
+          <span>Nome do backup</span>
+          <input
+            type="text"
+            maxlength="255"
+            [(ngModel)]="createName"
+            (ngModelChange)="onCreateNameChanged()"
+            placeholder="Antes da reforma"
+          />
+        </label>
+        <button
+          type="button"
+          class="primary-button"
+          [disabled]="!createName.trim() || createBusy"
+          (click)="createBackup()"
+        >
+          {{ createBusy ? 'Capturando…' : 'Criar backup' }}
+        </button>
+      </div>
+      <p class="muted">
+        O backup manual anterior será substituído somente depois que o novo snapshot for persistido com sucesso.
+      </p>
+      @if (createMessage) { <p class="success-message">{{ createMessage }}</p> }
+      @if (createError) { <p class="error-message">{{ createError }}</p> }
+    </section>
+
+    @if (selectedSnapshotOperation) {
+      <section class="card operation-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Operação de criação</span>
+            <h3>{{ selectedSnapshotOperation.requestedName }}</h3>
+            <p class="help">
+              {{ selectedSnapshotOperation.backupType === 'PERIODIC' ? 'Automático' : 'Manual' }} ·
+              {{ formatDate(selectedSnapshotOperation.startedAt || selectedSnapshotOperation.createdAt) }}
+              @if (!isActiveOperation(selectedSnapshotOperation) && selectedSnapshotOperation.finishedAt) {
+                · finalizado {{ formatDate(selectedSnapshotOperation.finishedAt) }}
+              }
+            </p>
+          </div>
+          <div class="operation-heading-actions">
+            <span
+              class="status-pill"
+              [class.partial]="selectedSnapshotOperation.status === 'PARTIAL'"
+              [class.failed]="selectedSnapshotOperation.status === 'FAILED'"
+            >
+              {{ statusLabel(selectedSnapshotOperation.status) }}
+            </span>
+            @if (!isActiveOperation(selectedSnapshotOperation)) {
+              <button
+                type="button"
+                class="secondary-button compact-button"
+                (click)="toggleSnapshotDetails()"
+              >
+                {{ snapshotDetailsExpanded ? 'Ocultar detalhes' : 'Ver detalhes' }}
+              </button>
+              <button
+                type="button"
+                class="ghost-button compact-button"
+                (click)="dismissSnapshotOperation()"
+              >
+                Dispensar
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (isActiveOperation(selectedSnapshotOperation) || snapshotDetailsExpanded) {
+          <div class="operation-progress">
+            <div>
+              <strong>{{ progressPercent(selectedSnapshotOperation) }}%</strong>
+              <span>
+                {{ selectedSnapshotOperation.progressCurrent }} /
+                {{ selectedSnapshotOperation.progressTotal || '—' }} etapas
+              </span>
+            </div>
+            <progress
+              max="100"
+              [value]="progressPercent(selectedSnapshotOperation)"
+            ></progress>
+            @if (selectedSnapshotOperation.currentStep) {
+              <small>Etapa atual: {{ selectedSnapshotOperation.currentStep }}</small>
+            }
+          </div>
+
+          @if (selectedSnapshotOperation.steps.length) {
+            <div class="operation-steps">
+              @for (step of selectedSnapshotOperation.steps; track step.id) {
+                <div
+                  class="operation-step"
+                  [class.failed]="step.status === 'FAILED'"
+                  [class.skipped]="step.status === 'SKIPPED'"
+                >
+                  <span class="step-state">{{ stepStatusLabel(step.status) }}</span>
+                  <div>
+                    <strong>{{ step.message }}</strong>
+                    <small>
+                      {{ step.progressCurrent }} / {{ step.progressTotal || '—' }} ·
+                      {{ formatDate(step.createdAt) }}
+                    </small>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (selectedSnapshotOperation.errorCode) {
+            <p class="error-message">Código: {{ selectedSnapshotOperation.errorCode }}</p>
+          }
+        } @else {
+          <p class="help operation-retention-note">
+            O processamento concluído fica disponível aqui por 3 horas. Expanda para rever as etapas.
+          </p>
+        }
+      </section>
+    }
+
+    <section class="card">
+      <div class="card-heading">
+        <div>
+          <span class="eyebrow">Histórico</span>
+          <h3>Snapshots desta guild</h3>
+        </div>
+        @if (catalog && !catalog.canRestore) {
+          <span class="owner-badge">Restore e exclusão: somente dono do servidor</span>
+        }
+      </div>
+
+      @if (deleteMessage) { <p class="success-message">{{ deleteMessage }}</p> }
+      @if (deleteError) { <p class="error-message">{{ deleteError }}</p> }
+
+      @if (catalog?.backups?.length) {
+        <div class="backup-list">
+          @for (backup of catalog!.backups; track backup.id) {
+            <article class="backup-row">
+              <div class="backup-main">
+                <div class="backup-title-line">
+                  <strong>{{ backup.name }}</strong>
+                  <span class="type-badge">{{ typeLabel(backup.type) }}</span>
+                </div>
+                <p class="muted">
+                  {{ formatDate(backup.createdAt) }}
+                  @if (backup.creatorDiscordUserId) { · Criador Discord {{ backup.creatorDiscordUserId }} }
+                </p>
+                <p>
+                  {{ backup.summary.roles }} cargos ·
+                  {{ backup.summary.channels }} canais/categorias ·
+                  {{ backup.summary.permissionOverwrites }} permissões de cargos
+                </p>
+                @if (operationForBackup(backup.id); as operation) {
+                  <p class="operation-inline" [class.partial]="operation.status === 'PARTIAL'" [class.failed]="operation.status === 'FAILED'">
+                    Último restore: {{ statusLabel(operation.status) }} · {{ scopeLabel(operation.scope) }}
+                  </p>
+                }
+              </div>
+              <div class="backup-actions">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  [disabled]="!catalog!.canRestore || deleteBusyId != null"
+                  (click)="openRestore(backup)"
+                >
+                  Restaurar
+                </button>
+                @if (catalog!.canRestore) {
+                  <button
+                    type="button"
+                    class="danger-outline-button"
+                    [disabled]="deleteBusyId != null"
+                    (click)="requestDelete(backup)"
+                  >
+                    Excluir
+                  </button>
+                }
+              </div>
+              @if (deleteCandidate?.id === backup.id) {
+                <div class="delete-confirmation">
+                  <div>
+                    <strong>Excluir este backup?</strong>
+                    <p>
+                      A estrutura salva será removida definitivamente. O histórico da operação
+                      permanece para auditoria.
+                    </p>
+                  </div>
+                  <div class="actions">
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      [disabled]="deleteBusyId === backup.id"
+                      (click)="cancelDelete()"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      class="danger-button"
+                      [disabled]="deleteBusyId === backup.id"
+                      (click)="confirmDelete()"
+                    >
+                      {{ deleteBusyId === backup.id ? 'Excluindo…' : 'Excluir definitivamente' }}
+                    </button>
+                  </div>
+                </div>
+              }
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="muted">Nenhum backup salvo para esta guild.</p>
+      }
+    </section>
+
+    @if (selectedBackup) {
+      <section class="card restore-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Restore destrutivo</span>
+            <h3>{{ selectedBackup.name }}</h3>
+          </div>
+          <button type="button" class="ghost-button" (click)="closeRestore()">Fechar</button>
+        </div>
+
+        <div class="restore-summary">
+          <div><strong>Criado</strong><span>{{ formatDate(selectedBackup.createdAt) }}</span></div>
+          <div><strong>Cargos</strong><span>{{ selectedBackup.summary.roles }}</span></div>
+          <div><strong>Canais</strong><span>{{ selectedBackup.summary.channels }}</span></div>
+          <div><strong>Permissões</strong><span>{{ selectedBackup.summary.permissionOverwrites }}</span></div>
+        </div>
+
+        <label class="scope-field">
+          <span>Escopo</span>
+          <select [(ngModel)]="restoreScope" (ngModelChange)="onRestoreScopeChanged()">
+            <option value="full">Completo</option>
+            <option value="roles">Somente cargos</option>
+            <option value="channels">Somente canais</option>
+            <option value="permissions">Somente permissões</option>
+          </select>
+        </label>
+        @if (restoreScope === 'channels') {
+          <p class="muted">Restaura metadados e estrutura dos tipos de canal atualmente suportados pelo Coddy.</p>
+        }
+
+        @if (previewLoading) {
+          <p>Consultando o estado vivo do Discord…</p>
+        }
+        @if (previewError) {
+          <p class="error-message">{{ previewError }}</p>
+        }
+
+        @if (restorePreview) {
+          @if (hardBlockers.length) {
+            <div class="blocker-box">
+              <strong>Restore bloqueado</strong>
+              @for (blocker of hardBlockers; track blocker.code) {
+                <p>{{ blocker.message }}</p>
+              }
+            </div>
+          }
+
+          @if (restorePreview.warnings.length) {
+            <div class="warning-box">
+              <strong>Warnings do preflight</strong>
+              @for (warning of restorePreview.warnings; track warning.code) {
+                <p>{{ warning.message }}</p>
+              }
+            </div>
+          }
+
+          <div class="plan-grid">
+            <div>
+              <strong>Cargos</strong>
+              <span>Criar {{ restorePreview.plan.roles.create }} · Atualizar {{ restorePreview.plan.roles.update }} · Reutilizar {{ restorePreview.plan.roles.reuse }}</span>
+            </div>
+            <div>
+              <strong>Canais</strong>
+              <span>Criar {{ restorePreview.plan.channels.create }} · Atualizar {{ restorePreview.plan.channels.update }} · Reutilizar {{ restorePreview.plan.channels.reuse }}</span>
+            </div>
+            <div>
+              <strong>Permissões</strong>
+              <span>Aplicar {{ restorePreview.plan.permissions.apply }} overwrites de cargos</span>
+            </div>
+          </div>
+
+          @if (roleMutationAllowed) {
+            <div class="role-limit-note" role="note">
+              <strong>Limite de criação de cargos — até 250 em 48 horas por servidor</strong>
+              <p>
+                Este preflight estima <strong>{{ estimatedRoleCreations }} nova(s) criação(ões) de cargo</strong>.
+                A estimativa considera as decisões de criar cargos duplicados e pode mudar
+                se o estado do servidor for alterado antes da execução.
+              </p>
+              <p>
+                A cota é compartilhada com todas as criações do servidor, inclusive manuais
+                e de outros bots. O Coddy não dispõe aqui de um saldo garantido.
+                Se a capacidade estiver esgotada, o restore pode terminar parcialmente
+                e será necessário aguardar a liberação gradual da janela móvel.
+                Repetir a operação ou excluir cargos não devolve a cota.
+              </p>
+            </div>
+          }
+
+          @if (restorePreview.ambiguousRoles.length) {
+            <div class="duplicate-box">
+              <strong>Cargos duplicados exigem decisão</strong>
+              @if (roleMutationAllowed) {
+                <label>
+                  <input
+                    type="radio"
+                    name="duplicate-strategy"
+                    value="merge"
+                    [ngModel]="duplicateStrategy"
+                    (ngModelChange)="setDuplicateStrategy($event)"
+                  />
+                  Unificar grupos duplicados (MERGE)
+                </label>
+              } @else {
+                <p class="help">
+                  Neste escopo, cargos existentes só podem ser mapeados explicitamente;
+                  nenhum cargo será criado, unificado ou excluído.
+                </p>
+              }
+              <label>
+                <input
+                  type="radio"
+                  name="duplicate-strategy"
+                  value="explicit"
+                  [ngModel]="duplicateStrategy"
+                  (ngModelChange)="setDuplicateStrategy($event)"
+                />
+                Resolver cada cargo explicitamente
+              </label>
+
+              @if (duplicateStrategy === 'explicit') {
+                @for (role of restorePreview.ambiguousRoles; track role.backupRoleId) {
+                  <label class="resolution-field">
+                    <span>{{ role.name }}</span>
+                    <select
+                      [ngModel]="roleResolutions['' + role.backupRoleId] || ''"
+                      (ngModelChange)="setRoleResolution(role.backupRoleId, $event)"
+                    >
+                      <option value="">Selecione uma decisão</option>
+                      @for (candidate of role.candidates; track candidate.id) {
+                        <option [value]="candidate.id">
+                          Reutilizar {{ candidate.name }} · ID {{ candidate.id }} · posição {{ candidate.position }}
+                        </option>
+                      }
+                      @if (role.canCreateNew) {
+                        <option value="CREATE_NEW">Criar novo cargo</option>
+                      }
+                    </select>
+                  </label>
+                }
+              }
+            </div>
+          }
+
+          @if (roleMutationAllowed) {
+            <label class="confirmation-line role-limit-confirmation">
+              <input type="checkbox" [(ngModel)]="roleLimitAcknowledged" />
+              <span>
+                Entendo o limite de até 250 criações de cargos por servidor em 48 horas,
+                que a disponibilidade atual não é garantida e que esta restauração
+                pode ser interrompida parcialmente por cooldown do Discord.
+              </span>
+            </label>
+          }
+
+          <label class="confirmation-line">
+            <input
+              type="checkbox"
+              [(ngModel)]="restoreConfirmed"
+              (ngModelChange)="onRestoreConfirmationChanged()"
+            />
+            <span>
+              Confirmo que revisei o preflight e quero aplicar o escopo
+              <strong>{{ scopeLabel(restoreScope) }}</strong> deste backup nesta guild.
+            </span>
+          </label>
+
+          @if (restoreError) { <p class="error-message">{{ restoreError }}</p> }
+
+          <button
+            type="button"
+            class="danger-button"
+            [disabled]="!canStartRestore"
+            (click)="startRestore()"
+          >
+            {{ restoreBusy ? 'Iniciando…' : 'Iniciar restauração' }}
+          </button>
+        }
+      </section>
+    }
+
+    @if (selectedOperation) {
+      <section class="card operation-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Operação de restore</span>
+            <h3>{{ statusLabel(selectedOperation.status) }}</h3>
+            <p class="help">
+              Backup #{{ selectedOperation.backupId }} · {{ scopeLabel(selectedOperation.scope) }} ·
+              iniciada {{ formatDate(selectedOperation.startedAt || selectedOperation.createdAt) }}
+              @if (!isActiveOperation(selectedOperation) && selectedOperation.finishedAt) {
+                · finalizada {{ formatDate(selectedOperation.finishedAt) }}
+              }
+            </p>
+          </div>
+          <div class="operation-heading-actions">
+            <span
+              class="status-pill"
+              [class.partial]="selectedOperation.status === 'PARTIAL'"
+              [class.failed]="selectedOperation.status === 'FAILED'"
+            >
+              {{ statusLabel(selectedOperation.status) }}
+            </span>
+            @if (!isActiveOperation(selectedOperation)) {
+              <button
+                type="button"
+                class="secondary-button compact-button"
+                (click)="toggleRestoreDetails()"
+              >
+                {{ restoreDetailsExpanded ? 'Ocultar detalhes' : 'Ver detalhes' }}
+              </button>
+              <button
+                type="button"
+                class="ghost-button compact-button"
+                (click)="dismissRestoreOperation()"
+              >
+                Dispensar
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (isActiveOperation(selectedOperation) || restoreDetailsExpanded) {
+          <div class="operation-progress">
+            <div>
+              <strong>{{ progressPercent(selectedOperation) }}%</strong>
+              <span>
+                {{ selectedOperation.progressCurrent }} /
+                {{ selectedOperation.progressTotal || '—' }} etapas
+              </span>
+            </div>
+            <progress max="100" [value]="progressPercent(selectedOperation)"></progress>
+            @if (selectedOperation.currentStep) {
+              <small>Etapa atual: {{ selectedOperation.currentStep }}</small>
+            }
+          </div>
+
+          @if (selectedOperation.steps.length) {
+            <div class="operation-steps">
+              @for (step of selectedOperation.steps; track step.id) {
+                <div
+                  class="operation-step"
+                  [class.failed]="step.status === 'FAILED'"
+                  [class.skipped]="step.status === 'SKIPPED'"
+                >
+                  <span class="step-state">{{ stepStatusLabel(step.status) }}</span>
+                  <div>
+                    <strong>{{ step.message }}</strong>
+                    <small>
+                      {{ step.progressCurrent }} / {{ step.progressTotal || '—' }} ·
+                      {{ formatDate(step.createdAt) }}
+                    </small>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (selectedOperation.result; as result) {
+            <div class="result-grid">
+              @if (result.roles) {
+                <div><strong>Cargos</strong><span>+{{ result.roles.created }} criados · {{ result.roles.updated }} atualizados · {{ result.roles.skipped }} ignorados · {{ result.roles.failed }} falhas</span></div>
+              }
+              @if (result.channels) {
+                <div><strong>Canais</strong><span>+{{ result.channels.created }} criados · {{ result.channels.updated }} atualizados · {{ result.channels.skipped }} ignorados · {{ result.channels.failed }} falhas</span></div>
+              }
+              @if (result.permissions) {
+                <div><strong>Permissões</strong><span>{{ result.permissions.updated }} aplicadas · {{ result.permissions.skipped }} ignoradas · {{ result.permissions.failed }} falhas</span></div>
+              }
+            </div>
+            @if (result.warnings?.length) {
+              <p class="warning-message">{{ result.warnings!.length }} warning(s) registrados no resultado.</p>
+            }
+            @if (result.failures?.length) {
+              <p class="error-message">{{ result.failures!.length }} falha(s) parcial(is) registradas.</p>
+            }
+          }
+          @if (selectedOperation.errorCode) {
+            <p class="error-message">Código: {{ selectedOperation.errorCode }}</p>
+          }
+        } @else {
+          <p class="help operation-retention-note">
+            O processamento concluído fica disponível aqui por 3 horas. Expanda para rever as etapas.
+          </p>
+        }
+      </section>
+    }
+  }
+</div>

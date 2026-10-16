@@ -1,0 +1,16 @@
+@use "sass:map";
+@use "sass:meta";
+
+@use 'variables' as *;
+
+@function getColor($keys...) {
+  $map: $colors;
+  @each $key in $keys {
+    $map: map.get($map, $key);
+    
+    @if $map == null {
+      @error "getColor: chave `#{$key}` não existe no mapa.";
+    }
+  }
+  @return $map;
+}

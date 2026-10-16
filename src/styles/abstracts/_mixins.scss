@@ -1,0 +1,48 @@
+@use 'variables' as *;
+
+/// @param $weight numeric
+/// @param $size   css-size (px, rem…)
+/// @param $line   number or css-unit
+/// @param $family font-family string
+@mixin type-style($weight, $size, $line, $family: $font-body) {
+    font-family:  $family;
+    font-weight:  $weight;
+    font-size:    $size;
+    line-height:  $line;
+    letter-spacing: 0;
+}
+
+
+@mixin apply-typography {
+    // * { @include type-style($paragraph-01...); }
+
+    .subtitle-01 { @include type-style($subtitle-01...); }
+    .subtitle-02 { @include type-style($subtitle-02...); }
+    .subtitle-03 { @include type-style($subtitle-03...); }
+
+    // parágrafos / legendas / etc (Archivo)
+    .body-text   { @include type-style($paragraph-01...); }
+    .small-text  { @include type-style($paragraph-02...); }
+    .caption     { @include type-style($paragraph-03...); }
+    .micro       { @include type-style($paragraph-04...); }
+    .micro-2     { @include type-style($paragraph-05...); }
+
+
+    h1 { @include type-style($heading-01...); }
+    h2 { @include type-style($heading-02...); }
+    h3 { @include type-style($heading-03...); }
+    h4 { @include type-style($heading-04...); }
+    h5 { @include type-style($heading-05...); }
+    h6 { @include type-style($heading-06...); }
+    .heading-07 { @include type-style($heading-07...); }
+}
+
+
+@mixin flex-center($direction: row) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: $direction;
+}
+
+

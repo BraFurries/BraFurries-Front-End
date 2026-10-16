@@ -1,0 +1,178 @@
+<section class="vip-panel">
+  @if (loading) {
+    <section class="state-card compact">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Carregando configuração VIP…</p>
+    </section>
+  } @else if (!draft) {
+    <section class="state-card compact">
+      <div class="text-4xl">💎</div>
+      <h2>Configuração VIP indisponível</h2>
+      <p>{{ error || 'Não foi possível carregar a configuração.' }}</p>
+      <button type="button" class="secondary-button" (click)="load()">Tentar novamente</button>
+    </section>
+  } @else {
+    <section class="card hero-card">
+      <div>
+        <p class="eyebrow">Coddy · VIP</p>
+        <h2>Política de personalização VIP</h2>
+        <p class="help">
+          O painel controla as regras deste servidor. Cada membro continua personalizando cor, gradiente e ícone pelo
+          <code>/vip customizar</code> no Discord.
+        </p>
+      </div>
+      <div class="hero-badge">{{ draft.roleIds.length }} {{ draft.roleIds.length === 1 ? 'cargo concede VIP' : 'cargos concedem VIP' }}</div>
+    </section>
+
+    @if (draft.runtimeSyncPending) {
+      <p class="warning">A configuração está salva, mas o último reconcile imediato dos cargos VIP ainda não foi confirmado pelo Coddy.</p>
+    }
+    @for (warning of draft.warnings; track warning) {
+      <p class="warning">{{ warning }}</p>
+    }
+
+    <section class="card">
+      <p class="eyebrow">Elegibilidade</p>
+      <h3>Cargos que concedem VIP</h3>
+      <p class="help">Qualquer membro que possua um destes cargos pode usar a personalização VIP.</p>
+      <app-role-selection
+        [roles]="roles"
+        [selectedRoleIds]="draft.roleIds"
+        [persistedRoleIds]="persisted?.roleIds ?? []"
+        label="Cargos VIP"
+        description="Estes cargos só precisam existir na guild; o Coddy não precisa editá-los para reconhecer o VIP."
+        [showPersistenceState]="true"
+        (addRole)="addRole($event)"
+        (removeRole)="removeRole($event)"
+      ></app-role-selection>
+      @if (missingConfiguredRoleIds.length) {
+        <div class="warning mt-4">
+          <strong>Cargos VIP configurados não existem mais no Discord</strong>
+          <p class="help">Remova os IDs órfãos para salvar uma configuração válida.</p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            @for (roleId of missingConfiguredRoleIds; track roleId) {
+              <button type="button" class="secondary-button" (click)="removeRole(roleId)">
+                Remover ID {{ roleId }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    <section class="content-grid">
+      <article class="card">
+        <p class="eyebrow">Cargo personalizado</p>
+        <h3>Prefixo</h3>
+        <label class="block mt-4">
+          <span class="field-label">Prefixo do cargo</span>
+          <input
+            class="field-control"
+            maxlength="67"
+            [(ngModel)]="draft.customRolePrefix"
+            (ngModelChange)="onDraftChanged()"
+            placeholder="VIP">
+        </label>
+        <div class="preview mt-4">
+          <span>Prévia</span>
+          <strong>{{ draft.customRolePrefix.trim() || 'VIP' }} Nick</strong>
+        </div>
+        <p class="help">
+          Alterar o prefixo renomeia cargos já vinculados; não cria um novo cargo e não remove cor, gradiente ou ícone.
+        </p>
+      </article>
+
+      <article class="card">
+        <p class="eyebrow">Cores da staff</p>
+        <h3>Proteção visual</h3>
+        <label class="toggle-row mt-4">
+          <input
+            type="checkbox"
+            [(ngModel)]="draft.allowStaffColors"
+            (ngModelChange)="onDraftChanged()">
+          <span>Permitir cores iguais ou visualmente próximas às da staff</span>
+        </label>
+        <p class="help">
+          Desativado preserva a proteção atual por cores configuradas, cargos reais da staff e comparação perceptual.
+          Ativar não desliga as demais validações de cor.
+        </p>
+        <p class="help"><strong>Mudanças nesta regra não recolorem cargos existentes automaticamente.</strong></p>
+      </article>
+    </section>
+
+    <section class="card">
+      <p class="eyebrow">Organização</p>
+      <h3>Faixa dos cargos personalizados</h3>
+
+      <label class="toggle-row mt-4">
+        <input
+          type="checkbox"
+          [checked]="rangeEnabled"
+          [disabled]="!rangeEnabled && !!rangeUnavailableReason"
+          (change)="toggleRange($any($event.target).checked)">
+        <span>Organizar cargos VIP personalizados em uma faixa</span>
+      </label>
+
+      @if (rangeUnavailableReason) {
+        <p class="warning">{{ rangeUnavailableReason }}</p>
+      }
+
+      @if (rangeEnabled) {
+        <div class="grid gap-4 md:grid-cols-2 mt-5">
+          <label>
+            <span class="field-label">Abaixo de</span>
+            <select
+              class="field-control"
+              [disabled]="!!rangeUnavailableReason"
+              [ngModel]="draft.customRoleRange.topRoleId"
+              (ngModelChange)="updateTopRole($event)">
+              <option [ngValue]="null">Selecione a âncora superior</option>
+              @for (role of topRoleOptions; track role.id) {
+                <option [value]="role.id">{{ role.name }} · posição {{ role.position }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span class="field-label">Acima de (opcional)</span>
+            <select
+              class="field-control"
+              [disabled]="!!rangeUnavailableReason"
+              [(ngModel)]="draft.customRoleRange.bottomRoleId"
+              (ngModelChange)="onDraftChanged()">
+              <option [ngValue]="null">Sem âncora inferior</option>
+              @for (role of bottomRoleOptions; track role.id) {
+                <option [value]="role.id">{{ role.name }} · posição {{ role.position }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="range-preview mt-5">
+          <span>{{ role(draft.customRoleRange.topRoleId)?.name || 'Âncora superior' }}</span>
+          <strong>↓ cargos VIP personalizados ↓</strong>
+          <span>{{ role(draft.customRoleRange.bottomRoleId)?.name || 'Sem âncora inferior' }}</span>
+        </div>
+        <p class="help">A API revalida guild, ordem e hierarquia real do Coddy antes de salvar.</p>
+      } @else {
+        <p class="help mt-3">Sem faixa, a personalização continua funcionando sem forçar posição administrativa.</p>
+      }
+    </section>
+
+    @if (error) { <p class="error-message">{{ error }}</p> }
+    @if (saveMessage) { <p class="save-status success">{{ saveMessage }}</p> }
+
+    <footer class="sticky-save">
+      <div>
+        <strong>{{ dirty ? 'Alterações não salvas' : 'Configuração sincronizada' }}</strong>
+        <p class="help">Prefixo é apresentação; o vínculo do cargo personalizado é mantido pelo runtime.</p>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" class="secondary-button" [disabled]="!dirty || saving" (click)="resetDraft()">Descartar</button>
+        <button type="button" class="primary-button" [disabled]="!canSave" (click)="save()">
+          {{ saving ? 'Salvando…' : 'Salvar configuração VIP' }}
+        </button>
+      </div>
+    </footer>
+  }
+</section>

@@ -1,0 +1,36 @@
+@use 'theme/palettes'       as palettes;
+@use '@angular/material'    as mat;
+@use '../abstracts'         as abs;
+
+
+
+html {
+  // color-scheme: light dark;
+  @include mat.theme((
+    color: (
+      primary:   palettes.$primary-palette,
+      tertiary:  palettes.$tertiary-palette,
+    ),
+    typography: (
+      plain-family:  abs.$font-body,
+      brand-family:  abs.$font-body,
+      bold-weight:   abs.$weight-bold,
+      medium-weight: abs.$weight-medium,
+      regular-weight:abs.$weight-regular,
+    ),
+    density: 0
+  ));
+}
+
+:root {
+  @include mat.form-field-overrides((
+    outlined-outline-width:    0px,
+    filled-container-color:    abs.getColor(neutral, k05),
+    filled-input-text-color:   abs.getColor(neutral, k90),
+  ));
+
+  .mdc-text-field {
+    border-radius: 50px;
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+}

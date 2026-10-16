@@ -1,0 +1,435 @@
+<div class="theme-panel">
+  @if (loading) {
+    <section class="card"><p>Carregando Temas Temporários…</p></section>
+  } @else if (error && !catalog) {
+    <section class="card error-card">
+      <strong>Não foi possível carregar os Temas Temporários.</strong>
+      <p>{{ error }}</p>
+      <button type="button" class="secondary-button" (click)="load()">Tentar novamente</button>
+    </section>
+  } @else {
+    <section class="card intro-card">
+      <div>
+        <span class="eyebrow">Temas Temporários</span>
+        <h3>Mude a aparência sem perder o estado anterior</h3>
+        <p class="help">
+          O Coddy altera somente ícone, banner e nomes selecionados. IDs não mudam.
+          Antes do primeiro efeito, o estado necessário para rollback é persistido.
+        </p>
+      </div>
+      <div class="policy-note">
+        <strong>Independente de Backup</strong>
+        <p>
+          Temas não restauram a estrutura do servidor. O rollback atua somente nos
+          elementos efetivamente modificados por esta aplicação.
+        </p>
+      </div>
+    </section>
+
+    @if (activeApplication) {
+      <section class="card active-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Tema aplicado</span>
+            <h3>{{ activeApplication.themeName }}</h3>
+            <p class="help">
+              {{ statusLabel(activeApplication.status) }}
+              @if (activeApplication.appliedAt) { · aplicado em {{ formatDate(activeApplication.appliedAt) }} }
+            </p>
+          </div>
+          <span
+            class="status-pill"
+            [class.partial]="activeApplication.status.includes('PARTIAL')"
+            [class.failed]="activeApplication.status === 'FAILED'"
+          >{{ statusLabel(activeApplication.status) }}</span>
+        </div>
+
+        @if (activeApplication.errorSummary) {
+          <p class="warning-message">{{ activeApplication.errorSummary }}</p>
+        }
+
+        <div class="restore-box">
+          <label class="toggle-line danger-toggle">
+            <input type="checkbox" [(ngModel)]="forceRestore" />
+            <span>
+              <strong>Forçar restauração</strong>
+              <small>
+                Sobrescreve drift externo nos recursos ainda existentes. Use apenas quando
+                quiser restaurar o snapshot mesmo após uma alteração manual posterior.
+              </small>
+            </span>
+          </label>
+          <label class="confirmation-line">
+            <input type="checkbox" [(ngModel)]="restoreConfirmed" />
+            Confirmo a restauração deste Tema.
+          </label>
+          <button
+            type="button"
+            class="danger-outline-button"
+            [disabled]="!canRestore"
+            (click)="restoreTheme()"
+          >
+            {{ forceRestore ? 'Forçar restauração' : 'Restaurar estado anterior' }}
+          </button>
+        </div>
+      </section>
+    }
+
+    @if (operation) {
+      <section class="card operation-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Operação</span>
+            <h3>{{ operation.operationType === 'APPLY' ? 'Aplicação do Tema' : 'Restauração do Tema' }}</h3>
+          </div>
+          <span
+            class="status-pill"
+            [class.partial]="operation.status === 'PARTIAL'"
+            [class.failed]="operation.status === 'FAILED'"
+          >{{ statusLabel(operation.status) }}</span>
+        </div>
+
+        <div class="operation-progress">
+          <div>
+            <strong>{{ operationProgress(operation) }}%</strong>
+            <span>{{ operation.progressCurrent }} / {{ operation.progressTotal || '—' }} etapas</span>
+          </div>
+          <progress max="100" [value]="operationProgress(operation)"></progress>
+          @if (operation.currentStep) { <small>Etapa atual: {{ operation.currentStep }}</small> }
+        </div>
+
+        @if (operation.steps.length) {
+          <div class="operation-steps">
+            @for (step of operation.steps; track step.id) {
+              <div
+                class="operation-step"
+                [class.failed]="step.status === 'FAILED'"
+                [class.warning]="step.status === 'DRIFTED' || step.status === 'MISSING'"
+              >
+                <span class="step-state">{{ stepStatusLabel(step.status) }}</span>
+                <div>
+                  <strong>{{ step.message }}</strong>
+                  <small>{{ step.progressCurrent }} / {{ step.progressTotal || '—' }} · {{ formatDate(step.createdAt) }}</small>
+                </div>
+              </div>
+            }
+          </div>
+        }
+        @if (operation.errorCode) { <p class="error-message">Código: {{ operation.errorCode }}</p> }
+      </section>
+    }
+
+    @if (mutationMessage) { <p class="success-message global-message">{{ mutationMessage }}</p> }
+    @if (mutationError) { <p class="error-message global-message">{{ mutationError }}</p> }
+
+    <section class="workspace">
+      <aside class="card catalog-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Biblioteca</span>
+            <h3>Temas</h3>
+          </div>
+          <button
+            type="button"
+            class="secondary-button compact-button"
+            [disabled]="dirty || mutationBusy"
+            (click)="startNewTheme()"
+          >+ Novo</button>
+        </div>
+
+        <div class="theme-list">
+          @for (theme of themes; track theme.id) {
+            <button
+              type="button"
+              class="theme-row"
+              [class.selected]="draft.id === theme.id"
+              [disabled]="mutationBusy || (dirty && draft.id !== theme.id)"
+              (click)="selectTheme(theme.id)"
+            >
+              <span>
+                <strong>{{ theme.name }}</strong>
+                <small>{{ theme.resources.length }} renomeação(ões)</small>
+              </span>
+              @if (activeThemeId === theme.id) { <span class="active-badge">Ativo</span> }
+            </button>
+          } @empty {
+            <p class="help">Nenhum Tema criado nesta guild.</p>
+          }
+        </div>
+      </aside>
+
+      <section class="card editor-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">{{ draft.id == null ? 'Novo Tema' : 'Editar Tema' }}</span>
+            <h3>{{ draft.id == null ? 'Defina um tema reutilizável' : draft.name || 'Tema sem nome' }}</h3>
+          </div>
+          @if (dirty) { <span class="dirty-badge">Alterações não salvas</span> }
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Nome</span>
+            <input
+              type="text"
+              maxlength="120"
+              [(ngModel)]="draft.name"
+              (ngModelChange)="onDraftChanged()"
+              placeholder="Halloween"
+            />
+          </label>
+          <label class="full-width">
+            <span>Descrição</span>
+            <textarea
+              rows="3"
+              maxlength="1000"
+              [(ngModel)]="draft.description"
+              (ngModelChange)="onDraftChanged()"
+              placeholder="Identidade visual temporária do evento"
+            ></textarea>
+          </label>
+        </div>
+
+        <div class="asset-grid">
+          <article class="asset-card">
+            <div>
+              <strong>Ícone / logo</strong>
+              <small>Imagem do servidor</small>
+            </div>
+            @if (currentTheme?.icon?.url && !iconFile) {
+              <img [src]="currentTheme?.icon?.url" alt="Ícone configurado no Tema" />
+            }
+            <select [(ngModel)]="draft.iconAction" (ngModelChange)="onDraftChanged()">
+              <option value="UNCHANGED">Não alterar</option>
+              <option value="SET">Definir imagem</option>
+              <option value="REMOVE">Remover</option>
+            </select>
+            @if (draft.iconAction === 'SET') {
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                (change)="onAssetFile('icon', $any($event.target).files?.[0])"
+              />
+              @if (assetFileName('icon')) {
+                <div class="file-line">
+                  <small>{{ assetFileName('icon') }}</small>
+                  <button type="button" class="ghost-button" (click)="clearAssetFile('icon')">Remover arquivo</button>
+                </div>
+              }
+              @if (assetRequirementMessage('icon')) {
+                <p class="warning-message">{{ assetRequirementMessage('icon') }}</p>
+              }
+            }
+          </article>
+
+          <article class="asset-card">
+            <div>
+              <strong>Banner</strong>
+              <small>Disponibilidade depende dos recursos da guild no Discord</small>
+            </div>
+            @if (currentTheme?.banner?.url && !bannerFile) {
+              <img class="banner-preview" [src]="currentTheme?.banner?.url" alt="Banner configurado no Tema" />
+            }
+            <select [(ngModel)]="draft.bannerAction" (ngModelChange)="onDraftChanged()">
+              <option value="UNCHANGED">Não alterar</option>
+              <option value="SET">Definir imagem</option>
+              <option value="REMOVE">Remover</option>
+            </select>
+            @if (draft.bannerAction === 'SET') {
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                (change)="onAssetFile('banner', $any($event.target).files?.[0])"
+              />
+              @if (assetFileName('banner')) {
+                <div class="file-line">
+                  <small>{{ assetFileName('banner') }}</small>
+                  <button type="button" class="ghost-button" (click)="clearAssetFile('banner')">Remover arquivo</button>
+                </div>
+              }
+              @if (assetRequirementMessage('banner')) {
+                <p class="warning-message">{{ assetRequirementMessage('banner') }}</p>
+              }
+            }
+          </article>
+        </div>
+
+        <div class="resource-section">
+          <div class="section-heading">
+            <div>
+              <strong>Renomeações</strong>
+              <p class="help">
+                Os recursos são salvos pelo ID do Discord. Portaria, Staff e Cargos automáticos
+                continuam apontando para os mesmos IDs. Cargos VIP customizados e cargos não
+                gerenciáveis aparecem indisponíveis.
+              </p>
+            </div>
+          </div>
+
+          <div class="resource-add">
+            <select [(ngModel)]="newResourceType" (ngModelChange)="onResourceTypeChanged()">
+              <option value="CHANNEL">Canal</option>
+              <option value="CATEGORY">Categoria</option>
+              <option value="ROLE">Cargo</option>
+            </select>
+            <select [(ngModel)]="newResourceId">
+              <option value="">Selecione…</option>
+              @for (option of resourceOptions(); track option.id) {
+                <option
+                  [value]="option.id"
+                  [disabled]="!option.eligible || resourceAlreadyAdded(option.id)"
+                >
+                  {{ option.name }}{{ option.eligible ? '' : ' · indisponível' }}
+                </option>
+              }
+            </select>
+            <button
+              type="button"
+              class="secondary-button"
+              [disabled]="!newResourceId"
+              (click)="addResource()"
+            >Adicionar</button>
+          </div>
+
+          @if (newResourceType === 'ROLE') {
+            @for (role of resources?.roles ?? []; track role.id) {
+              @if (!role.eligible && role.unavailableReason) {
+                <small class="role-reason">{{ role.name }}: {{ role.unavailableReason }}</small>
+              }
+            }
+          }
+
+          <div class="resource-list">
+            @for (resource of draft.resources; track resource.resourceType + ':' + resource.resourceId; let index = $index) {
+              <div class="resource-row">
+                <div>
+                  <span class="type-badge">{{ resourceTypeLabel(resource.resourceType) }}</span>
+                  <strong>{{ resourceOriginalName(resource) }}</strong>
+                  <small>ID {{ resource.resourceId }}</small>
+                </div>
+                <span class="arrow">→</span>
+                <input
+                  type="text"
+                  maxlength="100"
+                  [(ngModel)]="resource.targetName"
+                  (ngModelChange)="onDraftChanged()"
+                />
+                <button type="button" class="ghost-button danger-text" (click)="removeResource(index)">Remover</button>
+              </div>
+            } @empty {
+              <p class="help">Nenhum canal, categoria ou cargo será renomeado.</p>
+            }
+          </div>
+        </div>
+
+        <div class="actions">
+          @if (draft.id != null) {
+            <button
+              type="button"
+              class="danger-link"
+              [disabled]="dirty || mutationBusy || activeThemeId === draft.id"
+              (click)="requestDelete(currentTheme)"
+            >Excluir Tema</button>
+          }
+          <span class="action-spacer"></span>
+          <button
+            type="button"
+            class="secondary-button"
+            [disabled]="!dirty || mutationBusy"
+            (click)="discardChanges()"
+          >Descartar</button>
+          <button
+            type="button"
+            class="primary-button"
+            [disabled]="!canSave"
+            (click)="saveTheme()"
+          >{{ mutationBusy ? 'Salvando…' : draft.id == null ? 'Criar Tema' : 'Salvar Tema' }}</button>
+        </div>
+
+        @if (deleteCandidate) {
+          <div class="delete-confirmation">
+            <div>
+              <strong>Excluir “{{ deleteCandidate.name }}”?</strong>
+              <p>Isso remove a definição reutilizável. Um Tema ativo precisa ser restaurado antes.</p>
+            </div>
+            <div class="actions inline-actions">
+              <button type="button" class="secondary-button" (click)="cancelDelete()">Cancelar</button>
+              <button type="button" class="danger-button" (click)="confirmDelete()">Excluir</button>
+            </div>
+          </div>
+        }
+      </section>
+    </section>
+
+    @if (draft.id != null) {
+      <section class="card preview-card">
+        <div class="card-heading">
+          <div>
+            <span class="eyebrow">Preflight ao vivo</span>
+            <h3>Preview antes de aplicar</h3>
+            <p class="help">
+              O Coddy confere o estado real da guild, permissões, hierarchy, managed roles,
+              VIP custom roles e suporte a banner antes de liberar a aplicação.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="secondary-button"
+            [disabled]="!canPreview"
+            (click)="previewTheme()"
+          >Gerar preview</button>
+        </div>
+
+        @if (preview) {
+          <div class="preview-summary">
+            <span class="status-pill" [class.failed]="!preview.ready">
+              {{ preview.ready ? 'Pronto para aplicar' : 'Aplicação bloqueada' }}
+            </span>
+            <strong>{{ preview.changes.length }} alteração(ões)</strong>
+          </div>
+
+          @if (preview.changes.length) {
+            <div class="change-list">
+              @for (change of preview.changes; track change.resourceType + ':' + change.resourceId) {
+                <div class="change-row">
+                  <span class="type-badge">{{ change.resourceType }}</span>
+                  <span>{{ change.beforeValue || 'ausente' }}</span>
+                  <span>→</span>
+                  <strong>{{ change.targetValue || 'remover' }}</strong>
+                </div>
+              }
+            </div>
+          }
+
+          @for (warning of preview.warnings; track warning.code + ':' + warning.resourceId) {
+            <div class="warning-box"><strong>{{ warning.code }}</strong><p>{{ warning.message }}</p></div>
+          }
+          @for (blocker of preview.blockers; track blocker.code + ':' + blocker.resourceId) {
+            <div class="blocker-box"><strong>{{ blocker.code }}</strong><p>{{ blocker.message }}</p></div>
+          }
+
+          @if (preview.ready && !activeApplication) {
+            <label class="confirmation-line apply-confirmation">
+              <input type="checkbox" [(ngModel)]="applyConfirmed" />
+              Confirmo a aplicação deste Tema com o estado mostrado no preview.
+            </label>
+            <button
+              type="button"
+              class="primary-button"
+              [disabled]="!canApply"
+              (click)="applyTheme()"
+            >Aplicar Tema</button>
+          } @else if (activeApplication) {
+            <p class="warning-message">
+              Já existe um Tema ativo nesta guild. Restaure-o antes de aplicar outro.
+            </p>
+          }
+        } @else {
+          <p class="help">
+            Salve a definição e gere um preview para confirmar exatamente o que será alterado.
+          </p>
+        }
+      </section>
+    }
+  }
+</div>

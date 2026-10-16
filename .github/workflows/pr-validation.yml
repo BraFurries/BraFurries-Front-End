@@ -1,0 +1,71 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout all refs
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan public history and tree with pinned Gitleaks
+        run: |
+          docker run --rm \
+            --mount type=bind,source="$PWD",target=/repo,readonly \
+            --workdir /repo \
+            ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            git --log-opts="--all" --redact=100
+
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused Community lifecycle tests
+        run: >
+          npm test -- --watch=false --browsers=ChromeHeadless
+          --include=**/community-access.service.spec.ts
+          --include=**/community-context.service.spec.ts
+          --include=**/community-context-layout.component.spec.ts
+          --include=**/community-access.component.spec.ts
+          --include=**/equipes.component.spec.ts
+          --include=**/community-activity.service.spec.ts
+          --include=**/community-activity.component.spec.ts
+          --include=**/communities.component.spec.ts
+          --include=**/membros.component.spec.ts
+          --include=**/perfil-usuario.component.spec.ts
+          --include=**/servidores.component.spec.ts
+          --include=**/xp-leveling-panel.component.spec.ts
+          --include=**/managed-servers-xp.service.spec.ts
+          --include=**/ai-configuration-panel.component.spec.ts
+          --include=**/managed-servers-ai.service.spec.ts
+          --include=**/vip-configuration-panel.component.spec.ts
+          --include=**/backup-management-panel.component.spec.ts
+          --include=**/theme-management-panel.component.spec.ts
+          --include=**/base-layout-dashboard.component.spec.ts
+          --include=**/stale-chunk-recovery.service.spec.ts
+
+      - name: Build
+        run: npm run build

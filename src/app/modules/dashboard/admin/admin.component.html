@@ -1,0 +1,50 @@
+<div class="h-full flex flex-col p-4 md:p-8 space-y-6">
+  <!-- Cabeçalho do Admin -->
+  <div>
+    <h1 class="text-3xl font-amaranth font-bold text-gray-800">Administração</h1>
+    <p class="text-gray-500 mt-1">Gerencie a comunidade, parcerias e o bot Coddy.</p>
+  </div>
+
+  <!-- Navegação de Abas (Tabs) -->
+  <div class="bg-white rounded-2xl p-2 shadow-sm border border-gray-100 flex overflow-x-auto hide-scrollbar shrink-0">
+    <nav class="flex gap-2 w-full min-w-max">
+      
+      <a routerLink="visao-geral" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30" 
+         [routerLinkActiveOptions]="{exact: true}"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>📊</span> Visão Geral
+      </a>
+      
+      <a routerLink="usuarios" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>👥</span> Usuários
+      </a>
+      
+      <a routerLink="parceiros" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>🤝</span> Parceiros
+      </a>
+      
+      <a routerLink="bot-coddy" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>🤖</span> Coddy Bot
+      </a>
+      
+      <a routerLink="metricas" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>📈</span> Métricas
+      </a>
+      
+      <a routerLink="avisos" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>📢</span> Avisos
+      </a>
+      
+    </nav>
+  </div>
+
+  <!-- Conteúdo das Sub-telas -->
+  <div class="flex-1 overflow-y-auto pb-10 hide-scrollbar">
+    <router-outlet></router-outlet>
+  </div>
+</div>

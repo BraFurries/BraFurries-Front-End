@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "src/app/modules/dashboard/admin/pages/bot-coddy-details/bot-coddy-details.component.spec.ts",
+    "src/app/core/services/admin.service.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}

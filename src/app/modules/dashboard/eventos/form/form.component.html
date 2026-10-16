@@ -1,0 +1,363 @@
+<main class="flex-1 flex flex-col relative bg-gray-50">
+    <div class="absolute inset-0 bg-pattern pointer-events-none"></div>
+
+    <!-- TELA DE CARREGAMENTO -->
+    <div *ngIf="isLoading" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-50/80 backdrop-blur-md transition-opacity duration-500">
+        <div class="relative w-36 h-36 flex items-center justify-center">
+            <div class="absolute inset-0 border-[5px] border-braPurple/20 rounded-full"></div>
+            <div class="absolute inset-0 border-[5px] border-braPurple border-t-transparent rounded-full animate-spin"></div>
+            <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif" alt="Loading" class="w-24 h-24 object-contain animate-pulse drop-shadow-[0_0_15px_#8b5cf680]">
+        </div>
+        <h2 class="mt-6 text-2xl font-amaranth font-bold text-braDark tracking-wide animate-pulse">Carregando Formulário...</h2>
+    </div>
+
+    <header class="bg-white/80 backdrop-blur-md px-5 py-4 md:px-10 md:py-6 flex justify-between items-center border-b border-gray-100 sticky top-0 z-20 shrink-0">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-amaranth font-bold text-braDark leading-none italic">{{ isEditing ? 'Editando Evento' : 'Novo Evento' }}</h1>
+            <p class="text-[10px] md:text-xs text-gray-400 mt-1 font-bold uppercase tracking-widest">
+                {{ isEditing ? 'Atualize os dados do encontro' : 'Preencha os dados do encontro' }}
+            </p>
+        </div>
+    </header>
+
+    <div class="px-0 py-6 md:p-10 w-full relative z-10 pb-20">
+
+
+        <form id="evento-form" class="space-y-8" [formGroup]="eventoForm" (ngSubmit)="salvarEvento()">
+
+            <section class="bg-white p-6 md:p-8 rounded-none md:rounded-[2.5rem] border-y md:border-x border-gray-100 shadow-sm space-y-6">
+                <h2 class="text-xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                    <span class="text-braPurple text-2xl">📝</span> Dados Principais
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="md:col-span-2">
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nome do Evento <span class="text-red-400">*</span></label>
+                        <input
+                            type="text"
+                            maxlength="64"
+                            formControlName="eventName"
+                            placeholder="Ex: Furboliche 2026"
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-braCyan focus:border-braCyan block p-3.5 transition-all outline-none font-medium">
+                    </div>
+
+                    <div class="md:col-span-2 grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr));">
+                        <div>
+                            <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tipo de Atividade <span class="text-red-400">*</span></label>
+                            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                                <mat-select formControlName="isEvent" panelClass="bf-select-panel">
+                                    <mat-option *ngFor="let type of activityTypes" [value]="type.value">{{ type.label }}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <div>
+                            <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex justify-between">
+                                <span>Logo do Evento</span> <span class="text-gray-300">Opcional</span>
+                            </label>
+                            
+                            <div class="flex flex-wrap items-center gap-4">
+                                <div *ngIf="currentEvent?.eventLogoUrl" class="w-16 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0 bg-gray-100 flex items-center justify-center">
+                                    <img [src]="currentEvent?.eventLogoUrl" class="w-full h-full object-cover">
+                                </div>
+                                
+                                <div class="flex flex-1 items-center gap-4 min-w-[260px]">
+                                    <div class="flex-1">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            (change)="onLogoSelected($event)"
+                                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-braCyan focus:border-braCyan block p-2 transition-all outline-none font-medium file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-braCyan/20 file:text-braDark hover:file:bg-braCyan/30 file:cursor-pointer cursor-pointer text-gray-500">
+                                    </div>
+                                    
+                                    <button *ngIf="currentEvent?.eventLogoUrl" type="button" (click)="removeLogo()" class="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 border border-transparent hover:border-red-100" title="Remover Logo">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex justify-between">
+                            <span>Descrição Completa</span> <span class="text-gray-300">Opcional</span>
+                        </label>
+                        <textarea
+                            rows="4"
+                            maxlength="512"
+                            formControlName="description"
+                            placeholder="Descreva o que vai rolar no evento..."
+                            style="field-sizing: content; min-height: 120px;"
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-braCyan focus:border-braCyan block p-3.5 transition-all outline-none font-medium resize-y custom-scrollbar"></textarea>
+                        <p class="text-[9px] text-gray-400 text-right mt-1 font-bold">Max 512 caracteres</p>
+                    </div>
+                </div>
+            </section>
+
+            <section *ngIf="!isEditing || canEditSchedule" class="bg-white p-6 md:p-8 rounded-none md:rounded-[2.5rem] border-y md:border-x border-gray-100 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <h2 class="text-xl font-amaranth font-bold text-braDark flex items-center gap-2 italic">
+                        <span class="text-braYellow text-2xl">⏰</span> Agenda
+                    </h2>
+                    
+                    <div class="flex items-center justify-between bg-gray-50 p-3 px-5 rounded-2xl border border-gray-100">
+                        <div class="mr-6">
+                            <p class="font-bold text-sm text-braDark">Evento de um único dia</p>
+                        </div>
+                        <label for="isSingleDay" class="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input type="checkbox" id="isSingleDay" formControlName="isSingleDay" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-braYellow/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-braYellow"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Layout de único dia -->
+                <div class="grid gap-6 items-end" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));" *ngIf="eventoForm.get('isSingleDay')?.value">
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Data do Evento <span class="text-red-400">*</span></label>
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                            <input matInput [matDatepicker]="startPickerSingle" formControlName="startDate" placeholder="Selecione a data" readonly>
+                            <mat-datepicker-toggle matIconSuffix [for]="startPickerSingle"></mat-datepicker-toggle>
+                            <mat-datepicker #startPickerSingle></mat-datepicker>
+                        </mat-form-field>
+                    </div>
+
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Horário de Início <span class="text-red-400">*</span></label>
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                            <mat-select formControlName="startTime" placeholder="Hora" panelClass="bf-select-panel">
+                                <mat-option *ngFor="let option of timeOptions" [value]="option.value">{{ option.label }}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Horário de Término <span class="text-red-400">*</span></label>
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                            <mat-select formControlName="endTime" placeholder="Hora" panelClass="bf-select-panel">
+                                <mat-option *ngFor="let option of timeOptions" [value]="option.value">{{ option.label }}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+                </div>
+
+                <!-- Layout de múltiplos dias -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end" *ngIf="!eventoForm.get('isSingleDay')?.value">
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Início <span class="text-red-400">*</span></label>
+                        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                                <input matInput [matDatepicker]="startPicker" formControlName="startDate" placeholder="Selecione a data" readonly>
+                                <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+                                <mat-datepicker #startPicker></mat-datepicker>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                                <mat-select formControlName="startTime" placeholder="Hora" panelClass="bf-select-panel">
+                                    <mat-option *ngFor="let option of timeOptions" [value]="option.value">{{ option.label }}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Término <span class="text-red-400">*</span></label>
+                        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                                <input matInput [matDatepicker]="endPicker" formControlName="endDate" placeholder="Selecione a data" readonly>
+                                <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+                                <mat-datepicker #endPicker></mat-datepicker>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-cyan w-full">
+                                <mat-select formControlName="endTime" placeholder="Hora" panelClass="bf-select-panel">
+                                    <mat-option *ngFor="let option of timeOptions" [value]="option.value">{{ option.label }}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 md:p-8 rounded-none md:rounded-[2.5rem] border-y md:border-x border-gray-100 shadow-sm space-y-6">
+                <h2 class="text-xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                    <span class="text-braCyan text-2xl">📍</span> Localização
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Estado / Região <span class="text-braMagenta">*</span></label>
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-yellow w-full">
+                            <mat-select formControlName="localeId" panelClass="bf-select-panel">
+                                <mat-option [value]="null" disabled>Selecione um estado</mat-option>
+                                <mat-option *ngIf="isLocalesLoading" [value]="null" disabled>Carregando estados...</mat-option>
+                                <mat-option *ngFor="let locale of localeOptions" [value]="locale.value">{{ locale.label }}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Cidade <span class="text-braMagenta">*</span></label>
+                        <input
+                            type="text"
+                            maxlength="32"
+                            formControlName="city"
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-braYellow focus:border-transparent block p-3.5 font-medium transition-all outline-none"
+                            placeholder="Ex: São Paulo">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nome do Local (Estabelecimento)</label>
+                        <input
+                            type="text"
+                            maxlength="64"
+                            formControlName="pointName"
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-braYellow focus:border-transparent block p-3.5 font-medium transition-all outline-none"
+                            placeholder="Ex: Shopping Interlagos, Parque Ibirapuera...">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Endereço Completo <span class="text-braMagenta">*</span></label>
+                        <input
+                            type="text"
+                            maxlength="256"
+                            formControlName="address"
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-braYellow focus:border-transparent block p-3.5 font-medium transition-all outline-none"
+                            placeholder="Ex: Av. Interlagos, 2255 - Interlagos">
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 md:p-8 rounded-none md:rounded-[2.5rem] border-y md:border-x border-gray-100 shadow-sm space-y-6">
+                <h2 class="text-xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                    <span class="text-green-500 text-2xl">🎫</span> Ingressos & Valores
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Preço Inicial (Deixe em branco se for grátis)</label>
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-green w-full bf-prefix-field">
+                            <span matTextPrefix class="bf-prefix">R$</span>
+                            <input
+                                matInput
+                                type="text"
+                                inputmode="decimal"
+                                formControlName="price"
+                                mask="separator.2"
+                                thousandSeparator="."
+                                decimalMarker=","
+                                placeholder="0,00">
+                        </mat-form-field>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Preço Máximo (Opcional)</label>
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="bf-mat-field bf-mat-field-green w-full bf-prefix-field">
+                            <span matTextPrefix class="bf-prefix">R$</span>
+                            <input
+                                matInput
+                                type="text"
+                                inputmode="decimal"
+                                formControlName="maxPrice"
+                                mask="separator.2"
+                                thousandSeparator="."
+                                decimalMarker=","
+                                placeholder="0,00">
+                        </mat-form-field>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Link para Venda de Ingressos (Sympla, Eventbrite, etc)</label>
+                        <input
+                            type="url"
+                            formControlName="ticketUrl"
+                            class="w-full bg-gray-50 border border-gray-200 text-braDark text-sm rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent block p-3.5 font-medium transition-all outline-none"
+                            placeholder="https://">
+                    </div>
+
+                    <div class="md:col-span-2 pt-4 border-t border-gray-50 grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+
+                        <div class="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div>
+                                <p class="font-bold text-sm text-braDark">Preço Fixo</p>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Valores confirmados?</p>
+                            </div>
+                            <label for="priceConfirmed" class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input type="checkbox" id="priceConfirmed" formControlName="priceConfirmed" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div>
+                                <p class="font-bold text-sm text-braDark">Esgotado</p>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Acabaram as vagas?</p>
+                            </div>
+                            <label for="outOfTickets" class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input type="checkbox" id="outOfTickets" formControlName="outOfTickets" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div>
+                                <p class="font-bold text-sm text-braDark">Encerrado</p>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">Vendas encerradas?</p>
+                            </div>
+                            <label for="salesEnded" class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input type="checkbox" id="salesEnded" formControlName="salesEnded" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 md:p-8 rounded-none md:rounded-[2.5rem] border-y md:border-x border-gray-100 shadow-sm space-y-6">
+                <h2 class="text-xl font-amaranth font-bold text-braDark flex items-center gap-2 italic mb-6">
+                    <span class="text-braMagenta text-2xl">🔗</span> Links Úteis
+                </h2>
+
+                <div class="grid gap-6 items-end" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex justify-between">
+                            <span>Website Oficial</span> <span class="text-gray-300">Opcional</span>
+                        </label>
+                        <div class="flex">
+                            <span class="inline-flex items-center px-4 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl font-bold">🌐</span>
+                            <input
+                                type="url"
+                                maxlength="64"
+                                formControlName="website"
+                                class="rounded-none rounded-r-xl bg-gray-50 border border-gray-200 text-braDark text-sm focus:ring-2 focus:ring-braPurple focus:border-transparent block flex-1 p-3.5 font-medium transition-all outline-none"
+                                placeholder="https://">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex justify-between">
+                            <span>Grupo do Telegram/Discord</span> <span class="text-gray-300">Opcional</span>
+                        </label>
+                        <div class="flex">
+                            <span class="inline-flex items-center px-4 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl font-bold">💬</span>
+                            <input
+                                type="url"
+                                formControlName="groupChatLink"
+                                class="rounded-none rounded-r-xl bg-gray-50 border border-gray-200 text-braDark text-sm focus:ring-2 focus:ring-braPurple focus:border-transparent block flex-1 p-3.5 font-medium transition-all outline-none"
+                                placeholder="https://t.me/...">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="flex flex-col-reverse md:flex-row gap-3 justify-end mt-10 px-6 md:px-0">
+                <button type="button" (click)="cancelar()" class="bg-gray-100 text-gray-600 font-bold px-8 py-4 rounded-xl text-sm hover:bg-gray-200 transition w-full md:w-auto">Cancelar</button>
+                <button type="submit" [disabled]="isLoading || isSubmitting || isLocalesLoading" class="bg-braCyan text-braDark font-bold px-10 py-4 rounded-xl text-sm hover:brightness-105 transition shadow-lg flex items-center justify-center gap-2 w-full md:w-auto disabled:opacity-60 disabled:cursor-not-allowed">
+                    <span class="text-lg">💾</span> {{ isEditing ? 'Salvar Edição' : 'Salvar Evento' }}
+                </button>
+            </div>
+
+        </form>
+    </div>
+</main>

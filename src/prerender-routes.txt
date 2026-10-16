@@ -1,0 +1,8 @@
+/
+/sobre
+/comunidade
+/coddy
+/coddy/docs
+/tos
+/privacidade
+/regras
