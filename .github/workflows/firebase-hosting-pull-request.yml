@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build_and_preview:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && vars.FRONT_PREVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
 
     steps:
