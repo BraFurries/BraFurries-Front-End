@@ -60,6 +60,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   eligibility: RecruitmentEligibility = { minMembershipDays: 0, requireVip: false, requirePartner: false };
   confirmPublication = false;
   termsText = '';
+  termsDirty = false;
   enrollmentClosesLocal = '';
   removeStageId: number | null = null;
 
@@ -85,6 +86,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
       this.publicationCheck = null;
       this.confirmPublication = false;
       this.termsText = '';
+      this.termsDirty = false;
       this.enrollmentClosesLocal = '';
       this.generation++;
       this.process = null;
@@ -179,6 +181,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.publicationCheck = null;
     this.confirmPublication = false;
     this.termsText = '';
+    this.termsDirty = false;
     this.enrollmentClosesLocal = '';
     this.error = '';
     this.revisionConflict = false;
@@ -454,11 +457,16 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           if (current !== this.generation || !this.process
               || this.process.process.id !== processId
               || this.process.process.draftRevision !== revision) return;
+          if (check.draftRevision !== revision) {
+            this.revisionConflict = true;
+            this.error = 'O rascunho foi atualizado por outra pessoa. Recarregue explicitamente antes de publicar.';
+            return;
+          }
           this.publicationCheck = check;
           if (check.configuredEligibility) {
             this.eligibility = { ...check.configuredEligibility };
           }
-          this.termsText = check.configuredTermsText ?? '';
+          if (!this.termsDirty) this.termsText = check.configuredTermsText ?? '';
         },
         error: error => {
           if (current !== this.generation) return;
@@ -509,6 +517,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
         if (current !== this.generation || !this.process) return;
         this.process.process.draftRevision = check.draftRevision;
         this.publicationCheck = check;
+        this.termsDirty = false;
         this.confirmPublication = false;
         this.busy = false;
         this.notice = 'Termos salvos na versão do rascunho.';
