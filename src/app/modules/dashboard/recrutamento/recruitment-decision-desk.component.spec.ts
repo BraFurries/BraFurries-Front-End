@@ -120,6 +120,17 @@ describe('RecruitmentDecisionDeskComponent', () => {
     expect(service.decide).not.toHaveBeenCalled();
   });
 
+  it('prevents confirmation when the consolidated evidence is truncated',()=>{
+    component.open(applicant);
+    component.openEvidence(detail.stages[0]);
+    component.evidence!.truncated=true;
+    component.confirmed=true;
+    expect(component.canDecide).toBeFalse();
+    expect(component.canSubmit).toBeFalse();
+    component.submit();
+    expect(service.decide).not.toHaveBeenCalled();
+  });
+
   it('wipes candidate and reviewer private data after closing details',()=>{
     component.open(applicant);
     component.openEvidence(detail.stages[0]);
