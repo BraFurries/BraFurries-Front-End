@@ -4,7 +4,8 @@ import { CommunityContextService } from '../../../core/services/community-contex
 import {
   RecruitmentDraft, RecruitmentForm, RecruitmentOption, RecruitmentProcess,
   RecruitmentQuestion, RecruitmentQuestionType, RecruitmentStage,
-  RecruitmentStageDefinition, RecruitmentStageType, RecruitmentDraftsService
+  RecruitmentStageDefinition, RecruitmentStageType, RecruitmentDraftsService,
+  RecruitmentEligibility, RecruitmentPublicationCheck
 } from '../../../core/services/recruitment-drafts.service';
 
 type FormAudience = 'candidate' | 'staff';
@@ -53,6 +54,11 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   error = '';
   notice = '';
   revisionConflict = false;
+  canManage = false;
+  canPublish = false;
+  publicationCheck: RecruitmentPublicationCheck | null = null;
+  eligibility: RecruitmentEligibility = { minMembershipDays: 0, requireVip: false, requirePartner: false };
+  confirmPublication = false;
   removeStageId: number | null = null;
 
   private readonly destroyed$ = new Subject<void>();
@@ -66,11 +72,16 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.context.state$.pipe(takeUntil(this.destroyed$)).subscribe(state => {
+      this.canManage = state.activeAccess?.capabilities.includes('RECRUITMENT_MANAGE_PROCESSES') === true;
+      this.canPublish = state.activeAccess?.capabilities.includes('RECRUITMENT_PUBLISH_PROCESSES') === true;
+      if (!this.canManage) this.selectedStage = null;
       const id = state.status === 'ready'
         && this.context.canAccessFeature('recrutamento', state)
         ? state.activeCommunity?.communityId ?? null : null;
       if (id === this.communityId) return;
       this.communityId = id;
+      this.publicationCheck = null;
+      this.confirmPublication = false;
       this.generation++;
       this.process = null;
       this.selectedStage = null;
@@ -91,7 +102,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   }
 
   get canEdit(): boolean {
-    return !this.busy && this.process?.process.status === 'DRAFT';
+    return this.canManage && !this.busy && this.process?.process.status === 'DRAFT';
   }
 
   get isAutomatic(): boolean {
@@ -134,7 +145,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
 
   createProcess(): void {
     const id = this.communityId;
-    if (id === null || this.busy || !this.newTitle.trim()) return;
+    if (id === null || !this.canManage || this.busy || !this.newTitle.trim()) return;
     this.busy = true;
     this.error = '';
     const current = this.generation;
@@ -161,6 +172,8 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     if (id === null) return;
     this.selectedStage = null;
     this.process = null;
+    this.publicationCheck = null;
+    this.confirmPublication = false;
     this.error = '';
     this.revisionConflict = false;
     const current = ++this.generation;
@@ -170,6 +183,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
         if (current !== this.generation) return;
         this.process = result;
         this.loading = false;
+        if (result.process.status === 'DRAFT') this.refreshPublicationCheck();
       },
       error: error => {
         if (current !== this.generation) return;
@@ -196,6 +210,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           this.busy = false;
           this.process.stages.push(stage);
           this.process.process.draftRevision++;
+          this.refreshPublicationCheck();
           this.newStageInternal = '';
           this.newStagePublic = '';
           this.openStage(stage);
@@ -209,7 +224,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   }
 
   openStage(stage: RecruitmentStage): void {
-    if (!this.process || this.communityId === null) return;
+    if (!this.canManage || !this.process || this.communityId === null) return;
     const communityId = this.communityId;
     const processId = this.process.process.id;
     const current = ++this.generation;
@@ -335,6 +350,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
         if (current !== this.generation || !this.process) return;
         this.selectedStage = updated;
         this.process.process.draftRevision = updated.draftRevision;
+        this.refreshPublicationCheck();
         const item = this.process.stages.find(stage => stage.id === stageId);
         if (item) {
           item.publicName = updated.publicName;
@@ -369,6 +385,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           if (current !== this.generation || !this.process) return;
           this.process.stages = updated;
           this.process.process.draftRevision++;
+          this.refreshPublicationCheck();
           this.busy = false;
         },
         error: error => {
@@ -394,6 +411,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           if (this.selectedStage?.id === stageId) this.selectedStage = null;
           this.removeStageId = null;
           this.process.process.draftRevision++;
+          this.refreshPublicationCheck();
           this.busy = false;
         },
         error: error => {
@@ -411,6 +429,99 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   reloadAfterConflict(): void {
     if (!this.revisionConflict || !this.process || this.busy) return;
     this.openProcess(this.process.process.id);
+  }
+
+  refreshPublicationCheck(): void {
+    if (!this.process || this.communityId === null
+        || this.process.process.status !== 'DRAFT') return;
+    const id = this.communityId;
+    const processId = this.process.process.id;
+    const current = this.generation;
+    const revision = this.process.process.draftRevision;
+    this.recruitment.previewPublication(id, processId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: check => {
+          if (current !== this.generation || !this.process
+              || this.process.process.id !== processId
+              || this.process.process.draftRevision !== revision) return;
+          this.publicationCheck = check;
+          if (check.configuredEligibility) {
+            this.eligibility = { ...check.configuredEligibility };
+          }
+        },
+        error: error => {
+          if (current !== this.generation) return;
+          this.publicationCheck = null;
+          this.error = this.apiError(error);
+        }
+      });
+  }
+
+  saveEligibility(): void {
+    if (!this.canEdit || !this.process || this.communityId === null) return;
+    const processId = this.process.process.id;
+    const revision = this.process.process.draftRevision;
+    const communityId = this.communityId;
+    this.busy = true;
+    this.error = '';
+    const current = this.generation;
+    this.recruitment.configureEligibility(communityId, processId, revision, { ...this.eligibility })
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: check => {
+          if (current !== this.generation || !this.process) return;
+          this.process.process.draftRevision = check.draftRevision;
+          this.publicationCheck = check;
+          this.confirmPublication = false;
+          this.busy = false;
+          this.notice = 'Requisitos de elegibilidade salvos.';
+        },
+        error: error => {
+          if (current !== this.generation) return;
+          this.busy = false;
+          this.error = this.apiError(error);
+        }
+      });
+  }
+
+  publishProcess(): void {
+    if (!this.canPublish || this.busy || !this.confirmPublication
+        || !this.process || this.communityId === null
+        || this.process.process.status !== 'DRAFT'
+        || !this.publicationCheck?.ready
+        || this.publicationCheck.draftRevision !== this.process.process.draftRevision) return;
+
+    const id = this.communityId;
+    const processId = this.process.process.id;
+    const revision = this.process.process.draftRevision;
+    this.busy = true;
+    this.error = '';
+    const current = this.generation;
+    this.recruitment.publishProcess(id, processId, revision)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: published => {
+          if (current !== this.generation || !this.process) return;
+          Object.assign(this.process.process, {
+            status: published.processStatus,
+            visibility: published.visibility,
+            enrollmentStatus: published.enrollmentStatus,
+            draftRevision: published.draftRevision,
+            draftVersion: 0
+          });
+          const item = this.processes.find(p => p.id === processId);
+          if (item) Object.assign(item, this.process.process);
+          this.selectedStage = null;
+          this.publicationCheck = null;
+          this.confirmPublication = false;
+          this.busy = false;
+          this.notice = 'Versão publicada. O processo permanece privado e com inscrições fechadas.';
+        },
+        error: error => {
+          if (current !== this.generation) return;
+          this.busy = false;
+          this.confirmPublication = false;
+          this.error = this.apiError(error);
+        }
+      });
   }
 
   private ensureForm(audience: FormAudience): RecruitmentForm {
