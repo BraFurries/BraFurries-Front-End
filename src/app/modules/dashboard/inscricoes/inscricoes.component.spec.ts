@@ -4,10 +4,12 @@ import {
   RecruitmentCandidatesService, CandidateApplicationForm
 } from '../../../core/services/recruitment-candidates.service';
 import { InscricoesComponent } from './inscricoes.component';
+import { RecruitmentTrackingService } from '../../../core/services/recruitment-tracking.service';
 
 describe('InscricoesComponent', () => {
   let subject: BehaviorSubject<CommunityContextState>;
   let api: jasmine.SpyObj<RecruitmentCandidatesService>;
+  let tracking: jasmine.SpyObj<RecruitmentTrackingService>;
   let component: InscricoesComponent;
 
   const process = { id: 70, title: 'Staff', description: 'Seleção',
@@ -57,7 +59,10 @@ describe('InscricoesComponent', () => {
       applicationId: 123, publishedVersionId: 71,
       status:'IN_PROGRESS',submittedAt:'2026-10-22T11:00:00Z'
     }));
-    component = new InscricoesComponent(context,api);
+    tracking = jasmine.createSpyObj('RecruitmentTrackingService',['mine']);
+    tracking.mine.and.returnValue(of([{ id: 400, processId: 70, processTitle: 'Seleção encerrada',
+      submittedAt: '2026-10-20T11:00:00Z', publicStatus: 'RECEIVED' }]));
+    component = new InscricoesComponent(context,api,tracking);
     component.ngOnInit();
   });
 
@@ -69,6 +74,13 @@ describe('InscricoesComponent', () => {
     component.open(70);
     expect(api.form).toHaveBeenCalledOnceWith(11,70);
     expect(component.selected?.form.questions.length).toBe(2);
+  });
+
+  it('shows own receipt even when intake is no longer open, without internal result', () => {
+    expect(tracking.mine).toHaveBeenCalledOnceWith(11);
+    expect(component.ownApplications.map(x => x.publicStatus)).toEqual(['RECEIVED']);
+    expect(component.ownApplications[0].processTitle).toBe('Seleção encerrada');
+    expect(component.ownApplications[0].id).toBe(400);
   });
 
   it('requires explicit terms and submits only candidate response values', () => {
@@ -84,6 +96,7 @@ describe('InscricoesComponent', () => {
     });
     expect(component.submitted?.applicationId).toBe(123);
     expect(component.answers).toEqual({});
+    expect(tracking.mine).toHaveBeenCalledTimes(2);
   });
 
   it('never sends a form when server says candidate is ineligible', () => {
@@ -114,6 +127,7 @@ describe('InscricoesComponent', () => {
     expect(component.communityId).toBeNull();
     expect(component.answers).toEqual({});
     expect(component.selected).toBeNull();
+    expect(component.ownApplications).toEqual([]);
     expect(api.list).toHaveBeenCalledTimes(1);
   });
 });
