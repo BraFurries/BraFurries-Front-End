@@ -52,6 +52,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   busy = false;
   error = '';
   notice = '';
+  revisionConflict = false;
   removeStageId: number | null = null;
 
   private readonly destroyed$ = new Subject<void>();
@@ -161,6 +162,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.selectedStage = null;
     this.process = null;
     this.error = '';
+    this.revisionConflict = false;
     const current = ++this.generation;
     this.loading = true;
     this.recruitment.detail(id, processId).pipe(takeUntil(this.destroyed$)).subscribe({
@@ -186,12 +188,14 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.error = '';
     const current = this.generation;
     this.recruitment.appendStage(communityId, processId,
-      this.newStageInternal.trim(), this.newStagePublic.trim(), this.newStageType)
+      this.newStageInternal.trim(), this.newStagePublic.trim(), this.newStageType,
+      this.process.process.draftRevision)
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next: stage => {
           if (current !== this.generation || !this.process) return;
           this.busy = false;
           this.process.stages.push(stage);
+          this.process.process.draftRevision++;
           this.newStageInternal = '';
           this.newStagePublic = '';
           this.openStage(stage);
@@ -320,6 +324,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.notice = '';
     const current = this.generation;
     this.recruitment.saveStage(communityId, processId, stageId, {
+      expectedRevision: this.process.process.draftRevision,
       internalName: definition.internalName.trim(),
       publicName: definition.publicName.trim(),
       stageType: definition.stageType,
@@ -329,6 +334,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
       next: updated => {
         if (current !== this.generation || !this.process) return;
         this.selectedStage = updated;
+        this.process.process.draftRevision = updated.draftRevision;
         const item = this.process.stages.find(stage => stage.id === stageId);
         if (item) {
           item.publicName = updated.publicName;
@@ -356,11 +362,13 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.busy = true;
     this.error = '';
     const current = this.generation;
-    this.recruitment.reorder(this.communityId, this.process.process.id, ordered.map(stage => stage.id))
+    this.recruitment.reorder(this.communityId, this.process.process.id, ordered.map(stage => stage.id),
+        this.process.process.draftRevision)
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next: updated => {
           if (current !== this.generation || !this.process) return;
           this.process.stages = updated;
+          this.process.process.draftRevision++;
           this.busy = false;
         },
         error: error => {
@@ -376,7 +384,8 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.busy = true;
     this.error = '';
     const current = this.generation;
-    this.recruitment.removeStage(this.communityId, this.process.process.id, stageId)
+    this.recruitment.removeStage(this.communityId, this.process.process.id, stageId,
+        this.process.process.draftRevision)
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next: () => {
           if (current !== this.generation || !this.process) return;
@@ -384,6 +393,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
             .map((stage, index) => ({ ...stage, position: index + 1 }));
           if (this.selectedStage?.id === stageId) this.selectedStage = null;
           this.removeStageId = null;
+          this.process.process.draftRevision++;
           this.busy = false;
         },
         error: error => {
@@ -392,6 +402,15 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           this.error = this.apiError(error);
         }
       });
+  }
+
+  /**
+   * Never reload a stale form automatically: it may contain unsaved answers or
+   * grading configuration. Clicking this intentionally discards local changes.
+   */
+  reloadAfterConflict(): void {
+    if (!this.revisionConflict || !this.process || this.busy) return;
+    this.openProcess(this.process.process.id);
   }
 
   private ensureForm(audience: FormAudience): RecruitmentForm {
@@ -413,7 +432,10 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   private apiError(error: { error?: { message?: string }; status?: number }): string {
     if (error.status === 403) return 'Você não tem permissão para editar esta seleção.';
     if (error.status === 404) return 'Processo ou etapa indisponível nesta Community.';
-    if (error.status === 409) return 'O rascunho foi alterado ou esta etapa não pode mais ser editada.';
+    if (error.status === 409) {
+      this.revisionConflict = true;
+      return 'Rascunho desatualizado ou etapa não editável. Suas alterações locais foram preservadas; recarregue para obter a versão atual.';
+    }
     return error.error?.message || 'Não foi possível salvar. Confira perguntas, alternativas e gabaritos.';
   }
 }
