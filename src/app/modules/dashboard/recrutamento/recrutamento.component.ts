@@ -338,6 +338,15 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     }
   }
 
+  policySaved(revision: number): void {
+    if (!this.process || !this.selectedStage) return;
+    this.process.process.draftRevision = revision;
+    this.selectedStage.draftRevision = revision;
+    this.confirmPublication = false;
+    this.publicationCheck = null;
+    this.notice = 'Política desta etapa salva. Revalide antes de publicar.';
+  }
+
   saveStage(): void {
     if (!this.canEdit || !this.selectedStage || !this.process || this.communityId === null) return;
     const communityId = this.communityId;
