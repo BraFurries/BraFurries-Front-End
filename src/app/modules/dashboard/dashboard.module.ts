@@ -25,6 +25,7 @@ import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
 import { InscricoesComponent } from './inscricoes/inscricoes.component';
 import { TriagemComponent } from './triagem/triagem.component';
 import { RecruitmentReviewersComponent } from './recrutamento/recruitment-reviewers.component';
+import { RecruitmentStagePolicyComponent } from './recrutamento/recruitment-stage-policy.component';
 
 @NgModule({
   declarations: [
@@ -49,6 +50,7 @@ import { RecruitmentReviewersComponent } from './recrutamento/recruitment-review
     InscricoesComponent,
     TriagemComponent,
     RecruitmentReviewersComponent,
+    RecruitmentStagePolicyComponent,
     CommunitiesComponent
   ],
   imports: [
