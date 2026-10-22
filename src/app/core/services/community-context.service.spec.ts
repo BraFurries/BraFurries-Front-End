@@ -277,6 +277,18 @@ describe('CommunityContextService', () => {
     expect(service.canAccessFeature('inscricoes', {
       ...state, activeCommunity: communities[1]
     })).toBeFalse();
+    expect(service.canAccessFeature('triagem', state)).toBeFalse();
+    expect(service.canAccessFeature('triagem', {
+      ...state, activeAccess: {
+        ...allowedAccess, capabilities: ['RECRUITMENT_REVIEW_APPLICATIONS']
+      }
+    })).toBeTrue();
+    expect(service.canAccessFeature('triagem', {
+      ...state, activeCommunity: communities[1],
+      activeAccess: {
+        ...allowedAccess, capabilities: ['RECRUITMENT_REVIEW_APPLICATIONS']
+      }
+    })).toBeFalse();
     expect(service.canAccessFeature('recrutamento', state)).toBeTrue();
     expect(service.canAccessFeature('recrutamento', {
       ...state, activeAccess: {
