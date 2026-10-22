@@ -48,6 +48,7 @@ jobs:
           --include=**/recrutamento.component.spec.ts
           --include=**/recruitment-reviewers.component.spec.ts
           --include=**/recruitment-stage-policy.component.spec.ts
+          --include=**/recruitment-decision-desk.component.spec.ts
           --include=**/inscricoes.component.spec.ts
           --include=**/triagem.component.spec.ts
           --include=**/community-context-layout.component.spec.ts
