@@ -178,6 +178,14 @@
                 <span class="mr-3">📝</span> Inscrições
             </a>
 
+            <a *ngIf="showTriageMenu" [routerLink]="scopedLink('triagem')"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.includes('/triagem')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">📨</span> Triagem de candidaturas
+            </a>
+
             <a *ngIf="showRecruitmentMenu" [routerLink]="scopedLink('recrutamento')"
                 class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
                 [ngClass]="activePath.includes('/recrutamento')
