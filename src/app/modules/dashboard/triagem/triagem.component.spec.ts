@@ -54,10 +54,16 @@ describe('TriagemComponent', () => {
         current.activeAccess?.capabilities.includes('RECRUITMENT_REVIEW_APPLICATIONS') === true
     } as CommunityContextService;
     tracking = jasmine.createSpyObj('RecruitmentTrackingService',
-      ['reviewProcesses','queue','reviewDetail']);
+      ['reviewProcesses','queue','reviewDetail','assessmentForm','ownAssessment','submitAssessment']);
     tracking.reviewProcesses.and.returnValue(of([{ id: 70, title: 'Staff' }]));
     tracking.queue.and.returnValue(of([queueItem]));
     tracking.reviewDetail.and.returnValue(of(details));
+    tracking.assessmentForm.and.returnValue(of({questions: []}));
+    tracking.ownAssessment.and.returnValue(throwError(() => ({status:404})));
+    tracking.submitAssessment.and.returnValue(of({
+      id: 6, applicationId: 50, stageId: 90, evaluatorUserId: 77,
+      score: 80, opinion: 'Bom', staffAnswers: {}, submittedAt: '2026-10-22T12:00:00Z'
+    }));
     component = new TriagemComponent(context, tracking);
     component.ngOnInit();
   });
@@ -90,6 +96,48 @@ describe('TriagemComponent', () => {
     expect(component.selected).toBeNull();
     expect(component.queue).toEqual([]);
     expect(component.processes).toEqual([]);
+  });
+
+  it('opens only assigned review stage form and saves a private opinion', () => {
+    component.detail(queueItem);
+    component.openAssessment(details.stages[0]);
+    expect(tracking.assessmentForm).toHaveBeenCalledOnceWith(11,50,90);
+    expect(component.assessmentForm?.questions).toEqual([]);
+    component.score = 80;
+    component.opinion = 'Bom';
+    component.submitAssessment();
+    expect(tracking.submitAssessment).toHaveBeenCalledOnceWith(
+      11,50,90,{score:80, opinion:'Bom', staffAnswers:{}}
+    );
+    expect(component.savedAssessment?.opinion).toBe('Bom');
+    component.submitAssessment();
+    expect(tracking.submitAssessment).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops private form, answers and score on Community access revocation', () => {
+    component.detail(queueItem);
+    component.openAssessment(details.stages[0]);
+    component.score = 40;
+    component.opinion = 'Confidencial';
+    component.staffAnswers['private'] = 'segredo';
+    state$.next({...state,activeAccess: {
+      ...state.activeAccess!, capabilities: []
+    }});
+    expect(component.selected).toBeNull();
+    expect(component.assessmentForm).toBeNull();
+    expect(component.assessmentStage).toBeNull();
+    expect(component.savedAssessment).toBeNull();
+    expect(component.staffAnswers).toEqual({});
+    expect(component.score).toBeNull();
+    expect(component.opinion).toBe('');
+  });
+
+  it('never offers automatic evaluation as a human assessment', () => {
+    component.detail(queueItem);
+    const automatic = {...details.stages[0], stageType:'AUTO_EVALUATION'};
+    expect(component.canAssess(automatic)).toBeFalse();
+    component.openAssessment(automatic);
+    expect(tracking.assessmentForm).not.toHaveBeenCalled();
   });
 
   it('does not retry inaccessible candidate details', () => {
