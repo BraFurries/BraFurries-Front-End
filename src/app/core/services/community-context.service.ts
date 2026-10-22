@@ -157,7 +157,8 @@ export class CommunityContextService {
         return access.capabilities.includes('TEAM_VIEW');
       case 'recrutamento':
         return this.isBraFurriesCommunity(state.activeCommunity)
-          && access.capabilities.includes('RECRUITMENT_MANAGE_PROCESSES');
+          && (access.capabilities.includes('RECRUITMENT_MANAGE_PROCESSES')
+            || access.capabilities.includes('RECRUITMENT_PUBLISH_PROCESSES'));
       case 'acessos':
       case 'atividade':
         return access.owner || access.communityAdmin;
