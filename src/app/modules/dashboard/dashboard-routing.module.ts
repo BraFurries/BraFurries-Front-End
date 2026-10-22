@@ -11,6 +11,7 @@ import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
 import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
+import { InscricoesComponent } from './inscricoes/inscricoes.component';
 
 const routes: Routes = [
   {
@@ -27,6 +28,7 @@ const routes: Routes = [
           { path: 'membros', component: MembrosComponent, data: { communityFeature: 'membros' } },
           { path: 'times', component: EquipesComponent, data: { communityFeature: 'times' } },
           { path: 'recrutamento', component: RecrutamentoComponent, data: { communityFeature: 'recrutamento' } },
+          { path: 'inscricoes', component: InscricoesComponent, data: { communityFeature: 'inscricoes' } },
           { path: 'acessos', component: CommunityAccessComponent, data: { communityFeature: 'acessos' } },
           { path: 'atividade', component: CommunityActivityComponent, data: { communityFeature: 'atividade' } },
           { path: 'coddy', component: ServidoresComponent, data: { communityFeature: 'coddy' } },
