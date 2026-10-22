@@ -25,7 +25,7 @@ import {
 export const COMMUNITY_CONTEXT_STORAGE_KEY = 'brafurries.activeCommunityId';
 const BRAFURRIES_MAIN_GUILD_ID = '753321055682035712';
 
-export type CommunityScopedFeature = 'membros' | 'times' | 'recrutamento' | 'inscricoes' | 'acessos' | 'atividade' | 'coddy';
+export type CommunityScopedFeature = 'membros' | 'times' | 'recrutamento' | 'triagem' | 'inscricoes' | 'acessos' | 'atividade' | 'coddy';
 export type CommunityContextStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface CommunityContextState {
@@ -157,6 +157,9 @@ export class CommunityContextService {
         return access.capabilities.includes('TEAM_VIEW');
       case 'inscricoes':
         return this.isBraFurriesCommunity(state.activeCommunity) && access.activeMember;
+      case 'triagem':
+        return this.isBraFurriesCommunity(state.activeCommunity)
+          && access.capabilities.includes('RECRUITMENT_REVIEW_APPLICATIONS');
       case 'recrutamento':
         return this.isBraFurriesCommunity(state.activeCommunity)
           && (access.capabilities.includes('RECRUITMENT_MANAGE_PROCESSES')
@@ -188,6 +191,7 @@ export class CommunityContextService {
       membros: 'Membros',
       times: 'Times',
       recrutamento: 'Processos seletivos',
+      triagem: 'Triagem de candidaturas',
       inscricoes: 'Inscrições',
       acessos: 'Acessos',
       atividade: 'Atividade',
@@ -199,7 +203,7 @@ export class CommunityContextService {
   scopedLocation(url: string): { communityId: number; feature: CommunityScopedFeature } | null {
     const path = url.split(/[?#]/, 1)[0];
     const match = path.match(
-      /^\/painel\/comunidades\/(\d+)\/(membros|times|recrutamento|inscricoes|acessos|atividade|coddy)(?:\/|$)/
+      /^\/painel\/comunidades\/(\d+)\/(membros|times|recrutamento|triagem|inscricoes|acessos|atividade|coddy)(?:\/|$)/
     );
     if (!match) return null;
     return {
