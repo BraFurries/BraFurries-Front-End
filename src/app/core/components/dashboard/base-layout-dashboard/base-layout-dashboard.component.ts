@@ -37,6 +37,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   showTeamsMenu = false;
   showRecruitmentMenu = false;
   showApplicationsMenu = false;
+  showTriageMenu = false;
   showCommunityAccessMenu = false;
   showActivityMenu = false;
 
@@ -193,6 +194,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     this.showTeamsMenu = access?.capabilities.includes('TEAM_VIEW') === true;
     this.showRecruitmentMenu = this.communityContext.canAccessFeature('recrutamento', state);
     this.showApplicationsMenu = this.communityContext.canAccessFeature('inscricoes', state);
+    this.showTriageMenu = this.communityContext.canAccessFeature('triagem', state);
     this.showCommunityAccessMenu = access?.owner === true || access?.communityAdmin === true;
     this.showActivityMenu = this.showCommunityAccessMenu;
     this.showCoddyMenu = state.managedServersAvailable && state.managedDiscordServers.length > 0;
