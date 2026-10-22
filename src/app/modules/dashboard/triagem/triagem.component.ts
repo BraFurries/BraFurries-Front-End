@@ -3,7 +3,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { CommunityContextService } from '../../../core/services/community-context.service';
 import {
   RecruitmentTrackingService, ReviewableRecruitmentProcess,
-  ReviewApplication, ReviewQueueItem
+  ReviewApplication, ReviewQueueItem, ReviewStage, StaffAssessmentForm, OwnStaffAssessment
 } from '../../../core/services/recruitment-tracking.service';
 
 @Component({
@@ -21,6 +21,15 @@ export class TriagemComponent implements OnInit, OnDestroy {
   busy = false;
   hasMore = false;
   error = '';
+  assessmentForm: StaffAssessmentForm | null = null;
+  assessmentStage: ReviewStage | null = null;
+  savedAssessment: OwnStaffAssessment | null = null;
+  score: number | null = null;
+  opinion = '';
+  staffAnswers: Record<string, unknown> = {};
+  assessmentBusy = false;
+  assessmentError = '';
+  assessmentMessage = '';
 
   private readonly destroyed$ = new Subject<void>();
   private generation = 0;
@@ -45,6 +54,7 @@ export class TriagemComponent implements OnInit, OnDestroy {
       this.busy = false;
       this.hasMore = false;
       this.error = '';
+      this.resetAssessment();
       if (id !== null) this.loadProcesses();
     });
   }
@@ -81,6 +91,7 @@ export class TriagemComponent implements OnInit, OnDestroy {
     this.processId = processId;
     this.queue = [];
     this.selected = null;
+    this.resetAssessment();
     this.hasMore = false;
     this.loadQueue();
   }
@@ -118,6 +129,7 @@ export class TriagemComponent implements OnInit, OnDestroy {
     const id = this.communityId;
     const current = ++this.generation;
     this.selected = null;
+    this.resetAssessment();
     this.busy = true;
     this.error = '';
     this.tracking.reviewDetail(id, item.id).pipe(takeUntil(this.destroyed$)).subscribe({
@@ -141,6 +153,112 @@ export class TriagemComponent implements OnInit, OnDestroy {
       question,
       answer: typeof value === 'string' ? value : JSON.stringify(value)
     }));
+  }
+
+  canAssess(stage: ReviewStage): boolean {
+    return stage.stageType !== 'AUTO_EVALUATION' &&
+      (stage.internalStatus === 'AWAITING_REVIEW' || stage.internalStatus === 'IN_PROGRESS');
+  }
+
+  openAssessment(stage: ReviewStage): void {
+    if (this.communityId === null || !this.selected || !this.canAssess(stage)) return;
+    const communityId = this.communityId;
+    const applicationId = this.selected.application.id;
+    const current = ++this.generation;
+    this.resetAssessment();
+    this.assessmentStage = stage;
+    this.assessmentBusy = true;
+    this.tracking.assessmentForm(communityId, applicationId, stage.stageId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: form => {
+          if (this.generation !== current) return;
+          this.assessmentForm = form;
+          this.assessmentBusy = false;
+        },
+        error: err => {
+          if (this.generation !== current) return;
+          this.assessmentBusy = false;
+          this.assessmentError = this.assessmentFailure(err);
+        }
+      });
+    this.tracking.ownAssessment(communityId, applicationId, stage.stageId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: assessment => {
+          if (this.generation !== current) return;
+          this.savedAssessment = assessment;
+        },
+        error: err => {
+          if (this.generation !== current || err.status === 404) return;
+          this.assessmentError = this.assessmentFailure(err);
+        }
+      });
+  }
+
+  hasChoice(questionId: string, optionId: string): boolean {
+    return Array.isArray(this.staffAnswers[questionId]) &&
+      (this.staffAnswers[questionId] as string[]).includes(optionId);
+  }
+
+  toggleChoice(questionId: string, optionId: string, checked: boolean): void {
+    const current = Array.isArray(this.staffAnswers[questionId])
+      ? this.staffAnswers[questionId] as string[] : [];
+    this.staffAnswers[questionId] = checked
+      ? [...new Set([...current, optionId])]
+      : current.filter(item => item !== optionId);
+  }
+
+  submitAssessment(): void {
+    if (this.communityId === null || !this.selected || !this.assessmentStage ||
+        !this.assessmentForm || this.savedAssessment || this.assessmentBusy) return;
+    const communityId = this.communityId;
+    const applicationId = this.selected.application.id;
+    const stageId = this.assessmentStage.stageId;
+    const current = this.generation;
+    this.assessmentBusy = true;
+    this.assessmentError = '';
+    this.assessmentMessage = '';
+    this.tracking.submitAssessment(communityId, applicationId, stageId, {
+      score: this.score, opinion: this.opinion.trim() || null,
+      staffAnswers: {...this.staffAnswers}
+    }).pipe(takeUntil(this.destroyed$)).subscribe({
+      next: value => {
+        if (current !== this.generation) return;
+        this.savedAssessment = value;
+        this.assessmentBusy = false;
+        this.assessmentMessage = 'Seu parecer foi registrado e não pode ser alterado.';
+      },
+      error: err => {
+        if (current !== this.generation) return;
+        this.assessmentBusy = false;
+        this.assessmentError = this.assessmentFailure(err);
+      }
+    });
+  }
+
+  closeAssessment(): void {
+    this.generation++;
+    this.resetAssessment();
+  }
+
+  private resetAssessment(): void {
+    this.assessmentForm = null;
+    this.assessmentStage = null;
+    this.savedAssessment = null;
+    this.score = null;
+    this.opinion = '';
+    this.staffAnswers = {};
+    this.assessmentBusy = false;
+    this.assessmentError = '';
+    this.assessmentMessage = '';
+  }
+
+  private assessmentFailure(error: {status?: number}): string {
+    if (error.status === 403 || error.status === 404) {
+      return 'Esta avaliação não está disponível para você nesta etapa.';
+    }
+    if (error.status === 409) return 'Avaliação já enviada ou etapa indisponível.';
+    if (error.status === 400) return 'Revise as respostas obrigatórias e a nota informada.';
+    return 'Não foi possível registrar a avaliação.';
   }
 
   private message(error: { status?: number }): string {
