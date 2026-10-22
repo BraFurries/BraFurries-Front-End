@@ -45,16 +45,34 @@ describe('RecrutamentoComponent', () => {
     const context = {
       state$: state$.asObservable(),
       canAccessFeature: (_feature: string, state: CommunityContextState) =>
-        state.activeAccess?.capabilities.includes('RECRUITMENT_MANAGE_PROCESSES') === true
+        state.activeAccess?.capabilities.some(capability =>
+          capability === 'RECRUITMENT_MANAGE_PROCESSES'
+          || capability === 'RECRUITMENT_PUBLISH_PROCESSES') === true
     } as CommunityContextService;
     service = jasmine.createSpyObj('RecruitmentDraftsService',
-      ['list', 'create', 'detail', 'appendStage', 'definition', 'saveStage', 'reorder', 'removeStage']);
-    service.list.and.returnValue(of([process]));
-    service.detail.and.returnValue(of(draft));
+      ['list', 'create', 'detail', 'appendStage', 'definition', 'saveStage', 'reorder', 'removeStage',
+        'previewPublication', 'configureEligibility', 'publishProcess']);
+    service.list.and.returnValue(of([{ ...process }]));
+    service.detail.and.returnValue(of({ process: { ...process }, stages: [{ ...stage }] }));
     service.definition.and.returnValue(of(definition));
     service.reorder.and.returnValue(of([stage]));
     service.saveStage.and.returnValue(of({ ...definition, candidateForm: { questions: [] } }));
     service.removeStage.and.returnValue(of(void 0));
+    service.previewPublication.and.returnValue(of({
+      processId: 7, processVersionId: 30, draftRevision: 0, ready: true,
+      stageCount: 1, blockers: [],
+      configuredEligibility: { minMembershipDays: 0, requireVip: false, requirePartner: false }
+    }));
+    service.configureEligibility.and.returnValue(of({
+      processId: 7, processVersionId: 30, draftRevision: 1, ready: true,
+      stageCount: 1, blockers: [],
+      configuredEligibility: { minMembershipDays: 30, requireVip: false, requirePartner: false }
+    }));
+    service.publishProcess.and.returnValue(of({
+      processId: 7, versionId: 30, draftRevision: 1,
+      processStatus: 'ACTIVE', versionStatus: 'PUBLISHED',
+      enrollmentStatus: 'CLOSED', visibility: 'PRIVATE'
+    }));
     component = new RecrutamentoComponent(context, service);
     component.ngOnInit();
   });
@@ -113,6 +131,47 @@ describe('RecrutamentoComponent', () => {
     expect(component.communityId).toBeNull();
     expect(component.process).toBeNull();
     expect(component.processes).toEqual([]);
+    component.createProcess();
+    expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it('configures eligibility with expected revision and refreshes preflight', () => {
+    component.openProcess(7);
+    expect(service.previewPublication).toHaveBeenCalledOnceWith(10, 7);
+    component.eligibility.minMembershipDays = 30;
+    component.saveEligibility();
+    expect(service.configureEligibility).toHaveBeenCalledOnceWith(10, 7, 0, {
+      minMembershipDays: 30, requireVip: false, requirePartner: false
+    });
+    expect(component.process?.process.draftRevision).toBe(1);
+  });
+
+  it('publishes only after confirmation and leaves intake closed', () => {
+    state$.next({ ...authorized, activeAccess: {
+      ...authorized.activeAccess!,
+      capabilities: ['RECRUITMENT_MANAGE_PROCESSES', 'RECRUITMENT_PUBLISH_PROCESSES']
+    }});
+    component.openProcess(7);
+    component.publishProcess();
+    expect(service.publishProcess).not.toHaveBeenCalled();
+    component.confirmPublication = true;
+    component.publishProcess();
+    expect(service.publishProcess).toHaveBeenCalledOnceWith(10, 7, 0);
+    expect(component.process?.process.status).toBe('ACTIVE');
+    expect(component.process?.process.enrollmentStatus).toBe('CLOSED');
+    expect(component.process?.process.visibility).toBe('PRIVATE');
+  });
+
+  it('publish-only staff can inspect selection but cannot edit gabaritos', () => {
+    state$.next({ ...authorized, activeAccess: {
+      ...authorized.activeAccess!, capabilities: ['RECRUITMENT_PUBLISH_PROCESSES']
+    }});
+    component.openProcess(7);
+    expect(component.canManage).toBeFalse();
+    expect(component.canPublish).toBeTrue();
+    expect(component.canEdit).toBeFalse();
+    component.openStage(stage);
+    expect(service.definition).not.toHaveBeenCalled();
     component.createProcess();
     expect(service.create).not.toHaveBeenCalled();
   });
