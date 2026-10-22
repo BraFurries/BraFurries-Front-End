@@ -210,10 +210,11 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           this.busy = false;
           this.process.stages.push(stage);
           this.process.process.draftRevision++;
-          this.refreshPublicationCheck();
+          this.confirmPublication = false;
           this.newStageInternal = '';
           this.newStagePublic = '';
           this.openStage(stage);
+          this.refreshPublicationCheck();
         },
         error: error => {
           if (current !== this.generation) return;
@@ -350,6 +351,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
         if (current !== this.generation || !this.process) return;
         this.selectedStage = updated;
         this.process.process.draftRevision = updated.draftRevision;
+        this.confirmPublication = false;
         this.refreshPublicationCheck();
         const item = this.process.stages.find(stage => stage.id === stageId);
         if (item) {
@@ -385,6 +387,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           if (current !== this.generation || !this.process) return;
           this.process.stages = updated;
           this.process.process.draftRevision++;
+          this.confirmPublication = false;
           this.refreshPublicationCheck();
           this.busy = false;
         },
@@ -411,6 +414,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           if (this.selectedStage?.id === stageId) this.selectedStage = null;
           this.removeStageId = null;
           this.process.process.draftRevision++;
+          this.confirmPublication = false;
           this.refreshPublicationCheck();
           this.busy = false;
         },
