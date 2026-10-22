@@ -82,6 +82,33 @@ export interface SaveRecruitmentStage {
   staffForm: RecruitmentForm | null;
 }
 
+/** Administrative configuration, never candidate-facing eligibility determination. */
+export interface RecruitmentEligibility {
+  minMembershipDays: number;
+  requireVip: boolean;
+  requirePartner: boolean;
+}
+
+export interface RecruitmentPublicationCheck {
+  processId: number;
+  processVersionId: number | null;
+  draftRevision: number;
+  ready: boolean;
+  stageCount: number;
+  blockers: string[];
+  configuredEligibility: RecruitmentEligibility | null;
+}
+
+export interface RecruitmentPublicationResult {
+  processId: number;
+  versionId: number;
+  draftRevision: number;
+  processStatus: string;
+  versionStatus: string;
+  enrollmentStatus: string;
+  visibility: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class RecruitmentDraftsService {
   constructor(private readonly http: HttpClient) {}
@@ -136,6 +163,29 @@ export class RecruitmentDraftsService {
     return this.http.delete<void>(
       `${this.stagesUrl(communityId, processId)}/${stageId}`,
       { params: { expectedRevision: String(expectedRevision) } }
+    );
+  }
+
+  previewPublication(communityId: number, processId: number): Observable<RecruitmentPublicationCheck> {
+    return this.http.get<RecruitmentPublicationCheck>(
+      `${this.processesUrl(communityId)}/${processId}/publication/preview`
+    );
+  }
+
+  configureEligibility(communityId: number, processId: number,
+                       expectedRevision: number,
+                       eligibility: RecruitmentEligibility): Observable<RecruitmentPublicationCheck> {
+    return this.http.put<RecruitmentPublicationCheck>(
+      `${this.processesUrl(communityId)}/${processId}/publication/eligibility`,
+      { expectedRevision, eligibility }
+    );
+  }
+
+  publishProcess(communityId: number, processId: number,
+                 expectedRevision: number): Observable<RecruitmentPublicationResult> {
+    return this.http.post<RecruitmentPublicationResult>(
+      `${this.processesUrl(communityId)}/${processId}/publication/publish`,
+      { expectedRevision }
     );
   }
 
