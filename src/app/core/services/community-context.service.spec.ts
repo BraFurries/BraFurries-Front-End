@@ -268,6 +268,15 @@ describe('CommunityContextService', () => {
       activeAccess: allowedAccess
     };
 
+    expect(service.canAccessFeature('inscricoes', state)).toBeTrue();
+    expect(service.canAccessFeature('inscricoes', {
+      ...state, activeAccess: {
+        ...allowedAccess, activeMember: false
+      }
+    })).toBeFalse();
+    expect(service.canAccessFeature('inscricoes', {
+      ...state, activeCommunity: communities[1]
+    })).toBeFalse();
     expect(service.canAccessFeature('recrutamento', state)).toBeTrue();
     expect(service.canAccessFeature('recrutamento', {
       ...state, activeAccess: {
