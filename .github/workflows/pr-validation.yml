@@ -46,6 +46,7 @@ jobs:
           --include=**/community-access.service.spec.ts
           --include=**/community-context.service.spec.ts
           --include=**/recrutamento.component.spec.ts
+          --include=**/inscricoes.component.spec.ts
           --include=**/community-context-layout.component.spec.ts
           --include=**/community-access.component.spec.ts
           --include=**/equipes.component.spec.ts
