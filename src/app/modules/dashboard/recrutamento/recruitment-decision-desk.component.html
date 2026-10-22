@@ -1,0 +1,163 @@
+<section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+  <header class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="font-amaranth text-xl font-bold">Mesa de decisões da Staff</h2>
+      <p class="mt-1 text-sm text-gray-600">
+        Área restrita à gestão. Pareceres são confidenciais e resultados só serão
+        comunicados depois de publicação manual separada.
+      </p>
+    </div>
+    <button type="button" (click)="loadQueue()" [disabled]="loading || deciding"
+      class="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">
+      Atualizar candidaturas
+    </button>
+  </header>
+  <p *ngIf="notice" role="status" class="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-800">{{notice}}</p>
+  <p *ngIf="error" role="alert" class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{{error}}</p>
+  <p *ngIf="loading" role="status" class="mt-4 text-sm text-gray-600">Consultando candidaturas...</p>
+
+  <div class="mt-5 grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+    <aside class="min-w-0 space-y-2">
+      <h3 class="font-bold">Candidaturas</h3>
+      <p *ngIf="!loading && !queue.length" class="text-sm text-gray-500">
+        Não há candidaturas disponíveis nesta seleção.
+      </p>
+      <button *ngFor="let item of queue" type="button" (click)="open(item)"
+        [disabled]="deciding"
+        [class.border-braPurple]="selected?.application?.id === item.id"
+        class="block w-full rounded-xl border p-3 text-left disabled:opacity-40">
+        <strong class="block text-sm">#{{item.id}} · Pessoa #{{item.candidateUserId}}</strong>
+        <span class="mt-1 block text-xs text-gray-500">{{item.internalStatus}}</span>
+        <span class="mt-1 block text-xs text-gray-500">{{item.submittedAt | date:'dd/MM/yyyy HH:mm'}}</span>
+      </button>
+      <button *ngIf="hasMore" type="button" (click)="loadMore()"
+        [disabled]="loading || deciding" class="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">
+        Carregar mais
+      </button>
+    </aside>
+
+    <div class="min-w-0">
+      <p *ngIf="detailLoading" role="status" class="text-sm text-gray-500">Abrindo candidatura...</p>
+      <p *ngIf="detailError" role="alert" class="rounded-xl bg-red-50 p-3 text-sm text-red-800">{{detailError}}</p>
+      <div *ngIf="selected as application" class="space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="font-amaranth text-xl font-bold">Candidatura #{{application.application.id}}</h3>
+            <p class="mt-1 text-xs text-gray-500">
+              Pessoa #{{application.application.candidateUserId}} · {{application.application.internalStatus}}
+            </p>
+          </div>
+          <button type="button" (click)="close()" [disabled]="deciding"
+            class="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">
+            Fechar detalhes
+          </button>
+        </div>
+
+        <section class="rounded-xl border p-4">
+          <h4 class="font-bold">Respostas da inscrição</h4>
+          <p class="mt-1 text-xs text-gray-500">Consulta confidencial de informações enviadas pelo candidato.</p>
+          <p *ngIf="!candidateAnswerEntries.length" class="mt-3 text-sm text-gray-500">
+            Nenhuma resposta de inscrição disponível.
+          </p>
+          <div *ngFor="let answer of candidateAnswerEntries" class="mt-3 rounded-lg bg-gray-50 p-3">
+            <strong class="block break-words text-xs">{{answer.question}}</strong>
+            <p class="mt-1 whitespace-pre-wrap break-words text-sm">{{answer.value}}</p>
+          </div>
+        </section>
+
+        <section class="rounded-xl border p-4">
+          <h4 class="font-bold">Etapas e pareceres</h4>
+          <div *ngFor="let stage of application.stages" class="mt-3 rounded-lg border p-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0">
+                <strong class="block text-sm">{{stage.position}}. {{stage.publicName}}</strong>
+                <p class="mt-1 text-xs text-gray-600">{{stage.stageType}} · {{stage.internalStatus}}</p>
+                <p class="mt-1 text-xs text-gray-600">
+                  {{stage.assessmentCount}} de {{stage.policy.minimumAssessments}} pareceres mínimos
+                  · {{stage.policy.reviewMode === 'COLLECTIVE' ? 'Coletiva' : 'Individual'}}
+                  · {{stage.policy.decisionMode === 'MANUAL' ? 'Manual' : 'Automática (indisponível)'}}
+                </p>
+                <p *ngIf="stage.decisionOutcome" class="mt-1 text-xs font-semibold text-gray-700">
+                  Decisão administrativa: {{stage.decisionOutcome === 'APPROVE' ? 'Aprovada' : 'Reprovada'}}
+                  · Ainda não significa resultado publicado
+                </p>
+              </div>
+              <button *ngIf="canInspect(stage)" type="button" (click)="openEvidence(stage)"
+                [disabled]="deciding || evidenceLoading"
+                class="rounded-lg border border-braPurple px-3 py-2 text-xs font-bold text-braPurple disabled:opacity-40">
+                Consultar pareceres
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section *ngIf="evidenceLoading || evidence || evidenceError"
+          class="rounded-xl border border-braPurple p-4">
+          <p *ngIf="evidenceLoading" role="status" class="text-sm text-gray-500">Consultando pareceres...</p>
+          <p *ngIf="evidenceError" role="alert" class="text-sm text-red-700">{{evidenceError}}</p>
+          <ng-container *ngIf="evidence as assessment">
+            <h4 class="font-bold">Pareceres · {{assessment.stage.publicName}}</h4>
+            <p class="mt-1 text-xs text-gray-600">
+              {{assessment.stage.assessmentCount}} pareceres registrados.
+              Os pareceres são individuais, não representam votos ou decisão automática.
+            </p>
+            <p *ngIf="assessment.truncated" class="mt-2 text-sm text-amber-800">
+              Há mais pareceres do que os exibidos nesta consulta.
+            </p>
+            <p *ngIf="!assessment.assessments.length" class="mt-3 text-sm text-gray-600">
+              Nenhum parecer registrado nesta etapa.
+            </p>
+            <article *ngFor="let item of assessment.assessments" class="mt-3 rounded-lg bg-gray-50 p-4">
+              <p class="text-sm font-bold">
+                Avaliador interno #{{item.evaluatorUserId}}
+                · Nota {{item.score === null ? 'não informada' : item.score}}
+              </p>
+              <p class="mt-1 text-xs text-gray-500">{{item.submittedAt | date:'dd/MM/yyyy HH:mm'}}</p>
+              <p *ngIf="item.opinion" class="mt-3 whitespace-pre-wrap break-words text-sm">{{item.opinion}}</p>
+              <div *ngFor="let answer of assessmentAnswers(item.staffAnswers)"
+                class="mt-2 rounded-lg border bg-white p-2 text-sm">
+                <strong class="block break-words text-xs">{{answer.question}}</strong>
+                <p class="mt-1 whitespace-pre-wrap break-words">{{answer.value}}</p>
+              </div>
+            </article>
+
+            <section *ngIf="canDecide" class="mt-5 border-t pt-4">
+              <h5 class="font-bold">Registrar decisão administrativa</h5>
+              <p class="mt-1 text-sm text-gray-600">
+                A decisão é definitiva para esta etapa, mas não publica o resultado ao candidato.
+              </p>
+              <label class="mt-4 block text-sm font-bold">
+                Resultado da etapa
+                <select [(ngModel)]="outcome" [disabled]="deciding"
+                  class="mt-2 w-full rounded-lg border bg-white p-2">
+                  <option value="APPROVE">Aprovar e avançar quando aplicável</option>
+                  <option value="REJECT">Reprovar e bloquear próximas etapas</option>
+                </select>
+              </label>
+              <label class="mt-4 block text-sm font-bold">
+                Justificativa {{outcome === 'REJECT' ? '(obrigatória, mínimo 10 caracteres)' : '(opcional)'}}
+                <textarea [(ngModel)]="reason" [disabled]="deciding" maxlength="2000" rows="3"
+                  class="mt-2 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <label class="mt-4 flex items-start gap-2 text-sm">
+                <input type="checkbox" [(ngModel)]="confirmed" [disabled]="deciding">
+                <span>Revisei os pareceres. Confirmo esta decisão definitiva e sei que o resultado não será publicado agora.</span>
+              </label>
+              <button type="button" (click)="submit()" [disabled]="!canSubmit"
+                class="mt-4 rounded-lg bg-braPurple px-4 py-3 font-bold text-white disabled:opacity-40">
+                {{deciding ? 'Registrando...' : 'Confirmar decisão da etapa'}}
+              </button>
+            </section>
+            <p *ngIf="!canDecide" class="mt-4 text-sm text-amber-800">
+              A decisão não está disponível: confira status, pareceres mínimos,
+              etapas anteriores ou política de aprovação.
+            </p>
+          </ng-container>
+        </section>
+      </div>
+      <p *ngIf="!selected && !detailLoading && !detailError" class="text-sm text-gray-500">
+        Abra uma candidatura para consultar as etapas e registrar decisões autorizadas.
+      </p>
+    </div>
+  </div>
+</section>
