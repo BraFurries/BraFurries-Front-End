@@ -45,6 +45,7 @@ jobs:
           npm test -- --watch=false --browsers=ChromeHeadless
           --include=**/community-access.service.spec.ts
           --include=**/community-context.service.spec.ts
+          --include=**/recrutamento.component.spec.ts
           --include=**/community-context-layout.component.spec.ts
           --include=**/community-access.component.spec.ts
           --include=**/equipes.component.spec.ts
