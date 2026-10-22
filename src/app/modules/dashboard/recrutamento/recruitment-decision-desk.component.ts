@@ -158,7 +158,9 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
 
   get canDecide(): boolean {
     const current=this.evidence?.stage;
-    if (!current || !this.selected || this.deciding || this.evidenceLoading) return false;
+    // The manager must be able to inspect every assessment before deciding.
+    if (!current || !this.selected || this.deciding || this.evidenceLoading ||
+        this.evidence?.truncated) return false;
     if (this.selected.application.internalStatus!=='IN_PROGRESS' ||
         current.internalStatus!=='AWAITING_REVIEW' ||
         current.stageType==='AUTO_EVALUATION' ||
