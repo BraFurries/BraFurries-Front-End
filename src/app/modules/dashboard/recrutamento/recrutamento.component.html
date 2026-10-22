@@ -76,7 +76,7 @@
               O candidato deverá aceitar exatamente esta versão. Os termos
               ficam congelados após a publicação.
             </p>
-            <textarea [(ngModel)]="termsText" [disabled]="busy" maxlength="12000" rows="5"
+            <textarea [(ngModel)]="termsText" (ngModelChange)="termsDirty = true" [disabled]="busy" maxlength="12000" rows="5"
               aria-label="Termos de participação" class="mt-3 w-full rounded-lg border p-3"
               placeholder="Escreva os termos de participação na seleção."></textarea>
             <button type="button" (click)="saveTerms()"
