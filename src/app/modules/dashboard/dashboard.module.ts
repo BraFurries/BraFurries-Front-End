@@ -22,6 +22,7 @@ import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
 import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
+import { InscricoesComponent } from './inscricoes/inscricoes.component';
 
 @NgModule({
   declarations: [
@@ -43,6 +44,7 @@ import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
     CommunityActivityComponent,
     CommunityContextLayoutComponent,
     RecrutamentoComponent,
+    InscricoesComponent,
     CommunitiesComponent
   ],
   imports: [
