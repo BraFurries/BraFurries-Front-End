@@ -250,6 +250,39 @@ describe('CommunityContextService', () => {
     expect(service.canAccessFeature('coddy')).toBeFalse();
   });
 
+  it('restricts recruitment navigation to actual BraFurries guild AND explicit capability', () => {
+    const allowedAccess = {
+      ...accesses[1],
+      capabilities: ['RECRUITMENT_MANAGE_PROCESSES']
+    };
+    const braFurries = {
+      ...communities[0],
+      networks: [{
+        type: 'DISCORD', externalId: '753321055682035712',
+        name: 'Servidor principal', active: true
+      }]
+    };
+    const state = {
+      ...service.snapshot,
+      activeCommunity: braFurries,
+      activeAccess: allowedAccess
+    };
+
+    expect(service.canAccessFeature('recrutamento', state)).toBeTrue();
+    expect(service.canAccessFeature('recrutamento', {
+      ...state, activeCommunity: communities[1]
+    })).toBeFalse();
+    expect(service.canAccessFeature('recrutamento', {
+      ...state, activeAccess: {
+        ...allowedAccess, capabilities: ['TEAM_VIEW']
+      }
+    })).toBeFalse();
+    expect(service.scopedLocation('/painel/comunidades/7/recrutamento')).toEqual({
+      communityId: 7,
+      feature: 'recrutamento'
+    });
+  });
+
   it('parses only canonical scoped URLs', () => {
     expect(service.scopedLocation('/painel/comunidades/7/membros')).toEqual({
       communityId: 7,
