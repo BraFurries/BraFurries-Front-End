@@ -233,6 +233,16 @@
             </label>
           </div>
 
+          <app-recruitment-stage-policy
+            [communityId]="communityId"
+            [processId]="selected.process.id"
+            [stageId]="editor.id"
+            [stageType]="editor.stageType"
+            [expectedRevision]="selected.process.draftRevision"
+            [editable]="canEdit"
+            (saved)="policySaved($event)">
+          </app-recruitment-stage-policy>
+
           <div class="mt-6 flex flex-wrap gap-2 border-b pb-3">
             <button type="button" (click)="setAudience('candidate')" [attr.aria-pressed]="audience === 'candidate'"
               [class.bg-braPurple]="audience === 'candidate'" [class.text-white]="audience === 'candidate'"
