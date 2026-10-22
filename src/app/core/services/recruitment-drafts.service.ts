@@ -41,6 +41,7 @@ export interface RecruitmentProcess {
   visibility: string;
   enrollmentStatus: string;
   draftVersion: number;
+  draftRevision: number;
 }
 
 export interface RecruitmentStage {
@@ -69,9 +70,11 @@ export interface RecruitmentStageDefinition {
   stageType: RecruitmentStageType;
   candidateForm: RecruitmentForm | null;
   staffForm: RecruitmentForm | null;
+  draftRevision: number;
 }
 
 export interface SaveRecruitmentStage {
+  expectedRevision: number;
   internalName: string;
   publicName: string;
   stageType: RecruitmentStageType;
@@ -95,14 +98,16 @@ export class RecruitmentDraftsService {
     return this.http.get<RecruitmentDraft>(`${this.processesUrl(communityId)}/${processId}`);
   }
 
-  updateProcess(communityId: number, processId: number, title: string, description: string | null): Observable<RecruitmentProcess> {
-    return this.http.put<RecruitmentProcess>(`${this.processesUrl(communityId)}/${processId}`, { title, description });
+  updateProcess(communityId: number, processId: number, title: string,
+                description: string | null, expectedRevision: number): Observable<RecruitmentProcess> {
+    return this.http.put<RecruitmentProcess>(`${this.processesUrl(communityId)}/${processId}`, { title, description, expectedRevision });
   }
 
   appendStage(communityId: number, processId: number, internalName: string,
-              publicName: string, stageType: RecruitmentStageType): Observable<RecruitmentStage> {
+              publicName: string, stageType: RecruitmentStageType,
+              expectedRevision: number): Observable<RecruitmentStage> {
     return this.http.post<RecruitmentStage>(this.stagesUrl(communityId, processId), {
-      internalName, publicName, stageType
+      internalName, publicName, stageType, expectedRevision
     });
   }
 
@@ -119,14 +124,19 @@ export class RecruitmentDraftsService {
     );
   }
 
-  reorder(communityId: number, processId: number, stageIds: number[]): Observable<RecruitmentStage[]> {
+  reorder(communityId: number, processId: number, stageIds: number[],
+          expectedRevision: number): Observable<RecruitmentStage[]> {
     return this.http.put<RecruitmentStage[]>(
-      `${this.stagesUrl(communityId, processId)}/order`, { stageIds }
+      `${this.stagesUrl(communityId, processId)}/order`, { stageIds, expectedRevision }
     );
   }
 
-  removeStage(communityId: number, processId: number, stageId: number): Observable<void> {
-    return this.http.delete<void>(`${this.stagesUrl(communityId, processId)}/${stageId}`);
+  removeStage(communityId: number, processId: number, stageId: number,
+              expectedRevision: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.stagesUrl(communityId, processId)}/${stageId}`,
+      { params: { expectedRevision: String(expectedRevision) } }
+    );
   }
 
   private processesUrl(communityId: number): string {
