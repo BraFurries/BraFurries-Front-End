@@ -15,6 +15,32 @@
     </p>
     <p *ngIf="loading" role="status" class="mb-4 text-sm text-gray-500">Carregando...</p>
 
+    <section class="mb-6 rounded-2xl border bg-white p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="font-amaranth text-xl font-bold">Minhas candidaturas</h2>
+        <button type="button" (click)="loadReceipts()" [disabled]="receiptsLoading"
+          class="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+          Atualizar
+        </button>
+      </div>
+      <p class="mt-2 text-sm text-gray-500">
+        O recebimento da candidatura não significa aprovação. Os resultados
+        serão divulgados posteriormente pela Staff.
+      </p>
+      <p *ngIf="receiptsLoading" role="status" class="mt-3 text-sm text-gray-500">Consultando candidaturas...</p>
+      <p *ngIf="receiptsError" role="alert" class="mt-3 text-sm text-red-700">{{ receiptsError }}</p>
+      <div *ngFor="let receipt of ownApplications"
+        class="mt-3 rounded-xl border border-gray-200 p-3">
+        <strong class="block">{{ receipt.processTitle }}</strong>
+        <p class="mt-1 text-sm text-gray-500">
+          Inscrição #{{ receipt.id }} · Enviada em {{ receipt.submittedAt | date:'dd/MM/yyyy HH:mm' }}
+        </p>
+        <p class="mt-1 text-sm font-semibold text-braPurple">Recebida</p>
+      </div>
+      <p *ngIf="!ownApplications.length && !receiptsLoading && !receiptsError"
+        class="mt-3 text-sm text-gray-500">Você ainda não possui candidaturas registradas.</p>
+    </section>
+
     <section *ngIf="!selected && !loading" class="space-y-4">
       <div *ngFor="let process of processes" class="rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ process.title }}</h2>
