@@ -74,6 +74,9 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
       this.process = null;
       this.selectedStage = null;
       this.processes = [];
+      this.busy = false;
+      this.loading = false;
+      this.removeStageId = null;
       this.error = '';
       this.notice = '';
       if (id !== null) this.loadProcesses();
