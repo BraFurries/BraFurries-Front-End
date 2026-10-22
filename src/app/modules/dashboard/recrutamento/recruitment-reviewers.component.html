@@ -1,0 +1,88 @@
+<section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+  <h2 class="font-amaranth text-xl font-bold">Responsáveis por avaliação</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    Configure quem poderá consultar e avaliar cada etapa. O acesso também exige
+    a permissão de revisão de candidaturas; uma designação sozinha não a concede.
+  </p>
+  <p *ngIf="error" role="alert" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{{ error }}</p>
+  <p *ngIf="notice" role="status" class="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-800">{{ notice }}</p>
+  <p *ngIf="loading" class="mt-3 text-sm text-gray-500">Carregando etapas e versões...</p>
+  <p *ngIf="!loading && !stages.length" class="mt-3 text-sm text-gray-500">
+    Nenhuma etapa configurada neste processo.
+  </p>
+  <div *ngIf="stages.length" class="mt-4 grid gap-4 md:grid-cols-[260px_minmax(0,1fr)]">
+    <nav aria-label="Etapas para designação" class="min-w-0 space-y-2">
+      <button *ngFor="let stage of stages" type="button" (click)="selectStage(stage.stageId)"
+        [disabled]="saving" [class.border-braPurple]="selectedStageId === stage.stageId"
+        class="block w-full rounded-xl border p-3 text-left text-sm disabled:opacity-50">
+        <span class="block font-bold">{{ stage.position }}. {{ stage.publicName }}</span>
+        <span class="block text-xs text-gray-500">
+          Versão {{ stage.versionNumber }} · {{ stage.versionStatus }} · {{ stage.stageType }}
+        </span>
+      </button>
+    </nav>
+    <div *ngIf="selectedStage as selected" class="min-w-0 rounded-xl border p-4">
+      <h3 class="font-bold">Avaliadores · {{ selected.publicName }}</h3>
+      <p class="mt-1 text-xs text-gray-500">
+        Etapa #{{ selected.stageId }} · Versão {{ selected.versionNumber }}
+      </p>
+      <p *ngIf="detailLoading" class="mt-3 text-sm text-gray-500">Consultando responsáveis...</p>
+      <div *ngIf="!detailLoading" class="mt-4 space-y-2">
+        <div *ngFor="let assignment of assignments"
+          class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 p-3">
+          <span class="text-sm">{{ assigneeLabel(assignment) }}</span>
+          <button type="button" (click)="revoke(assignment.id)" [disabled]="saving"
+            class="rounded-lg border px-3 py-1 text-sm text-red-700 disabled:opacity-40">
+            {{ pendingRevokeId === assignment.id ? 'Confirmar revogação' : 'Revogar' }}
+          </button>
+        </div>
+        <p *ngIf="!assignments.length" class="text-sm text-amber-700">
+          Nenhum responsável designado: esta etapa permanece inacessível à triagem.
+        </p>
+      </div>
+
+      <form (ngSubmit)="assign()" class="mt-5 space-y-3 border-t pt-4">
+        <h4 class="font-bold">Nova designação</h4>
+        <div class="flex flex-wrap gap-4 text-sm">
+          <label class="flex items-center gap-2">
+            <input type="radio" name="reviewer-mode" value="role" [(ngModel)]="assigneeType">
+            Cargo interno
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="reviewer-mode" value="user" [(ngModel)]="assigneeType">
+            Pessoa específica
+          </label>
+        </div>
+        <label *ngIf="assigneeType === 'role'" class="block text-sm font-medium">
+          Cargo interno da Community
+          <select *ngIf="roles.length" name="reviewer-role" [(ngModel)]="roleId"
+            class="mt-2 block w-full rounded-lg border p-2">
+            <option [ngValue]="null">Selecione um cargo</option>
+            <option *ngFor="let role of roles" [ngValue]="role.id" [disabled]="!role.active">
+              {{ role.name }}{{ role.active ? '' : ' (inativo)' }}
+            </option>
+          </select>
+          <input *ngIf="!roles.length" type="number" min="1" step="1"
+            name="reviewer-role-id" [(ngModel)]="roleId"
+            class="mt-2 block w-full rounded-lg border p-2" placeholder="ID do cargo interno">
+        </label>
+        <label *ngIf="assigneeType === 'user'" class="block text-sm font-medium">
+          ID interno do usuário
+          <input type="number" min="1" step="1" name="reviewer-user-id"
+            [(ngModel)]="userId" placeholder="Ex.: 125"
+            class="mt-2 block w-full rounded-lg border p-2">
+          <span class="mt-1 block text-xs font-normal text-gray-500">
+            Utilize o ID da pessoa no painel BraFurries, não o ID de usuário do Discord.
+          </span>
+        </label>
+        <p *ngIf="rolesUnavailable && assigneeType === 'role'" class="text-xs text-amber-700">
+          A lista de cargos não está disponível para sua permissão. Informe o ID interno do cargo.
+        </p>
+        <button type="submit" [disabled]="!canAssign"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-40">
+          Designar responsável
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
