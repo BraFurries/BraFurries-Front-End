@@ -146,6 +146,13 @@ export class TriagemComponent implements OnInit, OnDestroy {
     });
   }
 
+  closeDetail(): void {
+    this.generation++;
+    this.selected = null;
+    this.busy = false;
+    this.resetAssessment();
+  }
+
   get answerEntries(): { question: string; answer: string }[] {
     const answers = this.selected?.candidateAnswers;
     if (!answers) return [];
