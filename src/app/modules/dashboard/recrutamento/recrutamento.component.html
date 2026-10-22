@@ -2,7 +2,7 @@
   <header class="mb-6">
     <p class="text-sm font-bold uppercase tracking-wide text-braPurple">BraFurries · Administração</p>
     <h1 class="font-amaranth text-3xl font-bold text-braDark">Processos seletivos</h1>
-    <p class="mt-2 text-gray-600">Prepare etapas e formulários independentes para candidatos e avaliadores. Esta versão ainda não publica processos.</p>
+    <p class="mt-2 text-gray-600">Prepare etapas, formulários e requisitos de elegibilidade; publique somente após a pré-validação. As inscrições continuam indisponíveis nesta versão.</p>
   </header>
 
   <div *ngIf="communityId === null" class="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
@@ -35,7 +35,7 @@
         </button>
         <p *ngIf="!processes.length && !loading" class="mt-3 text-sm text-gray-500">Nenhum processo cadastrado.</p>
 
-        <div class="mt-6 border-t border-gray-200 pt-4">
+        <div *ngIf="canManage" class="mt-6 border-t border-gray-200 pt-4">
           <h3 class="font-bold">Novo processo</h3>
           <label class="mt-3 block text-sm" for="recruitment-title">Nome</label>
           <input id="recruitment-title" [(ngModel)]="newTitle" maxlength="160" [disabled]="busy"
@@ -55,13 +55,79 @@
           <h2 class="font-amaranth text-2xl font-bold">{{ selected.process.title }}</h2>
           <p class="mt-1 text-sm text-gray-500">{{ selected.process.description || 'Sem descrição.' }}</p>
           <p class="mt-2 text-xs text-gray-500">Versão {{ selected.process.draftVersion }} · Revisão {{ selected.process.draftRevision }} · {{ selected.process.status }} · {{ selected.process.visibility }}</p>
-          <p class="mt-2 text-sm text-amber-700">Somente rascunhos são editáveis. Publicação e inscrições serão disponibilizadas em outra entrega.</p>
+          <p class="mt-2 text-sm text-amber-700">Após publicar, a versão fica congelada, mas inscrições permanecem fechadas e o processo privado.</p>
+        </section>
+
+        <section *ngIf="selected.process.status === 'DRAFT'"
+          class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="font-amaranth text-xl font-bold">Validação e publicação</h2>
+            <button type="button" (click)="refreshPublicationCheck()" [disabled]="busy"
+              class="rounded-lg border px-3 py-2 text-sm">Verificar requisitos</button>
+          </div>
+          <p class="mt-2 text-sm text-gray-500">
+            Publicar a definição não abre inscrições. Candidatos não poderão
+            preencher provas até que o módulo de execução esteja disponível.
+          </p>
+
+          <div *ngIf="canManage" class="mt-4 rounded-xl border p-4">
+            <h3 class="font-bold">Elegibilidade dos membros</h3>
+            <label class="mt-3 block text-sm" for="minimum-membership-days">
+              Tempo mínimo na Community (dias)
+            </label>
+            <input id="minimum-membership-days" type="number" min="0" max="3650"
+              [(ngModel)]="eligibility.minMembershipDays" [disabled]="busy"
+              class="mt-1 w-40 rounded-lg border p-2">
+            <label class="mt-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" [(ngModel)]="eligibility.requireVip" [disabled]="busy">
+              Exigir membro VIP
+            </label>
+            <label class="mt-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" [(ngModel)]="eligibility.requirePartner" [disabled]="busy">
+              Exigir membro parceiro
+            </label>
+            <p class="mt-2 text-xs text-gray-500">
+              Somente membros ativos e não banidos poderão se inscrever.
+              As exigências adicionais serão aplicadas quando as inscrições forem implementadas.
+            </p>
+            <button type="button" (click)="saveEligibility()"
+              [disabled]="!canEdit || eligibility.minMembershipDays === null ||
+                eligibility.minMembershipDays < 0 || eligibility.minMembershipDays > 3650"
+              class="mt-4 rounded-xl border border-braPurple px-4 py-2 font-bold text-braPurple disabled:opacity-40">
+              Salvar elegibilidade
+            </button>
+          </div>
+
+          <div *ngIf="publicationCheck as check" class="mt-4 rounded-xl border p-4">
+            <p class="font-bold" [class.text-green-700]="check.ready"
+              [class.text-amber-700]="!check.ready">
+              {{ check.ready ? 'Pronto para publicação' : 'Há pendências antes de publicar' }}
+            </p>
+            <p class="mt-1 text-sm text-gray-500">{{ check.stageCount }} etapas · Revisão {{ check.draftRevision }}</p>
+            <ul *ngIf="check.blockers.length" class="mt-3 list-disc pl-5 text-sm text-amber-800">
+              <li *ngFor="let blocker of check.blockers">{{ blocker }}</li>
+            </ul>
+          </div>
+
+          <div *ngIf="canPublish" class="mt-4 border-t pt-4">
+            <label class="flex items-start gap-2 text-sm">
+              <input type="checkbox" [(ngModel)]="confirmPublication" [disabled]="busy">
+              <span>Confirmo que revisei as etapas e compreendo que esta versão
+                ficará imutável, privada e com inscrições fechadas.</span>
+            </label>
+            <button type="button" (click)="publishProcess()"
+              [disabled]="busy || !confirmPublication || !publicationCheck?.ready ||
+                publicationCheck?.draftRevision !== selected.process.draftRevision"
+              class="mt-3 rounded-xl bg-braPurple px-5 py-3 font-bold text-white disabled:opacity-40">
+              Publicar definição da seleção
+            </button>
+          </div>
         </section>
 
         <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 class="font-amaranth text-xl font-bold">Etapas sequenciais</h2>
           <div *ngFor="let stage of selected.stages; let i = index" class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border p-3">
-            <button type="button" (click)="openStage(stage)" [disabled]="busy"
+            <button type="button" (click)="openStage(stage)" [disabled]="busy || !canManage"
               class="min-w-0 flex-1 text-left hover:text-braPurple">
               <span class="block font-bold">{{ i + 1 }}. {{ stage.publicName }}</span>
               <span class="text-xs text-gray-500">{{ stage.internalName }} · {{ stage.stageType }}</span>
@@ -80,7 +146,7 @@
           </div>
           <p *ngIf="!selected.stages.length" class="mt-4 text-sm text-gray-500">Adicione a primeira etapa para configurar a seleção.</p>
 
-          <div *ngIf="selected.process.status === 'DRAFT'" class="mt-5 grid gap-3 border-t pt-5 sm:grid-cols-2">
+          <div *ngIf="canManage && selected.process.status === 'DRAFT'" class="mt-5 grid gap-3 border-t pt-5 sm:grid-cols-2">
             <div>
               <label class="block text-sm font-bold" for="new-stage-internal">Nome interno</label>
               <input id="new-stage-internal" [(ngModel)]="newStageInternal" maxlength="160"
@@ -105,7 +171,7 @@
           </div>
         </section>
 
-        <section *ngIf="selectedStage as editor" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <section *ngIf="canManage && selectedStage as editor" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between gap-3">
             <h2 class="font-amaranth text-xl font-bold">Editar etapa {{ editor.position }}</h2>
             <button type="button" (click)="selectedStage = null" class="rounded-lg border px-3 py-1">Fechar</button>
