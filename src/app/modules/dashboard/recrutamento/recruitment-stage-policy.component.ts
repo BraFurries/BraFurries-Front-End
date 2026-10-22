@@ -28,10 +28,16 @@ export class RecruitmentStagePolicyComponent implements OnChanges, OnDestroy {
   versionStatus = '';
   private readonly destroyed$ = new Subject<void>();
   private generation = 0;
+  private loadedIdentity: string | null = null;
 
   constructor(private readonly service: RecruitmentDecisionPolicyService) {}
 
   ngOnChanges(): void {
+    const identity = this.communityId === null || this.processId === null || this.stageId === null
+      ? null : `${this.communityId}:${this.processId}:${this.stageId}`;
+    // Revision and editable flag changes must not discard unsaved form contents.
+    if (identity === this.loadedIdentity) return;
+    this.loadedIdentity = identity;
     const generation = ++this.generation;
     this.policy = {reviewMode:'INDIVIDUAL', decisionMode:'MANUAL', minimumAssessments:1};
     this.error = '';
