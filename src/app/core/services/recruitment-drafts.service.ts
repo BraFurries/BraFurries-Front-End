@@ -1,0 +1,139 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+
+export type RecruitmentStageType =
+  'APPLICATION' | 'ANALYSIS' | 'HUMAN_EVALUATION' |
+  'AUTO_EVALUATION' | 'INTERVIEW' | 'DECISION' | 'CUSTOM';
+
+export type RecruitmentQuestionType =
+  'SHORT_TEXT' | 'LONG_TEXT' | 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' |
+  'YES_NO' | 'NUMBER' | 'SCALE' | 'DATE' | 'LINK' | 'CONSENT';
+
+export interface RecruitmentOption {
+  id: string;
+  label: string;
+}
+
+export interface RecruitmentQuestion {
+  id: string;
+  label: string;
+  type: RecruitmentQuestionType;
+  required: boolean;
+  options: RecruitmentOption[];
+  minValue: number | null;
+  maxValue: number | null;
+  points: number | null;
+  correctAnswers: string[];
+}
+
+export interface RecruitmentForm {
+  questions: RecruitmentQuestion[];
+}
+
+export interface RecruitmentProcess {
+  id: number;
+  communityId: number;
+  title: string;
+  description: string | null;
+  status: string;
+  visibility: string;
+  enrollmentStatus: string;
+  draftVersion: number;
+}
+
+export interface RecruitmentStage {
+  id: number;
+  processId: number;
+  processVersionId: number;
+  position: number;
+  internalName: string;
+  publicName: string;
+  stageType: RecruitmentStageType;
+}
+
+export interface RecruitmentDraft {
+  process: RecruitmentProcess;
+  stages: RecruitmentStage[];
+}
+
+/** Staff-only DTO; candidate-facing APIs must never return these fields. */
+export interface RecruitmentStageDefinition {
+  id: number;
+  processId: number;
+  versionId: number;
+  position: number;
+  internalName: string;
+  publicName: string;
+  stageType: RecruitmentStageType;
+  candidateForm: RecruitmentForm | null;
+  staffForm: RecruitmentForm | null;
+}
+
+export interface SaveRecruitmentStage {
+  internalName: string;
+  publicName: string;
+  stageType: RecruitmentStageType;
+  candidateForm: RecruitmentForm | null;
+  staffForm: RecruitmentForm | null;
+}
+
+@Injectable({ providedIn: 'root' })
+export class RecruitmentDraftsService {
+  constructor(private readonly http: HttpClient) {}
+
+  list(communityId: number): Observable<RecruitmentProcess[]> {
+    return this.http.get<RecruitmentProcess[]>(this.processesUrl(communityId));
+  }
+
+  create(communityId: number, title: string, description: string | null): Observable<RecruitmentProcess> {
+    return this.http.post<RecruitmentProcess>(this.processesUrl(communityId), { title, description });
+  }
+
+  detail(communityId: number, processId: number): Observable<RecruitmentDraft> {
+    return this.http.get<RecruitmentDraft>(`${this.processesUrl(communityId)}/${processId}`);
+  }
+
+  updateProcess(communityId: number, processId: number, title: string, description: string | null): Observable<RecruitmentProcess> {
+    return this.http.put<RecruitmentProcess>(`${this.processesUrl(communityId)}/${processId}`, { title, description });
+  }
+
+  appendStage(communityId: number, processId: number, internalName: string,
+              publicName: string, stageType: RecruitmentStageType): Observable<RecruitmentStage> {
+    return this.http.post<RecruitmentStage>(this.stagesUrl(communityId, processId), {
+      internalName, publicName, stageType
+    });
+  }
+
+  definition(communityId: number, processId: number, stageId: number): Observable<RecruitmentStageDefinition> {
+    return this.http.get<RecruitmentStageDefinition>(
+      `${this.stagesUrl(communityId, processId)}/${stageId}/definition`
+    );
+  }
+
+  saveStage(communityId: number, processId: number, stageId: number,
+            definition: SaveRecruitmentStage): Observable<RecruitmentStageDefinition> {
+    return this.http.put<RecruitmentStageDefinition>(
+      `${this.stagesUrl(communityId, processId)}/${stageId}/definition`, definition
+    );
+  }
+
+  reorder(communityId: number, processId: number, stageIds: number[]): Observable<RecruitmentStage[]> {
+    return this.http.put<RecruitmentStage[]>(
+      `${this.stagesUrl(communityId, processId)}/order`, { stageIds }
+    );
+  }
+
+  removeStage(communityId: number, processId: number, stageId: number): Observable<void> {
+    return this.http.delete<void>(`${this.stagesUrl(communityId, processId)}/${stageId}`);
+  }
+
+  private processesUrl(communityId: number): string {
+    return `${environment.apiBaseUrl}/user/me/communities/${communityId}/recruitment/processes`;
+  }
+
+  private stagesUrl(communityId: number, processId: number): string {
+    return `${this.processesUrl(communityId)}/${processId}/stages`;
+  }
+}
