@@ -1,4 +1,4 @@
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 import { RecruitmentDraftsService, RecruitmentDraft, RecruitmentStageDefinition } from '../../../core/services/recruitment-drafts.service';
 import { RecrutamentoComponent } from './recrutamento.component';
@@ -10,7 +10,7 @@ describe('RecrutamentoComponent', () => {
 
   const process = {
     id: 7, communityId: 10, title: 'Seleção de Staff', description: null,
-    status: 'DRAFT', visibility: 'PRIVATE', enrollmentStatus: 'CLOSED', draftVersion: 1
+    status: 'DRAFT', visibility: 'PRIVATE', enrollmentStatus: 'CLOSED', draftVersion: 1, draftRevision: 0
   };
   const stage = {
     id: 100, processId: 7, processVersionId: 30, position: 1,
@@ -20,7 +20,7 @@ describe('RecrutamentoComponent', () => {
   const definition: RecruitmentStageDefinition = {
     id: 100, processId: 7, versionId: 30, position: 1,
     internalName: 'Prova', publicName: 'Avaliação', stageType: 'AUTO_EVALUATION',
-    candidateForm: null, staffForm: null
+    candidateForm: null, staffForm: null, draftRevision: 0
   };
   const authorized: CommunityContextState = {
     status: 'ready',
@@ -86,6 +86,26 @@ describe('RecrutamentoComponent', () => {
     expect(component.selectedStage?.staffForm?.questions.length).toBe(1);
   });
 
+  it('preserves unsaved form and only reloads stale editor after explicit action', () => {
+    component.openProcess(7);
+    component.openStage(stage);
+    component.addQuestion();
+    const unsaved = component.selectedStage!.candidateForm!.questions;
+    expect(unsaved.length).toBe(1);
+
+    const conflict = { status: 409 };
+    service.saveStage.and.returnValue(throwError(() => conflict));
+    component.saveStage();
+
+    expect(component.revisionConflict).toBeTrue();
+    expect(component.selectedStage?.candidateForm?.questions.length).toBe(1);
+    expect(service.detail).toHaveBeenCalledTimes(1);
+
+    component.reloadAfterConflict();
+    expect(service.detail).toHaveBeenCalledTimes(2);
+    expect(component.revisionConflict).toBeFalse();
+  });
+
   it('never loads drafts after losing recruitment capability', () => {
     state$.next({ ...authorized, activeAccess: {
       ...authorized.activeAccess!, capabilities: []
@@ -103,7 +123,8 @@ describe('RecrutamentoComponent', () => {
     component.process!.stages = [stage, other];
     service.reorder.and.returnValue(of([{ ...other, position: 1 }, { ...stage, position: 2 }]));
     component.moveStage(0, 1);
-    expect(service.reorder).toHaveBeenCalledOnceWith(10, 7, [101, 100]);
+    expect(service.reorder).toHaveBeenCalledOnceWith(10, 7, [101, 100], 0);
+    expect(component.process?.process.draftRevision).toBe(1);
     expect(component.process?.stages.map(s => s.id)).toEqual([101, 100]);
   });
 });
