@@ -46,8 +46,11 @@ describe('RecruitmentDecisionDeskComponent', () => {
     service=jasmine.createSpyObj('RecruitmentDecisionDeskService',
       ['queue','detail','evidence','decide']);
     service.queue.and.returnValue(of([applicant]));
-    service.detail.and.returnValue(of(detail));
-    service.evidence.and.returnValue(of(evidence));
+    // Fresh fixtures per HTTP response: specs must not mutate shared stage policies.
+    service.detail.and.callFake(() =>
+      of(JSON.parse(JSON.stringify(detail)) as DecisionApplicationDetail));
+    service.evidence.and.callFake(() =>
+      of(JSON.parse(JSON.stringify(evidence)) as DecisionStageEvidence));
     service.decide.and.returnValue(of(receipt));
     component=new RecruitmentDecisionDeskComponent(service);
     component.communityId=11;
