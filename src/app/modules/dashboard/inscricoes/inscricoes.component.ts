@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { CommunityContextService } from '../../../core/services/community-context.service';
+import { RecruitmentTrackingService, OwnRecruitmentApplication } from '../../../core/services/recruitment-tracking.service';
 import {
   CandidateApplicationForm, CandidateOpenProcess, CandidateQuestion,
   RecruitmentCandidatesService, SubmittedApplication
@@ -14,6 +15,9 @@ import {
 export class InscricoesComponent implements OnInit, OnDestroy {
   communityId: number | null = null;
   processes: CandidateOpenProcess[] = [];
+  ownApplications: OwnRecruitmentApplication[] = [];
+  receiptsLoading = false;
+  receiptsError = '';
   selected: CandidateApplicationForm | null = null;
   answers: Record<string, unknown> = {};
   acceptedTerms = false;
@@ -27,7 +31,8 @@ export class InscricoesComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly context: CommunityContextService,
-    private readonly candidates: RecruitmentCandidatesService
+    private readonly candidates: RecruitmentCandidatesService,
+    private readonly tracking: RecruitmentTrackingService
   ) {}
 
   ngOnInit(): void {
@@ -40,13 +45,19 @@ export class InscricoesComponent implements OnInit, OnDestroy {
       this.generation++;
       this.selected = null;
       this.processes = [];
+      this.ownApplications = [];
+      this.receiptsLoading = false;
+      this.receiptsError = '';
       this.answers = {};
       this.submitted = null;
       this.acceptedTerms = false;
       this.loading = false;
       this.busy = false;
       this.error = '';
-      if (id !== null) this.list();
+      if (id !== null) {
+        this.list();
+        this.loadReceipts();
+      }
     });
   }
 
@@ -72,6 +83,26 @@ export class InscricoesComponent implements OnInit, OnDestroy {
         if (current !== this.generation) return;
         this.loading = false;
         this.error = this.errorMessage(error);
+      }
+    });
+  }
+
+  loadReceipts(): void {
+    if (this.communityId === null) return;
+    const id = this.communityId;
+    const current = this.generation;
+    this.receiptsLoading = true;
+    this.receiptsError = '';
+    this.tracking.mine(id).pipe(takeUntil(this.destroyed$)).subscribe({
+      next: receipts => {
+        if (current !== this.generation || this.communityId !== id) return;
+        this.ownApplications = receipts;
+        this.receiptsLoading = false;
+      },
+      error: () => {
+        if (current !== this.generation || this.communityId !== id) return;
+        this.receiptsLoading = false;
+        this.receiptsError = 'Não foi possível consultar suas candidaturas.';
       }
     });
   }
@@ -142,6 +173,7 @@ export class InscricoesComponent implements OnInit, OnDestroy {
           this.busy = false;
           this.answers = {};
           this.acceptedTerms = false;
+          this.loadReceipts();
         },
         error: error => {
           if (current !== this.generation) return;
