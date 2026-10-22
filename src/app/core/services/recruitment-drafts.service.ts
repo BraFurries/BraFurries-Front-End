@@ -97,6 +97,7 @@ export interface RecruitmentPublicationCheck {
   stageCount: number;
   blockers: string[];
   configuredEligibility: RecruitmentEligibility | null;
+  configuredTermsText: string | null;
 }
 
 export interface RecruitmentPublicationResult {
@@ -186,6 +187,22 @@ export class RecruitmentDraftsService {
     return this.http.post<RecruitmentPublicationResult>(
       `${this.processesUrl(communityId)}/${processId}/publication/publish`,
       { expectedRevision }
+    );
+  }
+
+  configureTerms(communityId: number, processId: number,
+                 expectedRevision: number, termsText: string): Observable<RecruitmentPublicationCheck> {
+    return this.http.put<RecruitmentPublicationCheck>(
+      `${this.processesUrl(communityId)}/${processId}/publication/terms`,
+      { expectedRevision, termsText }
+    );
+  }
+
+  openEnrollment(communityId: number, processId: number,
+                 expectedRevision: number, endsAt: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.processesUrl(communityId)}/${processId}/intake/open`,
+      { expectedRevision, endsAt }
     );
   }
 
