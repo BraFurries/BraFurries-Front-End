@@ -56,6 +56,15 @@ describe('RecruitmentStagePolicyComponent', () => {
     component.savePolicy();
     expect(api.save).not.toHaveBeenCalled();
   });
+  it('preserves unsaved edits when parent revision or editable flag changes', () => {
+    component.policy.minimumAssessments=5;
+    component.expectedRevision=5;
+    component.editable=false;
+    component.ngOnChanges();
+    expect(component.policy.minimumAssessments).toBe(5);
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
   it('clears state and ignores late responses after switching Community', () => {
     const delayed=new Subject<StagePolicyResult>();
     api.get.and.returnValue(delayed);
