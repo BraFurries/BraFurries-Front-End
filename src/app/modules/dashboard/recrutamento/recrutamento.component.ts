@@ -59,6 +59,8 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
   publicationCheck: RecruitmentPublicationCheck | null = null;
   eligibility: RecruitmentEligibility = { minMembershipDays: 0, requireVip: false, requirePartner: false };
   confirmPublication = false;
+  termsText = '';
+  enrollmentClosesLocal = '';
   removeStageId: number | null = null;
 
   private readonly destroyed$ = new Subject<void>();
@@ -82,6 +84,8 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
       this.communityId = id;
       this.publicationCheck = null;
       this.confirmPublication = false;
+      this.termsText = '';
+      this.enrollmentClosesLocal = '';
       this.generation++;
       this.process = null;
       this.selectedStage = null;
@@ -174,6 +178,8 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
     this.process = null;
     this.publicationCheck = null;
     this.confirmPublication = false;
+    this.termsText = '';
+    this.enrollmentClosesLocal = '';
     this.error = '';
     this.revisionConflict = false;
     const current = ++this.generation;
@@ -452,6 +458,7 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           if (check.configuredEligibility) {
             this.eligibility = { ...check.configuredEligibility };
           }
+          this.termsText = check.configuredTermsText ?? '';
         },
         error: error => {
           if (current !== this.generation) return;
@@ -485,6 +492,68 @@ export class RecrutamentoComponent implements OnInit, OnDestroy {
           this.error = this.apiError(error);
         }
       });
+  }
+
+  saveTerms(): void {
+    if (!this.canEdit || !this.process || this.communityId === null
+        || this.termsText.trim().length < 20 || this.termsText.trim().length > 12000) return;
+    const processId = this.process.process.id;
+    const current = this.generation;
+    this.busy = true;
+    this.error = '';
+    this.recruitment.configureTerms(
+      this.communityId, processId, this.process.process.draftRevision,
+      this.termsText.trim()
+    ).pipe(takeUntil(this.destroyed$)).subscribe({
+      next: check => {
+        if (current !== this.generation || !this.process) return;
+        this.process.process.draftRevision = check.draftRevision;
+        this.publicationCheck = check;
+        this.confirmPublication = false;
+        this.busy = false;
+        this.notice = 'Termos salvos na versão do rascunho.';
+      },
+      error: error => {
+        if (current !== this.generation) return;
+        this.busy = false;
+        this.error = this.apiError(error);
+      }
+    });
+  }
+
+  openEnrollment(): void {
+    if (!this.canPublish || this.busy || !this.process || this.communityId === null
+        || this.process.process.status !== 'ACTIVE'
+        || this.process.process.enrollmentStatus !== 'CLOSED'
+        || this.process.process.visibility !== 'PRIVATE'
+        || !this.enrollmentClosesLocal) return;
+    const date = new Date(this.enrollmentClosesLocal);
+    if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + 15 * 60 * 1000) {
+      this.error = 'Escolha uma data de encerramento pelo menos 15 minutos no futuro.';
+      return;
+    }
+    const current = this.generation;
+    const communityId = this.communityId;
+    const processId = this.process.process.id;
+    this.busy = true;
+    this.error = '';
+    this.recruitment.openEnrollment(communityId, processId,
+      this.process.process.draftRevision, date.toISOString()
+    ).pipe(takeUntil(this.destroyed$)).subscribe({
+      next: () => {
+        if (current !== this.generation || !this.process) return;
+        this.process.process.enrollmentStatus = 'OPEN';
+        this.process.process.visibility = 'PUBLIC';
+        this.process.process.draftRevision++;
+        this.busy = false;
+        this.notice = 'Inscrições abertas até o prazo configurado.';
+      },
+      error: error => {
+        if (current !== this.generation) return;
+        this.busy = false;
+        this.error = this.apiError(error);
+      }
+    });
   }
 
   publishProcess(): void {
