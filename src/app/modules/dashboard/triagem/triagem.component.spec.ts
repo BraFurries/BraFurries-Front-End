@@ -140,6 +140,19 @@ describe('TriagemComponent', () => {
     expect(tracking.assessmentForm).not.toHaveBeenCalled();
   });
 
+  it('clears sensitive assessment data when closing application detail', () => {
+    component.detail(queueItem);
+    component.openAssessment(details.stages[0]);
+    component.opinion = 'Confidencial';
+    component.staffAnswers['private'] = 'sensitive';
+    component.closeDetail();
+    expect(component.selected).toBeNull();
+    expect(component.assessmentForm).toBeNull();
+    expect(component.savedAssessment).toBeNull();
+    expect(component.staffAnswers).toEqual({});
+    expect(component.opinion).toBe('');
+  });
+
   it('does not retry inaccessible candidate details', () => {
     tracking.reviewDetail.and.returnValue(throwError(() => ({status:403})));
     component.detail(queueItem);
