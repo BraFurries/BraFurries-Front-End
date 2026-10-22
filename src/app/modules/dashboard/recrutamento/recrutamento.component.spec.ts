@@ -51,7 +51,7 @@ describe('RecrutamentoComponent', () => {
     } as CommunityContextService;
     service = jasmine.createSpyObj('RecruitmentDraftsService',
       ['list', 'create', 'detail', 'appendStage', 'definition', 'saveStage', 'reorder', 'removeStage',
-        'previewPublication', 'configureEligibility', 'publishProcess']);
+        'previewPublication', 'configureEligibility', 'configureTerms', 'publishProcess', 'openEnrollment']);
     service.list.and.returnValue(of([{ ...process }]));
     service.detail.and.returnValue(of({ process: { ...process }, stages: [{ ...stage }] }));
     service.definition.and.returnValue(of(definition));
@@ -61,13 +61,21 @@ describe('RecrutamentoComponent', () => {
     service.previewPublication.and.returnValue(of({
       processId: 7, processVersionId: 30, draftRevision: 0, ready: true,
       stageCount: 1, blockers: [],
-      configuredEligibility: { minMembershipDays: 0, requireVip: false, requirePartner: false }
+      configuredEligibility: { minMembershipDays: 0, requireVip: false, requirePartner: false },
+      configuredTermsText: null
     }));
     service.configureEligibility.and.returnValue(of({
       processId: 7, processVersionId: 30, draftRevision: 1, ready: true,
       stageCount: 1, blockers: [],
-      configuredEligibility: { minMembershipDays: 30, requireVip: false, requirePartner: false }
+      configuredEligibility: { minMembershipDays: 30, requireVip: false, requirePartner: false },
+      configuredTermsText: 'Termos atuais da seleção.'
     }));
+    service.configureTerms.and.returnValue(of({
+      processId: 7, processVersionId: 30, draftRevision: 1, ready: true,
+      stageCount: 1, blockers: [], configuredEligibility: null,
+      configuredTermsText: 'Termos de participação da BraFurries.'
+    }));
+    service.openEnrollment.and.returnValue(of(void 0));
     service.publishProcess.and.returnValue(of({
       processId: 7, versionId: 30, draftRevision: 1,
       processStatus: 'ACTIVE', versionStatus: 'PUBLISHED',
