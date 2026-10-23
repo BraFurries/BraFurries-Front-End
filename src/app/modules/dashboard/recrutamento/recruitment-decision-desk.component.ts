@@ -1,6 +1,7 @@
 import { Component, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { RecruitmentVotingDecision } from '../../../core/services/recruitment-collective-voting.service';
+import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
 import {
   RecruitmentDecisionDeskService, DecisionQueueItem, DecisionApplicationDetail,
   DecisionStageEvidence, DecisionStageSummary
@@ -17,6 +18,9 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
   @Input() processId: number|null=null;
 
   queue: DecisionQueueItem[]=[];
+  examNotices: RecruitmentExamNotice[]=[];
+  noticesLoading=false;
+  noticesError='';
   selected: DecisionApplicationDetail|null=null;
   evidence: DecisionStageEvidence|null=null;
   loading=false;
@@ -38,7 +42,8 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
   private evidenceGeneration=0;
   private queueGeneration=0;
 
-  constructor(private readonly service: RecruitmentDecisionDeskService) {}
+  constructor(private readonly service: RecruitmentDecisionDeskService,
+    private readonly incidentService: RecruitmentExamNoticesService) {}
 
   ngOnChanges(): void {
     this.contextGeneration++;
@@ -46,12 +51,17 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
     this.detailGeneration++;
     this.evidenceGeneration++;
     this.queue=[];
+    this.examNotices=[];
+    this.noticesError='';
     this.loading=false;
     this.hasMore=false;
     this.error='';
     this.notice='';
     this.clearDetail();
-    if (this.communityId!==null && this.processId!==null) this.loadQueue();
+    if (this.communityId!==null && this.processId!==null) {
+      this.loadQueue();
+      this.refreshExamNotices();
+    }
   }
 
   ngOnDestroy(): void {
@@ -63,6 +73,49 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
     this.queue=[];
     this.destroyed$.next();
     this.destroyed$.complete();
+  }
+
+  refreshExamNotices(): void {
+    if(this.communityId===null || this.processId===null)return;
+    const context=this.contextGeneration,communityId=this.communityId,
+      processId=this.processId;
+    this.noticesLoading=true;
+    this.noticesError='';
+    this.incidentService.staff(communityId,processId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:items=>{
+          if(context!==this.contextGeneration)return;
+          this.examNotices=items;
+          this.noticesLoading=false;
+        },
+        error:()=>{
+          if(context!==this.contextGeneration)return;
+          this.noticesLoading=false;
+          this.noticesError='Não foi possível consultar os incidentes das provas.';
+        }
+      });
+  }
+
+  readExamNotice(item: RecruitmentExamNotice): void {
+    if(item.read || this.communityId===null || this.processId===null)return;
+    const context=this.contextGeneration,communityId=this.communityId,
+      processId=this.processId;
+    this.incidentService.staffRead(communityId,processId,item.id)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:()=>{
+          if(context!==this.contextGeneration)return;
+          this.examNotices=this.examNotices.map(n=>n.id===item.id?{...n,read:true}:n);
+        },
+        error:()=>{
+          if(context===this.contextGeneration)
+            this.noticesError='Não foi possível marcar o incidente como lido.';
+        }
+      });
+  }
+
+  openExamNotice(item: RecruitmentExamNotice): void {
+    // Detail API still authorizes the process and application before revealing data.
+    this.open({id:item.applicationId});
   }
 
   loadQueue(beforeId?: number): void {
@@ -94,7 +147,7 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
     this.loadQueue(this.queue[this.queue.length-1].id);
   }
 
-  open(item: DecisionQueueItem): void {
+  open(item: Pick<DecisionQueueItem,'id'>): void {
     if (this.communityId===null || this.processId===null || this.deciding) return;
     const communityId=this.communityId;
     const processId=this.processId;
@@ -220,6 +273,7 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
     const application=this.selected.application;
     this.open(application);
     this.notice='Reabertura da prova registrada. Tentativa liberada; resultado da seleção permanece privado.';
+    this.refreshExamNotices();
   }
 
   voteFinalized(result: RecruitmentVotingDecision): void {
