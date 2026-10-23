@@ -5,8 +5,8 @@
     <h4 class="font-amaranth text-lg font-bold">{{current.publicName}}</h4>
     <p class="mt-2 text-sm text-gray-600">
       Esta prova foi liberada para sua candidatura. Uma tentativa iniciada usa o tempo
-      do servidor. Recarregar retoma a mesma tentativa, mas respostas não enviadas
-      <strong>não ficam salvas</strong>.
+      do servidor. Suas respostas são salvas como rascunho no servidor durante a prova,
+      mas só o botão de envio conclui a tentativa.
     </p>
     <p *ngIf="notice" class="mt-2 text-sm text-green-700" role="status">{{notice}}</p>
 
@@ -51,13 +51,26 @@
         </p>
       </div>
 
+      <div class="rounded-lg border bg-white p-3 text-xs" role="status" aria-live="polite">
+        <p *ngIf="draftLoading">Recuperando suas respostas salvas...</p>
+        <p *ngIf="draftReady && !draftSaving && !draftDirty && !draftError">
+          {{draftSavedAt ? 'Rascunho salvo no servidor.' : 'Rascunho pronto para salvar.'}}
+          <span *ngIf="draftSavedAt">Último salvamento: {{draftSavedAt | date:'HH:mm:ss'}}.</span>
+        </p>
+        <p *ngIf="draftSaving">Salvando rascunho...</p>
+        <p *ngIf="draftDirty && !draftSaving && !draftError">Alterações aguardando salvamento.</p>
+        <p *ngIf="draftError" class="text-red-700" role="alert">{{draftError}}</p>
+        <button *ngIf="draftError && !draftConflict" type="button" (click)="retryDraft()"
+          class="mt-2 font-bold text-braPurple">Tentar novamente</button>
+      </div>
+
       <fieldset *ngFor="let question of attempt.form.questions; let i=index"
-        class="rounded-lg border bg-white p-4" [disabled]="busy || secondsLeft<=0">
+        class="rounded-lg border bg-white p-4" [disabled]="busy || secondsLeft<=0 || !draftReady || draftConflict">
         <legend class="font-bold">{{i+1}}. {{question.label}}
           <span *ngIf="question.required" class="text-red-600">*</span>
         </legend>
         <select *ngIf="question.type==='SINGLE_CHOICE'"
-          [(ngModel)]="answers[question.id]" class="mt-2 w-full rounded-lg border p-2">
+          [(ngModel)]="answers[question.id]" (ngModelChange)="answersChanged()" class="mt-2 w-full rounded-lg border p-2">
           <option [ngValue]="undefined">Selecione uma resposta</option>
           <option *ngFor="let option of question.options" [ngValue]="option.id">{{option.label}}</option>
         </select>
@@ -70,7 +83,7 @@
           </label>
         </div>
 
-        <select *ngIf="question.type==='YES_NO'" [(ngModel)]="answers[question.id]"
+        <select *ngIf="question.type==='YES_NO'" [(ngModel)]="answers[question.id]" (ngModelChange)="answersChanged()"
           class="mt-2 w-full rounded-lg border p-2">
           <option [ngValue]="undefined">Selecione</option>
           <option [ngValue]="true">Sim</option>
@@ -78,14 +91,14 @@
         </select>
 
         <input *ngIf="question.type==='NUMBER' || question.type==='SCALE'"
-          type="number" [(ngModel)]="answers[question.id]"
+          type="number" [(ngModel)]="answers[question.id]" (ngModelChange)="answersChanged()"
           [min]="question.minValue" [max]="question.maxValue"
           [step]="question.type==='SCALE' ? 1 : 'any'"
           class="mt-2 w-full rounded-lg border p-2">
       </fieldset>
 
       <label class="flex items-start gap-2 text-sm">
-        <input type="checkbox" [(ngModel)]="confirmed" [disabled]="busy || secondsLeft<=0">
+        <input type="checkbox" [(ngModel)]="confirmed" [disabled]="busy || secondsLeft<=0 || !draftReady || draftConflict">
         Confirmo o envio definitivo das respostas desta tentativa.
       </label>
       <div *ngIf="pendingSignalsCount" class="rounded-lg border border-amber-200 p-3 text-sm">
