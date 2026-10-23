@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { environment } from '../../../environments/environment';
+import { environment as productionEnvironment } from '../../../environments/environment.production';
 import { of, throwError } from 'rxjs';
 
 import {
@@ -307,6 +309,33 @@ describe('CommunityContextService', () => {
       communityId: 7,
       feature: 'recrutamento'
     });
+  });
+
+  it('keeps recruitment UI hidden when the deployment gate is disabled', () => {
+    expect(productionEnvironment.recruitmentUiEnabled).toBeFalse();
+    const previous = environment.recruitmentUiEnabled;
+    environment.recruitmentUiEnabled = false;
+    try {
+      const state = {
+        ...service.snapshot,
+        activeCommunity: {
+          ...communities[0],
+          networks: [{ type: 'DISCORD', externalId: '753321055682035712', name: 'BraFurries', active: true }]
+        },
+        activeAccess: {
+          ...accesses[1],
+          activeMember: true,
+          capabilities: ['MEMBERS_VIEW', 'RECRUITMENT_MANAGE_PROCESSES',
+            'RECRUITMENT_REVIEW_APPLICATIONS', 'RECRUITMENT_PUBLISH_PROCESSES']
+        }
+      };
+      expect(service.canAccessFeature('inscricoes', state)).toBeFalse();
+      expect(service.canAccessFeature('triagem', state)).toBeFalse();
+      expect(service.canAccessFeature('recrutamento', state)).toBeFalse();
+      expect(service.canAccessFeature('membros', state)).toBeTrue();
+    } finally {
+      environment.recruitmentUiEnabled = previous;
+    }
   });
 
   it('parses only canonical scoped URLs', () => {
