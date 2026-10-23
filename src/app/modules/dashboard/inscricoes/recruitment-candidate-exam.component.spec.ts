@@ -75,6 +75,7 @@ describe('RecruitmentCandidateExamComponent',()=>{
     const pending=new Subject<RecruitmentExamNotice[]>();
     incidents.candidate.and.returnValue(pending);
     component.refresh();
+    incidents.candidate.and.returnValue(of([]));
     component.communityId=12;component.ngOnChanges();
     pending.next([blockNotice]);
     expect(component.incidentNotices).toEqual([]);
