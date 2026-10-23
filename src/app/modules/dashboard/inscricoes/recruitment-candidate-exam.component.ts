@@ -29,6 +29,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   private readonly destroyed$ = new Subject<void>();
   private timer: ReturnType<typeof setInterval> | null = null;
+  private localDeadlineMs = 0;
   private identity = '';
   private generation = 0;
 
@@ -90,6 +91,10 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if (generation !== this.generation || stageId !== this.exam?.stageId) return;
           this.busy = false;
           this.session = session;
+          // Server's own clock is the baseline; client's wall-clock skew does not
+          // affect the countdown. API still rejects late submissions.
+          this.localDeadlineMs = Date.now() + Math.max(0,
+            Date.parse(session.expiresAt) - Date.parse(session.serverNow));
           this.answers = {};
           this.submitted = null;
           this.confirmed = false;
@@ -182,7 +187,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.clearTimer();
     const update=()=>{
       if (!this.session) return;
-      const remaining = Math.max(0,Math.ceil((Date.parse(this.session.expiresAt)-Date.now())/1000));
+      const remaining = Math.max(0,Math.ceil((this.localDeadlineMs-Date.now())/1000));
       this.secondsLeft=Number.isFinite(remaining)?remaining:0;
       if(this.secondsLeft===0) {
         this.confirmed=false;
@@ -201,6 +206,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private clearAttempt(): void {
     this.clearTimer();
     this.session=null;
+    this.localDeadlineMs=0;
     this.answers={};
     this.confirmed=false;
     this.secondsLeft=0;
