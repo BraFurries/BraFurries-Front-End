@@ -71,6 +71,16 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(component.incidentNotices[0].read).toBeTrue();
   });
 
+  it('refreshes server eligibility after a reinstatement notice',()=>{
+    service.currentExams.and.returnValue(of([{...exam,blocked:true}]));
+    component.refresh();
+    expect(component.blocked).toBeTrue();
+    service.currentExams.and.returnValue(of([exam]));
+    component.refresh();
+    expect(component.blocked).toBeFalse();
+    expect(component.exam?.stageId).toBe(501);
+  });
+
   it('discards stale incident responses after switching Community',()=>{
     const pending=new Subject<RecruitmentExamNotice[]>();
     incidents.candidate.and.returnValue(pending);
