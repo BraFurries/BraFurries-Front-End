@@ -1,0 +1,78 @@
+<section class="mt-6 rounded-xl border border-braPurple/30 bg-gray-50 p-4">
+  <h3 class="font-amaranth text-xl font-bold">Política de avaliação da etapa</h3>
+  <p class="mt-1 text-sm text-gray-600">
+    A configuração pertence a esta versão. Não é uma publicação de resultados.
+  </p>
+  <p *ngIf="loading" role="status" class="mt-3 text-sm text-gray-500">Carregando política...</p>
+  <p *ngIf="error" role="alert" class="mt-3 text-sm text-red-700">{{ error }}</p>
+  <p *ngIf="notice" role="status" class="mt-3 text-sm text-green-700">{{ notice }}</p>
+
+  <ng-container *ngIf="!loading && !error">
+    <p *ngIf="stageType === 'AUTO_EVALUATION'" class="mt-3 text-sm text-amber-800">
+      Etapa objetiva: correção automática será configurada no motor de provas, não aqui.
+    </p>
+    <div *ngIf="stageType !== 'AUTO_EVALUATION'" class="mt-4 grid gap-4 sm:grid-cols-2">
+      <label class="block text-sm font-bold">
+        Revisão humana
+        <select aria-label="Modo de revisão humana" [ngModel]="policy.reviewMode"
+          (ngModelChange)="changeMode($event)" [disabled]="!editable || busy || versionStatus !== 'DRAFT'"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+          <option value="INDIVIDUAL">Individual</option>
+          <option value="COLLECTIVE">Coletiva</option>
+        </select>
+      </label>
+      <label class="block text-sm font-bold">
+        Decisão
+        <select aria-label="Modo de decisão" [ngModel]="policy.decisionMode"
+          (ngModelChange)="changeDecisionMode($event)"
+          [disabled]="!editable || busy || versionStatus !== 'DRAFT'"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+          <option value="MANUAL">Manual, por gestor</option>
+          <option [disabled]="policy.reviewMode !== 'COLLECTIVE'" value="AUTOMATIC_VOTE">
+            Votação automática (futura)
+          </option>
+        </select>
+      </label>
+      <label class="block text-sm font-bold">
+        Pareceres mínimos
+        <input type="number" aria-label="Número mínimo de pareceres"
+          [(ngModel)]="policy.minimumAssessments" min="1" max="20" step="1"
+          [disabled]="!editable || busy || versionStatus !== 'DRAFT' || policy.reviewMode === 'INDIVIDUAL'"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+      </label>
+    </div>
+    <div *ngIf="stageType !== 'AUTO_EVALUATION' && policy.decisionMode === 'AUTOMATIC_VOTE'"
+      class="mt-4 grid gap-4 sm:grid-cols-2">
+      <label class="block text-sm font-bold">
+        Quórum mínimo de votos
+        <input type="number" min="2" max="20" step="1"
+          [(ngModel)]="policy.minimumVotes"
+          [disabled]="!editable || busy || versionStatus !== 'DRAFT'"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+      </label>
+      <label class="block text-sm font-bold">
+        Política de empate
+        <select [(ngModel)]="policy.tiePolicy"
+          [disabled]="!editable || busy || versionStatus !== 'DRAFT'"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+          <option value="REJECT_ON_TIE">Reprovar em empate</option>
+          <option value="MANAGER_OVERRIDE">Desempate com justificativa de gestor</option>
+        </select>
+      </label>
+    </div>
+    <p *ngIf="policy.decisionMode === 'AUTOMATIC_VOTE'"
+      class="mt-3 text-sm text-amber-800">
+      O motor de votação está disponível na API, mas a publicação de processos com
+      esta modalidade continua bloqueada até a validação completa do fluxo Front/API.
+    </p>
+    <p *ngIf="versionStatus && versionStatus !== 'DRAFT'"
+      class="mt-3 text-sm text-gray-600">
+      Política congelada nesta versão publicada.
+    </p>
+    <button *ngIf="stageType !== 'AUTO_EVALUATION'" type="button"
+      (click)="savePolicy()" [disabled]="!canSave"
+      class="mt-4 rounded-lg border border-braPurple px-4 py-2 font-bold text-braPurple disabled:opacity-40">
+      {{ busy ? 'Salvando...' : 'Salvar política de decisão' }}
+    </button>
+  </ng-container>
+</section>

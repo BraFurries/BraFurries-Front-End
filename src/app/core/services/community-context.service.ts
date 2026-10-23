@@ -25,7 +25,7 @@ import {
 export const COMMUNITY_CONTEXT_STORAGE_KEY = 'brafurries.activeCommunityId';
 const BRAFURRIES_MAIN_GUILD_ID = '753321055682035712';
 
-export type CommunityScopedFeature = 'membros' | 'times' | 'acessos' | 'atividade' | 'coddy';
+export type CommunityScopedFeature = 'membros' | 'times' | 'recrutamento' | 'triagem' | 'inscricoes' | 'acessos' | 'atividade' | 'coddy';
 export type CommunityContextStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface CommunityContextState {
@@ -155,6 +155,15 @@ export class CommunityContextService {
         return access.capabilities.includes('MEMBERS_VIEW');
       case 'times':
         return access.capabilities.includes('TEAM_VIEW');
+      case 'inscricoes':
+        return this.isBraFurriesCommunity(state.activeCommunity) && access.activeMember;
+      case 'triagem':
+        return this.isBraFurriesCommunity(state.activeCommunity)
+          && access.capabilities.includes('RECRUITMENT_REVIEW_APPLICATIONS');
+      case 'recrutamento':
+        return this.isBraFurriesCommunity(state.activeCommunity)
+          && (access.capabilities.includes('RECRUITMENT_MANAGE_PROCESSES')
+            || access.capabilities.includes('RECRUITMENT_PUBLISH_PROCESSES'));
       case 'acessos':
       case 'atividade':
         return access.owner || access.communityAdmin;
@@ -181,6 +190,9 @@ export class CommunityContextService {
     const labels: Record<CommunityScopedFeature, string> = {
       membros: 'Membros',
       times: 'Times',
+      recrutamento: 'Processos seletivos',
+      triagem: 'Triagem de candidaturas',
+      inscricoes: 'Inscrições',
       acessos: 'Acessos',
       atividade: 'Atividade',
       coddy: 'Coddy'
@@ -191,7 +203,7 @@ export class CommunityContextService {
   scopedLocation(url: string): { communityId: number; feature: CommunityScopedFeature } | null {
     const path = url.split(/[?#]/, 1)[0];
     const match = path.match(
-      /^\/painel\/comunidades\/(\d+)\/(membros|times|acessos|atividade|coddy)(?:\/|$)/
+      /^\/painel\/comunidades\/(\d+)\/(membros|times|recrutamento|triagem|inscricoes|acessos|atividade|coddy)(?:\/|$)/
     );
     if (!match) return null;
     return {

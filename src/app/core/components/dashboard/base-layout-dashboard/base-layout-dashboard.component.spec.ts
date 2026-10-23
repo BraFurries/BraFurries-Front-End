@@ -66,13 +66,14 @@ describe('BaseLayoutDashboardComponent', () => {
     context$ = new BehaviorSubject<CommunityContextState>(baseState);
     context = jasmine.createSpyObj<CommunityContextService>(
       'CommunityContextService',
-      ['initialize', 'selectCommunity', 'scopedLocation', 'communityImageUrl'],
+      ['initialize', 'selectCommunity', 'scopedLocation', 'communityImageUrl', 'canAccessFeature'],
       { state$: context$.asObservable() }
     );
     context.initialize.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.selectCommunity.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.scopedLocation.and.returnValue(null);
     context.communityImageUrl.and.returnValue(null);
+    context.canAccessFeature.and.returnValue(false);
 
     await TestBed.configureTestingModule({
       declarations: [BaseLayoutDashboardComponent, TestDashboardPageComponent],

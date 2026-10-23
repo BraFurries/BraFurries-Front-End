@@ -45,6 +45,17 @@ jobs:
           npm test -- --watch=false --browsers=ChromeHeadless
           --include=**/community-access.service.spec.ts
           --include=**/community-context.service.spec.ts
+          --include=**/recrutamento.component.spec.ts
+          --include=**/recruitment-reviewers.component.spec.ts
+          --include=**/recruitment-stage-policy.component.spec.ts
+          --include=**/recruitment-decision-desk.component.spec.ts
+          --include=**/recruitment-vote-tally.component.spec.ts
+          --include=**/recruitment-own-ballot.component.spec.ts
+          --include=**/inscricoes.component.spec.ts
+          --include=**/recruitment-candidate-exam.component.spec.ts
+          --include=**/recruitment-exam-policy.component.spec.ts
+          --include=**/recruitment-exam-review.component.spec.ts
+          --include=**/triagem.component.spec.ts
           --include=**/community-context-layout.component.spec.ts
           --include=**/community-access.component.spec.ts
           --include=**/equipes.component.spec.ts

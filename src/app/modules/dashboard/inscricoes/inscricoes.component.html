@@ -1,0 +1,169 @@
+<section class="mx-auto max-w-4xl p-5 md:p-10">
+  <header class="mb-6">
+    <p class="text-sm font-bold uppercase tracking-wide text-braPurple">BraFurries · Candidaturas</p>
+    <h1 class="font-amaranth text-3xl font-bold text-braDark">Participar de uma seleção</h1>
+    <p class="mt-2 text-gray-600">Encontre inscrições abertas e envie sua candidatura à Staff.</p>
+  </header>
+
+  <p *ngIf="communityId === null" class="rounded-xl border bg-white p-5 text-gray-600">
+    As inscrições estão disponíveis somente para membros ativos da BraFurries.
+  </p>
+
+  <ng-container *ngIf="communityId !== null">
+    <p *ngIf="error" role="alert" class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+      {{ error }}
+    </p>
+    <p *ngIf="loading" role="status" class="mb-4 text-sm text-gray-500">Carregando...</p>
+
+    <section class="mb-6 rounded-2xl border bg-white p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="font-amaranth text-xl font-bold">Minhas candidaturas</h2>
+        <button type="button" (click)="loadReceipts()" [disabled]="receiptsLoading"
+          class="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+          Atualizar
+        </button>
+      </div>
+      <p class="mt-2 text-sm text-gray-500">
+        O recebimento da candidatura não significa aprovação. Os resultados
+        serão divulgados posteriormente pela Staff.
+      </p>
+      <p *ngIf="receiptsLoading" role="status" class="mt-3 text-sm text-gray-500">Consultando candidaturas...</p>
+      <p *ngIf="receiptsError" role="alert" class="mt-3 text-sm text-red-700">{{ receiptsError }}</p>
+      <div *ngFor="let receipt of ownApplications"
+        class="mt-3 rounded-xl border border-gray-200 p-3">
+        <strong class="block">{{ receipt.processTitle }}</strong>
+        <p class="mt-1 text-sm text-gray-500">
+          Inscrição #{{ receipt.id }} · Enviada em {{ receipt.submittedAt | date:'dd/MM/yyyy HH:mm' }}
+        </p>
+        <p class="mt-1 text-sm font-semibold text-braPurple">Recebida</p>
+        <app-recruitment-candidate-exam
+          [communityId]="communityId" [applicationId]="receipt.id">
+        </app-recruitment-candidate-exam>
+      </div>
+      <p *ngIf="!ownApplications.length && !receiptsLoading && !receiptsError"
+        class="mt-3 text-sm text-gray-500">Você ainda não possui candidaturas registradas.</p>
+    </section>
+
+    <section *ngIf="!selected && !loading" class="space-y-4">
+      <div *ngFor="let process of processes" class="rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">{{ process.title }}</h2>
+        <p class="mt-2 text-gray-600">{{ process.description || 'Sem descrição.' }}</p>
+        <p class="mt-2 text-xs text-gray-500">
+          Inscrições até {{ process.enrollmentEndsAt | date:'dd/MM/yyyy HH:mm' }}
+        </p>
+        <button type="button" (click)="open(process.id)"
+          class="mt-4 rounded-xl bg-braPurple px-5 py-2 font-bold text-white">
+          Consultar requisitos e formulário
+        </button>
+      </div>
+      <p *ngIf="processes.length === 0" class="rounded-2xl border bg-white p-6 text-gray-600">
+        Nenhum processo seletivo com inscrições abertas neste momento.
+      </p>
+    </section>
+
+    <section *ngIf="selected as form" class="space-y-5">
+      <button type="button" (click)="back()" [disabled]="busy" class="rounded-lg border px-4 py-2">
+        ← Voltar às seleções
+      </button>
+
+      <div class="rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-2xl font-bold">{{ form.process.title }}</h2>
+        <p class="mt-2 text-sm text-gray-500">Prazo: {{ form.process.enrollmentEndsAt | date:'dd/MM/yyyy HH:mm' }}</p>
+        <p class="mt-3 text-gray-700">{{ form.process.description }}</p>
+      </div>
+
+      <div *ngIf="!form.eligible" class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+        <p class="font-bold">Você ainda não atende aos requisitos desta seleção.</p>
+        <ul class="mt-2 list-disc pl-5 text-sm">
+          <li *ngFor="let reason of form.eligibilityBlockers">{{ reason }}</li>
+        </ul>
+      </div>
+
+      <div *ngIf="submitted as result" role="status" class="rounded-2xl border border-green-200 bg-green-50 p-6">
+        <h3 class="font-amaranth text-xl font-bold text-green-900">Candidatura registrada!</h3>
+        <p class="mt-2 text-green-900">
+          Número {{ result.applicationId }}. Sua inscrição foi recebida; a avaliação
+          e os resultados serão divulgados conforme as regras da seleção.
+        </p>
+      </div>
+
+      <ng-container *ngIf="form.eligible && !submitted">
+        <section class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+          <h3 class="font-amaranth text-xl font-bold">Formulário de inscrição</h3>
+          <div *ngFor="let question of form.form.questions; let i=index" class="border-b pb-5">
+            <label class="block font-semibold">
+              {{ i + 1 }}. {{ question.label }}
+              <span *ngIf="question.required" class="text-red-600" aria-label="Obrigatório">*</span>
+            </label>
+
+            <input *ngIf="question.type === 'SHORT_TEXT' || question.type === 'LINK'"
+              [type]="question.type === 'LINK' ? 'url' : 'text'"
+              [(ngModel)]="answers[question.id]" [required]="question.required" [disabled]="busy"
+              class="mt-2 w-full rounded-lg border p-3">
+
+            <textarea *ngIf="question.type === 'LONG_TEXT'"
+              [(ngModel)]="answers[question.id]" [required]="question.required" [disabled]="busy"
+              rows="4" class="mt-2 w-full rounded-lg border p-3"></textarea>
+
+            <select *ngIf="question.type === 'SINGLE_CHOICE'"
+              [(ngModel)]="answers[question.id]" [disabled]="busy"
+              class="mt-2 w-full rounded-lg border bg-white p-3">
+              <option [ngValue]="undefined">Escolha uma alternativa</option>
+              <option *ngFor="let option of question.options" [ngValue]="option.id">{{ option.label }}</option>
+            </select>
+
+            <div *ngIf="question.type === 'MULTIPLE_CHOICE'" class="mt-3 space-y-2">
+              <label *ngFor="let option of question.options" class="flex items-center gap-3">
+                <input type="checkbox" [checked]="isMultipleSelected(question,option.id)"
+                  (change)="toggleMultiple(question,option.id,$any($event.target).checked)"
+                  [disabled]="busy">
+                <span>{{ option.label }}</span>
+              </label>
+            </div>
+
+            <select *ngIf="question.type === 'YES_NO'"
+              [(ngModel)]="answers[question.id]" [disabled]="busy"
+              class="mt-2 w-full rounded-lg border bg-white p-3">
+              <option [ngValue]="undefined">Selecione</option>
+              <option [ngValue]="true">Sim</option>
+              <option [ngValue]="false">Não</option>
+            </select>
+
+            <input *ngIf="question.type === 'NUMBER' || question.type === 'SCALE'"
+              type="number" [(ngModel)]="answers[question.id]" [min]="question.minValue"
+              [max]="question.maxValue" [step]="question.type === 'SCALE' ? 1 : 'any'"
+              [disabled]="busy" class="mt-2 w-full rounded-lg border p-3">
+
+            <input *ngIf="question.type === 'DATE'" type="date"
+              [(ngModel)]="answers[question.id]" [disabled]="busy"
+              class="mt-2 w-full rounded-lg border p-3">
+
+            <label *ngIf="question.type === 'CONSENT'" class="mt-3 flex items-center gap-3 text-sm">
+              <input type="checkbox" [(ngModel)]="answers[question.id]" [disabled]="busy">
+              <span>Concordo.</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="rounded-2xl border bg-white p-5 shadow-sm">
+          <h3 class="font-amaranth text-xl font-bold">Termos de participação</h3>
+          <div class="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-4 text-sm text-gray-800">
+            {{ form.termsText }}
+          </div>
+          <label class="mt-4 flex items-start gap-3 text-sm">
+            <input type="checkbox" [(ngModel)]="acceptedTerms" [disabled]="busy">
+            <span>Li e aceito os termos apresentados acima.</span>
+          </label>
+          <p class="mt-2 text-xs text-gray-500">
+            Sua inscrição só será enviada após a confirmação. Respostas e aceite
+            serão registrados para avaliação da Staff.
+          </p>
+          <button type="button" (click)="apply()" [disabled]="!canSubmit"
+            class="mt-4 rounded-xl bg-braPurple px-6 py-3 font-bold text-white disabled:opacity-40">
+            Enviar candidatura
+          </button>
+        </section>
+      </ng-container>
+    </section>
+  </ng-container>
+</section>

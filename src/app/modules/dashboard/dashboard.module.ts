@@ -21,6 +21,17 @@ import { CommunityAccessComponent } from './community-access/community-access.co
 import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
+import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
+import { InscricoesComponent } from './inscricoes/inscricoes.component';
+import { TriagemComponent } from './triagem/triagem.component';
+import { RecruitmentReviewersComponent } from './recrutamento/recruitment-reviewers.component';
+import { RecruitmentStagePolicyComponent } from './recrutamento/recruitment-stage-policy.component';
+import { RecruitmentDecisionDeskComponent } from './recrutamento/recruitment-decision-desk.component';
+import { RecruitmentOwnBallotComponent } from './triagem/recruitment-own-ballot.component';
+import { RecruitmentVoteTallyComponent } from './recrutamento/recruitment-vote-tally.component';
+import { RecruitmentCandidateExamComponent } from './inscricoes/recruitment-candidate-exam.component';
+import { RecruitmentExamPolicyComponent } from './recrutamento/recruitment-exam-policy.component';
+import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-review.component';
 
 @NgModule({
   declarations: [
@@ -41,6 +52,17 @@ import { CommunityContextLayoutComponent } from './community-context/community-c
     CommunityAccessComponent,
     CommunityActivityComponent,
     CommunityContextLayoutComponent,
+    RecrutamentoComponent,
+    InscricoesComponent,
+    TriagemComponent,
+    RecruitmentReviewersComponent,
+    RecruitmentStagePolicyComponent,
+    RecruitmentDecisionDeskComponent,
+    RecruitmentOwnBallotComponent,
+    RecruitmentVoteTallyComponent,
+    RecruitmentCandidateExamComponent,
+    RecruitmentExamPolicyComponent,
+    RecruitmentExamReviewComponent,
     CommunitiesComponent
   ],
   imports: [
