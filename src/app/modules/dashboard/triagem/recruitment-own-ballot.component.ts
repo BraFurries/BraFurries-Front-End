@@ -18,6 +18,7 @@ export class RecruitmentOwnBallotComponent implements OnChanges, OnDestroy {
   @Input() assessmentSubmitted = false;
 
   ballot: OwnRecruitmentBallot | null = null;
+  available = false;
   choice: BallotChoice = 'APPROVE';
   confirmed = false;
   loading = false;
@@ -32,11 +33,12 @@ export class RecruitmentOwnBallotComponent implements OnChanges, OnDestroy {
   constructor(private readonly votes: RecruitmentCollectiveVotingService) {}
 
   ngOnChanges(): void {
-    const identity = `${this.communityId}:${this.applicationId}:${this.stageId}:${this.assessmentSubmitted}`;
+    const identity = `${this.communityId}:${this.applicationId}:${this.stageId}:${this.stageStatus}:${this.assessmentSubmitted}`;
     if (identity === this.identity) return;
     this.identity = identity;
     const generation = ++this.generation;
     this.ballot = null;
+    this.available = false;
     this.choice = 'APPROVE';
     this.confirmed = false;
     this.loading = false;
@@ -51,24 +53,41 @@ export class RecruitmentOwnBallotComponent implements OnChanges, OnDestroy {
     const applicationId = this.applicationId;
     const stageId = this.stageId;
     this.loading = true;
-    this.votes.mine(communityId, applicationId, stageId)
+    this.votes.availability(communityId, applicationId, stageId)
       .pipe(takeUntil(this.destroyed$)).subscribe({
-        next: ballot => {
+        next: availability => {
           if (generation !== this.generation) return;
-          this.ballot = ballot;
-          this.loading = false;
+          this.available = availability.enabled && availability.hasAssessment;
+          if (!this.available || !availability.alreadyVoted) {
+            this.loading = false;
+            return;
+          }
+          this.votes.mine(communityId, applicationId, stageId)
+            .pipe(takeUntil(this.destroyed$)).subscribe({
+              next: ballot => {
+                if (generation !== this.generation) return;
+                this.ballot = ballot;
+                this.loading = false;
+              },
+              error: err => {
+                if (generation !== this.generation) return;
+                this.loading = false;
+                this.available = false;
+                this.error = this.failure(err);
+              }
+            });
         },
         error: err => {
           if (generation !== this.generation) return;
           this.loading = false;
-          // 404 means no ballot has been cast; never infer anyone else's vote.
-          if (err.status !== 404) this.error = this.failure(err);
+          this.available = false;
+          this.error = this.failure(err);
         }
       });
   }
 
   get canCast(): boolean {
-    return this.assessmentSubmitted && this.stageStatus === 'AWAITING_REVIEW' &&
+    return this.available && this.assessmentSubmitted && this.stageStatus === 'AWAITING_REVIEW' &&
       !this.ballot && !this.loading && !this.saving && this.confirmed &&
       (this.choice === 'APPROVE' || this.choice === 'REJECT');
   }
@@ -105,6 +124,7 @@ export class RecruitmentOwnBallotComponent implements OnChanges, OnDestroy {
   ngOnDestroy(): void {
     ++this.generation;
     this.ballot = null;
+    this.available = false;
     this.choice = 'APPROVE';
     this.confirmed = false;
     this.destroyed$.next();
