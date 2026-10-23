@@ -495,6 +495,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   }
   ngOnDestroy(): void {
     ++this.generation;
+    this.incidentNotices=[];
+    this.incidentLoading=false;
+    this.incidentError='';
     this.clearSensitive();
     this.exam=null;
     this.destroyed$.next();
