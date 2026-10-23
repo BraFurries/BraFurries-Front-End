@@ -52,6 +52,7 @@ describe('RecruitmentExamReviewComponent',()=>{
     expect(api.reinstate).toHaveBeenCalledOnceWith(11,100,501,800,reason);
     expect(restored).toHaveBeenCalledTimes(1);
     expect(component.selectedAttempt).toBeNull();
+    expect(component.notice).toContain('reaberta até');
   });
   it('does not allow reactivation when stage is already completed',()=>{
     component.stageStatus='COMPLETED';
