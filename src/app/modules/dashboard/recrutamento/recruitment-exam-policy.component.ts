@@ -94,7 +94,10 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
       Number.isInteger(this.attempt.maxAttempts) &&
       this.attempt.maxAttempts>=1 && this.attempt.maxAttempts<=5 &&
       Number.isInteger(this.attempt.timeLimitSeconds) &&
-      this.attempt.timeLimitSeconds>=60 && this.attempt.timeLimitSeconds<=14400;
+      this.attempt.timeLimitSeconds>=60 && this.attempt.timeLimitSeconds<=14400 &&
+      (this.attempt.maxFocusLosses===null ||
+        (Number.isInteger(this.attempt.maxFocusLosses) &&
+          this.attempt.maxFocusLosses>=1 && this.attempt.maxFocusLosses<=10));
   }
   get canSaveGrade():boolean {
     return this.canSaveAttempt && this.attemptConfigured &&
@@ -111,8 +114,7 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
     const generation=this.generation,communityId=this.communityId,
       processId=this.processId,stageId=this.stageId;
     const policy:AttemptPolicy={...this.attempt,deadlineAt:this.deadlineLocal
-      ?new Date(this.deadlineLocal).toISOString():null,
-      maxFocusLosses:null,blockCopy:false};
+      ?new Date(this.deadlineLocal).toISOString():null};
     this.busy=true;
     this.error='';
     this.notice='';
