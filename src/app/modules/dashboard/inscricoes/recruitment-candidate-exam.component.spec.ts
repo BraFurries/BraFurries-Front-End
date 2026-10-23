@@ -1,4 +1,5 @@
 import { of, Subject, throwError } from 'rxjs';
+import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
 import {
   CandidateExam, ExamNumericScore, ExamSession, RecruitmentExamService
 } from '../../../core/services/recruitment-exam.service';
@@ -7,6 +8,11 @@ import { RecruitmentCandidateExamComponent } from './recruitment-candidate-exam.
 describe('RecruitmentCandidateExamComponent',()=>{
   let service:jasmine.SpyObj<RecruitmentExamService>;
   let component:RecruitmentCandidateExamComponent;
+  let incidents:jasmine.SpyObj<RecruitmentExamNoticesService>;
+  const blockNotice={id:901,applicationId:100,stageId:501,attemptId:800,
+    eventType:'BLOCKED' as const,occurredAt:'2026-10-23T14:00:00Z',
+    newExpiresAt:null,read:false};
+
   const exam:CandidateExam={applicationId:100,stageId:501,publicName:'Prova objetiva',
     blocked:false};
   const session:ExamSession={
@@ -24,6 +30,12 @@ describe('RecruitmentCandidateExamComponent',()=>{
   };
 
   beforeEach(()=>{
+    incidents=jasmine.createSpyObj('RecruitmentExamNoticesService',
+      ['candidate','candidateRead','staff','staffRead']);
+    incidents.candidate.and.returnValue(of([]));
+    incidents.staff.and.returnValue(of([]));
+    incidents.candidateRead.and.returnValue(of(void 0));
+    incidents.staffRead.and.returnValue(of(void 0));
     service=jasmine.createSpyObj('RecruitmentExamService',
       ['currentExams','start','submit','ownScores','attemptPolicy',
        'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent','draft','saveDraft']);
@@ -44,11 +56,31 @@ describe('RecruitmentCandidateExamComponent',()=>{
       attemptId:800,applicationId:100,stageId:501,status:'SUBMITTED',
       submittedAt:new Date().toISOString(),score
     }));
-    component=new RecruitmentCandidateExamComponent(service);
+    component=new RecruitmentCandidateExamComponent(service,incidents);
     component.communityId=11;component.applicationId=100;
     component.ngOnChanges();
   });
   afterEach(()=>component.ngOnDestroy());
+
+  it('shows persisted blocked notices and marks only own notice as read',()=>{
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    component.refresh();
+    expect(component.incidentNotices.length).toBe(1);
+    component.markIncidentRead(blockNotice);
+    expect(incidents.candidateRead).toHaveBeenCalledOnceWith(11,100,901);
+    expect(component.incidentNotices[0].read).toBeTrue();
+  });
+
+  it('discards stale incident responses after switching Community',()=>{
+    const pending=new Subject<RecruitmentExamNotice[]>();
+    incidents.candidate.and.returnValue(pending);
+    component.refresh();
+    component.communityId=12;component.ngOnChanges();
+    pending.next([blockNotice]);
+    expect(component.incidentNotices).toEqual([]);
+  });
+
+
 
   it('discovers only current objective exams from the scoped application',()=>{
     expect(service.currentExams).toHaveBeenCalledOnceWith(11,100);
