@@ -88,6 +88,16 @@
                 Consultar pareceres
               </button>
             </div>
+            <app-recruitment-exam-review
+              *ngIf="stage.stageType === 'AUTO_EVALUATION' &&
+                stage.internalStatus === 'AWAITING_CANDIDATE'"
+              [communityId]="communityId"
+              [applicationId]="application.application.id"
+              [stageId]="stage.stageId"
+              [stageStatus]="stage.internalStatus"
+              [applicationStatus]="application.application.internalStatus"
+              (restored)="examRestored()">
+            </app-recruitment-exam-review>
           </div>
         </section>
 
