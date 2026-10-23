@@ -52,6 +52,7 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
     this.evidenceGeneration++;
     this.queue=[];
     this.examNotices=[];
+    this.noticesLoading=false;
     this.noticesError='';
     this.loading=false;
     this.hasMore=false;
@@ -71,6 +72,9 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
     this.evidenceGeneration++;
     this.clearDetail();
     this.queue=[];
+    this.examNotices=[];
+    this.noticesLoading=false;
+    this.noticesError='';
     this.destroyed$.next();
     this.destroyed$.complete();
   }
