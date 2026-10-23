@@ -109,13 +109,14 @@ export class RecruitmentExamReviewComponent implements OnChanges,OnDestroy {
         next:receipt=>{
           if(generation!==this.generation)return;
           this.busy=false;
-          this.notice=`Tentativa #${receipt.attemptId} reaberta até `+
-            new Date(receipt.expiresAt).toLocaleString('pt-BR')+
-            '. A decisão final do processo continua privada.';
           this.selectedAttempt=null;
           this.reason='';
           this.confirmed=false;
           this.load();
+          // load() clears prior feedback; show the success receipt afterwards.
+          this.notice=`Tentativa #${receipt.attemptId} reaberta até `+
+            new Date(receipt.expiresAt).toLocaleString('pt-BR')+
+            '. A decisão final do processo continua privada.';
           this.restored.emit();
         },
         error:err=>{
