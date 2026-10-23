@@ -1,0 +1,88 @@
+<section *ngIf="stageType === 'AUTO_EVALUATION'" class="mt-6 rounded-xl border border-braPurple/30 bg-gray-50 p-4">
+  <h3 class="font-bold">Política de execução da prova</h3>
+  <p class="mt-1 text-sm text-gray-600">
+    Estas regras pertencem à versão da etapa e ficam congeladas quando o processo é publicado.
+  </p>
+  <p *ngIf="loading" role="status" class="mt-2 text-sm">Consultando políticas...</p>
+  <p *ngIf="error" role="alert" class="mt-2 text-sm text-red-700">{{error}}</p>
+  <p *ngIf="notice" role="status" class="mt-2 text-sm text-green-700">{{notice}}</p>
+
+  <div class="mt-4 grid gap-4 sm:grid-cols-2">
+    <label class="block text-sm font-bold">
+      Máximo de tentativas (1–5)
+      <input type="number" min="1" max="5" step="1" [(ngModel)]="attempt.maxAttempts"
+        [disabled]="!editable || busy"
+        class="mt-1 w-full rounded-lg border bg-white p-2">
+    </label>
+    <label class="block text-sm font-bold">
+      Duração de cada tentativa (segundos, 60–14400)
+      <input type="number" min="60" max="14400" step="60"
+        [(ngModel)]="attempt.timeLimitSeconds" [disabled]="!editable || busy"
+        class="mt-1 w-full rounded-lg border bg-white p-2">
+    </label>
+    <label class="block text-sm font-bold">
+      Data limite da etapa (opcional)
+      <input type="datetime-local" [(ngModel)]="deadlineLocal" [disabled]="!editable || busy"
+        class="mt-1 w-full rounded-lg border bg-white p-2">
+    </label>
+    <label class="block text-sm font-bold">
+      Política ao encerrar o prazo
+      <select [(ngModel)]="attempt.hardDeadline" [disabled]="!editable || busy"
+        class="mt-1 w-full rounded-lg border bg-white p-2">
+        <option [ngValue]="true">Rígido — interrompe tentativas</option>
+        <option [ngValue]="false">Flexível — conclui tentativas iniciadas</option>
+      </select>
+    </label>
+  </div>
+  <p class="mt-2 text-xs text-amber-800">
+    Controle de cópia e perda de foco ainda não estão disponíveis.
+    Não são prometidos como proteção contra cola.
+  </p>
+  <button type="button" (click)="saveAttempts()" [disabled]="!canSaveAttempt"
+    class="mt-3 rounded-lg border border-braPurple px-4 py-2 font-bold text-braPurple disabled:opacity-40">
+    {{busy ? 'Salvando...' : 'Salvar tentativas e prazos'}}
+  </button>
+
+  <div class="mt-6 border-t pt-5">
+    <h4 class="font-bold">Correção e divulgação da nota</h4>
+    <p class="mt-1 text-sm text-gray-600">
+      A nota de cada prova é diferente da aprovação final do processo seletivo.
+      O gabarito permanece privado em qualquer opção.
+    </p>
+    <div class="mt-3 grid gap-4 sm:grid-cols-2">
+      <label class="block text-sm font-bold">
+        Nota de corte (%)
+        <input type="number" min="1" max="100" step="0.01"
+          [(ngModel)]="grade.passingPercentage" [disabled]="!editable || busy"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+      </label>
+      <label class="block text-sm font-bold">
+        Qual tentativa prevalece
+        <select [(ngModel)]="grade.resultStrategy" [disabled]="!editable || busy"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+          <option value="BEST">Melhor nota</option>
+          <option value="LAST">Última tentativa</option>
+        </select>
+      </label>
+      <label class="block text-sm font-bold sm:col-span-2">
+        Quando mostrar a nota numérica ao candidato
+        <select [(ngModel)]="grade.scoreVisibility" [disabled]="!editable || busy"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+          <option value="PRIVATE">Não mostrar após enviar a prova (padrão)</option>
+          <option value="AFTER_SUBMISSION">Mostrar pontos e percentual após cada tentativa</option>
+        </select>
+      </label>
+    </div>
+    <p class="mt-2 text-xs text-gray-600">
+      Mesmo com divulgação imediata da nota, o resultado final da seleção
+      continuará sujeito à publicação manual da Staff.
+    </p>
+    <p *ngIf="!attemptConfigured" class="mt-2 text-xs text-amber-800">
+      Salve primeiro as tentativas e prazos para habilitar a política de correção.
+    </p>
+    <button type="button" (click)="saveGrades()" [disabled]="!canSaveGrade"
+      class="mt-3 rounded-lg border border-braPurple px-4 py-2 font-bold text-braPurple disabled:opacity-40">
+      {{busy ? 'Salvando...' : 'Salvar correção e divulgação'}}
+    </button>
+  </div>
+</section>
