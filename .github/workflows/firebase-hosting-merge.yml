@@ -3,8 +3,10 @@
 
 name: Deploy to Firebase Hosting on merge
 
-# Public repository: BraFurries/BraFurries-Front-End-Next.
-# Never enable this workflow on the private legacy repository.
+# Canonical public repository: BraFurries/BraFurries-Front-End.
+# The old -Next name redirects to this repository, but github.repository uses
+# the current name. Keep production disabled until an explicit second gate is
+# configured by an authorized operator; never deploy from legacy forks.
 'on':
   push:
     branches:
@@ -19,7 +21,7 @@ concurrency:
 
 jobs:
   build_and_deploy:
-    if: ${{ github.repository == 'BraFurries/BraFurries-Front-End-Next' && (github.event_name == 'workflow_dispatch' || vars.FRONT_AUTO_DEPLOY_ENABLED == 'true') }}
+    if: ${{ github.repository == 'BraFurries/BraFurries-Front-End' && vars.FRONT_PROD_DEPLOY_APPROVED == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.FRONT_AUTO_DEPLOY_ENABLED == 'true')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Git Repo
