@@ -118,6 +118,12 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     return Array.isArray(current) && current.includes(optionId);
   }
 
+  get clock(): string {
+    const minutes=Math.floor(this.secondsLeft/60);
+    const seconds=this.secondsLeft%60;
+    return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  }
+
   get canSubmit(): boolean {
     return !!this.session && !this.busy && this.secondsLeft > 0 &&
       this.confirmed && this.session.form.questions.every(q => {
