@@ -1,5 +1,6 @@
 import { Component, HostListener, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
+import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
 import {
   CandidateExam, ExamNumericScore, ExamQuestion, ExamSession,
   ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource, RecruitmentExamService
@@ -19,6 +20,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   session: ExamSession | null = null;
   submitted: ExamSubmissionReceipt | null = null;
   scores: ExamNumericScore[] = [];
+  incidentNotices: RecruitmentExamNotice[] = [];
+  incidentLoading = false;
+  incidentError = '';
   answers: Record<string, unknown> = {};
   draftRevision = 0;
   draftSavedAt: string | null = null;
@@ -46,7 +50,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private identity = '';
   private generation = 0;
 
-  constructor(private readonly api: RecruitmentExamService) {}
+  constructor(private readonly api: RecruitmentExamService,
+    private readonly incidents: RecruitmentExamNoticesService) {}
 
   ngOnChanges(): void {
     const id = `${this.communityId}:${this.applicationId}`;
@@ -55,6 +60,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     ++this.generation;
     this.clearSensitive();
     this.exam = null;
+    this.incidentNotices = [];
+    this.incidentError = '';
     this.blocked = false;
     this.error = '';
     this.notice = '';
@@ -73,6 +80,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.blocked = false;
     this.loading = true;
     this.error = '';
+    this.loadIncidentNotices(generation,communityId,applicationId);
     this.api.currentExams(communityId,applicationId)
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next: exams => {
@@ -361,6 +369,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if(response.blocked || response.status==='BLOCKED') {
             this.blocked=true;
             this.clearAttempt();
+            this.loadIncidentNotices(this.generation,communityId,applicationId);
             this.error='Sua prova foi bloqueada após atingir o limite de saídas da tela. '+
               'A gestão poderá analisar o registro.';
             return;
@@ -382,6 +391,46 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
             this.error='Não foi possível registrar um evento da prova. '+
               'Confira sua conexão e tente reenviar o registro.';
           }
+        }
+      });
+  }
+
+  refreshIncidentNotices(): void {
+    if(this.communityId===null || this.applicationId===null) return;
+    this.loadIncidentNotices(this.generation,this.communityId,this.applicationId);
+  }
+
+  markIncidentRead(notice: RecruitmentExamNotice): void {
+    if(notice.read || this.communityId===null || this.applicationId===null) return;
+    const generation=this.generation,communityId=this.communityId,applicationId=this.applicationId;
+    this.incidents.candidateRead(communityId,applicationId,notice.id)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:()=>{
+          if(generation!==this.generation)return;
+          this.incidentNotices=this.incidentNotices.map(item=>
+            item.id===notice.id?{...item,read:true}:item);
+        },
+        error:()=>{
+          if(generation===this.generation)
+            this.incidentError='Não foi possível registrar a leitura do aviso.';
+        }
+      });
+  }
+
+  private loadIncidentNotices(generation:number,communityId:number,applicationId:number):void {
+    this.incidentLoading=true;
+    this.incidentError='';
+    this.incidents.candidate(communityId,applicationId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:items=>{
+          if(generation!==this.generation)return;
+          this.incidentNotices=items;
+          this.incidentLoading=false;
+        },
+        error:err=>{
+          if(generation!==this.generation)return;
+          this.incidentLoading=false;
+          if(err.status!==404) this.incidentError='Não foi possível consultar avisos da prova.';
         }
       });
   }
