@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import {
   BehaviorSubject,
   Observable,
@@ -149,6 +150,11 @@ export class CommunityContextService {
   ): boolean {
     const access = state.activeAccess;
     if (!state.activeCommunity || !access) return false;
+    // Visual rollout only. API remains authoritative for auth and tenant gating.
+    if (!environment.recruitmentUiEnabled &&
+        (feature === 'inscricoes' || feature === 'triagem' || feature === 'recrutamento')) {
+      return false;
+    }
 
     switch (feature) {
       case 'membros':
