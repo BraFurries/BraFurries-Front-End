@@ -215,6 +215,13 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
       });
   }
 
+  examRestored(): void {
+    if(!this.selected || this.deciding)return;
+    const application=this.selected.application;
+    this.open(application);
+    this.notice='Reabertura da prova registrada. Tentativa liberada; resultado da seleção permanece privado.';
+  }
+
   voteFinalized(result: RecruitmentVotingDecision): void {
     // Refresh all private data after the stage transition; do not keep a stale tally.
     this.detailGeneration++;
