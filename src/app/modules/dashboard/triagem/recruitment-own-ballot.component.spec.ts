@@ -1,6 +1,7 @@
 import { of, Subject, throwError } from 'rxjs';
 import {
-  OwnRecruitmentBallot, RecruitmentCollectiveVotingService
+  OwnRecruitmentBallot, RecruitmentCollectiveVotingService,
+  RecruitmentVotingAvailability
 } from '../../../core/services/recruitment-collective-voting.service';
 import { RecruitmentOwnBallotComponent } from './recruitment-own-ballot.component';
 
@@ -14,8 +15,11 @@ describe('RecruitmentOwnBallotComponent', () => {
 
   beforeEach(() => {
     voting = jasmine.createSpyObj('RecruitmentCollectiveVotingService',
-      ['mine','cast','tally','finalize']);
-    voting.mine.and.returnValue(throwError(() => ({status:404})));
+      ['availability','mine','cast','tally','finalize']);
+    voting.availability.and.returnValue(of({
+      enabled:true,hasAssessment:true,alreadyVoted:false
+    }));
+    voting.mine.and.returnValue(of(ballot));
     voting.cast.and.returnValue(of(ballot));
     component = new RecruitmentOwnBallotComponent(voting);
     component.communityId=11;
@@ -28,7 +32,8 @@ describe('RecruitmentOwnBallotComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   it('queries only the own ballot and never the aggregate or anyone else', () => {
-    expect(voting.mine).toHaveBeenCalledOnceWith(11,100,501);
+    expect(voting.availability).toHaveBeenCalledOnceWith(11,100,501);
+    expect(voting.mine).not.toHaveBeenCalled();
     expect(voting.tally).not.toHaveBeenCalled();
     expect(voting.finalize).not.toHaveBeenCalled();
     expect(component.ballot).toBeNull();
@@ -73,15 +78,28 @@ describe('RecruitmentOwnBallotComponent', () => {
   });
 
   it('clears private vote on Community switch and ignores late responses', () => {
-    const pending = new Subject<OwnRecruitmentBallot>();
-    voting.mine.and.returnValue(pending);
+    const pending = new Subject<RecruitmentVotingAvailability>();
+    voting.availability.and.returnValue(pending);
     component.communityId=12;
     component.ngOnChanges();
     component.communityId=null;
     component.ngOnChanges();
-    pending.next(ballot);
+    pending.next({enabled:true,hasAssessment:true,alreadyVoted:false});
     expect(component.ballot).toBeNull();
     expect(component.choice).toBe('APPROVE');
+  });
+
+  it('hides the entire voting form in manual-only stages', () => {
+    voting.availability.and.returnValue(of({
+      enabled:false,hasAssessment:false,alreadyVoted:false
+    }));
+    component.stageId=502;
+    component.ngOnChanges();
+    expect(component.available).toBeFalse();
+    component.confirmed=true;
+    expect(component.canCast).toBeFalse();
+    component.cast();
+    expect(voting.cast).not.toHaveBeenCalled();
   });
 
   it('does not offer voting in a completed or not-yet-ready stage', () => {
@@ -91,6 +109,9 @@ describe('RecruitmentOwnBallotComponent', () => {
   });
 
   it('drops its saved ballot on destroy', () => {
+    voting.availability.and.returnValue(of({
+      enabled:true,hasAssessment:true,alreadyVoted:true
+    }));
     voting.mine.and.returnValue(of(ballot));
     component.stageId=502;
     component.ngOnChanges();
