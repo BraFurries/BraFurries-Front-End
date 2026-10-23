@@ -31,7 +31,7 @@
       <div class="rounded-xl border border-amber-300 bg-amber-50 p-3">
         <p class="font-bold">Tentativa {{attempt.attemptNumber}}</p>
         <p class="text-sm" role="timer">
-          Tempo restante: {{ (secondsLeft / 60) | number:'1.0-0' }} min (aproximadamente)
+          Tempo restante: {{ clock }}
         </p>
         <p class="text-xs text-amber-900">Expira em {{attempt.expiresAt | date:'dd/MM/yyyy HH:mm:ss' }}.</p>
       </div>
