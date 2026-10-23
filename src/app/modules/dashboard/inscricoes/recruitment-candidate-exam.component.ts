@@ -23,6 +23,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   draftRevision = 0;
   draftSavedAt: string | null = null;
   draftLoading = false;
+  draftReady = false;
   draftSaving = false;
   draftDirty = false;
   draftConflict = false;
@@ -152,7 +153,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   get canSubmit(): boolean {
     return !!this.session && !this.busy && !this.blocked &&
-      !this.draftLoading && !this.draftConflict &&
+      this.draftReady && !this.draftLoading && !this.draftConflict &&
       !this.pendingSignals.length && this.secondsLeft > 0 &&
       this.confirmed && this.session.form.questions.every(q => {
         if (!q.required) return true;
@@ -201,7 +202,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
    * Blur and hidden from one away cycle count as exactly one local event.
    */
   @HostListener('window:blur')
-  onWindowBlur(): void { this.noteFocusLoss('WINDOW_BLUR'); }
+  onWindowBlur(): void { this.noteFocusLoss('WINDOW_BLUR'); if(this.draftDirty) this.saveDraft(); }
 
   @HostListener('document:visibilitychange')
   onVisibilityChange(): void {
@@ -233,7 +234,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   /** Invoked only for candidate answer edits, never for server draft restoration. */
   answersChanged(): void {
-    if(!this.session || this.draftLoading || this.draftConflict ||
+    if(!this.session || !this.draftReady || this.draftLoading || this.draftConflict ||
       this.busy || this.secondsLeft<=0) return;
     this.confirmed=false;
     this.draftDirty=true;
@@ -262,6 +263,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     const attemptId=this.session.attemptId,stageId=this.exam.stageId;
     const communityId=this.communityId,applicationId=this.applicationId;
     this.draftLoading=true;
+    this.draftReady=false;
     this.draftError='';
     this.draftConflict=false;
     this.api.draft(communityId,applicationId,stageId,attemptId)
@@ -273,6 +275,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           this.draftSavedAt=result.savedAt;
           this.draftDirty=false;
           this.draftLoading=false;
+          this.draftReady=true;
         },
         error:()=>{
           if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
@@ -286,7 +289,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private saveDraft(): void {
     if(!this.session || !this.exam || this.communityId===null ||
        this.applicationId===null || this.draftLoading || this.draftSaving ||
-       this.draftConflict || !this.draftDirty || this.busy ||
+       !this.draftReady || this.draftConflict || !this.draftDirty || this.busy ||
        this.secondsLeft<=0)return;
     this.cancelDraftTimer();
     const generation=this.generation;
@@ -422,6 +425,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.draftRevision=0;
     this.draftSavedAt=null;
     this.draftLoading=false;
+    this.draftReady=false;
     this.draftSaving=false;
     this.draftDirty=false;
     this.draftConflict=false;
