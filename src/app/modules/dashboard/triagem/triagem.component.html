@@ -188,6 +188,13 @@
                 </button>
               </form>
             </ng-template>
+            <app-recruitment-own-ballot *ngIf="savedAssessment"
+              [communityId]="communityId"
+              [applicationId]="application.application.id"
+              [stageId]="stage.stageId"
+              [stageStatus]="stage.internalStatus"
+              [assessmentSubmitted]="true">
+            </app-recruitment-own-ballot>
           </section>
           <p class="mt-4 text-xs text-amber-700">
             Pareceres não modificam o andamento da seleção nem divulgam resultados.
