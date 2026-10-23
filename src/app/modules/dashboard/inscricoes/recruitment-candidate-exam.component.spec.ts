@@ -26,10 +26,16 @@ describe('RecruitmentCandidateExamComponent',()=>{
   beforeEach(()=>{
     service=jasmine.createSpyObj('RecruitmentExamService',
       ['currentExams','start','submit','ownScores','attemptPolicy',
-       'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent']);
+       'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent','draft','saveDraft']);
     service.currentExams.and.returnValue(of([exam]));
     service.ownScores.and.returnValue(throwError(()=>({status:404})));
     service.start.and.returnValue(of(session));
+    service.draft.and.returnValue(of({
+      attemptId:800,revision:0,savedAt:null,answers:{}
+    }));
+    service.saveDraft.and.returnValue(of({
+      attemptId:800,revision:1,savedAt:new Date().toISOString(),answers:{first:'b'}
+    }));
     service.integrityEvent.and.returnValue(of({
       eventId:'00000000-0000-4000-8000-000000000001',
       status:'STARTED',focusLosses:1,maxFocusLosses:3,blocked:false
@@ -60,6 +66,55 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(component.secondsLeft).toBeGreaterThanOrEqual(89);
     expect(component.secondsLeft).toBeLessThanOrEqual(91);
     expect(component.clock).toMatch(/^01:3[01]$/);
+  });
+
+  it('recovers a private draft when resuming an attempt',()=>{
+    service.draft.and.returnValue(of({
+      attemptId:800,revision:4,savedAt:new Date().toISOString(),answers:{first:'b'}
+    }));
+    component.start();
+    expect(service.draft).toHaveBeenCalledOnceWith(11,100,501,800);
+    expect(component.answers['first']).toBe('b');
+    expect(component.draftRevision).toBe(4);
+    expect(component.draftReady).toBeTrue();
+  });
+
+  it('sends one CAS draft and preserves the server revision',()=>{
+    component.start();
+    component.answers['first']='b';
+    component.answersChanged();
+    expect(component.draftDirty).toBeTrue();
+    component.retryDraft();
+    expect(service.saveDraft).toHaveBeenCalledOnceWith(11,100,501,800,0,{first:'b'});
+    expect(component.draftRevision).toBe(1);
+    expect(component.draftDirty).toBeFalse();
+  });
+
+  it('never overwrites a newer draft after revision conflict',()=>{
+    component.start();
+    component.answers['first']='b';
+    component.answersChanged();
+    service.saveDraft.and.returnValue(throwError(()=>({status:409})));
+    component.retryDraft();
+    expect(component.draftConflict).toBeTrue();
+    expect(component.canSubmit).toBeFalse();
+    expect(component.answers['first']).toBe('b');
+    component.retryDraft();
+    expect(service.saveDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not allow edits before a draft has been retrieved',()=>{
+    const pending=new Subject<{
+      attemptId:number;revision:number;savedAt:string|null;answers:Record<string,unknown>
+    }>();
+    service.draft.and.returnValue(pending);
+    component.start();
+    expect(component.draftReady).toBeFalse();
+    component.answersChanged();
+    expect(component.draftDirty).toBeFalse();
+    pending.next({attemptId:800,revision:1,savedAt:null,answers:{first:'a'}});
+    expect(component.answers['first']).toBe('a');
+    expect(component.draftReady).toBeTrue();
   });
 
   it('does not start exam without candidate click',()=>{
