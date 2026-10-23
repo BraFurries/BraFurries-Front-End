@@ -133,6 +133,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     return Array.isArray(current) && current.includes(optionId);
   }
 
+  get pendingSignalsCount(): number {return this.pendingSignals.length;}
+
   get clock(): string {
     const minutes=Math.floor(this.secondsLeft/60);
     const seconds=this.secondsLeft%60;
