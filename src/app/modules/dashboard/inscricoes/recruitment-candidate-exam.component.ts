@@ -20,6 +20,13 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   submitted: ExamSubmissionReceipt | null = null;
   scores: ExamNumericScore[] = [];
   answers: Record<string, unknown> = {};
+  draftRevision = 0;
+  draftSavedAt: string | null = null;
+  draftLoading = false;
+  draftSaving = false;
+  draftDirty = false;
+  draftConflict = false;
+  draftError = '';
   secondsLeft = 0;
   confirmed = false;
   blocked = false;
@@ -30,6 +37,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   private readonly destroyed$ = new Subject<void>();
   private timer: ReturnType<typeof setInterval> | null = null;
+  private draftTimer: ReturnType<typeof setTimeout> | null = null;
   private localDeadlineMs = 0;
   private away = false;
   private sendingSignal = false;
@@ -109,6 +117,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           this.submitted = null;
           this.confirmed = false;
           this.startClock();
+          this.loadDraft();
         },
         error: error => {
           if (generation !== this.generation) return;
@@ -125,7 +134,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.answers[question.id] = checked
       ? [...new Set([...selected,optionId])]
       : selected.filter(id => id !== optionId);
-    this.confirmed = false;
+    this.answersChanged();
   }
 
   isMultipleSelected(question: ExamQuestion, optionId: string): boolean {
@@ -143,6 +152,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   get canSubmit(): boolean {
     return !!this.session && !this.busy && !this.blocked &&
+      !this.draftLoading && !this.draftConflict &&
       !this.pendingSignals.length && this.secondsLeft > 0 &&
       this.confirmed && this.session.form.questions.every(q => {
         if (!q.required) return true;
@@ -159,7 +169,10 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     const generation = this.generation;
     const communityId=this.communityId, applicationId=this.applicationId,
       stageId=this.exam.stageId, attemptId=this.session.attemptId;
-    const snapshot={...this.answers};
+    // Final submission carries its own complete snapshot; an unfinished
+    // autosave cannot replace the final answers even if its request arrives late.
+    const snapshot=JSON.parse(JSON.stringify(this.answers)) as Record<string,unknown>;
+    this.cancelDraftTimer();
     this.busy=true;
     this.error='';
     this.api.submit(communityId,applicationId,stageId,attemptId,snapshot)
@@ -216,6 +229,101 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     // Merely discourages copy from this page. Browser APIs cannot prevent
     // screenshots, photos, developer tools or external AI usage.
     this.queueSignal('COPY_PREVENTED',source);
+  }
+
+  /** Invoked only for candidate answer edits, never for server draft restoration. */
+  answersChanged(): void {
+    if(!this.session || this.draftLoading || this.draftConflict ||
+      this.busy || this.secondsLeft<=0) return;
+    this.confirmed=false;
+    this.draftDirty=true;
+    this.draftError='';
+    this.scheduleDraft();
+  }
+
+  private scheduleDraft(): void {
+    this.cancelDraftTimer();
+    if(!this.session || !this.draftDirty || this.draftSaving ||
+       this.draftLoading || this.draftConflict || this.busy) return;
+    this.draftTimer=setTimeout(()=>this.saveDraft(),1200);
+  }
+
+  retryDraft(): void {
+    if(this.draftConflict) return;
+    if(this.draftLoading) return;
+    if(this.draftError && !this.draftDirty) this.loadDraft();
+    else if(this.draftDirty) this.saveDraft();
+  }
+
+  private loadDraft(): void {
+    if(!this.session || !this.exam ||
+       this.communityId===null || this.applicationId===null)return;
+    const generation=this.generation;
+    const attemptId=this.session.attemptId,stageId=this.exam.stageId;
+    const communityId=this.communityId,applicationId=this.applicationId;
+    this.draftLoading=true;
+    this.draftError='';
+    this.draftConflict=false;
+    this.api.draft(communityId,applicationId,stageId,attemptId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:result=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.answers={...result.answers};
+          this.draftRevision=result.revision;
+          this.draftSavedAt=result.savedAt;
+          this.draftDirty=false;
+          this.draftLoading=false;
+        },
+        error:()=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.draftLoading=false;
+          // Do not allow typing over an unknown existing server draft.
+          this.draftError='Não foi possível recuperar o rascunho. Tente novamente antes de responder.';
+        }
+      });
+  }
+
+  private saveDraft(): void {
+    if(!this.session || !this.exam || this.communityId===null ||
+       this.applicationId===null || this.draftLoading || this.draftSaving ||
+       this.draftConflict || !this.draftDirty || this.busy ||
+       this.secondsLeft<=0)return;
+    this.cancelDraftTimer();
+    const generation=this.generation;
+    const attemptId=this.session.attemptId,stageId=this.exam.stageId;
+    const communityId=this.communityId,applicationId=this.applicationId;
+    const revision=this.draftRevision;
+    const snapshot=JSON.parse(JSON.stringify(this.answers)) as Record<string,unknown>;
+    this.draftSaving=true;
+    this.draftDirty=false;
+    this.draftError='';
+    this.api.saveDraft(communityId,applicationId,stageId,attemptId,revision,snapshot)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:result=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.draftSaving=false;
+          this.draftRevision=result.revision;
+          this.draftSavedAt=result.savedAt;
+          if(this.draftDirty) this.scheduleDraft();
+        },
+        error:err=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.draftSaving=false;
+          this.draftDirty=true;
+          if(err.status===409 || err.status===403 || err.status===404) {
+            this.draftConflict=true;
+            this.draftError='O rascunho mudou em outra aba ou a prova encerrou. '+
+              'Copie suas respostas manualmente se necessário e recarregue a tentativa.';
+          } else {
+            this.draftError='Não foi possível salvar as respostas. Confira sua conexão e tente novamente.';
+          }
+        }
+      });
+  }
+
+  private cancelDraftTimer(): void {
+    if(this.draftTimer!==null) clearTimeout(this.draftTimer);
+    this.draftTimer=null;
   }
 
   private queueSignal(type:ExamIntegrityType,source:ExamIntegritySource): void {
@@ -310,6 +418,14 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   }
   private clearAttempt(): void {
     this.clearTimer();
+    this.cancelDraftTimer();
+    this.draftRevision=0;
+    this.draftSavedAt=null;
+    this.draftLoading=false;
+    this.draftSaving=false;
+    this.draftDirty=false;
+    this.draftConflict=false;
+    this.draftError='';
     this.session=null;
     this.localDeadlineMs=0;
     this.away=false;
