@@ -34,9 +34,29 @@
       </select>
     </label>
   </div>
-  <p class="mt-2 text-xs text-amber-800">
-    Controle de cópia e perda de foco ainda não estão disponíveis.
-    Não são prometidos como proteção contra cola.
+  <div class="mt-4 grid gap-4 sm:grid-cols-2">
+    <label class="block text-sm font-bold">
+      Bloquear a prova após quantas saídas da tela
+      <select [(ngModel)]="attempt.maxFocusLosses" [disabled]="!editable || busy"
+        class="mt-1 w-full rounded-lg border bg-white p-2">
+        <option [ngValue]="null">Desabilitado (padrão)</option>
+        <option *ngFor="let n of [1,2,3,4,5,6,7,8,9,10]" [ngValue]="n">
+          {{n}} {{n === 1 ? 'saída' : 'saídas'}}
+        </option>
+      </select>
+    </label>
+    <label class="flex items-start gap-3 self-end text-sm">
+      <input type="checkbox" [(ngModel)]="attempt.blockCopy"
+        [disabled]="!editable || busy">
+      <span><strong>Dificultar cópia da prova</strong>
+        (texto não selecionável, copiar, recortar e menu de contexto)</span>
+    </label>
+  </div>
+  <p class="mt-3 text-xs text-amber-800">
+    Os eventos de saída serão contabilizados somente enquanto a tentativa estiver ativa.
+    Ao atingir o limite, a tentativa é bloqueada e não poderá ser reiniciada nessa etapa.
+    Essas medidas são dissuasivas e podem produzir falsos positivos; não impedem fotos,
+    captura de tela, uso de outro dispositivo ou alterações no navegador.
   </p>
   <button type="button" (click)="saveAttempts()" [disabled]="!canSaveAttempt"
     class="mt-3 rounded-lg border border-braPurple px-4 py-2 font-bold text-braPurple disabled:opacity-40">
