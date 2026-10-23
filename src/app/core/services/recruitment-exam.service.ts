@@ -7,6 +7,7 @@ export interface CandidateExam {
   applicationId: number;
   stageId: number;
   publicName: string;
+  blocked: boolean;
 }
 export interface ExamQuestion {
   id: string;
