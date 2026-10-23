@@ -1,8 +1,8 @@
-import { Component, Input, OnChanges, OnDestroy } from '@angular/core';
+import { Component, HostListener, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import {
   CandidateExam, ExamNumericScore, ExamQuestion, ExamSession,
-  ExamSubmissionReceipt, RecruitmentExamService
+  ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource, RecruitmentExamService
 } from '../../../core/services/recruitment-exam.service';
 
 /** Candidate-only exam runner; timing and eligibility are authoritative on the API. */
@@ -22,6 +22,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   answers: Record<string, unknown> = {};
   secondsLeft = 0;
   confirmed = false;
+  blocked = false;
   loading = false;
   busy = false;
   error = '';
@@ -30,6 +31,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private readonly destroyed$ = new Subject<void>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private localDeadlineMs = 0;
+  private away = false;
+  private sendingSignal = false;
+  private pendingSignals: {id:string;type:ExamIntegrityType;source:ExamIntegritySource}[] = [];
   private identity = '';
   private generation = 0;
 
@@ -42,6 +46,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     ++this.generation;
     this.clearSensitive();
     this.exam = null;
+    this.blocked = false;
     this.error = '';
     this.notice = '';
     this.loading = false;
@@ -56,6 +61,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     const applicationId = this.applicationId;
     this.clearSensitive();
     this.exam = null;
+    this.blocked = false;
     this.loading = true;
     this.error = '';
     this.api.currentExams(communityId,applicationId)
@@ -63,6 +69,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
         next: exams => {
           if (generation !== this.generation) return;
           this.exam = exams.length ? exams[0] : null;
+          this.blocked = this.exam?.blocked === true;
           this.loading = false;
           if (this.exam) this.loadScores(generation,communityId,applicationId,this.exam.stageId);
         },
@@ -77,7 +84,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   start(): void {
     if (!this.exam || this.communityId === null || this.applicationId === null ||
-        this.loading || this.busy || this.session) return;
+        this.loading || this.busy || this.session || this.blocked) return;
     const generation = this.generation;
     const communityId = this.communityId;
     const applicationId = this.applicationId;
@@ -91,6 +98,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if (generation !== this.generation || stageId !== this.exam?.stageId) return;
           this.busy = false;
           this.session = session;
+          this.away = false;
+          this.pendingSignals = [];
+          this.sendingSignal = false;
           // Server's own clock is the baseline; client's wall-clock skew does not
           // affect the countdown. API still rejects late submissions.
           this.localDeadlineMs = Date.now() + Math.max(0,
@@ -130,7 +140,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   }
 
   get canSubmit(): boolean {
-    return !!this.session && !this.busy && this.secondsLeft > 0 &&
+    return !!this.session && !this.busy && !this.blocked &&
+      !this.pendingSignals.length && this.secondsLeft > 0 &&
       this.confirmed && this.session.form.questions.every(q => {
         if (!q.required) return true;
         const answer = this.answers[q.id];
@@ -166,6 +177,98 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           this.busy=false;
           this.confirmed=false;
           this.error=this.failure(error);
+        }
+      });
+  }
+
+  /**
+   * Advisory browser events can be suppressed by browser extensions or JS changes.
+   * Blur and hidden from one away cycle count as exactly one local event.
+   */
+  @HostListener('window:blur')
+  onWindowBlur(): void { this.noteFocusLoss('WINDOW_BLUR'); }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if(document.hidden) this.noteFocusLoss('TAB_HIDDEN');
+    else { this.away=false; this.sendPendingSignals(); }
+  }
+
+  @HostListener('window:focus')
+  onWindowFocus(): void {
+    if(!document.hidden) this.away=false;
+    this.sendPendingSignals();
+  }
+
+  noteFocusLoss(source:'TAB_HIDDEN'|'WINDOW_BLUR'): void {
+    if(!this.session || this.blocked || this.busy ||
+      this.secondsLeft<=0 || this.session.maxFocusLosses===null || this.away)return;
+    this.away=true;
+    this.queueSignal('FOCUS_LOST',source);
+  }
+
+  preventCopy(event:Event,source:'COPY'|'CUT'|'CONTEXT_MENU'): void {
+    if(!this.session?.blockCopy || this.secondsLeft<=0 || this.blocked)return;
+    event.preventDefault();
+    event.stopPropagation();
+    // Merely discourages copy from this page. Browser APIs cannot prevent
+    // screenshots, photos, developer tools or external AI usage.
+    this.queueSignal('COPY_PREVENTED',source);
+  }
+
+  private queueSignal(type:ExamIntegrityType,source:ExamIntegritySource): void {
+    if(!this.session || this.blocked || !globalThis.crypto?.randomUUID)return;
+    if(this.pendingSignals.length>=12) {
+      this.error='Não foi possível sincronizar os eventos da prova. Confira sua conexão.';
+      return;
+    }
+    this.pendingSignals.push({id:crypto.randomUUID(),type,source});
+    this.sendPendingSignals();
+  }
+
+  retryIntegrityEvents(): void { this.sendPendingSignals(); }
+
+  private sendPendingSignals(): void {
+    if(this.sendingSignal || this.pendingSignals.length===0 ||
+      !this.session || !this.exam ||
+      this.communityId===null || this.applicationId===null || this.blocked)return;
+    const generation=this.generation;
+    const communityId=this.communityId, applicationId=this.applicationId,
+      stageId=this.exam.stageId,attemptId=this.session.attemptId;
+    const event=this.pendingSignals[0];
+    this.sendingSignal=true;
+    this.api.integrityEvent(communityId,applicationId,stageId,
+      attemptId,event.id,event.type,event.source)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:response=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.sendingSignal=false;
+          this.pendingSignals.shift();
+          this.session.focusLosses=response.focusLosses;
+          if(response.blocked || response.status==='BLOCKED') {
+            this.blocked=true;
+            this.clearAttempt();
+            this.error='Sua prova foi bloqueada após atingir o limite de saídas da tela. '+
+              'A gestão poderá analisar o registro.';
+            return;
+          }
+          if(response.maxFocusLosses!==null && event.type==='FOCUS_LOST') {
+            this.notice=`Saídas registradas: ${response.focusLosses}/${response.maxFocusLosses}.`;
+          }
+          this.sendPendingSignals();
+        },
+        error:err=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.sendingSignal=false;
+          if(err.status===409 || err.status===404) {
+            this.blocked=true;
+            this.clearAttempt();
+            this.error='O estado da tentativa mudou ou ela foi encerrada. '+
+              'Atualize para verificar se a prova continua disponível.';
+          } else {
+            this.error='Não foi possível registrar um evento da prova. '+
+              'Confira sua conexão e tente reenviar o registro.';
+          }
         }
       });
   }
@@ -207,6 +310,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.clearTimer();
     this.session=null;
     this.localDeadlineMs=0;
+    this.away=false;
+    this.pendingSignals=[];
+    this.sendingSignal=false;
     this.answers={};
     this.confirmed=false;
     this.secondsLeft=0;
