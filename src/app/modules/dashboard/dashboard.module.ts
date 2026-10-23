@@ -30,6 +30,7 @@ import { RecruitmentDecisionDeskComponent } from './recrutamento/recruitment-dec
 import { RecruitmentOwnBallotComponent } from './triagem/recruitment-own-ballot.component';
 import { RecruitmentVoteTallyComponent } from './recrutamento/recruitment-vote-tally.component';
 import { RecruitmentCandidateExamComponent } from './inscricoes/recruitment-candidate-exam.component';
+import { RecruitmentExamPolicyComponent } from './recrutamento/recruitment-exam-policy.component';
 
 @NgModule({
   declarations: [
@@ -59,6 +60,7 @@ import { RecruitmentCandidateExamComponent } from './inscricoes/recruitment-cand
     RecruitmentOwnBallotComponent,
     RecruitmentVoteTallyComponent,
     RecruitmentCandidateExamComponent,
+    RecruitmentExamPolicyComponent,
     CommunitiesComponent
   ],
   imports: [
