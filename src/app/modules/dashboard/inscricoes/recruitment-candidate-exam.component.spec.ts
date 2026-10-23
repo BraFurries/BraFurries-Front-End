@@ -11,6 +11,7 @@ describe('RecruitmentCandidateExamComponent',()=>{
   const session:ExamSession={
     attemptId:800,applicationId:100,stageId:501,attemptNumber:1,
     status:'STARTED',expiresAt:new Date(Date.now()+120000).toISOString(),
+    serverNow:new Date().toISOString(),
     form:{questions:[
       {id:'first',label:'Qual opção?',type:'SINGLE_CHOICE',required:true,
        options:[{id:'a',label:'A'},{id:'b',label:'B'}],minValue:null,maxValue:null}
@@ -41,6 +42,18 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(service.currentExams).toHaveBeenCalledOnceWith(11,100);
     expect(component.exam).toEqual(exam);
     expect(component.session).toBeNull();
+  });
+
+  it('computes countdown from server time even when local time is skewed',()=>{
+    service.start.and.returnValue(of({
+      ...session,
+      serverNow:'2026-10-23T00:00:00Z',
+      expiresAt:'2026-10-23T00:01:30Z'
+    }));
+    component.start();
+    expect(component.secondsLeft).toBeGreaterThanOrEqual(89);
+    expect(component.secondsLeft).toBeLessThanOrEqual(91);
+    expect(component.clock).toMatch(/^01:3[01]$/);
   });
 
   it('does not start exam without candidate click',()=>{
