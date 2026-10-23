@@ -16,6 +16,48 @@
   <p *ngIf="error" role="alert" class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{{error}}</p>
   <p *ngIf="loading" role="status" class="mt-4 text-sm text-gray-600">Consultando candidaturas...</p>
 
+  <section class="mt-4 rounded-xl border p-4" aria-label="Incidentes das provas">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h3 class="font-bold">Incidentes das provas</h3>
+        <p class="text-xs text-gray-500">Últimos 50 avisos desta seleção, visíveis apenas à gestão autorizada.</p>
+      </div>
+      <button type="button" (click)="refreshExamNotices()" [disabled]="noticesLoading"
+        class="rounded-lg border px-3 py-1 text-xs">Atualizar incidentes</button>
+    </div>
+    <p *ngIf="noticesLoading" role="status" class="mt-2 text-sm">Carregando incidentes...</p>
+    <p *ngIf="noticesError" role="alert" class="mt-2 text-sm text-red-700">{{noticesError}}</p>
+    <p *ngIf="!examNotices.length && !noticesLoading && !noticesError"
+      class="mt-2 text-sm text-gray-500">Nenhum incidente registrado.</p>
+    <div *ngFor="let item of examNotices" class="mt-2 rounded-lg border p-3 text-sm"
+      [class.border-amber-400]="!item.read">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <strong>
+            {{item.eventType === 'BLOCKED' ? 'Bloqueio por perda de foco' : 'Reabertura administrativa'}}
+            <span *ngIf="!item.read" class="text-braPurple">· Novo</span>
+          </strong>
+          <p class="mt-1 text-xs text-gray-600">
+            Candidatura #{{item.applicationId}} · Etapa #{{item.stageId}}
+            · Tentativa #{{item.attemptId}}
+            · {{item.occurredAt | date:'dd/MM/yyyy HH:mm'}}
+          </p>
+          <p *ngIf="item.eventType === 'REINSTATED' && item.newExpiresAt" class="mt-1 text-xs">
+            Reaberta até {{item.newExpiresAt | date:'dd/MM/yyyy HH:mm'}}.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" (click)="openExamNotice(item)" [disabled]="deciding"
+            class="rounded border px-3 py-1 text-xs font-bold text-braPurple">
+            Ver candidatura
+          </button>
+          <button *ngIf="!item.read" type="button" (click)="readExamNotice(item)"
+            class="rounded border px-3 py-1 text-xs">Marcar como lido</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="mt-5 grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
     <aside class="min-w-0 space-y-2">
       <h3 class="font-bold">Candidaturas</h3>
