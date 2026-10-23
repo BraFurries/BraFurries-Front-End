@@ -121,6 +121,21 @@
               </div>
             </article>
 
+            <app-recruitment-vote-tally
+              *ngIf="assessment.stage.policy.decisionMode === 'AUTOMATIC_VOTE' &&
+                assessment.stage.internalStatus === 'AWAITING_REVIEW' &&
+                application.application.internalStatus === 'IN_PROGRESS'"
+              [communityId]="communityId"
+              [applicationId]="application.application.id"
+              [stageId]="assessment.stage.stageId"
+              [stageStatus]="assessment.stage.internalStatus"
+              [applicationStatus]="application.application.internalStatus"
+              [assessmentCount]="assessment.stage.assessmentCount"
+              [policy]="assessment.stage.policy"
+              [evidenceTruncated]="assessment.truncated"
+              (completed)="voteFinalized($event)">
+            </app-recruitment-vote-tally>
+
             <section *ngIf="canDecide" class="mt-5 border-t pt-4">
               <h5 class="font-bold">Registrar decisão administrativa</h5>
               <p class="mt-1 text-sm text-gray-600">
@@ -148,7 +163,8 @@
                 {{deciding ? 'Registrando...' : 'Confirmar decisão da etapa'}}
               </button>
             </section>
-            <p *ngIf="!canDecide" class="mt-4 text-sm text-amber-800">
+            <p *ngIf="!canDecide && assessment.stage.policy.decisionMode === 'MANUAL'"
+              class="mt-4 text-sm text-amber-800">
               A decisão não está disponível: confira status, pareceres mínimos,
               etapas anteriores ou política de aprovação.
             </p>
