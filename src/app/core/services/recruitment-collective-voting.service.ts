@@ -7,6 +7,12 @@ import { DecisionReceipt } from './recruitment-decision-desk.service';
 export type BallotChoice = 'APPROVE' | 'REJECT';
 export type VotingTiePolicy = 'REJECT_ON_TIE' | 'MANAGER_OVERRIDE';
 
+export interface RecruitmentVotingAvailability {
+  enabled: boolean;
+  hasAssessment: boolean;
+  alreadyVoted: boolean;
+}
+
 export interface OwnRecruitmentBallot {
   id: number;
   applicationId: number;
@@ -35,6 +41,12 @@ export interface RecruitmentVotingDecision {
 @Injectable({providedIn: 'root'})
 export class RecruitmentCollectiveVotingService {
   constructor(private readonly http: HttpClient) {}
+
+  availability(communityId: number, applicationId: number, stageId: number):
+    Observable<RecruitmentVotingAvailability> {
+    return this.http.get<RecruitmentVotingAvailability>(
+      `${this.base(communityId,applicationId,stageId)}/availability`);
+  }
 
   mine(communityId: number, applicationId: number, stageId: number):
     Observable<OwnRecruitmentBallot> {
