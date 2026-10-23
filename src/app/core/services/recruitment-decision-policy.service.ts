@@ -9,6 +9,8 @@ export interface RecruitmentDecisionPolicy {
   reviewMode: ReviewMode;
   decisionMode: DecisionMode;
   minimumAssessments: number;
+  minimumVotes?: number | null;
+  tiePolicy?: 'REJECT_ON_TIE' | 'MANAGER_OVERRIDE' | null;
 }
 export interface StagePolicyResult {
   stageId: number;
