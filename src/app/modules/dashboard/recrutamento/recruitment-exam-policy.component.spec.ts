@@ -40,6 +40,28 @@ describe('RecruitmentExamPolicyComponent',()=>{
     expect(component.expectedRevision).toBe(5);
   });
 
+  it('saves optional three-loss block and copy deterrence in draft policy',()=>{
+    component.attempt.maxFocusLosses=3;
+    component.attempt.blockCopy=true;
+    api.saveAttemptPolicy.and.returnValue(of({
+      stageId:501,versionId:80,draftRevision:5,policy:{...component.attempt}
+    }));
+    component.saveAttempts();
+    expect(api.saveAttemptPolicy).toHaveBeenCalledWith(11,70,501,4,
+      jasmine.objectContaining({maxFocusLosses:3,blockCopy:true}));
+  });
+
+  it('rejects unsupported focus-loss counts',()=>{
+    component.attempt.maxFocusLosses=11;
+    expect(component.canSaveAttempt).toBeFalse();
+    component.attempt.maxFocusLosses=0;
+    expect(component.canSaveAttempt).toBeFalse();
+    component.attempt.maxFocusLosses=null;
+    expect(component.canSaveAttempt).toBeTrue();
+    component.attempt.maxFocusLosses=3;
+    expect(component.canSaveAttempt).toBeTrue();
+  });
+
   it('can opt into AFTER_SUBMISSION without publishing final selection result',()=>{
     component.attemptConfigured=true;
     component.grade.scoreVisibility='AFTER_SUBMISSION';
