@@ -1,4 +1,5 @@
 import { of, Subject, throwError } from 'rxjs';
+import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
 import {
   RecruitmentDecisionDeskService, DecisionQueueItem, DecisionApplicationDetail,
   DecisionStageEvidence, DecisionReceipt
@@ -8,6 +9,11 @@ import { RecruitmentDecisionDeskComponent } from './recruitment-decision-desk.co
 describe('RecruitmentDecisionDeskComponent', () => {
   let service:jasmine.SpyObj<RecruitmentDecisionDeskService>;
   let component:RecruitmentDecisionDeskComponent;
+  let incidents:jasmine.SpyObj<RecruitmentExamNoticesService>;
+  const blockNotice:RecruitmentExamNotice={id:901,applicationId:100,stageId:501,
+    attemptId:800,eventType:'BLOCKED',occurredAt:'2026-10-23T14:00:00Z',
+    newExpiresAt:null,read:false};
+
 
   const applicant:DecisionQueueItem={
     id:100,processId:70,processVersionId:80,candidateUserId:99,
@@ -43,6 +49,12 @@ describe('RecruitmentDecisionDeskComponent', () => {
   };
 
   beforeEach(()=>{
+    incidents=jasmine.createSpyObj('RecruitmentExamNoticesService',
+      ['candidate','candidateRead','staff','staffRead']);
+    incidents.candidate.and.returnValue(of([]));
+    incidents.staff.and.returnValue(of([]));
+    incidents.candidateRead.and.returnValue(of(void 0));
+    incidents.staffRead.and.returnValue(of(void 0));
     service=jasmine.createSpyObj('RecruitmentDecisionDeskService',
       ['queue','detail','evidence','decide']);
     service.queue.and.returnValue(of([applicant]));
@@ -52,12 +64,34 @@ describe('RecruitmentDecisionDeskComponent', () => {
     service.evidence.and.callFake(() =>
       of(JSON.parse(JSON.stringify(evidence)) as DecisionStageEvidence));
     service.decide.and.returnValue(of(receipt));
-    component=new RecruitmentDecisionDeskComponent(service);
+    component=new RecruitmentDecisionDeskComponent(service,incidents);
     component.communityId=11;
     component.processId=70;
     component.ngOnChanges();
   });
   afterEach(()=>component.ngOnDestroy());
+
+  it('displays process-scoped incident and marks own read receipt',()=>{
+    incidents.staff.and.returnValue(of([blockNotice]));
+    component.refreshExamNotices();
+    expect(component.examNotices.length).toBe(1);
+    component.readExamNotice(blockNotice);
+    expect(incidents.staffRead).toHaveBeenCalledOnceWith(11,70,901);
+    expect(component.examNotices[0].read).toBeTrue();
+    component.openExamNotice(blockNotice);
+    expect(service.detail).toHaveBeenCalledWith(11,70,100);
+  });
+
+  it('does not retain stale notice data after switching Community',()=>{
+    const pending=new Subject<RecruitmentExamNotice[]>();
+    incidents.staff.and.returnValue(pending);
+    component.refreshExamNotices();
+    component.communityId=12;component.processId=71;component.ngOnChanges();
+    pending.next([blockNotice]);
+    expect(component.examNotices).toEqual([]);
+  });
+
+
 
   it('loads a scoped manager queue and detail, without prematurely fetching staff evidence',()=>{
     expect(service.queue).toHaveBeenCalledOnceWith(11,70,undefined);
