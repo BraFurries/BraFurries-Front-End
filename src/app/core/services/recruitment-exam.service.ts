@@ -31,6 +31,12 @@ export interface ExamSession {
   blockCopy: boolean;
   focusLosses: number;
 }
+export interface ExamDraft {
+  attemptId: number;
+  revision: number;
+  savedAt: string | null;
+  answers: Record<string, unknown>;
+}
 export interface ExamIntegrityReceipt {
   eventId: string;
   status: 'STARTED' | 'BLOCKED';
@@ -95,6 +101,18 @@ export class RecruitmentExamService {
     Observable<ExamSession> {
     return this.http.post<ExamSession>(
       `${this.attempts(communityId,applicationId,stageId)}/start`, {});
+  }
+  draft(communityId: number, applicationId: number, stageId: number,
+    attemptId: number): Observable<ExamDraft> {
+    return this.http.get<ExamDraft>(
+      `${this.attempts(communityId,applicationId,stageId)}/${attemptId}/draft`);
+  }
+  saveDraft(communityId: number, applicationId: number, stageId: number,
+    attemptId: number, expectedRevision: number,
+    answers: Record<string, unknown>): Observable<ExamDraft> {
+    return this.http.put<ExamDraft>(
+      `${this.attempts(communityId,applicationId,stageId)}/${attemptId}/draft`,
+      {expectedRevision,answers});
   }
   submit(communityId: number, applicationId: number, stageId: number,
          attemptId: number, answers: Record<string, unknown>): Observable<ExamSubmissionReceipt> {
