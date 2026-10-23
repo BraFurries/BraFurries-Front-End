@@ -86,6 +86,7 @@ describe('RecruitmentDecisionDeskComponent', () => {
     const pending=new Subject<RecruitmentExamNotice[]>();
     incidents.staff.and.returnValue(pending);
     component.refreshExamNotices();
+    incidents.staff.and.returnValue(of([]));
     component.communityId=12;component.processId=71;component.ngOnChanges();
     pending.next([blockNotice]);
     expect(component.examNotices).toEqual([]);
