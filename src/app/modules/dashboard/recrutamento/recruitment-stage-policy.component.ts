@@ -77,14 +77,34 @@ export class RecruitmentStagePolicyComponent implements OnChanges, OnDestroy {
       && this.policy.minimumAssessments >= (this.policy.reviewMode === 'COLLECTIVE' ? 2 : 1)
       && this.policy.minimumAssessments <= 20
       && (this.policy.reviewMode !== 'INDIVIDUAL' || this.policy.minimumAssessments === 1)
-      && (this.policy.decisionMode !== 'AUTOMATIC_VOTE'
-        || this.policy.reviewMode === 'COLLECTIVE');
+      && (this.policy.decisionMode !== 'AUTOMATIC_VOTE' ||
+        (this.policy.reviewMode === 'COLLECTIVE' &&
+        Number.isInteger(this.policy.minimumVotes) &&
+        (this.policy.minimumVotes ?? 0) >= 2 && (this.policy.minimumVotes ?? 0) <= 20 &&
+        (this.policy.tiePolicy === 'REJECT_ON_TIE' ||
+         this.policy.tiePolicy === 'MANAGER_OVERRIDE')))
+      && (this.policy.decisionMode === 'AUTOMATIC_VOTE' ||
+          (this.policy.minimumVotes == null && this.policy.tiePolicy == null));
   }
 
   changeMode(mode: ReviewMode): void {
     this.policy.reviewMode = mode;
     this.policy.minimumAssessments = mode === 'INDIVIDUAL' ? 1 : 2;
-    if (mode === 'INDIVIDUAL') this.policy.decisionMode = 'MANUAL';
+    if (mode === 'INDIVIDUAL') this.changeDecisionMode('MANUAL');
+    this.notice = '';
+  }
+
+  changeDecisionMode(mode: 'MANUAL' | 'AUTOMATIC_VOTE'): void {
+    this.policy.decisionMode = mode;
+    if (mode === 'MANUAL') {
+      this.policy.minimumVotes = null;
+      this.policy.tiePolicy = null;
+    } else {
+      this.policy.reviewMode = 'COLLECTIVE';
+      if (this.policy.minimumAssessments < 2) this.policy.minimumAssessments = 2;
+      if (!this.policy.minimumVotes) this.policy.minimumVotes = 2;
+      if (!this.policy.tiePolicy) this.policy.tiePolicy = 'MANAGER_OVERRIDE';
+    }
     this.notice = '';
   }
 
