@@ -24,6 +24,7 @@ export interface ExamSession {
   attemptNumber: number;
   status: 'STARTED';
   expiresAt: string;
+  serverNow: string;
   form: {questions: ExamQuestion[]};
 }
 export interface ExamNumericScore {
