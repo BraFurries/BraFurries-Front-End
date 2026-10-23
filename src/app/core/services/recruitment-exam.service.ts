@@ -26,7 +26,21 @@ export interface ExamSession {
   expiresAt: string;
   serverNow: string;
   form: {questions: ExamQuestion[]};
+  maxFocusLosses: number | null;
+  blockCopy: boolean;
+  focusLosses: number;
 }
+export interface ExamIntegrityReceipt {
+  eventId: string;
+  status: 'STARTED' | 'BLOCKED';
+  focusLosses: number;
+  maxFocusLosses: number | null;
+  blocked: boolean;
+}
+export type ExamIntegrityType = 'FOCUS_LOST' | 'COPY_PREVENTED';
+export type ExamIntegritySource =
+  'TAB_HIDDEN' | 'WINDOW_BLUR' | 'COPY' | 'CUT' | 'CONTEXT_MENU';
+
 export interface ExamNumericScore {
   attemptId: number;
   earnedPoints: number;
@@ -86,6 +100,13 @@ export class RecruitmentExamService {
     return this.http.post<ExamSubmissionReceipt>(
       `${this.attempts(communityId,applicationId,stageId)}/${attemptId}/submit`,
       {answers});
+  }
+  integrityEvent(communityId: number, applicationId: number, stageId: number,
+    attemptId: number, eventId: string, eventType: ExamIntegrityType,
+    source: ExamIntegritySource): Observable<ExamIntegrityReceipt> {
+    return this.http.post<ExamIntegrityReceipt>(
+      `${this.attempts(communityId,applicationId,stageId)}/${attemptId}/integrity-events`,
+      {eventId,eventType,source});
   }
   ownScores(communityId: number, applicationId: number, stageId: number):
     Observable<ExamNumericScore[]> {
