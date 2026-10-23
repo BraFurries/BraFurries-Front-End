@@ -1,5 +1,6 @@
 import { Component, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
+import { RecruitmentVotingDecision } from '../../../core/services/recruitment-collective-voting.service';
 import {
   RecruitmentDecisionDeskService, DecisionQueueItem, DecisionApplicationDetail,
   DecisionStageEvidence, DecisionStageSummary
@@ -212,6 +213,17 @@ export class RecruitmentDecisionDeskComponent implements OnChanges,OnDestroy {
             : this.failure(err);
         }
       });
+  }
+
+  voteFinalized(result: RecruitmentVotingDecision): void {
+    // Refresh all private data after the stage transition; do not keep a stale tally.
+    this.detailGeneration++;
+    this.evidenceGeneration++;
+    this.clearDetail();
+    this.notice = result.receipt.applicationStatus === 'AWAITING_PUBLICATION'
+      ? 'Votação consolidada. Resultado privado até publicação manual.'
+      : 'Votação consolidada. Próxima etapa atualizada quando aplicável.';
+    this.loadQueue();
   }
 
   get candidateAnswerEntries(): {question:string;value:string}[] {
