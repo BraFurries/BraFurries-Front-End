@@ -48,6 +48,34 @@ describe('RecruitmentStagePolicyComponent', () => {
       {reviewMode:'COLLECTIVE',decisionMode:'MANUAL',minimumAssessments:3});
     expect(saved).toHaveBeenCalledOnceWith(5);
   });
+  it('requires explicit quorum and tie policy for an automatic vote', () => {
+    component.changeDecisionMode('AUTOMATIC_VOTE');
+    expect(component.policy.reviewMode).toBe('COLLECTIVE');
+    expect(component.policy.minimumVotes).toBe(2);
+    expect(component.policy.tiePolicy).toBe('MANAGER_OVERRIDE');
+    expect(component.canSave).toBeTrue();
+    component.policy.minimumVotes=1;
+    expect(component.canSave).toBeFalse();
+    component.policy.minimumVotes=3;
+    component.policy.tiePolicy=null;
+    expect(component.canSave).toBeFalse();
+    component.policy.tiePolicy='REJECT_ON_TIE';
+    component.policy.minimumAssessments=2;
+    expect(component.canSave).toBeTrue();
+    component.savePolicy();
+    expect(api.save).toHaveBeenCalledWith(11,70,501,4, {
+      reviewMode:'COLLECTIVE',decisionMode:'AUTOMATIC_VOTE',
+      minimumAssessments:2,minimumVotes:3,tiePolicy:'REJECT_ON_TIE'
+    });
+  });
+  it('does not carry quorum and tie fields into manual policies', () => {
+    component.changeDecisionMode('AUTOMATIC_VOTE');
+    component.changeDecisionMode('MANUAL');
+    expect(component.policy.minimumVotes).toBeNull();
+    expect(component.policy.tiePolicy).toBeNull();
+    expect(component.canSave).toBeTrue();
+  });
+
   it('never sends mutations for automatic objective stages or published versions', () => {
     component.stageType='AUTO_EVALUATION';
     component.savePolicy();
