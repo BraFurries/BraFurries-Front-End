@@ -54,6 +54,7 @@ jobs:
           --include=**/inscricoes.component.spec.ts
           --include=**/recruitment-candidate-exam.component.spec.ts
           --include=**/recruitment-exam-policy.component.spec.ts
+          --include=**/recruitment-exam-review.component.spec.ts
           --include=**/triagem.component.spec.ts
           --include=**/community-context-layout.component.spec.ts
           --include=**/community-access.component.spec.ts
