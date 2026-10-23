@@ -7,11 +7,13 @@ import { RecruitmentCandidateExamComponent } from './recruitment-candidate-exam.
 describe('RecruitmentCandidateExamComponent',()=>{
   let service:jasmine.SpyObj<RecruitmentExamService>;
   let component:RecruitmentCandidateExamComponent;
-  const exam:CandidateExam={applicationId:100,stageId:501,publicName:'Prova objetiva'};
+  const exam:CandidateExam={applicationId:100,stageId:501,publicName:'Prova objetiva',
+    blocked:false};
   const session:ExamSession={
     attemptId:800,applicationId:100,stageId:501,attemptNumber:1,
     status:'STARTED',expiresAt:new Date(Date.now()+120000).toISOString(),
     serverNow:new Date().toISOString(),
+    maxFocusLosses:null,blockCopy:false,focusLosses:0,
     form:{questions:[
       {id:'first',label:'Qual opção?',type:'SINGLE_CHOICE',required:true,
        options:[{id:'a',label:'A'},{id:'b',label:'B'}],minValue:null,maxValue:null}
@@ -24,10 +26,14 @@ describe('RecruitmentCandidateExamComponent',()=>{
   beforeEach(()=>{
     service=jasmine.createSpyObj('RecruitmentExamService',
       ['currentExams','start','submit','ownScores','attemptPolicy',
-       'saveAttemptPolicy','gradePolicy','saveGradePolicy']);
+       'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent']);
     service.currentExams.and.returnValue(of([exam]));
     service.ownScores.and.returnValue(throwError(()=>({status:404})));
     service.start.and.returnValue(of(session));
+    service.integrityEvent.and.returnValue(of({
+      eventId:'00000000-0000-4000-8000-000000000001',
+      status:'STARTED',focusLosses:1,maxFocusLosses:3,blocked:false
+    }));
     service.submit.and.returnValue(of({
       attemptId:800,applicationId:100,stageId:501,status:'SUBMITTED',
       submittedAt:new Date().toISOString(),score
@@ -111,6 +117,66 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(component.canSubmit).toBeFalse();
     component.submit();
     expect(service.submit).not.toHaveBeenCalled();
+  });
+
+  it('registers only one event per blur plus hide cycle',()=>{
+    service.start.and.returnValue(of({...session,maxFocusLosses:3}));
+    component.start();
+    component.noteFocusLoss('WINDOW_BLUR');
+    component.noteFocusLoss('TAB_HIDDEN');
+    expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+    expect(service.integrityEvent.calls.mostRecent().args.slice(0,4))
+      .toEqual([11,100,501,800]);
+    expect(component.session?.focusLosses).toBe(1);
+    expect(component.notice).toContain('1/3');
+  });
+
+  it('blocks the exam and clears answers after threshold response',()=>{
+    service.start.and.returnValue(of({...session,maxFocusLosses:3,focusLosses:2}));
+    service.integrityEvent.and.returnValue(of({
+      eventId:'00000000-0000-4000-8000-000000000001',
+      status:'BLOCKED',focusLosses:3,maxFocusLosses:3,blocked:true
+    }));
+    component.start();
+    component.answers['first']='a';
+    component.noteFocusLoss('TAB_HIDDEN');
+    expect(component.blocked).toBeTrue();
+    expect(component.session).toBeNull();
+    expect(component.answers).toEqual({});
+    expect(component.canSubmit).toBeFalse();
+    expect(component.error).toContain('bloqueada');
+  });
+
+  it('stops copy only when policy is enabled',()=>{
+    component.start();
+    const unrestricted=new Event('copy',{cancelable:true});
+    component.preventCopy(unrestricted,'COPY');
+    expect(unrestricted.defaultPrevented).toBeFalse();
+    expect(service.integrityEvent).not.toHaveBeenCalled();
+   });
+
+  it('can log prevented copies without incrementing focus counter',()=>{
+    service.start.and.returnValue(of({...session,blockCopy:true,maxFocusLosses:3}));
+    service.integrityEvent.and.returnValue(of({
+      eventId:'00000000-0000-4000-8000-000000000001',
+      status:'STARTED',focusLosses:0,maxFocusLosses:3,blocked:false
+    }));
+    component.start();
+    const copy=new Event('copy',{cancelable:true});
+    component.preventCopy(copy,'COPY');
+    expect(copy.defaultPrevented).toBeTrue();
+    expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+    expect(service.integrityEvent.calls.mostRecent().args.slice(-2))
+      .toEqual(['COPY_PREVENTED','COPY']);
+    expect(component.session?.focusLosses).toBe(0);
+  });
+
+  it('does not allow a blocked exam to start after page refresh',()=>{
+    service.currentExams.and.returnValue(of([{...exam,blocked:true}]));
+    component.refresh();
+    expect(component.blocked).toBeTrue();
+    component.start();
+    expect(service.start).not.toHaveBeenCalled();
   });
 
   it('preserves answers when submission returns a conflict but never pretends success',()=>{
