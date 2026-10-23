@@ -1,0 +1,76 @@
+<section class="mt-5 rounded-xl border border-braPurple/40 bg-gray-50 p-4">
+  <h5 class="font-bold">Consolidação da votação coletiva</h5>
+  <p class="mt-1 text-sm text-gray-600">
+    Somente gestores podem consultar os totais. A consolidação registra uma decisão
+    definitiva, mas não publica o resultado ao candidato.
+  </p>
+  <p *ngIf="loading" role="status" class="mt-3 text-sm text-gray-500">Consultando votos...</p>
+  <p *ngIf="error" role="alert" class="mt-3 text-sm text-red-700">{{error}}</p>
+  <button type="button" (click)="refresh()" [disabled]="loading || busy"
+    class="mt-3 rounded-lg border px-3 py-2 text-xs disabled:opacity-40">
+    Atualizar placar
+  </button>
+
+  <ng-container *ngIf="tally as count">
+    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-lg border bg-white p-3">
+        <strong class="block text-lg">{{count.approves}}</strong>
+        <span class="text-xs">Votos para aprovar</span>
+      </div>
+      <div class="rounded-lg border bg-white p-3">
+        <strong class="block text-lg">{{count.rejects}}</strong>
+        <span class="text-xs">Votos para reprovar</span>
+      </div>
+      <div class="rounded-lg border bg-white p-3">
+        <strong class="block text-lg">{{count.approves + count.rejects}} / {{count.quorum}}</strong>
+        <span class="text-xs">Votos / quórum mínimo</span>
+      </div>
+    </div>
+    <p *ngIf="!count.quorumReached" class="mt-3 text-sm text-amber-800">
+      O quórum ainda não foi atingido. Nenhuma decisão pode ser consolidada.
+    </p>
+    <p *ngIf="count.quorumReached && !count.tie" class="mt-3 text-sm">
+      Maioria apurada: <strong>{{count.approves > count.rejects ? 'Aprovação' : 'Reprovação'}}</strong>.
+    </p>
+    <p *ngIf="count.quorumReached && count.tie && count.tiePolicy === 'REJECT_ON_TIE'"
+      class="mt-3 text-sm text-amber-800">
+      Empate: a política publicada determina reprovação, mediante confirmação do gestor.
+    </p>
+    <p *ngIf="count.quorumReached && count.tie && count.tiePolicy === 'MANAGER_OVERRIDE'"
+      class="mt-3 text-sm text-amber-800">
+      Empate: um gestor deverá indicar a decisão e justificar o desempate.
+    </p>
+    <div *ngIf="requiresOverride && count.quorumReached" class="mt-4 space-y-3">
+      <label class="block text-sm font-bold">
+        Decisão de desempate
+        <select [(ngModel)]="overrideOutcome" [disabled]="busy"
+          class="mt-1 w-full rounded-lg border bg-white p-2">
+          <option value="REJECT">Reprovar</option>
+          <option value="APPROVE">Aprovar</option>
+        </select>
+      </label>
+      <label class="block text-sm font-bold">
+        Justificativa do desempate (10 a 1800 caracteres)
+        <textarea [(ngModel)]="overrideReason" [disabled]="busy" maxlength="1800" rows="3"
+          class="mt-1 w-full rounded-lg border bg-white p-2"></textarea>
+      </label>
+    </div>
+    <p *ngIf="evidenceTruncated" class="mt-3 text-sm text-red-800">
+      A consulta de pareceres está incompleta. Não é possível consolidar por este painel.
+    </p>
+    <div *ngIf="canFinalize" class="mt-4 border-t pt-4">
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" [(ngModel)]="confirmed" [disabled]="busy">
+        <span>Revisei os pareceres e o placar. Confirmo que esta consolidação é definitiva e não publica o resultado.</span>
+      </label>
+      <button type="button" (click)="finalize()" [disabled]="!canSubmit"
+        class="mt-3 rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-40">
+        {{busy ? 'Consolidando...' : 'Confirmar consolidação dos votos'}}
+      </button>
+    </div>
+    <p *ngIf="!canFinalize && count.quorumReached" class="mt-3 text-sm text-amber-800">
+      A consolidação não está liberada. Confira pareceres mínimos, etapa atual,
+      política publicada e justificativa do desempate.
+    </p>
+  </ng-container>
+</section>
