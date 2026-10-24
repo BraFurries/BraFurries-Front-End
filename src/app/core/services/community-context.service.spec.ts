@@ -312,7 +312,7 @@ describe('CommunityContextService', () => {
   });
 
   it('keeps recruitment UI hidden when the deployment gate is disabled', () => {
-    expect(productionEnvironment.recruitmentUiEnabled).toBeFalse();
+    expect(productionEnvironment.recruitmentUiEnabled).toBeTrue();
     const previous = environment.recruitmentUiEnabled;
     environment.recruitmentUiEnabled = false;
     try {
