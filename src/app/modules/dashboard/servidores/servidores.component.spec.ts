@@ -198,6 +198,31 @@ describe('ServidoresComponent', () => {
     expect(component.portaria?.questions[0].label).toBe('Como conheceu?');
   });
 
+  it('retries a Discord server icon through the media host before rendering initials', () => {
+    const cdn = 'https://cdn.discordapp.com/icons/1480343896461545606/hash.png?size=1024';
+    const media = 'https://media.discordapp.net/icons/1480343896461545606/hash.png?size=1024';
+    contextState$.next({
+      ...contextState$.value,
+      managedDiscordServers: [{ ...servers[0], iconUrl: cdn }, servers[1]]
+    });
+    create();
+
+    let image = fixture.nativeElement.querySelector('img[alt="Ícone de Comunidade Aurora"]') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe(cdn);
+
+    image.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    image = fixture.nativeElement.querySelector('img[alt="Ícone de Comunidade Aurora"]') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe(media);
+
+    image.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('img[alt="Ícone de Comunidade Aurora"]')).toBeNull();
+    expect(component.serverIconUrl(component.selectedServer!)).toBeNull();
+  });
+
   it('loads Bump alongside configuration and ignores a stale guild response', () => {
     const delayed = new Subject<BumpConfigResponse>();
     service.getBump.and.returnValue(delayed);
