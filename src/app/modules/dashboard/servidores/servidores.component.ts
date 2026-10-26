@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { concatMap, forkJoin, Observable, of, Subscription } from 'rxjs';
 import { AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
+import { guildIconSource } from '../../../core/utils/discord-guild-icon';
 
 type ServerSection = 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -518,8 +519,8 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   }
   retrySave(): void { if (!this.mutationInFlight) this.lastSave?.(); }
   serverInitials(server: ManagedServer): string { return server.name.split(' ').slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase(); }
-  hasServerIcon(server: ManagedServer): boolean { return !!server.iconUrl && !this.failedServerIcons.has(server.guildId); }
-  markServerIconFailed(server: ManagedServer): void { this.failedServerIcons.add(server.guildId); }
+  serverIconUrl(server: ManagedServer): string | null { return guildIconSource(server.iconUrl, this.failedServerIcons); }
+  markServerIconFailed(imageUrl: string): void { this.failedServerIcons.add(imageUrl); }
   formatMemberCount(memberCount?: number): string { return memberCount == null ? '—' : new Intl.NumberFormat('pt-BR').format(memberCount); }
   get textChannels(): GuildChannel[] { return (this.resources?.channels ?? []).filter(channel => channel.type === 'text' || channel.type === 'news'); }
   get portariaPublicationHasUnsavedChanges(): boolean { return this.portariaDirty || this.portariaRolesDirty; }
