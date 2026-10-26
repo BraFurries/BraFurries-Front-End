@@ -56,7 +56,7 @@
                         <img *ngIf="communityImageUrl(community) as imageUrl; else activeCommunityFallback"
                             [src]="imageUrl"
                             [alt]="'Foto de ' + community.name"
-                            (error)="markCommunityImageFailed(community)"
+                            (error)="markCommunityImageFailed(imageUrl)"
                             class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-black/5">
                         <ng-template #activeCommunityFallback>
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-braPurple/10 font-amaranth text-sm font-bold text-braPurple">
@@ -95,7 +95,7 @@
                         <img *ngIf="communityImageUrl(community) as imageUrl; else communityFallback"
                             [src]="imageUrl"
                             [alt]="'Foto de ' + community.name"
-                            (error)="markCommunityImageFailed(community)"
+                            (error)="markCommunityImageFailed(imageUrl)"
                             class="h-7 w-7 shrink-0 rounded-md object-cover ring-1"
                             [ngClass]="community.communityId === activeCommunity?.communityId
                                 ? 'ring-braPurple/30'
