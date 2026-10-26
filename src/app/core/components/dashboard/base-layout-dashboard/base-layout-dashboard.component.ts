@@ -11,6 +11,7 @@ import { CommunitySummary } from '../../../services/community-access.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
+import { guildIconSource } from '../../../utils/discord-guild-icon';
 
 @Component({
   selector: 'app-base-layout-dashboard',
@@ -95,14 +96,11 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   }
 
   communityImageUrl(community: CommunitySummary | null): string | null {
-    const imageUrl = this.communityContext.communityImageUrl(community);
-    if (!imageUrl || this.failedCommunityImageUrls.has(imageUrl)) return null;
-    return imageUrl;
+    return guildIconSource(this.communityContext.communityImageUrl(community), this.failedCommunityImageUrls);
   }
 
-  markCommunityImageFailed(community: CommunitySummary): void {
-    const imageUrl = this.communityContext.communityImageUrl(community);
-    if (imageUrl) this.failedCommunityImageUrls.add(imageUrl);
+  markCommunityImageFailed(imageUrl: string): void {
+    this.failedCommunityImageUrls.add(imageUrl);
   }
 
   scopedLink(feature: CommunityScopedFeature): any[] {

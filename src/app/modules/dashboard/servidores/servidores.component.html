@@ -31,8 +31,8 @@
       </header>
       <section class="server-hero">
         <div class="server-avatar overflow-hidden">
-          @if (hasServerIcon($any(selectedServer))) {
-            <img [src]="selectedServer.iconUrl" [alt]="'Ícone de ' + selectedServer.name" class="h-full w-full object-cover" (error)="markServerIconFailed($any(selectedServer))" />
+          @if (serverIconUrl($any(selectedServer)); as imageUrl) {
+            <img [src]="imageUrl" [alt]="'Ícone de ' + selectedServer.name" class="h-full w-full object-cover" (error)="markServerIconFailed(imageUrl)" />
           } @else {
             {{ serverInitials($any(selectedServer)) }}
           }

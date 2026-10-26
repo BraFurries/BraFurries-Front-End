@@ -137,6 +137,28 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(fixture.nativeElement.querySelector('img[alt="Foto de BraFurries"]')).toBeFalsy();
   });
 
+  it('retries a failed Discord guild icon from the media host before showing initials', () => {
+    const cdn = 'https://cdn.discordapp.com/icons/123/icon.png?size=1024';
+    const media = 'https://media.discordapp.net/icons/123/icon.png?size=1024';
+    context.communityImageUrl.and.returnValue(cdn);
+    fixture.detectChanges();
+
+    let image = fixture.nativeElement.querySelector('img[alt="Foto de BraFurries"]') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe(cdn);
+
+    image.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    image = fixture.nativeElement.querySelector('img[alt="Foto de BraFurries"]') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe(media);
+
+    image.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('img[alt="Foto de BraFurries"]')).toBeNull();
+    expect(component.communityImageUrl(community)).toBeNull();
+  });
+
   it('updates the sidebar name reactively without reload', () => {
     user$.next({ ...user, name: 'Luna Nova' });
     fixture.detectChanges();

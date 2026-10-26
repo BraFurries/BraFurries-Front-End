@@ -73,6 +73,7 @@ jobs:
           --include=**/backup-management-panel.component.spec.ts
           --include=**/theme-management-panel.component.spec.ts
           --include=**/base-layout-dashboard.component.spec.ts
+          --include=**/discord-guild-icon.spec.ts
           --include=**/stale-chunk-recovery.service.spec.ts
 
       - name: Build
