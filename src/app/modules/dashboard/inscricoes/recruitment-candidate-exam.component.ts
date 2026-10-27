@@ -45,6 +45,10 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
   private localDeadlineMs = 0;
   private away = false;
+  private focusAwaySince = 0;
+  private focusSource: 'TAB_HIDDEN' | 'WINDOW_BLUR' | null = null;
+  private focusGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly focusGraceMs = 5000;
   private sendingSignal = false;
   private pendingSignals: {id:string;type:ExamIntegrityType;source:ExamIntegritySource}[] = [];
   private identity = '';
@@ -115,7 +119,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if (generation !== this.generation || stageId !== this.exam?.stageId) return;
           this.busy = false;
           this.session = session;
-          this.away = false;
+          this.resetFocusGrace();
           this.pendingSignals = [];
           this.sendingSignal = false;
           // Server's own clock is the baseline; client's wall-clock skew does not
@@ -215,20 +219,50 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   @HostListener('document:visibilitychange')
   onVisibilityChange(): void {
     if(document.hidden) this.noteFocusLoss('TAB_HIDDEN');
-    else { this.away=false; this.sendPendingSignals(); }
+    else if(document.hasFocus()) this.resumeFromFocusLoss();
   }
 
   @HostListener('window:focus')
   onWindowFocus(): void {
-    if(!document.hidden) this.away=false;
-    this.sendPendingSignals();
+    if(!document.hidden) this.resumeFromFocusLoss();
   }
 
   noteFocusLoss(source:'TAB_HIDDEN'|'WINDOW_BLUR'): void {
     if(!this.session || this.blocked || this.busy ||
       this.secondsLeft<=0 || this.session.maxFocusLosses===null || this.away)return;
     this.away=true;
+    this.focusAwaySince=Date.now();
+    this.focusSource=source;
+    this.focusGraceTimer=setTimeout(()=>{
+      this.focusGraceTimer=null;
+      this.recordSustainedFocusLoss();
+    },this.focusGraceMs);
+  }
+
+  private recordSustainedFocusLoss(): void {
+    if(!this.away || !this.focusSource || !this.session ||
+      this.blocked || this.secondsLeft<=0) return;
+    const source=this.focusSource;
+    this.focusSource=null; // one event per blur + hide cycle
     this.queueSignal('FOCUS_LOST',source);
+  }
+
+  private resumeFromFocusLoss(): void {
+    if(this.away && this.focusSource &&
+      Date.now()-this.focusAwaySince>=this.focusGraceMs) {
+      // Background timers may be throttled; still count long absences on return.
+      this.recordSustainedFocusLoss();
+    }
+    this.resetFocusGrace();
+    this.sendPendingSignals();
+  }
+
+  private resetFocusGrace(): void {
+    if(this.focusGraceTimer!==null) clearTimeout(this.focusGraceTimer);
+    this.focusGraceTimer=null;
+    this.away=false;
+    this.focusSource=null;
+    this.focusAwaySince=0;
   }
 
   preventCopy(event:Event,source:'COPY'|'CUT'|'CONTEXT_MENU'): void {
@@ -481,7 +515,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.draftError='';
     this.session=null;
     this.localDeadlineMs=0;
-    this.away=false;
+    this.resetFocusGrace();
     this.pendingSignals=[];
     this.sendingSignal=false;
     this.answers={};
