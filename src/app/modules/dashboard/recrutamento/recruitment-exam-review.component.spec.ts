@@ -19,8 +19,9 @@ describe('RecruitmentExamReviewComponent',()=>{
   };
   const reason='Janela de acessibilidade do sistema retirou o foco sem intenção de cola';
   beforeEach(()=>{
-    api=jasmine.createSpyObj('RecruitmentExamReviewService',['panel','reinstate']);
+    api=jasmine.createSpyObj('RecruitmentExamReviewService',['panel','reinstate','denyAppeal']);
     api.panel.and.returnValue(of(review));
+    api.denyAppeal.and.returnValue(of({attemptId:800,status:'DENIED'}));
     api.reinstate.and.returnValue(of({
       applicationId:100,stageId:501,attemptId:800,restored:true,
       previousFocusLosses:3,expiresAt:'2026-10-23T17:00:00Z'
@@ -54,6 +55,30 @@ describe('RecruitmentExamReviewComponent',()=>{
     expect(component.selectedAttempt).toBeNull();
     expect(component.notice).toContain('reaberta até');
   });
+  it('handles Staff review after automatic block and records denial',()=>{
+    api.panel.and.returnValue(of({...review,incidents:[{
+      ...review.incidents[0],
+      appeal:{
+        attemptId:800,applicationId:100,stageId:501,candidateUserId:99,
+        reason:'Sistema operacional interrompeu a janela de prova',status:'PENDING',
+        requestedAt:'2026-10-27T12:00:00Z',
+        reviewedByUserId:null,reviewReason:null,reviewedAt:null
+      }
+    }]}));
+    component.applicationStatus='AWAITING_PUBLICATION';
+    component.stageStatus='BLOCKED';
+    component.ngOnChanges();
+    expect(component.available).toBeTrue();
+    component.toggle();
+    component.select(component.panel!.incidents[0]);
+    component.reason=reason;
+    component.confirmed=true;
+    expect(component.canDenyAppeal).toBeTrue();
+    component.denyAppeal();
+    expect(api.denyAppeal).toHaveBeenCalledWith(11,100,501,800,reason);
+    expect(component.notice).toContain('negado');
+  });
+
   it('does not allow reactivation when stage is already completed',()=>{
     component.stageStatus='COMPLETED';
     component.ngOnChanges();
