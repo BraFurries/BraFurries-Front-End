@@ -37,9 +37,10 @@ describe('RecruitmentCandidateExamComponent',()=>{
     incidents.candidateRead.and.returnValue(of(void 0));
     incidents.staffRead.and.returnValue(of(void 0));
     service=jasmine.createSpyObj('RecruitmentExamService',
-      ['currentExams','start','submit','ownScores','attemptPolicy',
+      ['currentExams','start','submit','ownScores','releasedScores','attemptPolicy',
        'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent','draft','saveDraft']);
     service.currentExams.and.returnValue(of([exam]));
+    service.releasedScores.and.returnValue(of([]));
     service.ownScores.and.returnValue(throwError(()=>({status:404})));
     service.start.and.returnValue(of(session));
     service.draft.and.returnValue(of({
@@ -97,6 +98,18 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(service.currentExams).toHaveBeenCalledOnceWith(11,100);
     expect(component.exam).toEqual(exam);
     expect(component.session).toBeNull();
+  });
+
+  it('shows scheduled grades after the exam is complete, without reopening it',()=>{
+    service.currentExams.and.returnValue(of([]));
+    service.releasedScores.and.returnValue(of([{
+      stageId:501,publicName:'Prova objetiva',scores:[score]
+    }]));
+    component.refresh();
+    expect(component.exam).toBeNull();
+    expect(component.releasedScores.length).toBe(1);
+    expect(component.releasedScores[0].scores[0].percentage).toBe(80);
+    expect(service.start).not.toHaveBeenCalled();
   });
 
   it('computes countdown from server time even when local time is skewed',()=>{
