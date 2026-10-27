@@ -4,11 +4,13 @@ import {
   CandidateExam, ExamNumericScore, ExamSession, RecruitmentExamService
 } from '../../../core/services/recruitment-exam.service';
 import { RecruitmentCandidateExamComponent } from './recruitment-candidate-exam.component';
+import { RecruitmentExamReviewService } from '../../../core/services/recruitment-exam-review.service';
 
 describe('RecruitmentCandidateExamComponent',()=>{
   let service:jasmine.SpyObj<RecruitmentExamService>;
   let component:RecruitmentCandidateExamComponent;
   let incidents:jasmine.SpyObj<RecruitmentExamNoticesService>;
+  let appeals:jasmine.SpyObj<RecruitmentExamReviewService>;
   const blockNotice={id:901,applicationId:100,stageId:501,attemptId:800,
     eventType:'BLOCKED' as const,occurredAt:'2026-10-23T14:00:00Z',
     newExpiresAt:null,read:false};
@@ -30,6 +32,15 @@ describe('RecruitmentCandidateExamComponent',()=>{
   };
 
   beforeEach(()=>{
+    appeals=jasmine.createSpyObj('RecruitmentExamReviewService',
+      ['candidateAppeal','candidateAppealStatus']);
+    appeals.candidateAppealStatus.and.returnValue(throwError(()=>({status:404})));
+    appeals.candidateAppeal.and.returnValue(of({
+      attemptId:800,applicationId:100,stageId:501,candidateUserId:99,
+      reason:'Uma notificação de sistema interrompeu a prova',
+      status:'PENDING',requestedAt:'2026-10-27T12:00:00Z',
+      reviewedByUserId:null,reviewReason:null,reviewedAt:null
+    }));
     incidents=jasmine.createSpyObj('RecruitmentExamNoticesService',
       ['candidate','candidateRead','staff','staffRead']);
     incidents.candidate.and.returnValue(of([]));
@@ -57,7 +68,7 @@ describe('RecruitmentCandidateExamComponent',()=>{
       attemptId:800,applicationId:100,stageId:501,status:'SUBMITTED',
       submittedAt:new Date().toISOString(),score
     }));
-    component=new RecruitmentCandidateExamComponent(service,incidents);
+    component=new RecruitmentCandidateExamComponent(service,incidents,appeals);
     component.communityId=11;component.applicationId=100;
     component.ngOnChanges();
   });
@@ -70,6 +81,36 @@ describe('RecruitmentCandidateExamComponent',()=>{
     component.markIncidentRead(blockNotice);
     expect(incidents.candidateRead).toHaveBeenCalledOnceWith(11,100,901);
     expect(component.incidentNotices[0].read).toBeTrue();
+  });
+
+  it('allows candidate to request review only on an own blocked notice',()=>{
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    component.refresh();
+    expect(appeals.candidateAppealStatus).toHaveBeenCalledWith(11,100,501,800);
+    expect(component.canRequestAppeal(blockNotice)).toBeTrue();
+    component.selectAppeal(blockNotice);
+    component.appealReason='Curta';
+    expect(component.canSubmitAppeal).toBeFalse();
+    component.appealReason='Uma notificação de sistema interrompeu a prova';
+    expect(component.canSubmitAppeal).toBeTrue();
+    component.sendAppeal();
+    expect(appeals.candidateAppeal).toHaveBeenCalledOnceWith(11,100,501,800,
+      'Uma notificação de sistema interrompeu a prova');
+    expect(component.appealStatuses[800]).toBe('PENDING');
+    expect(component.canRequestAppeal(blockNotice)).toBeFalse();
+    expect(component.appealNotice).toContain('registrado');
+  });
+
+  it('does not offer a second appeal after an earlier request',()=>{
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    appeals.candidateAppealStatus.and.returnValue(of({
+      attemptId:800,status:'PENDING',requestedAt:'2026-10-27T12:00:00Z'
+    }));
+    component.refresh();
+    expect(component.canRequestAppeal(blockNotice)).toBeFalse();
+    component.selectAppeal(blockNotice);
+    expect(component.selectedAppeal).toBeNull();
+    expect(appeals.candidateAppeal).not.toHaveBeenCalled();
   });
 
   it('refreshes server eligibility after a reinstatement notice',()=>{
