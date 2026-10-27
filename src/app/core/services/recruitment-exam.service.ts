@@ -74,7 +74,8 @@ export interface AttemptPolicy {
 export interface GradePolicy {
   passingPercentage: number;
   resultStrategy: 'BEST' | 'LAST';
-  scoreVisibility: 'PRIVATE' | 'AFTER_SUBMISSION';
+  scoreVisibility: 'PRIVATE' | 'AFTER_SUBMISSION' | 'AT_TIME';
+  scoreReleaseAt: string | null;
 }
 export interface AttemptPolicyResponse {
   stageId: number;
