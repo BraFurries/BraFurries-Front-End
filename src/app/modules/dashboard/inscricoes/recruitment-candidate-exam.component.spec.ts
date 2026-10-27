@@ -217,16 +217,38 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(service.submit).not.toHaveBeenCalled();
   });
 
-  it('registers only one event per blur plus hide cycle',()=>{
-    service.start.and.returnValue(of({...session,maxFocusLosses:3}));
-    component.start();
-    component.noteFocusLoss('WINDOW_BLUR');
-    component.noteFocusLoss('TAB_HIDDEN');
-    expect(service.integrityEvent).toHaveBeenCalledTimes(1);
-    expect(service.integrityEvent.calls.mostRecent().args.slice(0,4))
-      .toEqual([11,100,501,800]);
-    expect(component.session?.focusLosses).toBe(1);
-    expect(component.notice).toContain('1/3');
+  it('ignores a short focus loss before five seconds',()=>{
+    jasmine.clock().install();
+    try {
+      service.start.and.returnValue(of({...session,maxFocusLosses:3}));
+      component.start();
+      component.noteFocusLoss('WINDOW_BLUR');
+      jasmine.clock().tick(4999);
+      component.onWindowFocus();
+      jasmine.clock().tick(1000);
+      expect(service.integrityEvent).not.toHaveBeenCalled();
+      expect(component.session?.focusLosses).toBe(0);
+    } finally { jasmine.clock().uninstall(); }
+  });
+
+  it('counts just one sustained blur plus hide event after five seconds',()=>{
+    jasmine.clock().install();
+    try {
+      service.start.and.returnValue(of({...session,maxFocusLosses:3}));
+      component.start();
+      component.noteFocusLoss('WINDOW_BLUR');
+      component.noteFocusLoss('TAB_HIDDEN');
+      jasmine.clock().tick(4999);
+      expect(service.integrityEvent).not.toHaveBeenCalled();
+      jasmine.clock().tick(1);
+      expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+      expect(service.integrityEvent.calls.mostRecent().args.slice(0,4))
+        .toEqual([11,100,501,800]);
+      expect(component.session?.focusLosses).toBe(1);
+      expect(component.notice).toContain('1/3');
+      component.onWindowFocus();
+      expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+    } finally { jasmine.clock().uninstall(); }
   });
 
   it('blocks the exam and clears answers after threshold response',()=>{
@@ -237,7 +259,11 @@ describe('RecruitmentCandidateExamComponent',()=>{
     }));
     component.start();
     component.answers['first']='a';
-    component.noteFocusLoss('TAB_HIDDEN');
+    jasmine.clock().install();
+    try {
+      component.noteFocusLoss('TAB_HIDDEN');
+      jasmine.clock().tick(5000);
+    } finally { jasmine.clock().uninstall(); }
     expect(component.blocked).toBeTrue();
     expect(component.session).toBeNull();
     expect(component.answers).toEqual({});
