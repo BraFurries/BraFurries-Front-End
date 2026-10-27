@@ -1,4 +1,26 @@
-<section *ngIf="loading || exam || error || incidentNotices.length || incidentError || incidentLoading" class="mt-4 rounded-xl border border-braPurple/30 bg-gray-50 p-4">
+<section *ngIf="communityId !== null && applicationId !== null" class="mt-4 rounded-xl border border-braPurple/30 bg-gray-50 p-4">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h4 class="font-bold text-braDark">Provas e notas</h4>
+    <button type="button" (click)="refresh()" [disabled]="loading || busy || !!session || releasedScoresLoading"
+      class="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
+      Atualizar provas e notas
+    </button>
+  </div>
+  <p *ngIf="releasedScoresLoading" role="status" class="mt-2 text-sm">Consultando notas divulgadas...</p>
+  <p *ngIf="releasedScoresError" role="alert" class="mt-2 text-sm text-red-700">
+    {{releasedScoresError}}
+  </p>
+  <div *ngFor="let stage of releasedScores" class="mt-3 rounded-lg border bg-white p-3">
+    <h5 class="font-semibold">{{stage.publicName}} — Notas divulgadas</h5>
+    <p *ngFor="let score of stage.scores" class="mt-1 text-sm">
+      Tentativa #{{score.attemptId}}: {{score.earnedPoints}} / {{score.possiblePoints}}
+      pontos ({{score.percentage | number:'1.0-2'}}%)
+    </p>
+  </div>
+  <p *ngIf="!exam && !loading && !releasedScoresLoading && !releasedScores.length"
+    class="mt-2 text-sm text-gray-500">
+    Nenhuma prova liberada ou nota divulgada para consulta neste momento.
+  </p>
   <p *ngIf="loading" class="text-sm" role="status">Consultando sua etapa de prova...</p>
   <p *ngIf="error" class="mt-2 text-sm text-red-700" role="alert">{{error}}</p>
   <section *ngIf="incidentNotices.length || incidentLoading || incidentError"
