@@ -1,6 +1,7 @@
 import { Component, HostListener, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
+import { RecruitmentExamReviewService } from '../../../core/services/recruitment-exam-review.service';
 import {
   CandidateExam, ExamNumericScore, ExamQuestion, ExamSession,
   ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource,
@@ -27,6 +28,12 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   incidentNotices: RecruitmentExamNotice[] = [];
   incidentLoading = false;
   incidentError = '';
+  appealStatuses:Record<number,'NONE'|'PENDING'|'APPROVED'|'DENIED'|'ERROR'>={};
+  selectedAppeal:RecruitmentExamNotice|null=null;
+  appealReason='';
+  appealBusy=false;
+  appealError='';
+  appealNotice='';
   answers: Record<string, unknown> = {};
   draftRevision = 0;
   draftSavedAt: string | null = null;
@@ -59,7 +66,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private generation = 0;
 
   constructor(private readonly api: RecruitmentExamService,
-    private readonly incidents: RecruitmentExamNoticesService) {}
+    private readonly incidents: RecruitmentExamNoticesService,
+    private readonly appeals: RecruitmentExamReviewService) {}
 
   ngOnChanges(): void {
     const id = `${this.communityId}:${this.applicationId}`;
@@ -70,6 +78,11 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.exam = null;
     this.incidentNotices = [];
     this.incidentError = '';
+    this.appealStatuses={};
+    this.selectedAppeal=null;
+    this.appealReason='';
+    this.appealError='';
+    this.appealNotice='';
     this.blocked = false;
     this.error = '';
     this.notice = '';
@@ -467,11 +480,71 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if(generation!==this.generation)return;
           this.incidentNotices=items;
           this.incidentLoading=false;
+          for(const item of items) {
+            if(item.eventType!=='BLOCKED') continue;
+            this.appeals.candidateAppealStatus(
+              communityId,applicationId,item.stageId,item.attemptId)
+              .pipe(takeUntil(this.destroyed$)).subscribe({
+                next: status=>{
+                  if(generation===this.generation)
+                    this.appealStatuses[item.attemptId]=status.status;
+                },
+                error: err=>{
+                  if(generation===this.generation)
+                    this.appealStatuses[item.attemptId]=err.status===404?'NONE':'ERROR';
+                }
+              });
+          }
         },
         error:err=>{
           if(generation!==this.generation)return;
           this.incidentLoading=false;
           if(err.status!==404) this.incidentError='Não foi possível consultar avisos da prova.';
+        }
+      });
+  }
+
+  canRequestAppeal(item:RecruitmentExamNotice):boolean {
+    return item.eventType==='BLOCKED' && !!this.applicationId && !!this.communityId &&
+      !this.appealBusy && this.appealStatuses[item.attemptId]==='NONE' &&
+      !this.incidentNotices.some(n=>n.attemptId===item.attemptId &&
+        n.eventType==='REINSTATED');
+  }
+  selectAppeal(item:RecruitmentExamNotice):void {
+    if(!this.canRequestAppeal(item)) return;
+    this.selectedAppeal=item;
+    this.appealReason='';
+    this.appealError='';
+    this.appealNotice='';
+  }
+  get canSubmitAppeal():boolean {
+    return this.selectedAppeal!==null && !this.appealBusy &&
+      this.appealReason.trim().length>=20 && this.appealReason.trim().length<=2000;
+  }
+  sendAppeal():void {
+    if(!this.canSubmitAppeal || this.communityId===null ||
+      this.applicationId===null || !this.selectedAppeal)return;
+    const communityId=this.communityId,applicationId=this.applicationId;
+    const item=this.selectedAppeal,generation=this.generation;
+    this.appealBusy=true;
+    this.appealError='';
+    this.appeals.candidateAppeal(communityId,applicationId,
+      item.stageId,item.attemptId,this.appealReason.trim())
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:receipt=>{
+          if(generation!==this.generation)return;
+          this.appealBusy=false;
+          this.appealStatuses[item.attemptId]=receipt.status;
+          this.selectedAppeal=null;
+          this.appealReason='';
+          this.appealNotice='Pedido de revisão técnica registrado. A Staff poderá analisá-lo.';
+        },
+        error:err=>{
+          if(generation!==this.generation)return;
+          this.appealBusy=false;
+          this.appealError=err.status===409
+            ?'Esta tentativa já possui revisão ou o estado foi alterado. Atualize os avisos.'
+            :'Não foi possível solicitar a revisão da tentativa.';
         }
       });
   }
@@ -551,6 +624,12 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.clearAttempt();
     this.submitted=null;
     this.scores=[];
+    this.selectedAppeal=null;
+    this.appealReason='';
+    this.appealBusy=false;
+    this.appealStatuses={};
+    this.appealError='';
+    this.appealNotice='';
     this.releasedScores=[];
     this.releasedScoresLoading=false;
     this.releasedScoresError='';
