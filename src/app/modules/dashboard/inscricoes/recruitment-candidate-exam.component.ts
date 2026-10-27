@@ -3,7 +3,8 @@ import { Subject, takeUntil } from 'rxjs';
 import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
 import {
   CandidateExam, ExamNumericScore, ExamQuestion, ExamSession,
-  ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource, RecruitmentExamService
+  ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource,
+  ReleasedExamScoreStage, RecruitmentExamService
 } from '../../../core/services/recruitment-exam.service';
 
 /** Candidate-only exam runner; timing and eligibility are authoritative on the API. */
@@ -20,6 +21,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   session: ExamSession | null = null;
   submitted: ExamSubmissionReceipt | null = null;
   scores: ExamNumericScore[] = [];
+  releasedScores: ReleasedExamScoreStage[] = [];
+  releasedScoresLoading = false;
+  releasedScoresError = '';
   incidentNotices: RecruitmentExamNotice[] = [];
   incidentLoading = false;
   incidentError = '';
@@ -75,7 +79,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   }
 
   refresh(): void {
-    if (this.communityId === null || this.applicationId === null || this.busy) return;
+    if (this.communityId === null || this.applicationId === null ||
+        this.busy || this.session) return;
     const generation = ++this.generation;
     const communityId = this.communityId;
     const applicationId = this.applicationId;
@@ -85,6 +90,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.loading = true;
     this.error = '';
     this.loadIncidentNotices(generation,communityId,applicationId);
+    this.loadReleasedScores(generation,communityId,applicationId);
     this.api.currentExams(communityId,applicationId)
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next: exams => {
@@ -199,6 +205,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
             ? 'Tentativa enviada. Esta seleção permite consultar a nota desta prova.'
             : 'Tentativa enviada. A nota será mantida privada até sua divulgação.';
           if (receipt.score) this.scores=[...this.scores.filter(s=>s.attemptId!==receipt.score!.attemptId),receipt.score];
+          this.loadReleasedScores(generation,communityId,applicationId);
         },
         error: error => {
           if (generation !== this.generation) return;
@@ -469,6 +476,24 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
       });
   }
 
+  private loadReleasedScores(generation:number,communityId:number,applicationId:number):void {
+    this.releasedScoresLoading=true;
+    this.releasedScoresError='';
+    this.api.releasedScores(communityId,applicationId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: rows=>{
+          if(generation!==this.generation) return;
+          this.releasedScores=rows;
+          this.releasedScoresLoading=false;
+        },
+        error: ()=>{
+          if(generation!==this.generation) return;
+          this.releasedScoresLoading=false;
+          this.releasedScoresError='Não foi possível consultar as notas divulgadas.';
+        }
+      });
+  }
+
   private loadScores(generation: number,communityId:number,applicationId:number,stageId:number): void {
     this.api.ownScores(communityId,applicationId,stageId)
       .pipe(takeUntil(this.destroyed$)).subscribe({
@@ -526,6 +551,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.clearAttempt();
     this.submitted=null;
     this.scores=[];
+    this.releasedScores=[];
+    this.releasedScoresLoading=false;
+    this.releasedScoresError='';
   }
   ngOnDestroy(): void {
     ++this.generation;
