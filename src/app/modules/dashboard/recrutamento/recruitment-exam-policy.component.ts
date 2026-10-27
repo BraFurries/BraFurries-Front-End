@@ -24,6 +24,7 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
   attemptConfigured = false;
   gradeConfigured = false;
   deadlineLocal = '';
+  scoreReleaseLocal = '';
   loading = false;
   busy = false;
   error = '';
@@ -44,6 +45,7 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
     this.attemptConfigured=false;
     this.gradeConfigured=false;
     this.deadlineLocal='';
+    this.scoreReleaseLocal='';
     this.loading=false;
     this.busy=false;
     this.error='';
@@ -79,6 +81,8 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
         next: result=>{
           if(generation!==this.generation)return;
           this.grade={...result.policy};
+          this.scoreReleaseLocal=result.policy.scoreReleaseAt
+            ?this.toLocal(result.policy.scoreReleaseAt):'';
           this.gradeConfigured=true;
         },
         error:e=>{
@@ -105,7 +109,11 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
       this.grade.passingPercentage>=1 && this.grade.passingPercentage<=100 &&
       Math.round(this.grade.passingPercentage*100)/100===this.grade.passingPercentage &&
       (this.grade.resultStrategy==='BEST'||this.grade.resultStrategy==='LAST') &&
-      (this.grade.scoreVisibility==='PRIVATE'||this.grade.scoreVisibility==='AFTER_SUBMISSION');
+      (this.grade.scoreVisibility==='PRIVATE'||
+        this.grade.scoreVisibility==='AFTER_SUBMISSION'||
+        (this.grade.scoreVisibility==='AT_TIME' && !!this.scoreReleaseLocal &&
+          Number.isFinite(new Date(this.scoreReleaseLocal).getTime()) &&
+          new Date(this.scoreReleaseLocal).getTime()>Date.now()));
   }
 
   saveAttempts():void {
@@ -146,7 +154,9 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
     this.error='';
     this.notice='';
     this.api.saveGradePolicy(communityId,processId,stageId,
-      this.expectedRevision,{...this.grade})
+      this.expectedRevision,{...this.grade,
+        scoreReleaseAt:this.grade.scoreVisibility==='AT_TIME'
+          ?new Date(this.scoreReleaseLocal).toISOString():null})
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next:receipt=>{
           if(generation!==this.generation)return;
@@ -176,7 +186,8 @@ export class RecruitmentExamPolicyComponent implements OnChanges, OnDestroy {
       hardDeadline:true,maxFocusLosses:null,blockCopy:false};
   }
   private defaultGrade():GradePolicy {
-    return {passingPercentage:70,resultStrategy:'BEST',scoreVisibility:'PRIVATE'};
+    return {passingPercentage:70,resultStrategy:'BEST',scoreVisibility:'PRIVATE',
+      scoreReleaseAt:null};
   }
   private toLocal(value:string):string {
     const date=new Date(value);
