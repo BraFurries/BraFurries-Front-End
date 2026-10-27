@@ -86,7 +86,8 @@
         <p class="text-xs text-amber-900">Expira em {{attempt.expiresAt | date:'dd/MM/yyyy HH:mm:ss' }}.</p>
         <p *ngIf="attempt.maxFocusLosses !== null" class="mt-2 text-xs text-amber-900">
           Saídas de foco registradas: {{attempt.focusLosses}}/{{attempt.maxFocusLosses}}.
-          Sair da aba ou janela poderá bloquear definitivamente esta prova.
+          Saídas de foco inferiores a 5 segundos são ignoradas.
+          Ao atingir o limite de saídas contabilizadas, a tentativa pode ser bloqueada.
         </p>
         <p *ngIf="attempt.blockCopy" class="mt-2 text-xs text-amber-900">
           Cópia, recorte e menu de contexto estão restritos nesta prova.
