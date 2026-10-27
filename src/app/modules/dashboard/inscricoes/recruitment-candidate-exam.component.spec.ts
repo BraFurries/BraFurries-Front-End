@@ -113,6 +113,20 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(appeals.candidateAppeal).not.toHaveBeenCalled();
   });
 
+  it('drops late technical appeal status after a Community switch',()=>{
+    const pending=new Subject<{
+      attemptId:number;status:'PENDING';requestedAt:string
+    }>();
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    appeals.candidateAppealStatus.and.returnValue(pending);
+    component.refresh();
+    incidents.candidate.and.returnValue(of([]));
+    component.communityId=12;
+    component.ngOnChanges();
+    pending.next({attemptId:800,status:'PENDING',requestedAt:'2026-10-27T12:00:00Z'});
+    expect(component.appealStatuses[800]).toBeUndefined();
+  });
+
   it('refreshes server eligibility after a reinstatement notice',()=>{
     service.currentExams.and.returnValue(of([{...exam,blocked:true}]));
     component.refresh();
