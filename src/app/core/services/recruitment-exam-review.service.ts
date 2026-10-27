@@ -25,11 +25,33 @@ export interface ExamIncidentEvidence {
   truncated:boolean;
   recordedFocusSignals:number;
   canReinstate:boolean;
+  appeal?:ExamAppeal|null;
 }
 export interface ExamReviewPanel {
   applicationId:number;
   stageId:number;
   incidents:ExamIncidentEvidence[];
+}
+export interface ExamAppeal {
+  attemptId:number;
+  applicationId:number;
+  stageId:number;
+  candidateUserId:number;
+  reason:string;
+  status:'PENDING'|'APPROVED'|'DENIED';
+  requestedAt:string;
+  reviewedByUserId:number|null;
+  reviewReason:string|null;
+  reviewedAt:string|null;
+}
+export interface CandidateAppealStatus {
+  attemptId:number;
+  status:'PENDING'|'APPROVED'|'DENIED';
+  requestedAt:string;
+}
+export interface AppealDecision {
+  attemptId:number;
+  status:'DENIED';
 }
 export interface ExamReinstatement {
   applicationId:number;
@@ -50,6 +72,23 @@ export class RecruitmentExamReviewService {
     attemptId:number,reason:string):Observable<ExamReinstatement> {
     return this.http.post<ExamReinstatement>(
       `${this.base(communityId,applicationId,stageId)}/attempts/${attemptId}/reinstate`,
+      {reason});
+  }
+  candidateAppeal(communityId:number,applicationId:number,stageId:number,
+    attemptId:number,reason:string):Observable<ExamAppeal> {
+    return this.http.post<ExamAppeal>(
+      `${this.base(communityId,applicationId,stageId)}/attempts/${attemptId}/appeal`,
+      {reason});
+  }
+  candidateAppealStatus(communityId:number,applicationId:number,stageId:number,
+    attemptId:number):Observable<CandidateAppealStatus> {
+    return this.http.get<CandidateAppealStatus>(
+      `${this.base(communityId,applicationId,stageId)}/attempts/${attemptId}/appeal`);
+  }
+  denyAppeal(communityId:number,applicationId:number,stageId:number,
+    attemptId:number,reason:string):Observable<AppealDecision> {
+    return this.http.post<AppealDecision>(
+      `${this.base(communityId,applicationId,stageId)}/attempts/${attemptId}/appeal/deny`,
       {reason});
   }
   private base(communityId:number,applicationId:number,stageId:number):string {
