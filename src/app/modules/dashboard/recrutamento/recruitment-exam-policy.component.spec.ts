@@ -77,6 +77,27 @@ describe('RecruitmentExamPolicyComponent',()=>{
     expect(saved).toHaveBeenCalledOnceWith(5);
   });
 
+  it('requires a future scheduled release and sends the UTC instant',()=>{
+    component.attemptConfigured=true;
+    component.grade.scoreVisibility='AT_TIME';
+    expect(component.canSaveGrade).toBeFalse();
+    component.scoreReleaseLocal='2000-01-01T00:00';
+    expect(component.canSaveGrade).toBeFalse();
+    const future=new Date(Date.now()+3600000);
+    const pad=(n:number)=>String(n).padStart(2,'0');
+    component.scoreReleaseLocal=`${future.getFullYear()}-${pad(future.getMonth()+1)}-${pad(future.getDate())}T`+
+      `${pad(future.getHours())}:${pad(future.getMinutes())}`;
+    expect(component.canSaveGrade).toBeTrue();
+    api.saveGradePolicy.and.returnValue(of({
+      processVersionId:80,stageId:501,revision:5,
+      policy:{...component.grade,scoreReleaseAt:new Date(component.scoreReleaseLocal).toISOString()}
+    }));
+    component.saveGrades();
+    expect(api.saveGradePolicy).toHaveBeenCalledWith(11,70,501,4,
+      jasmine.objectContaining({scoreVisibility:'AT_TIME',
+        scoreReleaseAt:new Date(component.scoreReleaseLocal).toISOString()}));
+  });
+
   it('never saves in a published or non-objective stage',()=>{
     component.editable=false;
     component.saveAttempts();component.saveGrades();
