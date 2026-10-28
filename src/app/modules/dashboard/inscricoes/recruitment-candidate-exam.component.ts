@@ -116,8 +116,12 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
         error: error => {
           if (generation !== this.generation) return;
           this.loading = false;
-          // No candidate-stage information is disclosed on feature/auth denial.
-          if (error.status !== 404) this.error = this.failure(error);
+          // Never disclose stage details on a feature/auth denial, but do not
+          // silently hide the entire exam section when the API returns 404.
+          this.error = error.status===404 || error.status===403
+            ? 'Não foi possível confirmar a disponibilidade de provas para sua candidatura. ' +
+              'Confira o acesso à comunidade e tente novamente.'
+            : this.failure(error);
         }
       });
   }
