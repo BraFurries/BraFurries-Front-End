@@ -95,6 +95,19 @@ describe('InscricoesComponent', () => {
     expect(api.form).not.toHaveBeenCalled();
   });
 
+  it('removes a newly submitted process from available cards when the receipt reloads', () => {
+    tracking.mine.and.returnValue(of([
+      {id:123,processId:70,processTitle:'Staff',
+        submittedAt:'2026-10-28T14:00:00Z',publicStatus:'RECEIVED'}
+    ]));
+    component.open(70);
+    component.acceptedTerms=true;
+    component.apply();
+    expect(api.submit).toHaveBeenCalledTimes(1);
+    expect(component.ownApplications[0].id).toBe(123);
+    expect(component.availableProcesses).toEqual([]);
+  });
+
   it('requires explicit terms and submits only candidate response values', () => {
     component.open(70);
     component.answers['motivation'] = 'Quero ajudar';
