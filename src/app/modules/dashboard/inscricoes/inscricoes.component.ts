@@ -26,6 +26,12 @@ export class InscricoesComponent implements OnInit, OnDestroy {
   busy = false;
   error = '';
 
+  /** Candidate-facing list must not offer another signup for an existing application. */
+  get availableProcesses(): CandidateOpenProcess[] {
+    const subscribed = new Set(this.ownApplications.map(a => a.processId));
+    return this.processes.filter(process => !subscribed.has(process.id));
+  }
+
   private readonly destroyed$ = new Subject<void>();
   private generation = 0;
 
@@ -108,7 +114,8 @@ export class InscricoesComponent implements OnInit, OnDestroy {
   }
 
   open(processId: number): void {
-    if (this.communityId === null || this.busy) return;
+    if (this.communityId === null || this.busy ||
+        this.ownApplications.some(a => a.processId === processId)) return;
     const id = this.communityId;
     const current = ++this.generation;
     this.selected = null;
@@ -142,7 +149,8 @@ export class InscricoesComponent implements OnInit, OnDestroy {
 
   get canSubmit(): boolean {
     return this.communityId !== null && !this.busy && !!this.selected?.eligible
-      && this.acceptedTerms && !this.submitted;
+      && this.acceptedTerms && !this.submitted
+      && !this.ownApplications.some(a => a.processId === this.selected?.process.id);
   }
 
   isMultipleSelected(question: CandidateQuestion, id: string): boolean {
