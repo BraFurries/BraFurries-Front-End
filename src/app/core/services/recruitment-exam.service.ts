@@ -54,6 +54,11 @@ export interface ExamNumericScore {
   possiblePoints: number;
   percentage: number;
 }
+export interface ReleasedExamScoreStage {
+  stageId: number;
+  publicName: string;
+  scores: ExamNumericScore[];
+}
 export interface ExamSubmissionReceipt {
   attemptId: number;
   applicationId: number;
@@ -74,7 +79,8 @@ export interface AttemptPolicy {
 export interface GradePolicy {
   passingPercentage: number;
   resultStrategy: 'BEST' | 'LAST';
-  scoreVisibility: 'PRIVATE' | 'AFTER_SUBMISSION';
+  scoreVisibility: 'PRIVATE' | 'AFTER_SUBMISSION' | 'AT_TIME';
+  scoreReleaseAt: string | null;
 }
 export interface AttemptPolicyResponse {
   stageId: number;
@@ -131,6 +137,11 @@ export class RecruitmentExamService {
     Observable<ExamNumericScore[]> {
     return this.http.get<ExamNumericScore[]>(
       `${this.attempts(communityId,applicationId,stageId)}/scores`);
+  }
+  releasedScores(communityId:number,applicationId:number):
+    Observable<ReleasedExamScoreStage[]> {
+    return this.http.get<ReleasedExamScoreStage[]>(
+      `${this.base(communityId,applicationId)}/released-scores`);
   }
   attemptPolicy(communityId: number, processId: number, stageId: number):
     Observable<AttemptPolicyResponse> {

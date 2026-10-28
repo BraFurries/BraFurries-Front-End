@@ -1,9 +1,11 @@
 import { Component, HostListener, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { RecruitmentExamNotice, RecruitmentExamNoticesService } from '../../../core/services/recruitment-exam-notices.service';
+import { RecruitmentExamReviewService } from '../../../core/services/recruitment-exam-review.service';
 import {
   CandidateExam, ExamNumericScore, ExamQuestion, ExamSession,
-  ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource, RecruitmentExamService
+  ExamSubmissionReceipt, ExamIntegrityType, ExamIntegritySource,
+  ReleasedExamScoreStage, RecruitmentExamService
 } from '../../../core/services/recruitment-exam.service';
 
 /** Candidate-only exam runner; timing and eligibility are authoritative on the API. */
@@ -20,9 +22,18 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   session: ExamSession | null = null;
   submitted: ExamSubmissionReceipt | null = null;
   scores: ExamNumericScore[] = [];
+  releasedScores: ReleasedExamScoreStage[] = [];
+  releasedScoresLoading = false;
+  releasedScoresError = '';
   incidentNotices: RecruitmentExamNotice[] = [];
   incidentLoading = false;
   incidentError = '';
+  appealStatuses:Record<number,'NONE'|'PENDING'|'APPROVED'|'DENIED'|'ERROR'>={};
+  selectedAppeal:RecruitmentExamNotice|null=null;
+  appealReason='';
+  appealBusy=false;
+  appealError='';
+  appealNotice='';
   answers: Record<string, unknown> = {};
   draftRevision = 0;
   draftSavedAt: string | null = null;
@@ -45,13 +56,18 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
   private localDeadlineMs = 0;
   private away = false;
+  private focusAwaySince = 0;
+  private focusSource: 'TAB_HIDDEN' | 'WINDOW_BLUR' | null = null;
+  private focusGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly focusGraceMs = 5000;
   private sendingSignal = false;
   private pendingSignals: {id:string;type:ExamIntegrityType;source:ExamIntegritySource}[] = [];
   private identity = '';
   private generation = 0;
 
   constructor(private readonly api: RecruitmentExamService,
-    private readonly incidents: RecruitmentExamNoticesService) {}
+    private readonly incidents: RecruitmentExamNoticesService,
+    private readonly appeals: RecruitmentExamReviewService) {}
 
   ngOnChanges(): void {
     const id = `${this.communityId}:${this.applicationId}`;
@@ -62,6 +78,11 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.exam = null;
     this.incidentNotices = [];
     this.incidentError = '';
+    this.appealStatuses={};
+    this.selectedAppeal=null;
+    this.appealReason='';
+    this.appealError='';
+    this.appealNotice='';
     this.blocked = false;
     this.error = '';
     this.notice = '';
@@ -71,7 +92,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   }
 
   refresh(): void {
-    if (this.communityId === null || this.applicationId === null || this.busy) return;
+    if (this.communityId === null || this.applicationId === null ||
+        this.busy || this.session) return;
     const generation = ++this.generation;
     const communityId = this.communityId;
     const applicationId = this.applicationId;
@@ -81,6 +103,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.loading = true;
     this.error = '';
     this.loadIncidentNotices(generation,communityId,applicationId);
+    this.loadReleasedScores(generation,communityId,applicationId);
     this.api.currentExams(communityId,applicationId)
       .pipe(takeUntil(this.destroyed$)).subscribe({
         next: exams => {
@@ -93,8 +116,12 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
         error: error => {
           if (generation !== this.generation) return;
           this.loading = false;
-          // No candidate-stage information is disclosed on feature/auth denial.
-          if (error.status !== 404) this.error = this.failure(error);
+          // Never disclose stage details on a feature/auth denial, but do not
+          // silently hide the entire exam section when the API returns 404.
+          this.error = error.status===404 || error.status===403
+            ? 'Não foi possível confirmar a disponibilidade de provas para sua candidatura. ' +
+              'Confira o acesso à comunidade e tente novamente.'
+            : this.failure(error);
         }
       });
   }
@@ -115,7 +142,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if (generation !== this.generation || stageId !== this.exam?.stageId) return;
           this.busy = false;
           this.session = session;
-          this.away = false;
+          this.resetFocusGrace();
           this.pendingSignals = [];
           this.sendingSignal = false;
           // Server's own clock is the baseline; client's wall-clock skew does not
@@ -195,6 +222,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
             ? 'Tentativa enviada. Esta seleção permite consultar a nota desta prova.'
             : 'Tentativa enviada. A nota será mantida privada até sua divulgação.';
           if (receipt.score) this.scores=[...this.scores.filter(s=>s.attemptId!==receipt.score!.attemptId),receipt.score];
+          this.loadReleasedScores(generation,communityId,applicationId);
         },
         error: error => {
           if (generation !== this.generation) return;
@@ -215,20 +243,50 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   @HostListener('document:visibilitychange')
   onVisibilityChange(): void {
     if(document.hidden) this.noteFocusLoss('TAB_HIDDEN');
-    else { this.away=false; this.sendPendingSignals(); }
+    else if(document.hasFocus()) this.resumeFromFocusLoss();
   }
 
   @HostListener('window:focus')
   onWindowFocus(): void {
-    if(!document.hidden) this.away=false;
-    this.sendPendingSignals();
+    if(!document.hidden) this.resumeFromFocusLoss();
   }
 
   noteFocusLoss(source:'TAB_HIDDEN'|'WINDOW_BLUR'): void {
     if(!this.session || this.blocked || this.busy ||
       this.secondsLeft<=0 || this.session.maxFocusLosses===null || this.away)return;
     this.away=true;
+    this.focusAwaySince=Date.now();
+    this.focusSource=source;
+    this.focusGraceTimer=setTimeout(()=>{
+      this.focusGraceTimer=null;
+      this.recordSustainedFocusLoss();
+    },this.focusGraceMs);
+  }
+
+  private recordSustainedFocusLoss(): void {
+    if(!this.away || !this.focusSource || !this.session ||
+      this.blocked || this.secondsLeft<=0) return;
+    const source=this.focusSource;
+    this.focusSource=null; // one event per blur + hide cycle
     this.queueSignal('FOCUS_LOST',source);
+  }
+
+  private resumeFromFocusLoss(): void {
+    if(this.away && this.focusSource &&
+      Date.now()-this.focusAwaySince>=this.focusGraceMs) {
+      // Background timers may be throttled; still count long absences on return.
+      this.recordSustainedFocusLoss();
+    }
+    this.resetFocusGrace();
+    this.sendPendingSignals();
+  }
+
+  private resetFocusGrace(): void {
+    if(this.focusGraceTimer!==null) clearTimeout(this.focusGraceTimer);
+    this.focusGraceTimer=null;
+    this.away=false;
+    this.focusSource=null;
+    this.focusAwaySince=0;
   }
 
   preventCopy(event:Event,source:'COPY'|'CUT'|'CONTEXT_MENU'): void {
@@ -426,11 +484,89 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           if(generation!==this.generation)return;
           this.incidentNotices=items;
           this.incidentLoading=false;
+          for(const item of items) {
+            if(item.eventType!=='BLOCKED') continue;
+            this.appeals.candidateAppealStatus(
+              communityId,applicationId,item.stageId,item.attemptId)
+              .pipe(takeUntil(this.destroyed$)).subscribe({
+                next: status=>{
+                  if(generation===this.generation)
+                    this.appealStatuses[item.attemptId]=status.status;
+                },
+                error: err=>{
+                  if(generation===this.generation)
+                    this.appealStatuses[item.attemptId]=err.status===404?'NONE':'ERROR';
+                }
+              });
+          }
         },
         error:err=>{
           if(generation!==this.generation)return;
           this.incidentLoading=false;
           if(err.status!==404) this.incidentError='Não foi possível consultar avisos da prova.';
+        }
+      });
+  }
+
+  canRequestAppeal(item:RecruitmentExamNotice):boolean {
+    return item.eventType==='BLOCKED' && !!this.applicationId && !!this.communityId &&
+      !this.appealBusy && this.appealStatuses[item.attemptId]==='NONE' &&
+      !this.incidentNotices.some(n=>n.attemptId===item.attemptId &&
+        n.eventType==='REINSTATED');
+  }
+  selectAppeal(item:RecruitmentExamNotice):void {
+    if(!this.canRequestAppeal(item)) return;
+    this.selectedAppeal=item;
+    this.appealReason='';
+    this.appealError='';
+    this.appealNotice='';
+  }
+  get canSubmitAppeal():boolean {
+    return this.selectedAppeal!==null && !this.appealBusy &&
+      this.appealReason.trim().length>=20 && this.appealReason.trim().length<=2000;
+  }
+  sendAppeal():void {
+    if(!this.canSubmitAppeal || this.communityId===null ||
+      this.applicationId===null || !this.selectedAppeal)return;
+    const communityId=this.communityId,applicationId=this.applicationId;
+    const item=this.selectedAppeal,generation=this.generation;
+    this.appealBusy=true;
+    this.appealError='';
+    this.appeals.candidateAppeal(communityId,applicationId,
+      item.stageId,item.attemptId,this.appealReason.trim())
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:receipt=>{
+          if(generation!==this.generation)return;
+          this.appealBusy=false;
+          this.appealStatuses[item.attemptId]=receipt.status;
+          this.selectedAppeal=null;
+          this.appealReason='';
+          this.appealNotice='Pedido de revisão técnica registrado. A Staff poderá analisá-lo.';
+        },
+        error:err=>{
+          if(generation!==this.generation)return;
+          this.appealBusy=false;
+          this.appealError=err.status===409
+            ?'Esta tentativa já possui revisão ou o estado foi alterado. Atualize os avisos.'
+            :'Não foi possível solicitar a revisão da tentativa.';
+        }
+      });
+  }
+
+  private loadReleasedScores(generation:number,communityId:number,applicationId:number):void {
+    this.releasedScoresLoading=true;
+    this.releasedScoresError='';
+    this.api.releasedScores(communityId,applicationId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next: rows=>{
+          if(generation!==this.generation) return;
+          this.releasedScores=rows;
+          this.releasedScoresLoading=false;
+        },
+        error: ()=>{
+          if(generation!==this.generation) return;
+          this.releasedScoresLoading=false;
+          this.releasedScoresError='Não foi possível consultar as notas divulgadas.';
         }
       });
   }
@@ -481,7 +617,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.draftError='';
     this.session=null;
     this.localDeadlineMs=0;
-    this.away=false;
+    this.resetFocusGrace();
     this.pendingSignals=[];
     this.sendingSignal=false;
     this.answers={};
@@ -492,6 +628,15 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.clearAttempt();
     this.submitted=null;
     this.scores=[];
+    this.selectedAppeal=null;
+    this.appealReason='';
+    this.appealBusy=false;
+    this.appealStatuses={};
+    this.appealError='';
+    this.appealNotice='';
+    this.releasedScores=[];
+    this.releasedScoresLoading=false;
+    this.releasedScoresError='';
   }
   ngOnDestroy(): void {
     ++this.generation;

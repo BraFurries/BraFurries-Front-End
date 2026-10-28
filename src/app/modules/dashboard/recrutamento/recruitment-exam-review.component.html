@@ -31,6 +31,16 @@
           · Reaberta em {{item.incident.reinstatedAt | date:'dd/MM/yyyy HH:mm'}}
         </span>
       </p>
+      <p *ngIf="item.appeal as appeal" class="mt-2 text-xs text-gray-700">
+        Revisão técnica solicitada · {{appeal.status}} ·
+        {{appeal.requestedAt | date:'dd/MM/yyyy HH:mm'}}
+      </p>
+      <p *ngIf="item.appeal" class="mt-1 text-xs whitespace-pre-wrap break-words">
+        Pedido do candidato: {{item.appeal.reason}}
+      </p>
+      <p *ngIf="item.appeal?.reviewReason" class="mt-1 text-xs whitespace-pre-wrap break-words">
+        Justificativa administrativa: {{item.appeal?.reviewReason}}
+      </p>
       <p *ngIf="item.incident.reviewReason" class="mt-2 text-xs whitespace-pre-wrap break-words">
         Justificativa da reabertura: {{item.incident.reviewReason}}
       </p>
@@ -66,13 +76,17 @@
       </label>
       <label class="mt-3 flex items-start gap-2 text-sm">
         <input type="checkbox" [(ngModel)]="confirmed" [disabled]="busy">
-        Revisei os eventos. Confirmo a reabertura como possível falso positivo,
+        Revisei os eventos. Confirmo que a decisão será registrada com justificativa,
         sem modificar notas nem publicar resultados.
       </label>
       <div class="mt-3 flex flex-wrap gap-2">
         <button type="button" (click)="reinstate()" [disabled]="!canReinstate"
           class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-40">
           {{busy ? 'Registrando...' : 'Confirmar reabertura'}}
+        </button>
+        <button *ngIf="canDenyAppeal" type="button" (click)="denyAppeal()"
+          [disabled]="busy" class="rounded-lg border border-red-700 px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-40">
+          Negar pedido de revisão
         </button>
         <button type="button" (click)="selectedAttempt=null;confirmed=false;reason=''"
           [disabled]="busy" class="rounded-lg border px-4 py-2 text-sm">

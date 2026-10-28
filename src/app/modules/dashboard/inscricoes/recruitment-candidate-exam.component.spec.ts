@@ -4,11 +4,13 @@ import {
   CandidateExam, ExamNumericScore, ExamSession, RecruitmentExamService
 } from '../../../core/services/recruitment-exam.service';
 import { RecruitmentCandidateExamComponent } from './recruitment-candidate-exam.component';
+import { RecruitmentExamReviewService } from '../../../core/services/recruitment-exam-review.service';
 
 describe('RecruitmentCandidateExamComponent',()=>{
   let service:jasmine.SpyObj<RecruitmentExamService>;
   let component:RecruitmentCandidateExamComponent;
   let incidents:jasmine.SpyObj<RecruitmentExamNoticesService>;
+  let appeals:jasmine.SpyObj<RecruitmentExamReviewService>;
   const blockNotice={id:901,applicationId:100,stageId:501,attemptId:800,
     eventType:'BLOCKED' as const,occurredAt:'2026-10-23T14:00:00Z',
     newExpiresAt:null,read:false};
@@ -30,6 +32,15 @@ describe('RecruitmentCandidateExamComponent',()=>{
   };
 
   beforeEach(()=>{
+    appeals=jasmine.createSpyObj('RecruitmentExamReviewService',
+      ['candidateAppeal','candidateAppealStatus']);
+    appeals.candidateAppealStatus.and.returnValue(throwError(()=>({status:404})));
+    appeals.candidateAppeal.and.returnValue(of({
+      attemptId:800,applicationId:100,stageId:501,candidateUserId:99,
+      reason:'Uma notificação de sistema interrompeu a prova',
+      status:'PENDING',requestedAt:'2026-10-27T12:00:00Z',
+      reviewedByUserId:null,reviewReason:null,reviewedAt:null
+    }));
     incidents=jasmine.createSpyObj('RecruitmentExamNoticesService',
       ['candidate','candidateRead','staff','staffRead']);
     incidents.candidate.and.returnValue(of([]));
@@ -37,9 +48,10 @@ describe('RecruitmentCandidateExamComponent',()=>{
     incidents.candidateRead.and.returnValue(of(void 0));
     incidents.staffRead.and.returnValue(of(void 0));
     service=jasmine.createSpyObj('RecruitmentExamService',
-      ['currentExams','start','submit','ownScores','attemptPolicy',
+      ['currentExams','start','submit','ownScores','releasedScores','attemptPolicy',
        'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent','draft','saveDraft']);
     service.currentExams.and.returnValue(of([exam]));
+    service.releasedScores.and.returnValue(of([]));
     service.ownScores.and.returnValue(throwError(()=>({status:404})));
     service.start.and.returnValue(of(session));
     service.draft.and.returnValue(of({
@@ -56,7 +68,7 @@ describe('RecruitmentCandidateExamComponent',()=>{
       attemptId:800,applicationId:100,stageId:501,status:'SUBMITTED',
       submittedAt:new Date().toISOString(),score
     }));
-    component=new RecruitmentCandidateExamComponent(service,incidents);
+    component=new RecruitmentCandidateExamComponent(service,incidents,appeals);
     component.communityId=11;component.applicationId=100;
     component.ngOnChanges();
   });
@@ -69,6 +81,50 @@ describe('RecruitmentCandidateExamComponent',()=>{
     component.markIncidentRead(blockNotice);
     expect(incidents.candidateRead).toHaveBeenCalledOnceWith(11,100,901);
     expect(component.incidentNotices[0].read).toBeTrue();
+  });
+
+  it('allows candidate to request review only on an own blocked notice',()=>{
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    component.refresh();
+    expect(appeals.candidateAppealStatus).toHaveBeenCalledWith(11,100,501,800);
+    expect(component.canRequestAppeal(blockNotice)).toBeTrue();
+    component.selectAppeal(blockNotice);
+    component.appealReason='Curta';
+    expect(component.canSubmitAppeal).toBeFalse();
+    component.appealReason='Uma notificação de sistema interrompeu a prova';
+    expect(component.canSubmitAppeal).toBeTrue();
+    component.sendAppeal();
+    expect(appeals.candidateAppeal).toHaveBeenCalledOnceWith(11,100,501,800,
+      'Uma notificação de sistema interrompeu a prova');
+    expect(component.appealStatuses[800]).toBe('PENDING');
+    expect(component.canRequestAppeal(blockNotice)).toBeFalse();
+    expect(component.appealNotice).toContain('registrado');
+  });
+
+  it('does not offer a second appeal after an earlier request',()=>{
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    appeals.candidateAppealStatus.and.returnValue(of({
+      attemptId:800,status:'PENDING',requestedAt:'2026-10-27T12:00:00Z'
+    }));
+    component.refresh();
+    expect(component.canRequestAppeal(blockNotice)).toBeFalse();
+    component.selectAppeal(blockNotice);
+    expect(component.selectedAppeal).toBeNull();
+    expect(appeals.candidateAppeal).not.toHaveBeenCalled();
+  });
+
+  it('drops late technical appeal status after a Community switch',()=>{
+    const pending=new Subject<{
+      attemptId:number;status:'PENDING';requestedAt:string
+    }>();
+    incidents.candidate.and.returnValue(of([blockNotice]));
+    appeals.candidateAppealStatus.and.returnValue(pending);
+    component.refresh();
+    incidents.candidate.and.returnValue(of([]));
+    component.communityId=12;
+    component.ngOnChanges();
+    pending.next({attemptId:800,status:'PENDING',requestedAt:'2026-10-27T12:00:00Z'});
+    expect(component.appealStatuses[800]).toBeUndefined();
   });
 
   it('refreshes server eligibility after a reinstatement notice',()=>{
@@ -93,10 +149,30 @@ describe('RecruitmentCandidateExamComponent',()=>{
 
 
 
+  it('shows a generic 404 message instead of silently hiding the exam section',()=>{
+    service.currentExams.and.returnValue(throwError(()=>({status:404})));
+    component.refresh();
+    expect(component.exam).toBeNull();
+    expect(component.error).toContain('Não foi possível confirmar');
+    expect(component.error).not.toContain('stage');
+  });
+
   it('discovers only current objective exams from the scoped application',()=>{
     expect(service.currentExams).toHaveBeenCalledOnceWith(11,100);
     expect(component.exam).toEqual(exam);
     expect(component.session).toBeNull();
+  });
+
+  it('shows scheduled grades after the exam is complete, without reopening it',()=>{
+    service.currentExams.and.returnValue(of([]));
+    service.releasedScores.and.returnValue(of([{
+      stageId:501,publicName:'Prova objetiva',scores:[score]
+    }]));
+    component.refresh();
+    expect(component.exam).toBeNull();
+    expect(component.releasedScores.length).toBe(1);
+    expect(component.releasedScores[0].scores[0].percentage).toBe(80);
+    expect(service.start).not.toHaveBeenCalled();
   });
 
   it('computes countdown from server time even when local time is skewed',()=>{
@@ -217,16 +293,38 @@ describe('RecruitmentCandidateExamComponent',()=>{
     expect(service.submit).not.toHaveBeenCalled();
   });
 
-  it('registers only one event per blur plus hide cycle',()=>{
-    service.start.and.returnValue(of({...session,maxFocusLosses:3}));
-    component.start();
-    component.noteFocusLoss('WINDOW_BLUR');
-    component.noteFocusLoss('TAB_HIDDEN');
-    expect(service.integrityEvent).toHaveBeenCalledTimes(1);
-    expect(service.integrityEvent.calls.mostRecent().args.slice(0,4))
-      .toEqual([11,100,501,800]);
-    expect(component.session?.focusLosses).toBe(1);
-    expect(component.notice).toContain('1/3');
+  it('ignores a short focus loss before five seconds',()=>{
+    jasmine.clock().install();
+    try {
+      service.start.and.returnValue(of({...session,maxFocusLosses:3}));
+      component.start();
+      component.noteFocusLoss('WINDOW_BLUR');
+      jasmine.clock().tick(4999);
+      component.onWindowFocus();
+      jasmine.clock().tick(1000);
+      expect(service.integrityEvent).not.toHaveBeenCalled();
+      expect(component.session?.focusLosses).toBe(0);
+    } finally { jasmine.clock().uninstall(); }
+  });
+
+  it('counts just one sustained blur plus hide event after five seconds',()=>{
+    jasmine.clock().install();
+    try {
+      service.start.and.returnValue(of({...session,maxFocusLosses:3}));
+      component.start();
+      component.noteFocusLoss('WINDOW_BLUR');
+      component.noteFocusLoss('TAB_HIDDEN');
+      jasmine.clock().tick(4999);
+      expect(service.integrityEvent).not.toHaveBeenCalled();
+      jasmine.clock().tick(1);
+      expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+      expect(service.integrityEvent.calls.mostRecent().args.slice(0,4))
+        .toEqual([11,100,501,800]);
+      expect(component.session?.focusLosses).toBe(1);
+      expect(component.notice).toContain('1/3');
+      component.onWindowFocus();
+      expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+    } finally { jasmine.clock().uninstall(); }
   });
 
   it('blocks the exam and clears answers after threshold response',()=>{
@@ -237,7 +335,11 @@ describe('RecruitmentCandidateExamComponent',()=>{
     }));
     component.start();
     component.answers['first']='a';
-    component.noteFocusLoss('TAB_HIDDEN');
+    jasmine.clock().install();
+    try {
+      component.noteFocusLoss('TAB_HIDDEN');
+      jasmine.clock().tick(5000);
+    } finally { jasmine.clock().uninstall(); }
     expect(component.blocked).toBeTrue();
     expect(component.session).toBeNull();
     expect(component.answers).toEqual({});

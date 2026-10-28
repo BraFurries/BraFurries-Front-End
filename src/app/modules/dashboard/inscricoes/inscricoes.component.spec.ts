@@ -60,7 +60,7 @@ describe('InscricoesComponent', () => {
       status:'IN_PROGRESS',submittedAt:'2026-10-22T11:00:00Z'
     }));
     tracking = jasmine.createSpyObj('RecruitmentTrackingService',['mine']);
-    tracking.mine.and.returnValue(of([{ id: 400, processId: 70, processTitle: 'Seleção encerrada',
+    tracking.mine.and.returnValue(of([{ id: 400, processId: 69, processTitle: 'Seleção encerrada',
       submittedAt: '2026-10-20T11:00:00Z', publicStatus: 'RECEIVED' }]));
     component = new InscricoesComponent(context,api,tracking);
     component.ngOnInit();
@@ -81,6 +81,31 @@ describe('InscricoesComponent', () => {
     expect(component.ownApplications.map(x => x.publicStatus)).toEqual(['RECEIVED']);
     expect(component.ownApplications[0].processTitle).toBe('Seleção encerrada');
     expect(component.ownApplications[0].id).toBe(400);
+  });
+
+  it('hides enrolled processes, keeps the existing application, and blocks reopening the form', () => {
+    tracking.mine.and.returnValue(of([
+      {id:400,processId:70,processTitle:'Staff',
+        submittedAt:'2026-10-20T11:00:00Z',publicStatus:'RECEIVED'}
+    ]));
+    component.loadReceipts();
+    expect(component.ownApplications).toHaveSize(1);
+    expect(component.availableProcesses).toEqual([]);
+    component.open(70);
+    expect(api.form).not.toHaveBeenCalled();
+  });
+
+  it('removes a newly submitted process from available cards when the receipt reloads', () => {
+    tracking.mine.and.returnValue(of([
+      {id:123,processId:70,processTitle:'Staff',
+        submittedAt:'2026-10-28T14:00:00Z',publicStatus:'RECEIVED'}
+    ]));
+    component.open(70);
+    component.acceptedTerms=true;
+    component.apply();
+    expect(api.submit).toHaveBeenCalledTimes(1);
+    expect(component.ownApplications[0].id).toBe(123);
+    expect(component.availableProcesses).toEqual([]);
   });
 
   it('requires explicit terms and submits only candidate response values', () => {

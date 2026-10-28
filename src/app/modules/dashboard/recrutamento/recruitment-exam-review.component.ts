@@ -45,8 +45,11 @@ export class RecruitmentExamReviewComponent implements OnChanges,OnDestroy {
 
   get available():boolean {
     return this.communityId!==null && this.applicationId!==null &&
-      this.stageId!==null && this.applicationStatus==='IN_PROGRESS' &&
-      this.stageStatus==='AWAITING_CANDIDATE';
+      this.stageId!==null &&
+      ((this.applicationStatus==='IN_PROGRESS' &&
+        this.stageStatus==='AWAITING_CANDIDATE') ||
+       (this.applicationStatus==='AWAITING_PUBLICATION' &&
+        this.stageStatus==='BLOCKED'));
   }
 
   toggle():void {
@@ -94,6 +97,39 @@ export class RecruitmentExamReviewComponent implements OnChanges,OnDestroy {
       this.reason.trim().length>=20 && this.reason.trim().length<=2000 &&
       !!this.panel?.incidents.some(i=>i.incident.attemptId===this.selectedAttempt &&
         i.canReinstate);
+  }
+
+  get canDenyAppeal():boolean {
+    return this.canReinstate &&
+      !!this.panel?.incidents.some(i=>i.incident.attemptId===this.selectedAttempt &&
+        i.appeal?.status==='PENDING');
+  }
+
+  denyAppeal():void {
+    if(!this.canDenyAppeal || this.communityId===null ||
+      this.applicationId===null || this.stageId===null || this.selectedAttempt===null)return;
+    const generation=this.generation,communityId=this.communityId,
+      applicationId=this.applicationId,stageId=this.stageId,attemptId=this.selectedAttempt;
+    this.busy=true;
+    this.error='';
+    this.api.denyAppeal(communityId,applicationId,stageId,attemptId,this.reason.trim())
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next:()=>{
+          if(generation!==this.generation)return;
+          this.busy=false;
+          this.selectedAttempt=null;
+          this.reason='';
+          this.confirmed=false;
+          this.load();
+          this.notice='Pedido de revisão negado com justificativa registrada.';
+        },
+        error:err=>{
+          if(generation!==this.generation)return;
+          this.busy=false;
+          this.confirmed=false;
+          this.error=this.failure(err);
+        }
+      });
   }
 
   reinstate():void {

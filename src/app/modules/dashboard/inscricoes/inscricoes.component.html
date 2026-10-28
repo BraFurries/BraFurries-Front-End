@@ -45,7 +45,7 @@
     </section>
 
     <section *ngIf="!selected && !loading" class="space-y-4">
-      <div *ngFor="let process of processes" class="rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngFor="let process of availableProcesses" class="rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ process.title }}</h2>
         <p class="mt-2 text-gray-600">{{ process.description || 'Sem descrição.' }}</p>
         <p class="mt-2 text-xs text-gray-500">
@@ -56,7 +56,7 @@
           Consultar requisitos e formulário
         </button>
       </div>
-      <p *ngIf="processes.length === 0" class="rounded-2xl border bg-white p-6 text-gray-600">
+      <p *ngIf="availableProcesses.length === 0" class="rounded-2xl border bg-white p-6 text-gray-600">
         Nenhum processo seletivo com inscrições abertas neste momento.
       </p>
     </section>
