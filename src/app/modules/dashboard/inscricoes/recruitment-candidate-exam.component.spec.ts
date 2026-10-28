@@ -149,6 +149,14 @@ describe('RecruitmentCandidateExamComponent',()=>{
 
 
 
+  it('shows a generic 404 message instead of silently hiding the exam section',()=>{
+    service.currentExams.and.returnValue(throwError(()=>({status:404})));
+    component.refresh();
+    expect(component.exam).toBeNull();
+    expect(component.error).toContain('Não foi possível confirmar');
+    expect(component.error).not.toContain('stage');
+  });
+
   it('discovers only current objective exams from the scoped application',()=>{
     expect(service.currentExams).toHaveBeenCalledOnceWith(11,100);
     expect(component.exam).toEqual(exam);
