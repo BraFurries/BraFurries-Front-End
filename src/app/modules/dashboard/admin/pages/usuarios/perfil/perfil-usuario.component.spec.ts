@@ -416,6 +416,23 @@ describe('AdminUserProfileComponent helpers', () => {
     expect(Object.keys(identity())).not.toContain('primaryUser');
   });
 
+  it('retains optional private ban details only inside the scoped admin history', () => {
+    const scoped = createComponent({} as any);
+    scoped.identityHistory = {
+      ...history(),
+      bans: [{
+        id: 7, sourceUserId: 1, sourceDiscordIds: ['111'],
+        communityId: 5, communityName: 'BraFurries',
+        date: '2026-10-29', reason: 'Motivo resumido',
+        reasonDetails: 'Contexto restrito à administração'
+      }]
+    };
+    expect(scoped.bansFor(1)[0].reasonDetails).toBe('Contexto restrito à administração');
+    expect(scoped.bansFor(2)).toEqual([]);
+    scoped.identityHistory = { ...history(), bans: [] };
+    expect(scoped.bansFor(1)).toEqual([]);
+  });
+
   it('loads identity moderation only for the selected community', () => {
     const getUserIdentityModerationHistory = jasmine.createSpy().and.returnValue(of(history()));
     const contextual = createComponent({ getUserIdentityModerationHistory });
