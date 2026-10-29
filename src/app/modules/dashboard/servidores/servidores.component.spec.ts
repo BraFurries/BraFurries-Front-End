@@ -10,6 +10,17 @@ import { RoleSelectionComponent } from './role-selection.component';
 import { ServidoresComponent } from './servidores.component';
 
 @Component({
+  selector: 'app-portaria-clarification-settings',
+  standalone: false,
+  template: ''
+})
+class MockPortariaClarificationSettingsComponent {
+  @Input() guildId = '';
+  @Input() categories: unknown[] = [];
+  @Input() canManageChannels = false;
+}
+
+@Component({
   selector: 'app-xp-leveling-panel',
   standalone: false,
   template: ''
@@ -182,7 +193,7 @@ describe('ServidoresComponent', () => {
     service.updatePortariaEnabled.and.returnValue(of(portaria));
     service.publishPortariaFlow.and.returnValue(of({ flowId: 1, channelId: '888888888888888888', messageId: '123456789012345678', created: true, reused: false, updated: false }));
     service.getLogs.and.returnValue(of(logs)); service.updateLog.and.returnValue(of(logs)); service.testLog.and.returnValue(of(void 0));
-    await TestBed.configureTestingModule({ declarations: [ServidoresComponent, RoleSelectionComponent, MockXpLevelingPanelComponent, MockAiConfigurationPanelComponent, MockVipConfigurationPanelComponent, MockBackupManagementPanelComponent, MockThemeManagementPanelComponent], imports: [FormsModule], providers: [provideRouter([]), { provide: ActivatedRoute, useValue: route }, { provide: ManagedServersService, useValue: service }, { provide: CommunityContextService, useValue: communityContext }] }).compileComponents();
+    await TestBed.configureTestingModule({ declarations: [ServidoresComponent, RoleSelectionComponent, MockPortariaClarificationSettingsComponent, MockXpLevelingPanelComponent, MockAiConfigurationPanelComponent, MockVipConfigurationPanelComponent, MockBackupManagementPanelComponent, MockThemeManagementPanelComponent], imports: [FormsModule], providers: [provideRouter([]), { provide: ActivatedRoute, useValue: route }, { provide: ManagedServersService, useValue: service }, { provide: CommunityContextService, useValue: communityContext }] }).compileComponents();
     router = TestBed.inject(Router);
   });
   function create(): void { fixture = TestBed.createComponent(ServidoresComponent); component = fixture.componentInstance; fixture.detectChanges(); }
