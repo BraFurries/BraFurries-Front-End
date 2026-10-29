@@ -49,7 +49,8 @@ describe('RecruitmentCandidateExamComponent',()=>{
     incidents.staffRead.and.returnValue(of(void 0));
     service=jasmine.createSpyObj('RecruitmentExamService',
       ['currentExams','start','submit','ownScores','releasedScores','attemptPolicy',
-       'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent','draft','saveDraft']);
+       'saveAttemptPolicy','gradePolicy','saveGradePolicy','integrityEvent',
+        'acknowledgeFocusWarning','draft','saveDraft']);
     service.currentExams.and.returnValue(of([exam]));
     service.releasedScores.and.returnValue(of([]));
     service.ownScores.and.returnValue(throwError(()=>({status:404})));
@@ -59,6 +60,9 @@ describe('RecruitmentCandidateExamComponent',()=>{
     }));
     service.saveDraft.and.returnValue(of({
       attemptId:800,revision:1,savedAt:new Date().toISOString(),answers:{first:'b'}
+    }));
+    service.acknowledgeFocusWarning.and.returnValue(of({
+      attemptFocusLosses:1,acknowledgedFocusLosses:1
     }));
     service.integrityEvent.and.returnValue(of({
       eventId:'00000000-0000-4000-8000-000000000001',
@@ -325,6 +329,56 @@ describe('RecruitmentCandidateExamComponent',()=>{
       component.onWindowFocus();
       expect(service.integrityEvent).toHaveBeenCalledTimes(1);
     } finally { jasmine.clock().uninstall(); }
+  });
+
+  it('keeps one focus warning until server acknowledgement',()=>{
+    jasmine.clock().install();
+    try {
+      service.start.and.returnValue(of({...session,maxFocusLosses:3}));
+      component.start();
+      component.answers['first']='b';component.confirmed=true;
+      component.noteFocusLoss('WINDOW_BLUR');
+      expect(component.focusPhase).toBe('COUNTDOWN');
+      expect(component.canSubmit).toBeFalse();
+      component.noteFocusLoss('TAB_HIDDEN');
+      jasmine.clock().tick(5000);
+      expect(component.focusPhase).toBe('WARNING');
+      expect(component.focusWarningRemaining).toBe(2);
+      expect(component.canSubmit).toBeFalse();
+      expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+      component.onWindowFocus();
+      component.noteFocusLoss('TAB_HIDDEN');
+      jasmine.clock().tick(6000);
+      expect(service.integrityEvent).toHaveBeenCalledTimes(1);
+      component.acknowledgeFocusWarning();
+      expect(service.acknowledgeFocusWarning).toHaveBeenCalledOnceWith(11,100,501,800);
+      expect(component.focusPhase).toBe('IDLE');
+      expect(component.session?.acknowledgedFocusLosses).toBe(1);
+      component.noteFocusLoss('WINDOW_BLUR');
+      jasmine.clock().tick(5000);
+      expect(service.integrityEvent).toHaveBeenCalledTimes(2);
+    } finally { jasmine.clock().uninstall(); }
+  });
+
+  it('restores a warning after reloading the attempt',()=>{
+    service.start.and.returnValue(of({...session,maxFocusLosses:3,
+      focusLosses:2,acknowledgedFocusLosses:1}));
+    component.start();
+    expect(component.focusPhase).toBe('WARNING');
+    expect(component.focusWarningRemaining).toBe(1);
+    component.noteFocusLoss('TAB_HIDDEN');
+    expect(component.focusPhase).toBe('WARNING');
+    expect(service.integrityEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps the modal locked when server acknowledgement fails',()=>{
+    service.start.and.returnValue(of({...session,maxFocusLosses:3,
+      focusLosses:1,acknowledgedFocusLosses:0}));
+    service.acknowledgeFocusWarning.and.returnValue(throwError(()=>({status:503})));
+    component.start();
+    component.acknowledgeFocusWarning();
+    expect(component.focusPhase).toBe('WARNING');
+    expect(component.focusWarningError).toContain('Tente novamente');
   });
 
   it('blocks the exam and clears answers after threshold response',()=>{
