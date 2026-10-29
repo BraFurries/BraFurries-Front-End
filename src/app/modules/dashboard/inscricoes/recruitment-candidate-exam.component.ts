@@ -60,6 +60,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private focusSource: 'TAB_HIDDEN' | 'WINDOW_BLUR' | null = null;
   private focusGraceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly focusGraceMs = 5000;
+  focusPhase:'IDLE'|'COUNTDOWN'|'SYNCING'|'WARNING'='IDLE';
+  focusWarningError='';
+  focusAckBusy=false;
   private sendingSignal = false;
   private pendingSignals: {id:string;type:ExamIntegrityType;source:ExamIntegritySource}[] = [];
   private identity = '';
@@ -143,6 +146,10 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           this.busy = false;
           this.session = session;
           this.resetFocusGrace();
+          this.focusPhase=session.maxFocusLosses!==null &&
+            session.focusLosses>(session.acknowledgedFocusLosses??session.focusLosses)
+            ?'WARNING':'IDLE';
+          this.focusWarningError='';
           this.pendingSignals = [];
           this.sendingSignal = false;
           // Server's own clock is the baseline; client's wall-clock skew does not
@@ -188,6 +195,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   get canSubmit(): boolean {
     return !!this.session && !this.busy && !this.blocked &&
+      this.focusPhase==='IDLE' && !this.focusAckBusy &&
       this.draftReady && !this.draftLoading && !this.draftConflict &&
       !this.pendingSignals.length && this.secondsLeft > 0 &&
       this.confirmed && this.session.form.questions.every(q => {
@@ -253,40 +261,89 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
 
   noteFocusLoss(source:'TAB_HIDDEN'|'WINDOW_BLUR'): void {
     if(!this.session || this.blocked || this.busy ||
-      this.secondsLeft<=0 || this.session.maxFocusLosses===null || this.away)return;
+      this.secondsLeft<=0 || this.session.maxFocusLosses===null ||
+      this.away || this.focusPhase!=='IDLE')return;
     this.away=true;
+    this.focusPhase='COUNTDOWN';
     this.focusAwaySince=Date.now();
     this.focusSource=source;
+    this.focusWarningError='';
+    // Keep grace invisible; elapsed wall time is checked again when focus returns.
     this.focusGraceTimer=setTimeout(()=>{
       this.focusGraceTimer=null;
+      // Timeout completion is authoritative even under fake timers in tests.
+      // The return path also checks wall time when background timers are throttled.
       this.recordSustainedFocusLoss();
     },this.focusGraceMs);
   }
 
   private recordSustainedFocusLoss(): void {
-    if(!this.away || !this.focusSource || !this.session ||
-      this.blocked || this.secondsLeft<=0) return;
+    if(this.focusPhase!=='COUNTDOWN' || !this.away || !this.focusSource ||
+      !this.session || this.blocked || this.secondsLeft<=0)return;
     const source=this.focusSource;
-    this.focusSource=null; // one event per blur + hide cycle
+    this.focusSource=null;
+    this.stopFocusCountdown();
+    this.focusPhase='SYNCING'; // Do not allow another loss until server returns.
     this.queueSignal('FOCUS_LOST',source);
   }
 
   private resumeFromFocusLoss(): void {
-    if(this.away && this.focusSource &&
-      Date.now()-this.focusAwaySince>=this.focusGraceMs) {
-      // Background timers may be throttled; still count long absences on return.
-      this.recordSustainedFocusLoss();
+    if(this.away && this.focusPhase==='COUNTDOWN') {
+      // Browser throttles inactive timers; the return path uses elapsed wall time.
+      if(Date.now()-this.focusAwaySince>=this.focusGraceMs)
+        this.recordSustainedFocusLoss();
+      else {
+        this.resetFocusGrace();
+        this.focusPhase='IDLE';
+      }
+    } else {
+      this.resetFocusGrace(); // Do not clear SYNCING / WARNING states.
     }
-    this.resetFocusGrace();
     this.sendPendingSignals();
   }
 
-  private resetFocusGrace(): void {
-    if(this.focusGraceTimer!==null) clearTimeout(this.focusGraceTimer);
+  private stopFocusCountdown():void {
+    if(this.focusGraceTimer!==null)clearTimeout(this.focusGraceTimer);
     this.focusGraceTimer=null;
+  }
+
+  private resetFocusGrace(): void {
+    this.stopFocusCountdown();
     this.away=false;
     this.focusSource=null;
     this.focusAwaySince=0;
+  }
+
+  get focusWarningRemaining():number {
+    return Math.max(0,(this.session?.maxFocusLosses??0)-
+      (this.session?.focusLosses??0));
+  }
+
+  acknowledgeFocusWarning():void {
+    if(this.focusPhase!=='WARNING' || !this.session || !this.exam ||
+       this.communityId===null || this.applicationId===null ||
+       this.focusAckBusy || this.secondsLeft<=0)return;
+    const generation=this.generation,attemptId=this.session.attemptId;
+    const communityId=this.communityId,applicationId=this.applicationId,
+      stageId=this.exam.stageId;
+    this.focusAckBusy=true;
+    this.focusWarningError='';
+    this.api.acknowledgeFocusWarning(communityId,applicationId,stageId,attemptId)
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:result=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.focusAckBusy=false;
+          this.session.acknowledgedFocusLosses=result.acknowledgedFocusLosses;
+          this.session.focusLosses=result.attemptFocusLosses;
+          this.focusPhase='IDLE';
+          this.notice='Advertência confirmada. Evite novas saídas da avaliação.';
+        },
+        error:()=>{
+          if(generation!==this.generation || this.session?.attemptId!==attemptId)return;
+          this.focusAckBusy=false;
+          this.focusWarningError='Não foi possível confirmar a advertência. Tente novamente.';
+        }
+      });
   }
 
   preventCopy(event:Event,source:'COPY'|'CUT'|'CONTEXT_MENU'): void {
@@ -301,7 +358,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   /** Invoked only for candidate answer edits, never for server draft restoration. */
   answersChanged(): void {
     if(!this.session || !this.draftReady || this.draftLoading || this.draftConflict ||
-      this.busy || this.secondsLeft<=0) return;
+      this.busy || this.secondsLeft<=0 || this.focusPhase!=='IDLE') return;
     this.confirmed=false;
     this.draftDirty=true;
     this.draftError='';
@@ -433,6 +490,7 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
             return;
           }
           if(response.maxFocusLosses!==null && event.type==='FOCUS_LOST') {
+            this.focusPhase='WARNING';
             this.notice=`Saídas registradas: ${response.focusLosses}/${response.maxFocusLosses}.`;
           }
           this.sendPendingSignals();
@@ -448,6 +506,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
           } else {
             this.error='Não foi possível registrar um evento da prova. '+
               'Confira sua conexão e tente reenviar o registro.';
+            if(event.type==='FOCUS_LOST')this.focusWarningError=
+              'A ocorrência ainda não foi confirmada pelo servidor. Reenvie o registro.';
           }
         }
       });
@@ -618,6 +678,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.session=null;
     this.localDeadlineMs=0;
     this.resetFocusGrace();
+    this.focusPhase='IDLE';
+    this.focusWarningError='';
+    this.focusAckBusy=false;
     this.pendingSignals=[];
     this.sendingSignal=false;
     this.answers={};
