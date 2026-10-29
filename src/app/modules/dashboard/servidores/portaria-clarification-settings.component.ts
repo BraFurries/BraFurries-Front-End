@@ -35,6 +35,8 @@ export class PortariaClarificationSettingsComponent implements OnChanges {
     const generation = ++this.generation;
     this.enabled = false;
     this.categoryId = null;
+    this.saving = false;
+    this.loading = false;
     this.success = '';
     this.error = '';
     if (!id) return;
