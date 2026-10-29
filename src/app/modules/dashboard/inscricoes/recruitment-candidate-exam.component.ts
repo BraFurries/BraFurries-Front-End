@@ -275,7 +275,9 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.focusCountdownTimer=setInterval(()=>this.updateFocusCountdown(),200);
     this.focusGraceTimer=setTimeout(()=>{
       this.focusGraceTimer=null;
-      this.updateFocusCountdown();
+      // Timeout completion is authoritative even under fake timers in tests.
+      // The return path also checks wall time when background timers are throttled.
+      this.recordSustainedFocusLoss();
     },this.focusGraceMs);
   }
 
