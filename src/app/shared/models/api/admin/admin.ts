@@ -402,6 +402,8 @@ export interface IdentityBanHistory extends ModerationHistoryBase {
   communityName: string;
   date: string;
   reason: string;
+  /** Returned only by the ADMIN-scoped identity moderation endpoint. */
+  reasonDetails?: string | null;
   canAppeal?: boolean | null;
   validUntil?: string | null;
   appliedByUserId?: number | null;
