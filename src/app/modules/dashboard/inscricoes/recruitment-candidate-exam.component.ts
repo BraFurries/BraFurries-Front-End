@@ -61,10 +61,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private focusGraceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly focusGraceMs = 5000;
   focusPhase:'IDLE'|'COUNTDOWN'|'SYNCING'|'WARNING'='IDLE';
-  focusCountdown=5;
   focusWarningError='';
   focusAckBusy=false;
-  private focusCountdownTimer:ReturnType<typeof setInterval>|null=null;
   private sendingSignal = false;
   private pendingSignals: {id:string;type:ExamIntegrityType;source:ExamIntegritySource}[] = [];
   private identity = '';
@@ -269,10 +267,8 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     this.focusPhase='COUNTDOWN';
     this.focusAwaySince=Date.now();
     this.focusSource=source;
-    this.focusCountdown=5;
     this.focusWarningError='';
-    // Visible seconds update, using elapsed time rather than tick counts.
-    this.focusCountdownTimer=setInterval(()=>this.updateFocusCountdown(),200);
+    // Keep grace invisible; elapsed wall time is checked again when focus returns.
     this.focusGraceTimer=setTimeout(()=>{
       this.focusGraceTimer=null;
       // Timeout completion is authoritative even under fake timers in tests.
@@ -281,20 +277,12 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
     },this.focusGraceMs);
   }
 
-  private updateFocusCountdown():void {
-    if(this.focusPhase!=='COUNTDOWN')return;
-    const elapsed=Date.now()-this.focusAwaySince;
-    this.focusCountdown=Math.max(0,Math.ceil((this.focusGraceMs-elapsed)/1000));
-    if(elapsed>=this.focusGraceMs)this.recordSustainedFocusLoss();
-  }
-
   private recordSustainedFocusLoss(): void {
     if(this.focusPhase!=='COUNTDOWN' || !this.away || !this.focusSource ||
       !this.session || this.blocked || this.secondsLeft<=0)return;
     const source=this.focusSource;
     this.focusSource=null;
     this.stopFocusCountdown();
-    this.focusCountdown=0;
     this.focusPhase='SYNCING'; // Do not allow another loss until server returns.
     this.queueSignal('FOCUS_LOST',source);
   }
@@ -317,8 +305,6 @@ export class RecruitmentCandidateExamComponent implements OnChanges, OnDestroy {
   private stopFocusCountdown():void {
     if(this.focusGraceTimer!==null)clearTimeout(this.focusGraceTimer);
     this.focusGraceTimer=null;
-    if(this.focusCountdownTimer!==null)clearInterval(this.focusCountdownTimer);
-    this.focusCountdownTimer=null;
   }
 
   private resetFocusGrace(): void {
