@@ -30,6 +30,11 @@ export interface ExamSession {
   maxFocusLosses: number | null;
   blockCopy: boolean;
   focusLosses: number;
+  acknowledgedFocusLosses?: number;
+}
+export interface FocusWarningAcknowledgement {
+  attemptFocusLosses: number;
+  acknowledgedFocusLosses: number;
 }
 export interface ExamDraft {
   attemptId: number;
@@ -132,6 +137,11 @@ export class RecruitmentExamService {
     return this.http.post<ExamIntegrityReceipt>(
       `${this.attempts(communityId,applicationId,stageId)}/${attemptId}/integrity-events`,
       {eventId,eventType,source});
+  }
+  acknowledgeFocusWarning(communityId: number, applicationId: number, stageId: number,
+    attemptId: number): Observable<FocusWarningAcknowledgement> {
+    return this.http.post<FocusWarningAcknowledgement>(
+      `${this.attempts(communityId,applicationId,stageId)}/${attemptId}/focus-warning/ack`, {});
   }
   ownScores(communityId: number, applicationId: number, stageId: number):
     Observable<ExamNumericScore[]> {
