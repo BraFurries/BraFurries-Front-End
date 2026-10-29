@@ -303,9 +303,12 @@ describe('RecruitmentCandidateExamComponent',()=>{
       service.start.and.returnValue(of({...session,maxFocusLosses:3}));
       component.start();
       component.noteFocusLoss('WINDOW_BLUR');
+      expect(component.focusPhase).toBe('COUNTDOWN');
       jasmine.clock().tick(4999);
       component.onWindowFocus();
+      expect(component.focusPhase).toBe('IDLE');
       jasmine.clock().tick(1000);
+      expect(component.focusPhase).toBe('IDLE');
       expect(service.integrityEvent).not.toHaveBeenCalled();
       expect(component.session?.focusLosses).toBe(0);
     } finally { jasmine.clock().uninstall(); }
@@ -319,6 +322,7 @@ describe('RecruitmentCandidateExamComponent',()=>{
       component.noteFocusLoss('WINDOW_BLUR');
       component.noteFocusLoss('TAB_HIDDEN');
       jasmine.clock().tick(4999);
+      expect(component.focusPhase).toBe('COUNTDOWN');
       expect(service.integrityEvent).not.toHaveBeenCalled();
       jasmine.clock().tick(1);
       expect(service.integrityEvent).toHaveBeenCalledTimes(1);
