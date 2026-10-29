@@ -348,6 +348,11 @@
           </section>
         } @else if (activeSection === "portaria") {
           <section class="space-y-5">
+            <app-portaria-clarification-settings
+              [guildId]="selectedServerId"
+              [categories]="resources?.categories ?? []"
+              [canManageChannels]="resources?.botCapabilities?.canManageChannels ?? false">
+            </app-portaria-clarification-settings>
             @if (portaria.configured && !portaria.ambiguous && selectedFlow) {
               <article class="card">
                 <p class="eyebrow">Status</p>
