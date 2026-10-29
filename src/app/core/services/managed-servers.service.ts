@@ -89,6 +89,12 @@ export interface PortariaConfig {
   idadeMinimaContaAcessoProvisorioAtiva: boolean; idadeMinimaContaAcessoProvisorioDias: number;
   idadeMinimaEntradaServidorAtiva: boolean; idadeMinimaEntradaServidorAnos: number;
 }
+/** Web controls ONLY configuration; ticket operations and forms remain in Discord. */
+export interface PortariaClarificationSettings {
+  enabled: boolean;
+  categoryId: string | null;
+}
+
 export interface PortariaFlow { id: number; name: string; type: string; targetChannelId: string; approvedTargetChannelId?: string; rejectedTargetChannelId?: string; rejectionFeedbackEnabled: boolean; }
 export interface PortariaQuestion { id?: number; label: string; placeholder?: string; position: number; required: boolean; }
 export interface PortariaState { config: PortariaConfig; flows: PortariaFlow[]; selectedFlow?: PortariaFlow; questions: PortariaQuestion[]; configured: boolean; ambiguous: boolean; }
@@ -451,6 +457,12 @@ export class ManagedServersService {
   updateVipRoles(guildId: string, roleIds: string[]): Observable<StaffRoles> { return this.http.put<StaffRoles>(this.guildUrl(guildId, 'vip-roles'), { roleIds }); }
   updatePortariaRoles(guildId: string, roleIds: PortariaRoleIds): Observable<PortariaConfig> { return this.http.patch<PortariaConfig>(this.guildUrl(guildId, 'portaria/roles'), roleIds); }
   updatePortariaEnabled(guildId: string, enabled: boolean): Observable<PortariaState> { return this.http.patch<PortariaState>(this.guildUrl(guildId, 'portaria/enabled'), { enabled }); }
+  getPortariaClarificationSettings(guildId: string): Observable<PortariaClarificationSettings> {
+    return this.http.get<PortariaClarificationSettings>(this.guildUrl(guildId, 'portaria/clarification'));
+  }
+  updatePortariaClarificationSettings(guildId: string, config: PortariaClarificationSettings): Observable<PortariaClarificationSettings> {
+    return this.http.put<PortariaClarificationSettings>(this.guildUrl(guildId, 'portaria/clarification'), config);
+  }
   getPortaria(guildId: string, flowId?: number): Observable<PortariaState> {
     const suffix = flowId == null ? 'portaria' : `portaria?flowId=${flowId}`;
     return this.http.get<PortariaState>(this.guildUrl(guildId, suffix));
