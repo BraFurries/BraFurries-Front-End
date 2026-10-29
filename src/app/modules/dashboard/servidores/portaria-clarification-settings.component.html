@@ -1,0 +1,38 @@
+<article class="card" aria-label="Tickets excepcionais da Portaria">
+  <p class="eyebrow">Atendimento excepcional</p>
+  <h3>Tickets de esclarecimento</h3>
+  <p class="help mt-1">
+    Permite à Staff abrir um canal privado para conversar com o candidato antes de
+    aprovar ou reprovar a ficha. As fichas e os tickets são operados somente no Discord.
+  </p>
+
+  @if (loading) {
+    <p class="help mt-3">Carregando configuração...</p>
+  } @else {
+    <div class="mt-4 flex items-center gap-3">
+      <input id="portaria-clarification-enabled" type="checkbox"
+        [(ngModel)]="enabled" [disabled]="saving" />
+      <label for="portaria-clarification-enabled">Permitir tickets de esclarecimento</label>
+    </div>
+    <label class="mt-3 block" for="portaria-clarification-category">Categoria dos canais privados</label>
+    <select id="portaria-clarification-category" class="w-full mt-1 rounded-xl border p-3"
+      [(ngModel)]="categoryId" [disabled]="saving">
+      <option [ngValue]="null">Selecione uma categoria</option>
+      @for (category of categories; track category.id) {
+        <option [ngValue]="category.id">{{ category.name }}</option>
+      }
+    </select>
+    @if (enabled && !canManageChannels) {
+      <p class="warning mt-2">O Coddy precisa de permissão para gerenciar canais.</p>
+    }
+    @if (enabled && !categoryId) {
+      <p class="warning mt-2">Selecione uma categoria antes de habilitar os tickets.</p>
+    }
+    @if (error) { <p role="alert" class="warning mt-2">{{ error }}</p> }
+    @if (success) { <p role="status" class="help mt-2">{{ success }}</p> }
+    <button type="button" class="primary-button mt-4" (click)="save()"
+      [disabled]="saving || (enabled && (!categoryId || !canManageChannels))">
+      {{ saving ? 'Salvando...' : 'Salvar configuração' }}
+    </button>
+  }
+</article>
