@@ -199,6 +199,19 @@ describe('ServidoresComponent', () => {
   function create(): void { fixture = TestBed.createComponent(ServidoresComponent); component = fixture.componentInstance; fixture.detectChanges(); }
   function setRoute(params: Record<string, string>): void { route.snapshot.paramMap = convertToParamMap(params); routeParams.next(route.snapshot.paramMap); fixture.detectChanges(); }
 
+  it('places clarification settings inside the Portaria analysis destinations card', () => {
+    create();
+    setRoute({ guildId: '1480343896461545606', section: 'portaria' });
+    const cards = Array.from(fixture.nativeElement.querySelectorAll('article.card')) as HTMLElement[];
+    const destinationCard = cards.find(card =>
+      card.querySelector('h3')?.textContent?.trim() === 'Destinos da análise');
+    expect(destinationCard).toBeDefined();
+    const clarification = destinationCard?.querySelector('app-portaria-clarification-settings');
+    expect(clarification).not.toBeNull();
+    expect(destinationCard?.querySelector('select')).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('app-portaria-clarification-settings').length).toBe(1);
+  });
+
   it('loads real resources, Portaria and staff roles while preserving snowflakes as strings', () => {
     create();
     expect(component.selectedServerId).toBe('1480343896461545606');
