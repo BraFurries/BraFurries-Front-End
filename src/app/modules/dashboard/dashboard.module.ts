@@ -8,6 +8,7 @@ import { InicioComponent } from './inicio/inicio.component';
 import { PerfilComponent } from './perfil/perfil.component';
 import { ServidoresComponent } from './servidores/servidores.component';
 import { PortariaClarificationSettingsComponent } from './servidores/portaria-clarification-settings.component';
+import { TemporaryRolesPanelComponent } from './servidores/temporary-roles-panel.component';
 import { XpLevelingPanelComponent } from './servidores/xp-leveling-panel.component';
 import { AiConfigurationPanelComponent } from './servidores/ai-configuration-panel.component';
 import { VipConfigurationPanelComponent } from './servidores/vip-configuration-panel.component';
@@ -41,6 +42,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     PerfilComponent,
     ServidoresComponent,
     PortariaClarificationSettingsComponent,
+    TemporaryRolesPanelComponent,
     XpLevelingPanelComponent,
     AiConfigurationPanelComponent,
     VipConfigurationPanelComponent,

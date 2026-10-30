@@ -798,6 +798,12 @@
             </article>
             <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
           </section>
+        } @else if (activeSection === 'cargos-temporarios') {
+          <app-temporary-roles-panel
+            [guildId]="selectedServerId"
+            [roles]="resources.roles"
+            [canManageRoles]="resources.botCapabilities.canManageRoles"
+          ></app-temporary-roles-panel>
         } @else if (activeSection === 'vip') {
           <app-vip-configuration-panel
             [guildId]="selectedServerId"
