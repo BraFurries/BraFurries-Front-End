@@ -348,11 +348,6 @@
           </section>
         } @else if (activeSection === "portaria") {
           <section class="space-y-5">
-            <app-portaria-clarification-settings
-              [guildId]="selectedServerId"
-              [categories]="resources?.categories ?? []"
-              [canManageChannels]="resources?.botCapabilities?.canManageChannels ?? false">
-            </app-portaria-clarification-settings>
             @if (portaria.configured && !portaria.ambiguous && selectedFlow) {
               <article class="card">
                 <p class="eyebrow">Status</p>
@@ -736,6 +731,11 @@
                 >
                   Salvar resultado
                 </button>
+            <app-portaria-clarification-settings
+              [guildId]="selectedServerId"
+              [categories]="resources?.categories ?? []"
+              [canManageChannels]="resources?.botCapabilities?.canManageChannels ?? false">
+            </app-portaria-clarification-settings>
                 <div class="mt-6 border-t border-red-100 pt-4">
                   <p class="help mb-3">Ação destrutiva: remove este formulário e as suas publicações, preservando canais e cargos.</p>
                   <button type="button" (click)="deleteSelectedFlow()" [disabled]="mutationInFlight" class="secondary-button border-red-300 bg-red-50 text-red-700 hover:bg-red-100">Excluir formulário</button>
