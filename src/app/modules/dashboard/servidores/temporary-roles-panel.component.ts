@@ -23,12 +23,15 @@ export class TemporaryRolesPanelComponent implements OnChanges {
   discordUserId = '';
   roleId = '';
   expiresLocal = '';
+  expiryMode: 'duration' | 'date' = 'duration';
+  durationValue = 1;
+  durationUnit: 'minutes' | 'hours' | 'days' = 'hours';
   reason = '';
   renewExpiresLocal = '';
   renewReason = '';
   pending?: { type: 'RENEW' | 'CANCEL'; grant: TemporaryRoleGrant };
   private generation = 0;
-  private createRequestId = '';
+  private pendingCreate?: { fingerprint: string; request: TemporaryRoleCreate };
 
   constructor(private readonly api: ManagedServersService) {}
 
@@ -39,7 +42,7 @@ export class TemporaryRolesPanelComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['guildId']) {
       this.pending = undefined;
-      this.createRequestId = '';
+      this.pendingCreate = undefined;
       this.grants = [];
       this.notice = '';
       this.refresh();
@@ -86,11 +89,20 @@ export class TemporaryRolesPanelComponent implements OnChanges {
     return parsed.toISOString();
   }
 
+  /** Convert a local deadline or a relative duration to the existing API's UTC contract. */
+  private createExpiryUtc(): string | null {
+    if (this.expiryMode === 'date') return this.futureUtc(this.expiresLocal);
+    const unitMinutes = { minutes: 1, hours: 60, days: 1440 }[this.durationUnit];
+    const minutes = this.durationValue * unitMinutes;
+    if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 366 * 1440) return null;
+    return new Date(Date.now() + minutes * 60_000).toISOString();
+  }
+
   get canCreate(): boolean {
     return !!this.guildId && this.canManageRoles && !this.busy && !this.loading &&
       this.validSnowflake(this.discordUserId.trim()) &&
       this.manageableRoles.some(role => role.id === this.roleId) &&
-      !!this.futureUtc(this.expiresLocal) &&
+      !!this.createExpiryUtc() &&
       this.reason.trim().length >= 10 && this.reason.trim().length <= 200;
   }
 
@@ -98,16 +110,27 @@ export class TemporaryRolesPanelComponent implements OnChanges {
     if (!this.canCreate) return;
     const id = this.guildId;
     const generation = this.generation;
-    const expiresAt = this.futureUtc(this.expiresLocal);
-    if (!expiresAt) return;
-    if (!this.createRequestId) this.createRequestId = crypto.randomUUID();
-    const request: TemporaryRoleCreate = {
-      requestId: this.createRequestId,
-      discordUserId: this.discordUserId.trim(),
-      roleId: this.roleId,
-      expiresAt,
-      reason: this.reason.trim()
-    };
+    const expiry = this.createExpiryUtc();
+    if (!expiry) return;
+    const fingerprint = JSON.stringify([
+      id, this.discordUserId.trim(), this.roleId, this.reason.trim(),
+      this.expiryMode, this.durationValue, this.durationUnit, this.expiresLocal
+    ]);
+    // A retry of the same form must send the exact same UTC deadline with the
+    // same idempotency UUID; a changed form needs a new UUID.
+    if (!this.pendingCreate || this.pendingCreate.fingerprint !== fingerprint) {
+      this.pendingCreate = {
+        fingerprint,
+        request: {
+          requestId: crypto.randomUUID(),
+          discordUserId: this.discordUserId.trim(),
+          roleId: this.roleId,
+          expiresAt: expiry,
+          reason: this.reason.trim()
+        }
+      };
+    }
+    const request = this.pendingCreate.request;
     this.busy = true;
     this.error = '';
     this.notice = '';
@@ -115,7 +138,7 @@ export class TemporaryRolesPanelComponent implements OnChanges {
       next: () => {
         if (id !== this.guildId || generation !== this.generation) return;
         this.busy = false;
-        this.createRequestId = '';
+        this.pendingCreate = undefined;
         this.discordUserId = '';
         this.roleId = '';
         this.expiresLocal = '';
