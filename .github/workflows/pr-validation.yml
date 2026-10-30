@@ -66,6 +66,7 @@ jobs:
           --include=**/perfil-usuario.component.spec.ts
           --include=**/servidores.component.spec.ts
           --include=**/portaria-clarification-settings.component.spec.ts
+          --include=**/temporary-roles-panel.component.spec.ts
           --include=**/xp-leveling-panel.component.spec.ts
           --include=**/managed-servers-xp.service.spec.ts
           --include=**/ai-configuration-panel.component.spec.ts
