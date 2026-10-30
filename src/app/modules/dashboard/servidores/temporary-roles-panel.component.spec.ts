@@ -13,7 +13,7 @@ describe('TemporaryRolesPanelComponent', () => {
   let component: TemporaryRolesPanelComponent;
   let api: jasmine.SpyObj<ManagedServersService>;
   const grant: TemporaryRoleGrant = {
-    id: 5, guildId: '123', discordUserId: '700', roleId: '50',
+    id: 5, guildId: '123', discordUserId: '700', roleId: '50', grantSource: 'MANUAL',
     expiresAt: new Date(Date.now() + 86400000).toISOString(),
     reason: 'Apoio durante evento',
     status: 'ACTIVE', syncStatus: 'APPLIED', lastErrorCode: null,
