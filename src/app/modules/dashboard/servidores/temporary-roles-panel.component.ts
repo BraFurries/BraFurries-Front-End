@@ -128,12 +128,12 @@ export class TemporaryRolesPanelComponent implements OnChanges {
   }
 
   requestCancel(grant: TemporaryRoleGrant): void {
-    if (this.busy || grant.status !== 'ACTIVE') return;
+    if (this.busy || grant.grantSource !== 'MANUAL' || grant.status !== 'ACTIVE') return;
     this.pending = { type: 'CANCEL', grant };
   }
 
   requestRenew(grant: TemporaryRoleGrant): void {
-    if (this.busy || grant.status !== 'ACTIVE') return;
+    if (this.busy || grant.grantSource !== 'MANUAL' || grant.status !== 'ACTIVE') return;
     this.pending = { type: 'RENEW', grant };
     this.renewReason = grant.reason;
     this.renewExpiresLocal = '';
