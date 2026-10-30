@@ -94,7 +94,7 @@ export interface TemporaryRoleGrant {
   id: number; guildId: string; discordUserId: string; roleId: string;
   expiresAt: string; reason: string;
   status: 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
-  syncStatus: 'PENDING' | 'APPLIED' | 'FAILED';
+  syncStatus: 'PENDING' | 'PROCESSING' | 'APPLIED' | 'FAILED';
   lastErrorCode: string | null; roleAddedByBot: boolean;
   version: number; createdAt: string; appliedAt: string | null;
 }
