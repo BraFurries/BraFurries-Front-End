@@ -94,7 +94,8 @@ export class TemporaryRolesPanelComponent implements OnChanges {
     if (this.expiryMode === 'date') return this.futureUtc(this.expiresLocal);
     const unitMinutes = { minutes: 1, hours: 60, days: 1440 }[this.durationUnit];
     const minutes = this.durationValue * unitMinutes;
-    if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 366 * 1440) return null;
+    if (!Number.isSafeInteger(this.durationValue) || !Number.isSafeInteger(minutes) ||
+        minutes < 1 || minutes > 366 * 1440) return null;
     return new Date(Date.now() + minutes * 60_000).toISOString();
   }
 
