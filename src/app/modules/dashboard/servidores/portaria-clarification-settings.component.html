@@ -1,6 +1,5 @@
-<article class="card" aria-label="Tickets excepcionais da Portaria">
-  <p class="eyebrow">Atendimento excepcional</p>
-  <h3>Tickets de esclarecimento</h3>
+<section class="rounded-xl border border-gray-200 p-4 mt-5" aria-label="Tickets excepcionais da Portaria">
+  <h4 class="font-bold">Tickets de esclarecimento</h4>
   <p class="help mt-1">
     Permite à Staff abrir um canal privado para conversar com o candidato antes de
     aprovar ou reprovar a ficha. As fichas e os tickets são operados somente no Discord.
@@ -9,13 +8,15 @@
   @if (loading) {
     <p class="help mt-3">Carregando configuração...</p>
   } @else {
-    <div class="mt-4 flex items-center gap-3">
+    <label class="toggle-row mt-4" for="portaria-clarification-enabled">
       <input id="portaria-clarification-enabled" type="checkbox"
         [(ngModel)]="enabled" [disabled]="saving" />
-      <label for="portaria-clarification-enabled">Permitir tickets de esclarecimento</label>
-    </div>
-    <label class="mt-3 block" for="portaria-clarification-category">Categoria dos canais privados</label>
-    <select id="portaria-clarification-category" class="w-full mt-1 rounded-xl border p-3"
+      Permitir tickets de esclarecimento
+    </label>
+    <label class="block mt-4" for="portaria-clarification-category">
+      <span class="field-label">Categoria dos canais privados</span>
+    </label>
+    <select id="portaria-clarification-category" class="field-control"
       [(ngModel)]="categoryId" [disabled]="saving">
       <option [ngValue]="null">Selecione uma categoria</option>
       @for (category of categories; track category.id) {
@@ -35,4 +36,4 @@
       {{ saving ? 'Salvando...' : 'Salvar configuração' }}
     </button>
   }
-</article>
+</section>
