@@ -1,0 +1,116 @@
+<section class="space-y-5" aria-label="Gerenciamento de cargos temporários">
+  <article class="card">
+    <p class="eyebrow">Permissões temporárias</p>
+    <h3>Cargos temporários</h3>
+    <p class="mt-2 text-sm text-gray-600">
+      Cadastre concessões por prazo determinado. A API registra a autorização
+      e o Coddy aplica ou remove o cargo no Discord. Cargos de recompensas
+      automáticas continuam independentes.
+    </p>
+    <p *ngIf="!canManageRoles" role="alert" class="mt-3 text-sm text-amber-700">
+      O Coddy precisa de Gerenciar Cargos e de hierarquia superior ao cargo escolhido.
+    </p>
+    <div class="grid gap-4 md:grid-cols-2 mt-5">
+      <label class="block">
+        <span class="field-label">ID Discord do membro</span>
+        <input class="field-control" [(ngModel)]="discordUserId"
+               inputmode="numeric" autocomplete="off" maxlength="19"
+               placeholder="ID numérico do usuário" [disabled]="busy"/>
+      </label>
+      <label class="block">
+        <span class="field-label">Cargo</span>
+        <select class="field-control" [(ngModel)]="roleId" [disabled]="busy || !canManageRoles">
+          <option value="">Selecione um cargo gerenciável</option>
+          <option *ngFor="let role of manageableRoles" [value]="role.id">{{role.name}}</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="field-label">Expira em (horário local)</span>
+        <input class="field-control" type="datetime-local" [(ngModel)]="expiresLocal" [disabled]="busy"/>
+      </label>
+      <label class="block">
+        <span class="field-label">Justificativa (10 a 200 caracteres)</span>
+        <input class="field-control" [(ngModel)]="reason" maxlength="200"
+               placeholder="Motivo administrativo" [disabled]="busy"/>
+      </label>
+    </div>
+    <p class="text-xs text-gray-500 mt-3">
+      O prazo máximo é de 366 dias. Não é possível atribuir cargos gerenciados por
+      integrações ou acima da hierarquia do Coddy.
+    </p>
+    <button type="button" class="primary-button mt-4" [disabled]="!canCreate" (click)="create()">
+      {{busy ? 'Registrando...' : 'Conceder cargo temporário'}}
+    </button>
+  </article>
+
+  <article class="card">
+    <div class="flex flex-wrap justify-between gap-3 items-center">
+      <div>
+        <p class="eyebrow">Histórico e reconciliação</p>
+        <h3>Concessões recentes</h3>
+      </div>
+      <button type="button" class="secondary-button" (click)="refresh()" [disabled]="loading || busy">
+        Atualizar status
+      </button>
+    </div>
+    <p *ngIf="loading" role="status" class="mt-4">Consultando concessões...</p>
+    <p *ngIf="!loading && !grants.length" class="mt-4 text-gray-500">
+      Não há concessões cadastradas nesta lista.
+    </p>
+    <div *ngFor="let grant of grants" class="mt-4 p-4 rounded-xl border border-gray-200">
+      <div class="flex flex-wrap justify-between gap-3">
+        <div>
+          <strong>{{roleName(grant.roleId)}}</strong>
+          <p class="text-sm text-gray-600">Membro: {{grant.discordUserId}}</p>
+          <p class="text-xs text-gray-500">Expiração: {{grant.expiresAt | date:'dd/MM/yyyy HH:mm'}}</p>
+          <p class="text-xs text-gray-500">Motivo: {{grant.reason}}</p>
+        </div>
+        <div class="text-sm">
+          <p><strong>Situação:</strong> {{grant.status === 'ACTIVE' ? 'Ativa' :
+            grant.status === 'CANCELLED' ? 'Cancelada' : 'Expirada'}}</p>
+          <p><strong>Discord:</strong> {{grant.syncStatus === 'APPLIED' ? 'Sincronizado' :
+            grant.syncStatus === 'PENDING' ? 'Pendente' : 'Falha — aguardando nova tentativa'}}</p>
+          <p *ngIf="grant.lastErrorCode" class="text-red-700">
+            Diagnóstico: {{grant.lastErrorCode}}
+          </p>
+        </div>
+      </div>
+      <div *ngIf="grant.status === 'ACTIVE'" class="flex flex-wrap gap-2 mt-3">
+        <button type="button" class="secondary-button" [disabled]="busy"
+                (click)="requestRenew(grant)">Renovar</button>
+        <button type="button" class="secondary-button" [disabled]="busy"
+                (click)="requestCancel(grant)">Cancelar</button>
+      </div>
+    </div>
+  </article>
+
+  <p *ngIf="error" role="alert" class="text-sm text-red-700">{{error}}</p>
+  <p *ngIf="notice" role="status" class="text-sm text-green-700">{{notice}}</p>
+
+  <section *ngIf="pending as action" role="dialog" aria-modal="true"
+           aria-label="Confirmar alteração do cargo temporário"
+           class="card border border-amber-300">
+    <h3>{{action.type === 'RENEW' ? 'Confirmar renovação' : 'Confirmar cancelamento'}}</h3>
+    <p class="mt-2">
+      Cargo {{roleName(action.grant.roleId)}} do membro {{action.grant.discordUserId}}.
+      {{action.type === 'CANCEL' ? 'O Coddy verificará outras concessões antes de remover o cargo.' :
+        'A renovação preserva o histórico e altera somente o prazo da concessão.'}}
+    </p>
+    <div *ngIf="action.type === 'RENEW'" class="grid gap-3 md:grid-cols-2 mt-4">
+      <label><span class="field-label">Novo prazo (horário local)</span>
+        <input class="field-control" type="datetime-local" [(ngModel)]="renewExpiresLocal"/>
+      </label>
+      <label><span class="field-label">Justificativa</span>
+        <input class="field-control" [(ngModel)]="renewReason" maxlength="200"/>
+      </label>
+    </div>
+    <div class="flex gap-3 mt-4">
+      <button type="button" class="secondary-button" [disabled]="busy" (click)="pending = undefined">
+        Voltar
+      </button>
+      <button type="button" class="primary-button" [disabled]="!canConfirm" (click)="confirm()">
+        {{busy ? 'Registrando...' : 'Confirmar'}}
+      </button>
+    </div>
+  </section>
+</section>
