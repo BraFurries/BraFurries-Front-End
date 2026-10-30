@@ -90,6 +90,22 @@ export interface PortariaConfig {
   idadeMinimaEntradaServidorAtiva: boolean; idadeMinimaEntradaServidorAnos: number;
 }
 /** Web controls ONLY configuration; ticket operations and forms remain in Discord. */
+export interface TemporaryRoleGrant {
+  id: number; guildId: string; discordUserId: string; roleId: string;
+  expiresAt: string; reason: string;
+  status: 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
+  syncStatus: 'PENDING' | 'APPLIED' | 'FAILED';
+  lastErrorCode: string | null; roleAddedByBot: boolean;
+  version: number; createdAt: string; appliedAt: string | null;
+}
+export interface TemporaryRoleCreate {
+  requestId: string; discordUserId: string; roleId: string;
+  expiresAt: string; reason: string;
+}
+export interface TemporaryRoleRenew {
+  expectedVersion: number; expiresAt: string; reason: string;
+}
+
 export interface PortariaClarificationSettings {
   enabled: boolean;
   categoryId: string | null;
@@ -308,6 +324,25 @@ export interface GuildOperationResult { created: { key?: string; id: string }[];
 @Injectable({ providedIn: 'root' })
 export class ManagedServersService {
   constructor(private readonly http: HttpClient) {}
+
+  listTemporaryRoles(guildId: string): Observable<TemporaryRoleGrant[]> {
+    return this.http.get<TemporaryRoleGrant[]>(this.guildUrl(guildId, 'temporary-roles'));
+  }
+
+  createTemporaryRole(guildId: string, request: TemporaryRoleCreate): Observable<TemporaryRoleGrant> {
+    return this.http.post<TemporaryRoleGrant>(this.guildUrl(guildId, 'temporary-roles'), request);
+  }
+
+  renewTemporaryRole(guildId: string, id: number, request: TemporaryRoleRenew): Observable<TemporaryRoleGrant> {
+    return this.http.patch<TemporaryRoleGrant>(this.guildUrl(guildId, `temporary-roles/${id}`), request);
+  }
+
+  cancelTemporaryRole(guildId: string, id: number, expectedVersion: number): Observable<TemporaryRoleGrant> {
+    return this.http.delete<TemporaryRoleGrant>(
+      this.guildUrl(guildId, `temporary-roles/${id}`),
+      { params: { expectedVersion: String(expectedVersion) } }
+    );
+  }
 
   getManagedServers(): Observable<ManagedServer[]> {
     return this.http.get<ManagedServer[]>(`${environment.apiBaseUrl}/user/me/managed-servers`);
