@@ -4,7 +4,7 @@ import { concatMap, forkJoin, Observable, of, Subscription } from 'rxjs';
 import { AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 
-type ServerSection = 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
+type ServerSection = 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
 interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
@@ -20,7 +20,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   servers: ManagedServer[] = [];
   readonly sections: ServerSectionLink[] = [
     { id: 'overview', label: 'Visão geral', icon: '✨' }, { id: 'vip', label: 'VIP', icon: '💎' }, { id: 'channels', label: 'Canais', icon: '#️⃣' }, { id: 'ai', label: 'IA', icon: '🤖' }, { id: 'bump', label: 'Bump', icon: '🚀' },
-    { id: 'portaria', label: 'Portaria', icon: '🚪' }, { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️' }, { id: 'backups', label: 'Backups', icon: '💾' }, { id: 'themes', label: 'Temas', icon: '🎨' }, { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️' }, { id: 'private-area', label: 'Área privada', icon: '🔐' },
+    { id: 'portaria', label: 'Portaria', icon: '🚪' }, { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️' }, { id: 'backups', label: 'Backups', icon: '💾' }, { id: 'themes', label: 'Temas', icon: '🎨' }, { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️' }, { id: 'cargos-temporarios', label: 'Cargos temporários', icon: '⏳' }, { id: 'private-area', label: 'Área privada', icon: '🔐' },
     { id: 'logs', label: 'Logs', icon: '📜' }, { id: 'leveling', label: 'XP & Leveling', icon: '🏆' },
     { id: 'economy', label: 'Economia', icon: '💰', status: 'coming-soon' }, { id: 'tickets', label: 'Tickets', icon: '🎫', status: 'coming-soon' }
   ];
