@@ -92,7 +92,7 @@ export interface PortariaConfig {
 /** Web controls ONLY configuration; ticket operations and forms remain in Discord. */
 export interface TemporaryRoleGrant {
   id: number; guildId: string; discordUserId: string; roleId: string;
-  expiresAt: string; reason: string;
+  grantSource: 'LEGACY' | 'MANUAL'; expiresAt: string; reason: string;
   status: 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
   syncStatus: 'PENDING' | 'PROCESSING' | 'APPLIED' | 'FAILED';
   lastErrorCode: string | null; roleAddedByBot: boolean;
