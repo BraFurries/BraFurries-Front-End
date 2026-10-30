@@ -69,7 +69,7 @@
           <p><strong>Situação:</strong> {{grant.status === 'ACTIVE' ? 'Ativa' :
             grant.status === 'CANCELLED' ? 'Cancelada' : 'Expirada'}}</p>
           <p><strong>Discord:</strong> {{grant.syncStatus === 'APPLIED' ? 'Sincronizado' :
-            grant.syncStatus === 'PENDING' ? 'Pendente' : 'Falha — aguardando nova tentativa'}}</p>
+            grant.syncStatus === 'PENDING' ? 'Pendente' : grant.syncStatus === 'PROCESSING' ? 'Processando' : 'Falha — aguardando nova tentativa'}}</p>
           <p *ngIf="grant.lastErrorCode" class="text-red-700">
             Diagnóstico: {{grant.lastErrorCode}}
           </p>
