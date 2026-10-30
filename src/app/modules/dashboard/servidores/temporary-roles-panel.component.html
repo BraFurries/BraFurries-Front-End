@@ -25,7 +25,28 @@
         </select>
       </label>
       <label class="block">
-        <span class="field-label">Expira em (horário local)</span>
+        <span class="field-label">Definir validade</span>
+        <select class="field-control" [(ngModel)]="expiryMode" [disabled]="busy">
+          <option value="duration">Por duração</option>
+          <option value="date">Até data e horário</option>
+        </select>
+      </label>
+      <div *ngIf="expiryMode === 'duration'" class="block">
+        <span class="field-label">Duração</span>
+        <div class="grid grid-cols-2 gap-2">
+          <input class="field-control" aria-label="Quantidade de duração"
+                 type="number" min="1" step="1" [(ngModel)]="durationValue"
+                 [disabled]="busy"/>
+          <select class="field-control" aria-label="Unidade de duração"
+                  [(ngModel)]="durationUnit" [disabled]="busy">
+            <option value="minutes">Minutos</option>
+            <option value="hours">Horas</option>
+            <option value="days">Dias</option>
+          </select>
+        </div>
+      </div>
+      <label *ngIf="expiryMode === 'date'" class="block">
+        <span class="field-label">Até data e horário (horário local)</span>
         <input class="field-control" type="datetime-local" [(ngModel)]="expiresLocal" [disabled]="busy"/>
       </label>
       <label class="block">
@@ -35,7 +56,8 @@
       </label>
     </div>
     <p class="text-xs text-gray-500 mt-3">
-      O prazo máximo é de 366 dias. Não é possível atribuir cargos gerenciados por
+      O prazo máximo é de 366 dias, seja por duração ou data definida. A duração
+      começa no momento da concessão. Não é possível atribuir cargos gerenciados por
       integrações ou acima da hierarquia do Coddy.
     </p>
     <button type="button" class="primary-button mt-4" [disabled]="!canCreate" (click)="create()">
@@ -48,6 +70,7 @@
       <div>
         <p class="eyebrow">Histórico e reconciliação</p>
         <h3>Concessões recentes</h3>
+        <p class="mt-1 text-xs text-gray-500">Concessões encerradas e sincronizadas são removidas após um mês.</p>
       </div>
       <button type="button" class="secondary-button" (click)="refresh()" [disabled]="loading || busy">
         Atualizar status

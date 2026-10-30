@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SimpleChange } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import {
   ManagedServersService, TemporaryRoleGrant
 } from '../../../core/services/managed-servers.service';
@@ -72,6 +72,70 @@ describe('TemporaryRolesPanelComponent', () => {
     expect(request.discordUserId).toBe('700');
     expect(request.roleId).toBe('50');
     expect(request.requestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('accepts duration in minutes, hours or days and sends an absolute UTC expiry', () => {
+    component.discordUserId = '700';
+    component.roleId = '50';
+    component.reason = 'Apoio durante evento';
+    component.expiryMode = 'duration';
+    component.durationValue = 2;
+    component.durationUnit = 'hours';
+    const before = Date.now();
+    component.create();
+    const until = Date.parse(api.createTemporaryRole.calls.mostRecent().args[1].expiresAt);
+    expect(until - before).toBeGreaterThanOrEqual(2 * 3600000);
+    expect(until - before).toBeLessThan(2 * 3600000 + 3000);
+  });
+
+  it('supports an explicit local date and converts it to UTC', () => {
+    component.discordUserId = '700';
+    component.roleId = '50';
+    component.reason = 'Apoio durante evento';
+    component.expiryMode = 'date';
+    const target = new Date(Date.now() + 2 * 86400000);
+    const local = new Date(target.getTime() - target.getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 16);
+    component.expiresLocal = local;
+    component.create();
+    const request = api.createTemporaryRole.calls.mostRecent().args[1];
+    expect(request.expiresAt).toBe(new Date(local).toISOString());
+  });
+
+  it('rejects invalid or excessive relative durations', () => {
+    component.discordUserId = '700';
+    component.roleId = '50';
+    component.reason = 'Apoio durante evento';
+    component.expiryMode = 'duration';
+    component.durationUnit = 'days';
+    for (const invalid of [0, -1, 0.5, 367]) {
+      component.durationValue = invalid;
+      expect(component.canCreate).toBeFalse();
+    }
+    component.create();
+    expect(api.createTemporaryRole).not.toHaveBeenCalled();
+  });
+
+  it('retries the same duration request idempotently but changes UUID when form changes', () => {
+    component.discordUserId = '700';
+    component.roleId = '50';
+    component.reason = 'Apoio durante evento';
+    component.expiryMode = 'duration';
+    component.durationValue = 2;
+    component.durationUnit = 'days';
+    api.createTemporaryRole.and.returnValue(
+      throwError(() => ({ status: 503 }))
+    );
+    component.create();
+    const first = api.createTemporaryRole.calls.mostRecent().args[1];
+    component.create();
+    const retry = api.createTemporaryRole.calls.mostRecent().args[1];
+    expect(retry).toEqual(first);
+    component.durationValue = 3;
+    component.create();
+    const changed = api.createTemporaryRole.calls.mostRecent().args[1];
+    expect(changed.requestId).not.toBe(first.requestId);
+    expect(changed.expiresAt).not.toBe(first.expiresAt);
   });
 
   it('requires explicit confirmation before cancellation', () => {
