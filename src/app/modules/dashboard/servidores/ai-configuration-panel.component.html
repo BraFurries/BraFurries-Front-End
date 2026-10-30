@@ -30,16 +30,22 @@
         <p class="eyebrow">Modelo</p>
         <h3>Modelo OpenAI</h3>
         <label class="block mt-4">
-          <span class="field-label">Identificador do modelo</span>
-          <input
+          <span class="field-label">Modelo para respostas do Coddy</span>
+          <select
             class="field-control"
-            type="text"
-            maxlength="32"
+            aria-label="Modelo OpenAI"
             [(ngModel)]="draft.model"
             (ngModelChange)="onDraftChanged()"
-            placeholder="gpt-5-mini">
+            [disabled]="saving || tokenBusy">
+            @if (legacySelectedModel; as currentModel) {
+              <option [value]="currentModel">{{ currentModel }} (modelo configurado anteriormente)</option>
+            }
+            @for (model of aiModelOptions; track model.id) {
+              <option [value]="model.id">{{ model.label }}</option>
+            }
+          </select>
         </label>
-        <p class="help">Se já existir uma chave configurada e o modelo mudar, o backend valida o acesso ao novo modelo antes de salvar.</p>
+        <p class="help">Modelos recentes da API OpenAI. A disponibilidade e os custos dependem da conta e do modelo. Se já existir uma chave configurada e o modelo mudar, a API valida o acesso antes de salvar.</p>
       </article>
 
       <article class="card">

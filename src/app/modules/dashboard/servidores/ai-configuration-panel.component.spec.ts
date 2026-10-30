@@ -76,6 +76,45 @@ describe('AiConfigurationPanelComponent', () => {
     expect(component.messageChannels.map(channel => channel.id)).toEqual(['10', '11']);
   });
 
+  it('offers recent OpenAI models as a dropdown while keeping the configured legacy model', async () => {
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const picker = fixture.nativeElement.querySelector(
+      'select[aria-label="Modelo OpenAI"]'
+    ) as HTMLSelectElement;
+    expect(picker).not.toBeNull();
+    const values = Array.from(picker.options, option => option.value);
+    expect(values).toContain('gpt-6-luna');
+    expect(values).toContain('gpt-6.1-terra');
+    expect(values).toContain('gpt-6.1-sol');
+    expect(values).toContain('gpt-6-astra');
+    expect(values).toContain('gpt-5-mini');
+    expect(picker.value).toBe('gpt-5-mini');
+    expect(component.dirty).toBeFalse();
+  });
+
+  it('selecting a recent model changes only the draft until Save', async () => {
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const picker = fixture.nativeElement.querySelector(
+      'select[aria-label="Modelo OpenAI"]'
+    ) as HTMLSelectElement;
+    picker.value = 'gpt-6.1-terra';
+    picker.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(component.draft!.model).toBe('gpt-6.1-terra');
+    expect(component.persisted!.model).toBe('gpt-5-mini');
+    expect(component.dirty).toBeTrue();
+    expect(service.updateAi).not.toHaveBeenCalled();
+
+    component.save();
+    expect(service.updateAi).toHaveBeenCalledWith('123', jasmine.objectContaining({
+      model: 'gpt-6.1-terra'
+    }));
+  });
+
   it('uses a compact picker that only offers channels not already selected', () => {
     expect(component.availableMessageChannels.map(channel => channel.id)).toEqual(['11']);
 

@@ -35,6 +35,24 @@ export class AiConfigurationPanelComponent implements OnChanges, OnDestroy {
   adminUserIdsText = '';
   channelToAdd = '';
 
+  // Curated text-model IDs compatible with Coddy's OpenAI Responses workflow.
+  // Access to each model is still verified by the API using this guild's key.
+  readonly aiModelOptions: ReadonlyArray<{ id: string; label: string }> = [
+    { id: 'gpt-6-luna', label: 'GPT-6 Luna — econômico e rápido' },
+    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra — rápido e versátil' },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol — avançado e equilibrado' },
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra — máximo desempenho' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — geração anterior' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — geração anterior' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — geração anterior' }
+  ];
+
+  get legacySelectedModel(): string | null {
+    const selected = this.draft?.model ?? '';
+    return selected && !this.aiModelOptions.some(option => option.id === selected)
+      ? selected : null;
+  }
+
   private loadGeneration = 0;
   private draftRevision = 0;
 
