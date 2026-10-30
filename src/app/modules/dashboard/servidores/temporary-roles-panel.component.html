@@ -62,6 +62,7 @@
         <div>
           <strong>{{roleName(grant.roleId)}}</strong>
           <p class="text-sm text-gray-600">Membro: {{grant.discordUserId}}</p>
+          <p class="text-xs text-gray-500">Origem: {{grant.grantSource === 'MANUAL' ? 'Concessão administrativa' : 'Recompensa automática'}}</p>
           <p class="text-xs text-gray-500">Expiração: {{grant.expiresAt | date:'dd/MM/yyyy HH:mm'}}</p>
           <p class="text-xs text-gray-500">Motivo: {{grant.reason}}</p>
         </div>
@@ -75,7 +76,7 @@
           </p>
         </div>
       </div>
-      <div *ngIf="grant.status === 'ACTIVE'" class="flex flex-wrap gap-2 mt-3">
+      <div *ngIf="grant.grantSource === 'MANUAL' && grant.status === 'ACTIVE'" class="flex flex-wrap gap-2 mt-3">
         <button type="button" class="secondary-button" [disabled]="busy"
                 (click)="requestRenew(grant)">Renovar</button>
         <button type="button" class="secondary-button" [disabled]="busy"
