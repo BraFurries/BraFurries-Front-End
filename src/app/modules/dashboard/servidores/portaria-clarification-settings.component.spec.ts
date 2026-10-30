@@ -1,5 +1,5 @@
 import { SimpleChange } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, throwError } from 'rxjs';
 import { ManagedServersService } from '../../../core/services/managed-servers.service';
@@ -7,6 +7,7 @@ import { PortariaClarificationSettingsComponent } from './portaria-clarification
 
 describe('PortariaClarificationSettingsComponent', () => {
   let component: PortariaClarificationSettingsComponent;
+  let fixture: ComponentFixture<PortariaClarificationSettingsComponent>;
   let service: jasmine.SpyObj<ManagedServersService>;
 
   beforeEach(async () => {
@@ -20,13 +21,22 @@ describe('PortariaClarificationSettingsComponent', () => {
       declarations: [PortariaClarificationSettingsComponent],
       providers: [{provide: ManagedServersService, useValue: service}]
     }).compileComponents();
-    const fixture = TestBed.createComponent(PortariaClarificationSettingsComponent);
+    fixture = TestBed.createComponent(PortariaClarificationSettingsComponent);
     component = fixture.componentInstance;
     component.guildId = '123';
     component.categories = [{id: '987654321098765432', name: 'Atendimento'}];
     component.canManageChannels = true;
     component.ngOnChanges({guildId: new SimpleChange('', '123', true)});
     fixture.detectChanges();
+  });
+
+  it('uses the shared Portaria subsection and form control styling', () => {
+    const root = fixture.nativeElement.querySelector('section.rounded-xl') as HTMLElement;
+    expect(root).not.toBeNull();
+    expect(root.querySelector('h4')?.textContent).toContain('Tickets de esclarecimento');
+    expect(root.querySelector('label.toggle-row')).not.toBeNull();
+    expect(root.querySelector('select.field-control')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('article.card')).toBeNull();
   });
 
   it('starts disabled and does not create tickets in the website', () => {
