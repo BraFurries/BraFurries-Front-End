@@ -55,6 +55,67 @@ describe('UserService cached user state', () => {
     expect(service.getAccessToken()).toBe('fresh-access');
   });
 
+  it('uses one rotating refresh for simultaneous callers and retains the route credentials', () => {
+    service.login('luna@example.com', 'password', true).subscribe();
+    http.expectOne((request) => request.url.endsWith('/auth/login')).flush({
+      access_token: 'old-access', refresh_token: 'old-refresh', expires_in: 0, user
+    });
+
+    const results: boolean[] = [];
+    service.ensureValidSession().subscribe(value => results.push(value));
+    service.ensureValidSession().subscribe(value => results.push(value));
+
+    const pending = http.match((request) => request.url.endsWith('/auth/refresh'));
+    expect(pending.length).toBe(1);
+    expect(pending[0].request.body.refresh_token).toBe('old-refresh');
+    pending[0].flush({
+      access_token: 'new-access', refresh_token: 'rotated-refresh', expires_in: 900
+    });
+
+    expect(results).toEqual([true, true]);
+    expect(service.getAccessToken()).toBe('new-access');
+    expect(JSON.parse(localStorage.getItem('logged_user') || '{}').refreshToken).toBe('rotated-refresh');
+    expect(service.hasRecoverableSession()).toBeTrue();
+  });
+
+  it('does not restore a logged-out session from a late refresh response', () => {
+    service.login('luna@example.com', 'password', true).subscribe();
+    http.expectOne((request) => request.url.endsWith('/auth/login')).flush({
+      access_token: 'old-access', refresh_token: 'old-refresh', expires_in: 0, user
+    });
+
+    const refreshed: boolean[] = [];
+    service.refreshToken().subscribe(value => refreshed.push(value));
+    const refresh = http.expectOne((request) => request.url.endsWith('/auth/refresh'));
+
+    service.logout().subscribe();
+    http.expectOne((request) => request.url.endsWith('/auth/logout')).flush({ message: 'ok' });
+    refresh.flush({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 900 });
+
+    expect(refreshed).toEqual([false]);
+    expect(service.getAccessToken()).toBeNull();
+    expect(localStorage.getItem('logged_user')).toBeNull();
+  });
+
+  it('keeps newly rotated tokens when an older /user request finishes afterwards', () => {
+    service.login('luna@example.com', 'password', true).subscribe();
+    http.expectOne((request) => request.url.endsWith('/auth/login')).flush({
+      access_token: 'old-access', refresh_token: 'old-refresh', expires_in: 0, user
+    });
+
+    service.getUserDetails().subscribe();
+    const details = http.expectOne((request) => request.url.endsWith('/user'));
+    service.refreshToken().subscribe();
+    http.expectOne((request) => request.url.endsWith('/auth/refresh')).flush({
+      access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 900
+    });
+
+    details.flush({ ...user, name: 'Luna atualizado' });
+    expect(service.getAccessToken()).toBe('new-access');
+    expect(JSON.parse(localStorage.getItem('logged_user') || '{}').refreshToken).toBe('new-refresh');
+    expect(service.getUser()?.name).toBe('Luna atualizado');
+  });
+
   it('discards refresh credentials when the server rejects them as invalid', () => {
     service.login('luna@example.com', 'password', false).subscribe();
     http.expectOne((request) => request.url.endsWith('/auth/login')).flush({
