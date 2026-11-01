@@ -76,6 +76,9 @@ jobs:
           --include=**/theme-management-panel.component.spec.ts
           --include=**/base-layout-dashboard.component.spec.ts
           --include=**/stale-chunk-recovery.service.spec.ts
+          --include=**/dashboard.guard.spec.ts
+          --include=**/auth-token.interceptor.spec.ts
+          --include=**/user.service.spec.ts
 
       - name: Build
         run: npm run build

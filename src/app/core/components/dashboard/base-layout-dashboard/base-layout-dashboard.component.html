@@ -152,8 +152,20 @@
                 <span class="mr-3">📅</span> Eventos
             </a>
 
-            <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mt-4 mb-2 tracking-widest">Community</p>
+            <button type="button" (click)="toggleCommunitySection()"
+                class="flex w-full items-center justify-between rounded-lg px-4 py-2 mt-4 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 transition hover:bg-white/10 hover:text-white"
+                aria-controls="community-navigation-links"
+                [attr.aria-expanded]="isCommunitySectionExpanded"
+                [attr.aria-label]="isCommunitySectionExpanded ? 'Recolher menu Community' : 'Expandir menu Community'">
+                <span>Community</span>
+                <svg class="h-3.5 w-3.5 transition-transform duration-200"
+                    [ngClass]="{'rotate-180': isCommunitySectionExpanded}"
+                    viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
 
+            <div id="community-navigation-links" *ngIf="isCommunitySectionExpanded" class="space-y-2">
             <a *ngIf="showMembersMenu" [routerLink]="scopedLink('membros')"
                 class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
                 [ngClass]="activePath.includes('/membros')
@@ -231,6 +243,8 @@
                 class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40">
                 <span class="mr-3">➕</span> Adicionar o Coddy
             </a>
+
+            </div>
 
             <ng-container *ngIf="showAdminMenu">
                 <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mt-4 mb-2 tracking-widest">Administração</p>
