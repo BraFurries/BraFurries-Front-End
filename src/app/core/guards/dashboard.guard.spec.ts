@@ -11,7 +11,8 @@ describe('DashboardGuard', () => {
 
   beforeEach(() => {
     router = jasmine.createSpyObj<Router>('Router', ['createUrlTree']);
-    userService = jasmine.createSpyObj<UserService>('UserService', ['ensureValidSession']);
+    userService = jasmine.createSpyObj<UserService>('UserService', ['ensureValidSession', 'hasRecoverableSession']);
+    userService.hasRecoverableSession.and.returnValue(false);
     TestBed.configureTestingModule({
       providers: [DashboardGuard, { provide: Router, useValue: router }, { provide: UserService, useValue: userService }]
     });
@@ -27,6 +28,34 @@ describe('DashboardGuard', () => {
 
     expect(result).toBe(panelTree);
     expect(router.createUrlTree).toHaveBeenCalledWith(['/painel']);
+  });
+
+  it('keeps a guarded route while token refresh is temporarily unavailable', async () => {
+    userService.ensureValidSession.and.returnValue(of(false));
+    userService.hasRecoverableSession.and.returnValue(true);
+    const result = await firstValueFrom(guard.canLoad({
+      data: { guardMode: 'authenticatedOnly' }
+    }, [new UrlSegment('painel', {}), new UrlSegment('comunidades', {})]));
+
+    expect(result).toBeTrue();
+    expect(router.createUrlTree).not.toHaveBeenCalled();
+  });
+
+  it('redirects to login after refresh revocation, preserving the requested route', async () => {
+    userService.ensureValidSession.and.returnValue(of(false));
+    userService.hasRecoverableSession.and.returnValue(false);
+    const loginTree = {} as UrlTree;
+    router.createUrlTree.and.returnValue(loginTree);
+
+    const result = await firstValueFrom(guard.canLoad({
+      data: { guardMode: 'authenticatedOnly' }
+    }, [new UrlSegment('painel', {}), new UrlSegment('comunidades', {}),
+        new UrlSegment('42', {}), new UrlSegment('coddy', {})]));
+
+    expect(result).toBe(loginTree);
+    expect(router.createUrlTree).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/painel/comunidades/42/coddy' }
+    });
   });
 
   it('redirects an unauthenticated visitor to login with the requested path', async () => {
