@@ -24,6 +24,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   isUserMenuOpen = false;
   isCommunityMenuOpen = false;
+  isCommunitySectionExpanded = true;
   isMobileMenuOpen = false;
   isLoggingOut = false;
 
@@ -41,6 +42,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   showCommunityAccessMenu = false;
   showActivityMenu = false;
 
+  private readonly communitySectionStorageKey = 'brafurries.dashboard.community-section-expanded';
   private readonly destroy$ = new Subject<void>();
   private readonly failedCommunityImageUrls = new Set<string>();
 
@@ -55,6 +57,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   ) {
     this.activePath = window.location.pathname;
     this.showAdminMenu = this.userPermissionsService.isAdmin();
+    this.isCommunitySectionExpanded = this.restoreCommunitySectionState();
 
     this.router.events.pipe(takeUntil(this.destroy$)).subscribe(event => {
       if (event instanceof NavigationEnd) {
@@ -162,6 +165,23 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     if (!this.communities.length) return;
     this.isCommunityMenuOpen = !this.isCommunityMenuOpen;
     if (this.isCommunityMenuOpen) this.isUserMenuOpen = false;
+  }
+
+  toggleCommunitySection(): void {
+    this.isCommunitySectionExpanded = !this.isCommunitySectionExpanded;
+    try {
+      sessionStorage.setItem(this.communitySectionStorageKey, String(this.isCommunitySectionExpanded));
+    } catch {
+      // Disabled browser storage must not block sidebar navigation.
+    }
+  }
+
+  private restoreCommunitySectionState(): boolean {
+    try {
+      return sessionStorage.getItem(this.communitySectionStorageKey) !== 'false';
+    } catch {
+      return true;
+    }
   }
 
   toggleMobileMenu(): void {
