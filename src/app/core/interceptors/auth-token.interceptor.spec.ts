@@ -85,15 +85,15 @@ describe('authTokenInterceptor', () => {
 
   it('preserves a recoverable session on a temporary refresh outage', () => {
     login(0);
-    let seenError: HttpErrorResponse | null = null;
+    let seenStatus = 0;
     client.get(`${environment.apiBaseUrl}/user`).subscribe({
-      error: (error: HttpErrorResponse) => seenError = error
+      error: (error: HttpErrorResponse) => seenStatus = error.status
     });
 
     http.expectOne(`${environment.apiBaseUrl}/auth/refresh`)
       .flush({ message: 'Service unavailable' }, { status: 503, statusText: 'Unavailable' });
 
-    expect(seenError?.status).toBe(503);
+    expect(seenStatus).toBe(503);
     expect(userService.getAccessToken()).toBe('access-1');
     expect(userService.hasRecoverableSession()).toBeTrue();
     http.expectNone(`${environment.apiBaseUrl}/user`);
