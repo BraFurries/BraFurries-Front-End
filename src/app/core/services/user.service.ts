@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { UserReliability } from '../models/user-reliability.model';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, catchError, map, of, switchMap, tap, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse } from '../../shared/models/api/auth/authResponse';
 import { User } from '../../shared/models/user';
@@ -48,6 +48,7 @@ export class UserService {
   private readonly storageKey = 'logged_user';
   private readonly socialLoginReturnUrlKey = 'social_login_return_url';
   private session: UserSession | null = this.loadUserFromStorage();
+  private refreshInFlight$: Observable<boolean> | null = null;
   private readonly currentUserSubject = new BehaviorSubject<User | null>(this.session?.user ?? null);
   readonly user$ = this.currentUserSubject.asObservable();
 
@@ -207,31 +208,44 @@ export class UserService {
   }
 
   refreshToken(): Observable<boolean> {
-    const currentSession = this.session;
+    // Refresh tokens are rotated on the API: parallel callers must share one
+    // request, or the second refresh will fail with a revoked old token.
+    if (this.refreshInFlight$) return this.refreshInFlight$;
 
+    const currentSession = this.session;
     if (!currentSession?.refreshToken) {
       this.clearSession();
       return of(false);
     }
 
     const endpoint = `${environment.apiBaseUrl}/auth/refresh`;
-    return this.http.post<RefreshTokenResponse>(endpoint, { refresh_token: currentSession.refreshToken }).pipe(
-      tap((response) => {
+    const refresh$ = this.http.post<RefreshTokenResponse>(
+      endpoint, { refresh_token: currentSession.refreshToken }
+    ).pipe(
+      map(response => {
+        // Logout or a new login may have replaced the session while in flight.
+        // Never resurrect an old session with a late refresh response.
+        if (this.session?.refreshToken !== currentSession.refreshToken) return false;
         this.setSession(this.mapAuthResponseToSession(response, currentSession.user));
+        return true;
       }),
-      map(() => true),
       catchError((error: unknown) => {
-        // Connectivity, server outages and temporary throttling do not mean
-        // the refresh token was revoked. Preserve it so streaming (and other
-        // authenticated workflows) can retry after the network recovers.
+        // Only definitive credential rejection ends the session. Network loss,
+        // throttling and 5xx responses must leave it available for a retry.
         const transient = error instanceof HttpErrorResponse && (
-          error.status === 0 || error.status === 408
-          || error.status === 429 || error.status >= 500
+          error.status === 0 || error.status === 408 ||
+          error.status === 429 || error.status >= 500
         );
-        if (!transient) this.clearSession();
+        if (!transient && this.session?.refreshToken === currentSession.refreshToken) {
+          this.clearSession();
+        }
         return of(false);
-      })
+      }),
+      finalize(() => { this.refreshInFlight$ = null; }),
+      shareReplay({ bufferSize: 1, refCount: false })
     );
+    this.refreshInFlight$ = refresh$;
+    return refresh$;
   }
 
   getUserDetails(): Observable<User | null> {
@@ -244,10 +258,11 @@ export class UserService {
     const endpoint = `${environment.apiBaseUrl}/user`;
     return this.http.get<User>(endpoint).pipe(
       tap((userDetails) => {
-        this.setSession({
-          ...currentSession,
-          user: userDetails
-        });
+        // The refresh token may have rotated while /user was in flight.
+        // Retain the newest credentials instead of restoring stale tokens.
+        if (this.session?.user.id === currentSession.user.id) {
+          this.setSession({ ...this.session, user: userDetails });
+        }
       }),
       map(() => this.session?.user ?? null),
       catchError(() => of(this.session?.user ?? null))
@@ -286,6 +301,10 @@ export class UserService {
     return this.session?.accessToken ?? null;
   }
 
+  hasRecoverableSession(): boolean {
+    return Boolean(this.session?.refreshToken);
+  }
+
   getTokenType(): string {
     return this.session?.tokenType ?? 'Bearer';
   }
@@ -300,7 +319,7 @@ export class UserService {
     }
 
     return this.refreshToken().pipe(
-      switchMap((refreshOk) => of(refreshOk && this.session !== null))
+      map(refreshOk => refreshOk && this.session !== null)
     );
   }
 
