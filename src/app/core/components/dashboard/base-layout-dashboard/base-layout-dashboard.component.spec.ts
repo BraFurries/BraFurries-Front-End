@@ -62,6 +62,7 @@ describe('BaseLayoutDashboardComponent', () => {
   };
 
   beforeEach(async () => {
+    sessionStorage.removeItem('brafurries.dashboard.community-section-expanded');
     user$ = new BehaviorSubject<User | null>(user);
     context$ = new BehaviorSubject<CommunityContextState>(baseState);
     context = jasmine.createSpyObj<CommunityContextService>(
@@ -237,6 +238,45 @@ describe('BaseLayoutDashboardComponent', () => {
     component.selectCommunity(2);
 
     expect(context.selectCommunity).toHaveBeenCalledWith(2);
+  });
+
+  it('collapses Community links without hiding the section heading or other navigation', () => {
+    context$.next({
+      ...baseState,
+      activeAccess: { ...baseState.activeAccess!, capabilities: ['MEMBERS_VIEW', 'TEAM_VIEW'] }
+    });
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector('[aria-controls="community-navigation-links"]') as HTMLButtonElement;
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('#community-navigation-links')?.textContent).toContain('Membros');
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(fixture.nativeElement.querySelector('#community-navigation-links')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Início');
+    expect(fixture.nativeElement.textContent).toContain('Community');
+    expect(sessionStorage.getItem('brafurries.dashboard.community-section-expanded')).toBe('false');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(sessionStorage.getItem('brafurries.dashboard.community-section-expanded')).toBe('true');
+  });
+
+  it('restores collapsed Community state within the same tab session', () => {
+    sessionStorage.setItem('brafurries.dashboard.community-section-expanded', 'false');
+    const secondFixture = TestBed.createComponent(BaseLayoutDashboardComponent);
+    secondFixture.detectChanges();
+
+    expect(secondFixture.componentInstance.isCommunitySectionExpanded).toBeFalse();
+    expect(secondFixture.nativeElement.querySelector('#community-navigation-links')).toBeNull();
+    expect(secondFixture.nativeElement.querySelector('[aria-controls="community-navigation-links"]')
+      ?.getAttribute('aria-expanded')).toBe('false');
+    secondFixture.destroy();
   });
 
   it('opens and closes the mobile menu explicitly', () => {
