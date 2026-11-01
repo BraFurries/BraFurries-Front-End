@@ -32,11 +32,15 @@ export class DashboardGuard implements CanActivate, CanLoad {
   ): Observable<boolean | UrlTree> {
     return this.userService.ensureValidSession().pipe(
       map((isValidSession) => {
+        // A transient refresh failure must not navigate away from the current
+        // page. Only a genuinely absent/rejected session redirects to login.
+        // The API still enforces access independently on every request.
+        const sessionAvailable = isValidSession || this.userService.hasRecoverableSession();
         if (guardMode === 'publicOnly') {
-          return isValidSession ? this.router.createUrlTree(['/painel']) : true;
+          return sessionAvailable ? this.router.createUrlTree(['/painel']) : true;
         }
 
-        if (isValidSession) {
+        if (sessionAvailable) {
           return true;
         }
 
