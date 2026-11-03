@@ -35,11 +35,11 @@
       Você tem as permissões abaixo. Os cadastros correspondentes serão disponibilizados nas próximas entregas.
     </p>
     <ul class="mt-3 list-disc space-y-1 pl-6 text-gray-700">
-      <li *ngFor="let permission of permissionDefinitions">
-        <ng-container *ngIf="access?.permissions?.includes(permission.code)">
+      <ng-container *ngFor="let permission of permissionDefinitions">
+        <li *ngIf="access?.permissions?.includes(permission.code)">
           {{ permission.label }}
-        </ng-container>
-      </li>
+        </li>
+      </ng-container>
     </ul>
   </div>
 
