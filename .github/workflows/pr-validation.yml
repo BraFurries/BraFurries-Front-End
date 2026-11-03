@@ -75,6 +75,8 @@ jobs:
           --include=**/backup-management-panel.component.spec.ts
           --include=**/theme-management-panel.component.spec.ts
           --include=**/commerce-access.component.spec.ts
+          --include=**/commerce-catalog.component.spec.ts
+          --include=**/commerce-catalog.service.spec.ts
           --include=**/commerce-access.service.spec.ts
           --include=**/base-layout-dashboard.component.spec.ts
           --include=**/stale-chunk-recovery.service.spec.ts

@@ -11,6 +11,7 @@ import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
 import { CommerceAccessComponent } from './commerce/commerce-access.component';
+import { CommerceCatalogComponent } from './commerce/commerce-catalog.component';
 import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
 import { InscricoesComponent } from './inscricoes/inscricoes.component';
 import { TriagemComponent } from './triagem/triagem.component';
@@ -22,6 +23,7 @@ const routes: Routes = [
     children: [
       { path: '', component: InicioComponent },
       { path: 'perfil', component: PerfilComponent },
+      { path: 'gestao-comercial/catalogo', component: CommerceCatalogComponent },
       { path: 'gestao-comercial', component: CommerceAccessComponent },
       { path: 'comunidades', component: CommunitiesComponent },
       {

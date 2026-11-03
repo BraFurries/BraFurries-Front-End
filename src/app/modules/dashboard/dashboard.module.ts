@@ -21,6 +21,7 @@ import { TeamOrgChartComponent } from './equipes/team-org-chart/team-org-chart.c
 import { MembrosComponent } from './membros/membros.component';
 import { CommunityAccessComponent } from './community-access/community-access.component';
 import { CommerceAccessComponent } from './commerce/commerce-access.component';
+import { CommerceCatalogComponent } from './commerce/commerce-catalog.component';
 import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
@@ -56,6 +57,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     MembrosComponent,
     CommunityAccessComponent,
     CommerceAccessComponent,
+    CommerceCatalogComponent,
     CommunityActivityComponent,
     CommunityContextLayoutComponent,
     RecrutamentoComponent,
