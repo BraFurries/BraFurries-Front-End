@@ -40,7 +40,10 @@ describe('CommerceCatalogService', () => {
     expect(request.request.body instanceof FormData).toBeTrue();
     expect(request.request.body.get('templateId')).toBe('12');
     expect(request.request.body.get('oneTimeAmount')).toBe('199.99');
-    expect(request.request.body.get('file')).toBe(file);
+    const uploaded = request.request.body.get('file') as File;
+    expect(uploaded.name).toBe('contrato.pdf');
+    expect(uploaded.size).toBe(file.size);
+    expect(uploaded.type).toBe('application/pdf');
     expect(request.request.headers.has('Content-Type')).toBeFalse();
     request.flush({ id: 4 });
   });
