@@ -1,0 +1,179 @@
+<section class="mx-auto max-w-6xl space-y-6 p-5 md:p-10">
+  <header>
+    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Área interna · BraFurries</p>
+    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Gestão Comercial</h1>
+    <p class="mt-2 max-w-3xl text-sm text-gray-600">
+      Uma operação privada da BraFurries, independente dos acessos administrativos das Communities.
+      Cadastros de artes, contratos, produtos, vendas e fechamentos serão incluídos nas próximas etapas.
+    </p>
+  </header>
+
+  <p *ngIf="loading" class="rounded-xl bg-white p-5 text-gray-600" role="status">
+    Verificando acesso à Gestão Comercial...
+  </p>
+
+  <p *ngIf="errorMessage" role="alert"
+     class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ errorMessage }}</p>
+  <p *ngIf="successMessage" role="status"
+     class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">{{ successMessage }}</p>
+
+  <div *ngIf="!loading && access && !access.enabled"
+       class="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
+    O módulo comercial está desativado. A configuração privada do proprietário e da BraFurries
+    precisa ser validada na API antes de liberar o acesso.
+  </div>
+
+  <div *ngIf="!loading && access?.enabled && !access?.owner && !access?.permissions?.length"
+       class="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
+    Sua conta não possui autorização para acessar a Gestão Comercial.
+  </div>
+
+  <div *ngIf="!loading && access?.enabled && !access?.owner && access?.permissions?.length"
+       class="rounded-2xl border border-gray-200 bg-white p-6">
+    <h2 class="font-amaranth text-xl font-bold text-braDark">Seu acesso comercial</h2>
+    <p class="mt-1 text-sm text-gray-600">
+      Você tem as permissões abaixo. Os cadastros correspondentes serão disponibilizados nas próximas entregas.
+    </p>
+    <ul class="mt-3 list-disc space-y-1 pl-6 text-gray-700">
+      <ng-container *ngFor="let permission of permissionDefinitions">
+        <li *ngIf="access?.permissions?.includes(permission.code)">
+          {{ permission.label }}
+        </li>
+      </ng-container>
+    </ul>
+  </div>
+
+  <ng-container *ngIf="!loading && access?.owner">
+    <div class="rounded-2xl border border-braPurple/20 bg-purple-50 p-5 text-sm text-braDark">
+      <strong>Controle exclusivo do proprietário.</strong>
+      Cada pessoa precisa ser aprovada por você <strong>e</strong> possuir um cargo interno ativo da BraFurries
+      com a permissão correspondente. Administrar uma Community ou receber um cargo isoladamente não dá acesso.
+    </div>
+
+    <div *ngIf="loadingOwnerData" role="status" class="text-sm text-gray-500">
+      Atualizando pessoas e cargos autorizados...
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+      <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 class="font-amaranth text-2xl font-bold text-braDark">1. Pessoas autorizadas</h2>
+          <p class="mt-1 text-sm text-gray-600">
+            Aprovação individual e limite máximo do que cada pessoa poderá fazer.
+          </p>
+        </div>
+
+        <div class="space-y-2 rounded-xl bg-gray-50 p-3">
+          <label for="commerce-person-search" class="block text-sm font-bold text-gray-700">Buscar membro</label>
+          <div class="flex flex-wrap gap-2">
+            <input id="commerce-person-search" type="search" [(ngModel)]="searchText"
+              (keyup.enter)="searchPeople()" maxlength="100"
+              placeholder="Nome do usuário da BraFurries"
+              class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <button type="button" (click)="searchPeople()" [disabled]="searching || saving"
+              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+              {{ searching ? 'Buscando...' : 'Pesquisar' }}
+            </button>
+          </div>
+
+          <div *ngIf="searched">
+            <p *ngIf="!searching && !candidates.length" class="text-sm text-gray-500">
+              Nenhum membro elegível encontrado ou todos já estão aprovados.
+            </p>
+            <div *ngIf="candidates.length" class="flex flex-wrap gap-2">
+              <select [(ngModel)]="candidateUserId" aria-label="Pessoa para aprovação"
+                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option [ngValue]="null">Selecione um membro</option>
+                <option *ngFor="let person of candidates" [ngValue]="person.userId">
+                  {{ person.name }} (ID {{ person.userId }})
+                </option>
+              </select>
+              <button type="button" (click)="approveSelected()"
+                [disabled]="saving || candidateUserId == null"
+                class="rounded-lg border border-braPurple px-3 py-2 text-sm font-bold text-braPurple disabled:opacity-50">
+                Aprovar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <label for="commerce-approved-person" class="block text-sm font-bold text-gray-700">
+          Pessoa aprovada
+        </label>
+        <select id="commerce-approved-person" [(ngModel)]="selectedPersonId"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <option [ngValue]="null">Selecione</option>
+          <option *ngFor="let person of people" [ngValue]="person.userId">
+            {{ person.name }} (ID {{ person.userId }})
+          </option>
+        </select>
+
+        <div *ngIf="selectedPerson as person" class="space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="font-bold text-braDark">{{ person.name }}</h3>
+            <button type="button" (click)="removePerson(person)" [disabled]="saving"
+              class="rounded-lg px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">
+              Revogar acesso
+            </button>
+          </div>
+          <p class="text-xs text-gray-500">
+            Os itens marcados são o limite máximo da pessoa. A permissão do cargo também é obrigatória.
+          </p>
+          <label *ngFor="let permission of permissionDefinitions"
+            class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+            <input type="checkbox" class="mt-1 accent-braPurple"
+              [checked]="person.permissions.includes(permission.code)"
+              [disabled]="saving"
+              (change)="changePersonPermission(person, permission.code, $any($event.target).checked)">
+            <span>
+              <span class="block text-sm font-bold text-braDark">{{ permission.label }}</span>
+              <span class="block text-xs text-gray-500">{{ permission.description }}</span>
+            </span>
+          </label>
+        </div>
+        <p *ngIf="!people.length" class="text-sm text-gray-500">
+          Nenhuma pessoa aprovada. Use a pesquisa para começar.
+        </p>
+      </section>
+
+      <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 class="font-amaranth text-2xl font-bold text-braDark">2. Cargos do Time</h2>
+          <p class="mt-1 text-sm text-gray-600">
+            Permissões disponíveis para os membros de cada cargo interno da BraFurries,
+            respeitando os limites individuais aprovados.
+          </p>
+        </div>
+
+        <label for="commerce-role" class="block text-sm font-bold text-gray-700">Cargo interno</label>
+        <select id="commerce-role" [(ngModel)]="selectedRoleId"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <option [ngValue]="null">Selecione um cargo</option>
+          <option *ngFor="let role of roles" [ngValue]="role.roleId">
+            {{ role.name }}{{ role.active ? '' : ' (inativo)' }}
+          </option>
+        </select>
+
+        <div *ngIf="selectedRole as role" class="space-y-3">
+          <p class="text-xs text-gray-500">
+            Um cargo inativo não concede acesso. Alterar essas permissões não afeta os poderes normais dos Times.
+          </p>
+          <label *ngFor="let permission of permissionDefinitions"
+            class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+            <input type="checkbox" class="mt-1 accent-braPurple"
+              [checked]="role.permissions.includes(permission.code)"
+              [disabled]="saving"
+              (change)="changeRolePermission(role, permission.code, $any($event.target).checked)">
+            <span>
+              <span class="block text-sm font-bold text-braDark">{{ permission.label }}</span>
+              <span class="block text-xs text-gray-500">{{ permission.description }}</span>
+            </span>
+          </label>
+        </div>
+        <p *ngIf="!roles.length" class="text-sm text-gray-500">
+          Nenhum cargo interno cadastrado na BraFurries.
+        </p>
+      </section>
+    </div>
+  </ng-container>
+</section>

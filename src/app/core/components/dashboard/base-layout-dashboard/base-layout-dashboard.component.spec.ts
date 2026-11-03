@@ -9,6 +9,7 @@ import {
   CommunityContextState
 } from '../../../services/community-context.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
+import { CommerceAccessService } from '../../../services/commerce-access.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
 import { BaseLayoutDashboardComponent } from './base-layout-dashboard.component';
@@ -22,6 +23,7 @@ describe('BaseLayoutDashboardComponent', () => {
   let user$: BehaviorSubject<User | null>;
   let context$: BehaviorSubject<CommunityContextState>;
   let context: jasmine.SpyObj<CommunityContextService>;
+  let commerce: jasmine.SpyObj<CommerceAccessService>;
   let router: Router;
 
   const user: User = {
@@ -70,6 +72,8 @@ describe('BaseLayoutDashboardComponent', () => {
       ['initialize', 'selectCommunity', 'scopedLocation', 'communityImageUrl', 'canAccessFeature'],
       { state$: context$.asObservable() }
     );
+    commerce = jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService', ['myAccess']);
+    commerce.myAccess.and.returnValue(of({ enabled: false, owner: false, permissions: [] }));
     context.initialize.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.selectCommunity.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.scopedLocation.and.returnValue(null);
@@ -82,7 +86,8 @@ describe('BaseLayoutDashboardComponent', () => {
       providers: [
         { provide: UserPermissionsService, useValue: { isAdmin: () => false } },
         { provide: UserService, useValue: { user$: user$.asObservable(), logout: () => of(true) } },
-        { provide: CommunityContextService, useValue: context }
+        { provide: CommunityContextService, useValue: context },
+        { provide: CommerceAccessService, useValue: commerce }
       ]
     }).compileComponents();
 
@@ -305,6 +310,26 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(sidebar).toBeTruthy();
     expect(nav).toBeTruthy();
     expect(nav.className).toContain('dashboard-nav');
+  });
+
+  it('keeps private commerce independent of the active Community and hides it without access', () => {
+    expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
+
+    commerce.myAccess.and.returnValue(of({
+      enabled: true, owner: true, permissions: ['PAYMENTS_RECORD']
+    }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeTruthy();
+    context$.next({ ...baseState, activeCommunity: null, activeAccess: null });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeTruthy();
+
+    user$.next(null);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
   });
 
   it('uses canonical Community management navigation', () => {
