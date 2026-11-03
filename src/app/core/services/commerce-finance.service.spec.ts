@@ -73,6 +73,51 @@ describe('CommerceFinanceService', () => {
     pay.flush({id:99});
   });
 
+  it('sends processing details inside the sale without a second expense posting', () => {
+    service.createSale({
+      requestKey:crypto.randomUUID(),channel:'EVENT',
+      externalReference:null,buyerLabel:null,soldOn:'2026-11-03',
+      notes:null,items:[{batchId:1,quantity:2,unitPrice:50}],
+      paymentMethod:'CARD_CREDIT',processingProvider:'Maquininha',
+      processingFeePercent:3.5,processingFeeFixed:1.00
+    }).subscribe();
+    const request=http.expectOne(`${base}/sales`);
+    expect(request.request.body.paymentMethod).toBe('CARD_CREDIT');
+    expect(request.request.body.processingFeePercent).toBe(3.5);
+    expect(request.request.body.processingFeeFixed).toBe(1);
+    request.flush({id:7});
+  });
+
+  it('posts funding as a separate cash entry and reads the monthly summary', () => {
+    service.createCashMovement({
+      requestKey:crypto.randomUUID(),movementType:'CONTRIBUTION',
+      amount:80,occurredOn:'2026-11-03',category:'APORTE',
+      description:'Aporte da staff',counterpartyLabel:'Staff',
+      counterpartyUserId:null,contributorType:'STAFF',contributionNature:'REPAYABLE',
+      paymentMethod:'PIX',externalReference:null,notes:null
+    }).subscribe();
+    const post=http.expectOne(`${base}/cash-movements`);
+    expect(post.request.method).toBe('POST');
+    expect(post.request.body).toEqual(jasmine.objectContaining({
+      movementType:'CONTRIBUTION',contributionNature:'REPAYABLE',amount:80
+    }));
+    post.flush({id:21});
+
+    service.cashSummary(2026,11).subscribe();
+    const get=http.expectOne(req=>req.url===`${base}/cash-movements/summary`);
+    expect(get.request.params.get('year')).toBe('2026');
+    expect(get.request.params.get('month')).toBe('11');
+    get.flush({year:2026,month:11,netCashMovement:80});
+  });
+
+  it('uses an explicit compensating reversal endpoint for incorrect cash entries', () => {
+    service.reverseCashMovement(21,'Cadastro duplicado').subscribe();
+    const request=http.expectOne(`${base}/cash-movements/21/reverse`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({reason:'Cadastro duplicado'});
+    request.flush({id:22});
+  });
+
   it('cancels an existing sale only through the explicit compensation endpoint', () => {
     service.cancelSale(31,'Cliente desistiu').subscribe();
     const request=http.expectOne(`${base}/sales/31/cancel`);

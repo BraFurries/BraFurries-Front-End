@@ -3,8 +3,8 @@
     <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Gestão interna · exclusivamente BraFurries</p>
     <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Financeiro Comercial</h1>
     <p class="mt-2 text-sm text-gray-600">
-      Vendas de produtos físicos, royalties contratuais, fechamentos mensais e pagamentos
-      externos. Nenhum saldo ou moeda da loja virtual do Discord participa desses registros.
+      Vendas físicas com taxas, entradas, despesas, aportes, royalties e fechamentos mensais.
+      Nenhum saldo ou moeda da loja virtual do Discord participa desses registros.
     </p>
     <nav class="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-braPurple">
       <a routerLink="/painel/gestao-comercial">Equipe e acessos</a>
@@ -70,6 +70,42 @@
         <label class="block text-sm font-semibold">Data da venda
           <input type="date" [(ngModel)]="saleDate" class="mt-1 w-full rounded-lg border px-3 py-2">
         </label>
+        <div class="space-y-3 rounded-xl border bg-gray-50 p-4">
+          <h3 class="font-bold text-braDark">Recebimento e taxas</h3>
+          <label class="block text-sm font-semibold">Forma de recebimento
+            <select [(ngModel)]="salePaymentMethod" class="mt-1 w-full rounded-lg border px-3 py-2">
+              <option value="PIX">Pix</option>
+              <option value="CASH">Dinheiro</option>
+              <option value="CARD_DEBIT">Maquininha — débito</option>
+              <option value="CARD_CREDIT">Maquininha — crédito</option>
+              <option value="BANK_TRANSFER">Transferência bancária</option>
+              <option value="BANK_SLIP">Boleto</option>
+              <option value="OTHER">Outro</option>
+            </select>
+          </label>
+          <label class="block text-sm font-semibold">Operadora (opcional)
+            <input [(ngModel)]="saleProcessingProvider" maxlength="120"
+              placeholder="Ex.: operadora da maquininha"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm font-semibold">Taxa percentual (%)
+              <input type="number" min="0" max="100" step=".0001"
+                [(ngModel)]="saleProcessingFeePercent"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Taxa fixa (R$)
+              <input type="number" min="0" step=".01"
+                [(ngModel)]="saleProcessingFeeFixed"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+          </div>
+          <p class="text-xs text-gray-500">
+            A taxa aplica-se ao total da venda, não a cada unidade.
+            A API calculará o valor cobrado e o líquido recebido.
+            Royalties sobre receita bruta permanecem sobre o valor bruto.
+          </p>
+        </div>
         <div class="space-y-3 rounded-xl bg-gray-50 p-3">
           <div class="flex items-center justify-between gap-2">
             <h3 class="font-bold text-braDark">Itens</h3>
@@ -136,6 +172,11 @@
               <p class="mt-1 text-sm text-gray-600">
                 {{ sale.soldOn }} · {{ sale.channel }} · {{ sale.buyerLabel || 'Comprador não informado' }}
               </p>
+              <p class="mt-1 text-sm text-gray-700">
+                {{ sale.paymentMethod || 'Recebimento não especificado' }} ·
+                Taxa: {{ (sale.processingFeeAmount || 0) | currency:'BRL' }} ·
+                Líquido: {{ (sale.netReceiptAmount ?? sale.grossAmount) | currency:'BRL' }}
+              </p>
               <p *ngIf="sale.externalReference" class="text-xs text-gray-500">
                 Referência: {{ sale.externalReference }}
               </p>
@@ -184,7 +225,7 @@
       </div>
     </section>
 
-    <ng-container *ngIf="(activeTab === 'royalties' || activeTab === 'statements') && can('FINANCE_VIEW')">
+    <ng-container *ngIf="(activeTab === 'royalties' || activeTab === 'statements' || activeTab === 'cash') && can('FINANCE_VIEW')">
       <div class="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4">
         <label class="text-sm font-semibold">Ano
           <input type="number" min="2000" max="2200" step="1" [(ngModel)]="periodYear"
@@ -203,6 +244,199 @@
         </button>
       </div>
     </ng-container>
+
+    <section *ngIf="activeTab === 'cash' && can('FINANCE_VIEW')" class="space-y-6">
+      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Movimentação do período</h2>
+        <p class="text-sm text-gray-600">
+          Visão de caixa, não de lucro contábil. Aportes não são vendas ou receitas operacionais.
+          Custos de produção entram no caixa somente quando o pagamento efetivo é registrado
+          como despesa. Não lance novamente taxas de maquininha ou repasses a artistas:
+          eles já aparecem neste resumo. Vendas são atribuídas à data do pedido, não à
+          data de liquidação da operadora, que ainda não é acompanhada nesta versão.
+        </p>
+        <div *ngIf="cashSummary as summary" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Vendas brutas</span>
+            <strong class="mt-1 block text-lg">{{ summary.grossSales | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Taxas de recebimento</span>
+            <strong class="mt-1 block text-lg">{{ summary.processingFees | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Recebimento líquido de vendas</span>
+            <strong class="mt-1 block text-lg">{{ summary.netSales | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Receitas diversas</span>
+            <strong class="mt-1 block text-lg">{{ summary.otherIncome | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Despesas diversas</span>
+            <strong class="mt-1 block text-lg">{{ summary.operatingExpenses | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Aportes não reembolsáveis</span>
+            <strong class="mt-1 block text-lg">{{ summary.fundingNonRepayable | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Aportes reembolsáveis</span>
+            <strong class="mt-1 block text-lg">{{ summary.fundingRepayable | currency:'BRL' }}</strong>
+          </div>
+          <div class="rounded-xl border p-3 text-sm">
+            <span class="block text-gray-500">Pagamentos a artistas</span>
+            <strong class="mt-1 block text-lg">{{ summary.artistPayouts | currency:'BRL' }}</strong>
+          </div>
+        </div>
+        <div *ngIf="cashSummary as summary" class="border-t pt-3">
+          <span class="text-sm text-gray-600">Variação de caixa registrada no período</span>
+          <strong class="block text-2xl font-bold"
+            [ngClass]="summary.netCashMovement < 0 ? 'text-red-700' : 'text-braDark'">
+            {{ summary.netCashMovement | currency:'BRL' }}
+          </strong>
+          <p class="mt-1 text-xs text-gray-500">
+            Não representa o saldo bancário: não inclui saldo inicial, recebíveis pendentes
+            ou movimentações externas não cadastradas.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
+        <div *ngIf="can('CASHFLOW_MANAGE')" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+          <h2 class="font-amaranth text-xl font-bold">Nova entrada, saída ou aporte</h2>
+          <label class="block text-sm font-semibold">Natureza da movimentação
+            <select [(ngModel)]="cashForm.movementType"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+              <option value="INCOME">Entrada diversa (receita)</option>
+              <option value="EXPENSE">Saída diversa (despesa)</option>
+              <option value="CONTRIBUTION">Aporte / financiamento</option>
+            </select>
+          </label>
+          <label class="block text-sm font-semibold">Valor (R$)
+            <input type="number" min=".01" step=".01" [(ngModel)]="cashForm.amount"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="block text-sm font-semibold">Data efetiva
+            <input type="date" [(ngModel)]="cashForm.occurredOn"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="block text-sm font-semibold">Categoria
+            <input [(ngModel)]="cashForm.category" maxlength="80"
+              placeholder="Ex.: INSUMOS, EVENTO, MARKETING, DOAÇÃO"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="block text-sm font-semibold">Descrição
+            <textarea [(ngModel)]="cashForm.description" rows="2" maxlength="500"
+              placeholder="O que motivou a entrada ou saída?"
+              class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+          </label>
+          <label class="block text-sm font-semibold">Origem ou destinatário
+            <input [(ngModel)]="cashForm.counterpartyLabel" maxlength="160"
+              placeholder="Nome da pessoa, empresa ou identificação"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="block text-sm font-semibold">Usuário vinculado (ID opcional)
+            <input type="number" min="1" step="1" [(ngModel)]="cashForm.counterpartyUserId"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <div *ngIf="cashForm.movementType === 'CONTRIBUTION'"
+               class="space-y-3 rounded-xl border bg-purple-50 p-4">
+            <h3 class="font-bold">Informações do aporte</h3>
+            <label class="block text-sm font-semibold">Quem aportou?
+              <select [(ngModel)]="cashForm.contributorType"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+                <option value="OWNER">Proprietário</option>
+                <option value="STAFF">Membro da staff</option>
+                <option value="COMMUNITY_MEMBER">Membro da comunidade</option>
+                <option value="EXTERNAL">Outro apoiador</option>
+              </select>
+            </label>
+            <label class="block text-sm font-semibold">Condição do aporte
+              <select [(ngModel)]="cashForm.contributionNature"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+                <option value="NON_REPAYABLE">Não reembolsável</option>
+                <option value="REPAYABLE">Reembolsável / obrigação de devolver</option>
+              </select>
+            </label>
+            <p class="text-xs text-gray-600">
+              A classificação não formaliza participação societária nem constitui contrato
+              de empréstimo. A eventual devolução exige registro e tratamento próprios.
+            </p>
+          </div>
+          <label class="block text-sm font-semibold">Forma de pagamento/recebimento
+            <select [(ngModel)]="cashForm.paymentMethod"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+              <option value="PIX">Pix</option>
+              <option value="CASH">Dinheiro</option>
+              <option value="CARD_DEBIT">Cartão de débito</option>
+              <option value="CARD_CREDIT">Cartão de crédito</option>
+              <option value="BANK_TRANSFER">Transferência bancária</option>
+              <option value="BANK_SLIP">Boleto</option>
+              <option value="OTHER">Outro</option>
+            </select>
+          </label>
+          <label class="block text-sm font-semibold">Referência (opcional)
+            <input [(ngModel)]="cashForm.externalReference" maxlength="120"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="block text-sm font-semibold">Observações internas
+            <textarea [(ngModel)]="cashForm.notes" rows="2" maxlength="5000"
+              class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+          </label>
+          <button type="button" (click)="createCashMovement()" [disabled]="saving"
+            class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+            Registrar movimentação
+          </button>
+        </div>
+
+        <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+          <h2 class="font-amaranth text-xl font-bold">Entradas, saídas e aportes registrados</h2>
+          <p *ngIf="!cashMovements.length" class="text-sm text-gray-500">
+            Nenhuma movimentação avulsa neste período.
+          </p>
+          <article *ngFor="let movement of cashMovements"
+            class="space-y-2 rounded-xl border p-4 text-sm">
+            <div class="flex flex-wrap justify-between gap-2">
+              <strong>{{ movement.description }}</strong>
+              <strong [ngClass]="movement.signedAmount < 0 ? 'text-red-700' : 'text-braDark'">
+                {{ movement.signedAmount | currency:'BRL' }}
+              </strong>
+            </div>
+            <p class="text-xs text-gray-600">
+              {{ movement.occurredOn }} · {{ movement.movementType }} ·
+              {{ movement.category }} · {{ movement.counterpartyLabel }}
+            </p>
+            <p *ngIf="movement.movementType === 'CONTRIBUTION'" class="text-xs text-gray-600">
+              {{ movement.contributorType }} ·
+              {{ movement.contributionNature === 'REPAYABLE' ? 'Reembolsável' : 'Não reembolsável' }}
+            </p>
+            <p *ngIf="movement.eventKind === 'REVERSAL'" class="text-xs text-red-700">
+              Estorno do lançamento #{{ movement.reversalOfId }}.
+              {{ movement.reversalReason }}
+            </p>
+            <button *ngIf="can('CASHFLOW_MANAGE') && movement.eventKind === 'POSTED'"
+              type="button" (click)="startCashReversal(movement)"
+              class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">
+              Estornar lançamento
+            </button>
+            <div *ngIf="cashReversalId === movement.id"
+              class="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
+              <label class="block text-xs font-semibold">Motivo do estorno
+                <textarea [(ngModel)]="cashReversalReason" rows="2" maxlength="500"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <button type="button" [disabled]="saving" (click)="reverseCashMovement()"
+                class="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                Confirmar estorno
+              </button>
+              <button type="button" (click)="cashReversalId = null"
+                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
 
     <section *ngIf="activeTab === 'royalties' && can('FINANCE_VIEW')"
       class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">

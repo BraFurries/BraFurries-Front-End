@@ -25,6 +25,10 @@ export interface CreateCommerceSale {
   soldOn: string;
   notes: string | null;
   items: SaleLineInput[];
+  paymentMethod?: string;
+  processingProvider?: string | null;
+  processingFeePercent?: number;
+  processingFeeFixed?: number;
 }
 export interface CommercePhysicalSale {
   id: number;
@@ -34,6 +38,12 @@ export interface CommercePhysicalSale {
   soldOn: string;
   status: 'CONFIRMED' | 'CANCELLED';
   grossAmount: number;
+  paymentMethod?: string;
+  processingProvider?: string | null;
+  processingFeePercent?: number;
+  processingFeeFixed?: number;
+  processingFeeAmount?: number;
+  netReceiptAmount?: number;
   cancellationReason: string | null;
   createdAt: string;
 }
@@ -105,6 +115,47 @@ export interface CreateCommercePayment {
  * BRL commerce API contracts; no conversion to Discord coins and no financial
  * business calculation in Front-End.
  */
+export type CashMovementType = 'INCOME' | 'EXPENSE' | 'CONTRIBUTION';
+export type ContributionSource = 'OWNER' | 'STAFF' | 'COMMUNITY_MEMBER' | 'EXTERNAL';
+export type ContributionNature = 'NON_REPAYABLE' | 'REPAYABLE';
+
+export interface CreateCashMovement {
+  requestKey: string;
+  movementType: CashMovementType;
+  amount: number;
+  occurredOn: string;
+  category: string;
+  description: string;
+  counterpartyLabel: string;
+  counterpartyUserId: number | null;
+  contributorType: ContributionSource | null;
+  contributionNature: ContributionNature | null;
+  paymentMethod: string;
+  externalReference: string | null;
+  notes: string | null;
+}
+export interface CommerceCashMovement extends CreateCashMovement {
+  id: number;
+  eventKind: 'POSTED' | 'REVERSAL';
+  reversalOfId: number | null;
+  signedAmount: number;
+  reversalReason: string | null;
+  createdAt: string;
+}
+export interface CommerceCashSummary {
+  year: number;
+  month: number;
+  grossSales: number;
+  processingFees: number;
+  netSales: number;
+  otherIncome: number;
+  operatingExpenses: number;
+  fundingNonRepayable: number;
+  fundingRepayable: number;
+  artistPayouts: number;
+  netCashMovement: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CommerceFinanceService {
   private readonly base = `${environment.apiBaseUrl}/user/me/brafurries-commerce/finance`;
@@ -164,5 +215,27 @@ export class CommerceFinanceService {
 
   recordPayment(id: number, payment: CreateCommercePayment): Observable<FinanceCreated> {
     return this.http.post<FinanceCreated>(`${this.base}/statements/${id}/payments`, payment);
+  }
+
+  cashMovements(year: number, month: number): Observable<CommerceCashMovement[]> {
+    return this.http.get<CommerceCashMovement[]>(`${this.base}/cash-movements`, {
+      params: { year: String(year), month: String(month) }
+    });
+  }
+
+  cashSummary(year: number, month: number): Observable<CommerceCashSummary> {
+    return this.http.get<CommerceCashSummary>(`${this.base}/cash-movements/summary`, {
+      params: { year: String(year), month: String(month) }
+    });
+  }
+
+  createCashMovement(input: CreateCashMovement): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(`${this.base}/cash-movements`,input);
+  }
+
+  reverseCashMovement(id: number, reason: string): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(
+      `${this.base}/cash-movements/${id}/reverse`,{reason}
+    );
   }
 }
