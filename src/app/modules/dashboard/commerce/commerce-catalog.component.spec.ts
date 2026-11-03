@@ -16,7 +16,7 @@ describe('CommerceCatalogComponent', () => {
   async function create(permissions: string[], owner = false, enabled = true): Promise<void> {
     access = jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService', ['myAccess']);
     catalog = jasmine.createSpyObj<CommerceCatalogService>('CommerceCatalogService', [
-      'templates','artworks','suppliers','products','productionBatches',
+      'templates','artworks','suppliers','supplierChoices','products','productionBatches',
       'productArtworks','contracts','createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'searchArtists','signContract','downloadContract','terminateContract'
@@ -31,9 +31,11 @@ describe('CommerceCatalogComponent', () => {
       royaltyPercent: 10, royaltyFixedAmount: null, active: true, description: null
     }]));
     catalog.suppliers.and.returnValue(of([]));
+    catalog.supplierChoices.and.returnValue(of([{ id: 8, name: 'Oficina' }]));
     catalog.products.and.returnValue(of([{
       id: 3, sku: 'SKU-3', name: 'Caneca', description: null,
-      estimatedUnitCost: 20, suggestedPrice: 60, active: true
+      estimatedUnitCost: 20, suggestedPrice: 60, active: true,
+      preferredSupplierId: 8, preferredSupplierName: 'Oficina'
     }]));
     catalog.productionBatches.and.returnValue(of([]));
     catalog.contracts.and.returnValue(of([]));
