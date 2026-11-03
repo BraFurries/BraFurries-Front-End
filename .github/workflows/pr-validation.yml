@@ -76,6 +76,8 @@ jobs:
           --include=**/theme-management-panel.component.spec.ts
           --include=**/commerce-access.component.spec.ts
           --include=**/commerce-catalog.component.spec.ts
+          --include=**/commerce-finance.component.spec.ts
+          --include=**/commerce-finance.service.spec.ts
           --include=**/commerce-catalog.service.spec.ts
           --include=**/commerce-access.service.spec.ts
           --include=**/base-layout-dashboard.component.spec.ts
