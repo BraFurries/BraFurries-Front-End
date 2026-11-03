@@ -36,7 +36,8 @@ export const COMMERCE_PERMISSIONS = [
   { code: 'SALES_MANAGE', label: 'Gerenciar vendas', description: 'Registrar vendas, cancelamentos e estornos.' },
   { code: 'FINANCE_VIEW', label: 'Visualizar financeiro', description: 'Consultar receitas, custos, repasses e saldos.' },
   { code: 'SETTLEMENTS_MANAGE', label: 'Realizar fechamentos', description: 'Apurar e aprovar fechamentos mensais.' },
-  { code: 'PAYMENTS_RECORD', label: 'Registrar pagamentos', description: 'Registrar baixas e comprovantes, sem transferir dinheiro.' }
+  { code: 'PAYMENTS_RECORD', label: 'Registrar pagamentos', description: 'Registrar baixas e comprovantes, sem transferir dinheiro.' },
+  { code: 'CASHFLOW_MANAGE', label: 'Gerenciar caixa e aportes', description: 'Registrar receitas, despesas, aportes e seus estornos, com FINANCE_VIEW.' }
 ] as const;
 
 export type CommercePermissionCode = typeof COMMERCE_PERMISSIONS[number]['code'];
