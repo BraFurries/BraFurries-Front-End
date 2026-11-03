@@ -1,0 +1,10 @@
+# Reviewed false positives: UUID v4 fixtures for commerce sale/payment idempotency.
+# Only the exact commit, test path, generic-api-key rule and source line are ignored.
+# These UUIDs are not access tokens or credentials. Other findings remain blocking.
+bbc65b267b9b955ecca32d5454dbd0276e2dedd0:src/app/core/services/commerce-finance.service.spec.ts:generic-api-key:30
+bbc65b267b9b955ecca32d5454dbd0276e2dedd0:src/app/core/services/commerce-finance.service.spec.ts:generic-api-key:65
+096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:96
+096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:101
+096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:112
+096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:141
+096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:147
