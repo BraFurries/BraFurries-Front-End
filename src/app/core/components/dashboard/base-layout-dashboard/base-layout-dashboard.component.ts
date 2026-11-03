@@ -8,6 +8,7 @@ import {
   CommunityScopedFeature
 } from '../../../services/community-context.service';
 import { CommunitySummary } from '../../../services/community-access.service';
+import { CommerceAccessService } from '../../../services/commerce-access.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
@@ -21,6 +22,7 @@ import { User } from '../../../../shared/models/user';
 export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   activePath = '';
   showAdminMenu = false;
+  showCommerceMenu = false;
   currentUser: User | null = null;
   isUserMenuOpen = false;
   isCommunityMenuOpen = false;
@@ -43,6 +45,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   showActivityMenu = false;
 
   private readonly communitySectionStorageKey = 'brafurries.dashboard.community-section-expanded';
+  private lastCommerceUserId: number | null = null;
   private readonly destroy$ = new Subject<void>();
   private readonly failedCommunityImageUrls = new Set<string>();
 
@@ -53,6 +56,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     private readonly userPermissionsService: UserPermissionsService,
     private readonly userService: UserService,
     private readonly communityContext: CommunityContextService,
+    private readonly commerceAccess: CommerceAccessService,
     private readonly router: Router
   ) {
     this.activePath = window.location.pathname;
@@ -70,7 +74,28 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.userService.user$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(user => this.currentUser = user);
+      .subscribe(user => {
+        this.currentUser = user;
+        const userId = user?.id ?? null;
+        if (userId === this.lastCommerceUserId) return;
+        this.lastCommerceUserId = userId;
+        this.showCommerceMenu = false;
+        if (userId == null) return;
+
+        // Private commerce access is independent of the selected Community.
+        this.commerceAccess.myAccess()
+          .pipe(takeUntil(this.destroy$))
+          .subscribe({
+            next: access => {
+              if (this.lastCommerceUserId !== userId) return;
+              this.showCommerceMenu = access.enabled &&
+                (access.owner || access.permissions.length > 0);
+            },
+            error: () => {
+              if (this.lastCommerceUserId === userId) this.showCommerceMenu = false;
+            }
+          });
+      });
 
     this.communityContext.state$
       .pipe(takeUntil(this.destroy$))
