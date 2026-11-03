@@ -1,0 +1,364 @@
+<section class="mx-auto max-w-7xl space-y-6 p-5 md:p-10">
+  <header>
+    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Gestão interna · exclusivamente BraFurries</p>
+    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Financeiro Comercial</h1>
+    <p class="mt-2 text-sm text-gray-600">
+      Vendas de produtos físicos, royalties contratuais, fechamentos mensais e pagamentos
+      externos. Nenhum saldo ou moeda da loja virtual do Discord participa desses registros.
+    </p>
+    <nav class="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-braPurple">
+      <a routerLink="/painel/gestao-comercial">Equipe e acessos</a>
+      <a routerLink="/painel/gestao-comercial/catalogo">Cadastros comerciais</a>
+      <span aria-current="page" class="text-gray-500">Financeiro</span>
+    </nav>
+  </header>
+
+  <p *ngIf="errorMessage" role="alert"
+     class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    {{ errorMessage }}
+  </p>
+  <p *ngIf="successMessage" role="status"
+     class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+    {{ successMessage }}
+  </p>
+  <p *ngIf="loading" role="status" class="rounded-xl border bg-white p-4 text-sm text-gray-600">
+    Carregando registros comerciais...
+  </p>
+
+  <p *ngIf="!loading && (!access?.enabled || visibleTabs().length === 0)"
+     class="rounded-xl border bg-white p-5 text-sm text-gray-600">
+    Sua conta não possui autorização para consultar este financeiro.
+  </p>
+
+  <ng-container *ngIf="!loading && access?.enabled && visibleTabs().length > 0">
+    <nav class="flex flex-wrap gap-2" aria-label="Seções financeiras">
+      <button *ngFor="let tab of visibleTabs()" type="button" (click)="selectTab(tab.key)"
+        [attr.aria-current]="activeTab === tab.key ? 'page' : null"
+        [ngClass]="activeTab === tab.key ? 'bg-braPurple text-white' : 'bg-white text-gray-700'"
+        class="rounded-full border border-purple-100 px-4 py-2 text-sm font-bold shadow-sm">
+        {{ tab.label }}
+      </button>
+      <button type="button" (click)="reload()"
+        class="rounded-full border bg-white px-4 py-2 text-sm font-bold">Atualizar</button>
+    </nav>
+
+    <section *ngIf="activeTab === 'sales' && can('SALES_MANAGE')"
+      class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
+      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Registrar venda física</h2>
+        <p class="text-xs text-gray-500">
+          Os valores, contratos e custos do lote serão registrados como histórico no momento da venda.
+          Uma tentativa repetida com o mesmo identificador não deve gerar nova venda.
+        </p>
+        <label class="block text-sm font-semibold">Canal
+          <select [(ngModel)]="saleChannel" class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="DIRECT">Venda direta</option>
+            <option value="EVENT">Evento</option>
+            <option value="ONLINE">Online</option>
+            <option value="OTHER">Outros</option>
+          </select>
+        </label>
+        <label class="block text-sm font-semibold">Referência externa (opcional)
+          <input [(ngModel)]="saleReference" maxlength="120"
+            placeholder="Pedido, nota ou comprovante"
+            class="mt-1 w-full rounded-lg border px-3 py-2">
+        </label>
+        <label class="block text-sm font-semibold">Nome ou identificação do comprador (opcional)
+          <input [(ngModel)]="buyerLabel" maxlength="160"
+            class="mt-1 w-full rounded-lg border px-3 py-2">
+        </label>
+        <label class="block text-sm font-semibold">Data da venda
+          <input type="date" [(ngModel)]="saleDate" class="mt-1 w-full rounded-lg border px-3 py-2">
+        </label>
+        <div class="space-y-3 rounded-xl bg-gray-50 p-3">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-bold text-braDark">Itens</h3>
+            <button type="button" [disabled]="saving || batches.length === 0"
+              (click)="addSaleLine()"
+              class="rounded-lg border border-braPurple px-3 py-1.5 text-xs font-bold text-braPurple disabled:opacity-50">
+              Adicionar lote
+            </button>
+          </div>
+          <p *ngIf="!batches.length" class="text-sm text-gray-500">
+            Nenhum lote com estoque disponível. Cadastre lotes no catálogo primeiro.
+          </p>
+          <p *ngIf="!saleLines.length" class="text-xs text-gray-500">Adicione um lote para começar.</p>
+          <div *ngFor="let item of saleLines; let index = index" class="space-y-2 rounded-xl border bg-white p-3">
+            <div class="flex items-center justify-between">
+              <strong class="text-sm">Item {{ index + 1 }}</strong>
+              <button type="button" (click)="removeSaleLine(index)" [disabled]="saving"
+                class="text-xs font-bold text-red-700">Remover</button>
+            </div>
+            <label class="block text-xs font-semibold">Produto e lote
+              <select [(ngModel)]="item.batchId" (ngModelChange)="onBatchSelected(item)"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+                <option *ngFor="let batch of batches" [ngValue]="batch.batchId">
+                  {{ batch.productName }} — lote #{{ batch.batchId }}
+                  ({{ batch.availableUnits }} disponíveis)
+                </option>
+              </select>
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-xs font-semibold">Quantidade
+                <input type="number" min="1" step="1" [(ngModel)]="item.quantity"
+                  class="mt-1 w-full rounded-lg border px-3 py-2">
+              </label>
+              <label class="block text-xs font-semibold">Preço unitário (R$)
+                <input type="number" min="0" step=".01" [(ngModel)]="item.unitPrice"
+                  class="mt-1 w-full rounded-lg border px-3 py-2">
+              </label>
+            </div>
+          </div>
+        </div>
+        <label class="block text-sm font-semibold">Observações internas
+          <textarea [(ngModel)]="saleNotes" maxlength="5000" rows="2"
+            class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+        </label>
+        <p class="text-xs text-gray-500">
+          A API valida o estoque, calcula o total em reais e impede operações com
+          contratos sem vigência ou rateio definido.
+        </p>
+        <button type="button" [disabled]="saving || saleLines.length === 0"
+          (click)="createSale()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          {{ saving ? 'Salvando...' : 'Confirmar venda' }}
+        </button>
+      </div>
+
+      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Histórico de vendas</h2>
+        <p *ngIf="!sales.length" class="text-sm text-gray-500">Nenhuma venda cadastrada.</p>
+        <article *ngFor="let sale of sales" class="rounded-xl border p-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-braDark">
+                Venda #{{ sale.id }} · {{ sale.grossAmount | currency:'BRL' }}
+              </h3>
+              <p class="mt-1 text-sm text-gray-600">
+                {{ sale.soldOn }} · {{ sale.channel }} · {{ sale.buyerLabel || 'Comprador não informado' }}
+              </p>
+              <p *ngIf="sale.externalReference" class="text-xs text-gray-500">
+                Referência: {{ sale.externalReference }}
+              </p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold">
+              {{ sale.status === 'CONFIRMED' ? 'Confirmada' : 'Cancelada' }}
+            </span>
+          </div>
+          <p *ngIf="sale.cancellationReason" class="mt-2 text-xs text-red-700">
+            Cancelamento: {{ sale.cancellationReason }}
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" (click)="selectSale(sale)"
+              class="rounded-lg border px-3 py-2 text-xs font-bold">Ver itens</button>
+            <button *ngIf="sale.status === 'CONFIRMED'" type="button" (click)="startCancel(sale)"
+              [disabled]="saving"
+              class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
+              Cancelar venda
+            </button>
+          </div>
+          <div *ngIf="selectedSaleId === sale.id" class="mt-3 space-y-1 rounded-lg bg-gray-50 p-3">
+            <p *ngIf="!saleDetails.length" class="text-xs text-gray-500">Sem itens para exibir.</p>
+            <p *ngFor="let item of saleDetails" class="text-sm">
+              {{ item.productName }} — {{ item.quantity }} ×
+              {{ item.unitPrice | currency:'BRL' }}
+              = {{ item.lineGross | currency:'BRL' }}
+              <span class="text-xs text-gray-500">(lote #{{ item.batchId }})</span>
+            </p>
+          </div>
+          <div *ngIf="cancellationTarget === sale.id" class="mt-3 rounded-lg border border-red-100 bg-red-50 p-3">
+            <label class="block text-sm font-semibold text-red-800">Justificativa do cancelamento
+              <textarea [(ngModel)]="cancellationReason" maxlength="500" rows="2"
+                class="mt-1 w-full rounded-lg border p-2"></textarea>
+            </label>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button type="button" (click)="cancelSale()" [disabled]="saving"
+                class="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                Confirmar cancelamento integral
+              </button>
+              <button type="button" (click)="cancellationTarget = null"
+                class="rounded-lg border px-3 py-2 text-xs">Voltar</button>
+            </div>
+            <p class="mt-2 text-xs text-red-700">Se os royalties já estiverem em fechamento, a API rejeitará o cancelamento simples.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <ng-container *ngIf="(activeTab === 'royalties' || activeTab === 'statements') && can('FINANCE_VIEW')">
+      <div class="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4">
+        <label class="text-sm font-semibold">Ano
+          <input type="number" min="2000" max="2200" step="1" [(ngModel)]="periodYear"
+            class="mt-1 w-28 rounded-lg border px-3 py-2">
+        </label>
+        <label class="text-sm font-semibold">Mês
+          <select [(ngModel)]="periodMonth" class="mt-1 w-32 rounded-lg border px-3 py-2">
+            <option *ngFor="let month of [1,2,3,4,5,6,7,8,9,10,11,12]" [ngValue]="month">
+              {{ month }}
+            </option>
+          </select>
+        </label>
+        <button type="button" (click)="changePeriod()"
+          class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">
+          Consultar período
+        </button>
+      </div>
+    </ng-container>
+
+    <section *ngIf="activeTab === 'royalties' && can('FINANCE_VIEW')"
+      class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <h2 class="font-amaranth text-xl font-bold">Livro de lançamentos de royalties</h2>
+      <p class="text-sm text-gray-600">
+        Valores históricos por venda, arte e contrato. Reversões negativas preservam os
+        lançamentos originais. O cálculo de receita líquida e valor fixo mensal permanece
+        indisponível até definição dos termos financeiros.
+      </p>
+      <p *ngIf="!royalties.length" class="text-sm text-gray-500">
+        Nenhum lançamento no período.
+      </p>
+      <div class="space-y-2">
+        <article *ngFor="let event of royalties"
+          class="flex flex-wrap items-start justify-between gap-4 rounded-xl border p-4">
+          <div>
+            <h3 class="font-bold">{{ event.artistName }} · arte #{{ event.artworkId }}</h3>
+            <p class="mt-1 text-sm text-gray-600">
+              Venda #{{ event.saleId }} · contrato #{{ event.contractId }}
+              · {{ event.royaltyMethod }}
+            </p>
+            <p class="mt-1 text-xs text-gray-500">
+              Rateio da arte: {{ event.allocation }}%
+              · Base: {{ event.basisAmount | currency:'BRL' }}
+              · {{ event.eventKind === 'SALE' ? 'Venda' : 'Estorno' }}
+            </p>
+          </div>
+          <strong [ngClass]="event.amount < 0 ? 'text-red-700' : 'text-braDark'">
+            {{ event.amount | currency:'BRL' }}
+          </strong>
+        </article>
+      </div>
+    </section>
+
+    <section *ngIf="activeTab === 'statements' && can('FINANCE_VIEW')"
+      class="grid gap-6 xl:grid-cols-[minmax(280px,410px)_1fr]">
+      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Fechamentos mensais</h2>
+        <p class="text-sm text-gray-600">
+          Um demonstrativo por artista e mês. Só é possível fechar períodos já encerrados.
+          Com o rascunho criado, vendas e estornos daquele artista/mês ficam congelados.
+        </p>
+        <div *ngIf="can('SETTLEMENTS_MANAGE')" class="space-y-3 rounded-xl bg-gray-50 p-3">
+          <label class="block text-sm font-semibold">Artista do período
+            <select [(ngModel)]="statementArtistId" class="mt-1 w-full rounded-lg border px-3 py-2">
+              <option [ngValue]="null">Selecione o artista</option>
+              <option *ngFor="let artist of artistChoices" [ngValue]="artist.id">
+                {{ artist.name }}
+              </option>
+            </select>
+          </label>
+          <button type="button" (click)="createDraft()"
+            [disabled]="saving || statementArtistId == null"
+            class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+            Gerar rascunho
+          </button>
+        </div>
+        <p *ngIf="!statements.length" class="text-sm text-gray-500">
+          Nenhum demonstrativo criado para este período.
+        </p>
+        <button *ngFor="let statement of statements" type="button"
+          (click)="selectStatement(statement)"
+          [ngClass]="selectedStatementId === statement.id ? 'border-braPurple bg-purple-50' : 'border-gray-200'"
+          class="block w-full rounded-xl border p-4 text-left hover:bg-gray-50">
+          <span class="block font-bold">{{ statement.artistName }} · #{{ statement.id }}</span>
+          <span class="mt-1 block text-sm text-gray-600">
+            Total: {{ statement.totalAmount | currency:'BRL' }}
+            · Pago: {{ statement.paidAmount | currency:'BRL' }}
+          </span>
+          <span class="mt-1 block text-xs font-semibold text-gray-500">{{ statement.status }}</span>
+        </button>
+      </div>
+
+      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <ng-container *ngIf="selectedStatement as statement; else selectStatementHint">
+          <h2 class="font-amaranth text-xl font-bold">Demonstrativo #{{ statement.id }}</h2>
+          <p class="text-sm text-gray-600">
+            {{ statement.artistName }} · {{ statement.periodMonth }}/{{ statement.periodYear }}
+          </p>
+          <div class="grid gap-3 rounded-xl bg-gray-50 p-4 text-sm sm:grid-cols-3">
+            <p>Total: <strong class="block">{{ statement.totalAmount | currency:'BRL' }}</strong></p>
+            <p>Pago: <strong class="block">{{ statement.paidAmount | currency:'BRL' }}</strong></p>
+            <p>A pagar: <strong class="block">{{ statementBalance | currency:'BRL' }}</strong></p>
+          </div>
+          <div *ngIf="statement.status === 'DRAFT' && can('SETTLEMENTS_MANAGE')"
+            class="flex flex-wrap gap-2">
+            <button type="button" [disabled]="saving" (click)="approveStatement()"
+              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+              Aprovar fechamento
+            </button>
+            <button type="button" [disabled]="saving" (click)="discardStatement()"
+              class="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 disabled:opacity-50">
+              Descartar rascunho
+            </button>
+          </div>
+          <h3 class="font-bold">Lançamentos incluídos</h3>
+          <p *ngIf="!statementDetails.length" class="text-sm text-gray-500">Sem itens carregados.</p>
+          <div *ngFor="let item of statementDetails"
+            class="flex flex-wrap justify-between gap-3 rounded-xl border px-3 py-2 text-sm">
+            <span>Venda #{{ item.saleId }} · arte #{{ item.artworkId }}
+              · {{ item.eventKind === 'REVERSAL' ? 'Estorno' : 'Venda' }}
+            </span>
+            <strong>{{ item.amount | currency:'BRL' }}</strong>
+          </div>
+
+          <div *ngIf="can('PAYMENTS_RECORD') &&
+             (statement.status === 'APPROVED' || statement.status === 'PARTIALLY_PAID')"
+            class="space-y-3 rounded-xl bg-purple-50 p-4">
+            <h3 class="font-bold">Registrar pagamento realizado</h3>
+            <p class="text-xs text-gray-600">
+              Este registro não transfere dinheiro. Informe uma transferência já efetuada
+              e uma referência externa única para evitar baixas duplicadas.
+            </p>
+            <label class="block text-sm font-semibold">Valor pago (R$)
+              <input type="number" min=".01" step=".01" [(ngModel)]="paymentAmount"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Data da transferência
+              <input type="date" [(ngModel)]="paymentDate"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Referência da transferência
+              <input [(ngModel)]="paymentReference" maxlength="120"
+                placeholder="ID da transferência ou comprovante"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Observações (opcional)
+              <textarea [(ngModel)]="paymentNotes" maxlength="5000" rows="2"
+                class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+            </label>
+            <button type="button" [disabled]="saving || paymentAmount <= 0 || !paymentReference.trim()"
+              (click)="recordPayment()"
+              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+              Registrar pagamento externo
+            </button>
+          </div>
+
+          <h3 class="font-bold">Pagamentos registrados</h3>
+          <p *ngIf="!payments.length" class="text-sm text-gray-500">Nenhum pagamento registrado.</p>
+          <article *ngFor="let payment of payments"
+            class="rounded-xl border p-3 text-sm">
+            <div class="flex justify-between gap-3">
+              <strong>{{ payment.amount | currency:'BRL' }}</strong>
+              <span>{{ payment.paidOn }}</span>
+            </div>
+            <p class="mt-1 text-gray-600">Referência: {{ payment.externalReference }}</p>
+            <p *ngIf="payment.notes" class="text-xs text-gray-500">{{ payment.notes }}</p>
+          </article>
+        </ng-container>
+        <ng-template #selectStatementHint>
+          <h2 class="font-amaranth text-xl font-bold">Detalhes do fechamento</h2>
+          <p class="text-sm text-gray-500">
+            Selecione um demonstrativo à esquerda para revisar os lançamentos e pagamentos.
+          </p>
+        </ng-template>
+      </div>
+    </section>
+  </ng-container>
+</section>

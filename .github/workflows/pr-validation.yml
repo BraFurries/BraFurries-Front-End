@@ -19,11 +19,38 @@ jobs:
           fetch-depth: 0
       - name: Scan public history and tree with pinned Gitleaks
         run: |
+          set -euo pipefail
+          REPORT_DIR="$(mktemp -d)"
+          trap 'rm -rf -- "$REPORT_DIR"' EXIT
+
+          set +e
           docker run --rm \
             --mount type=bind,source="$PWD",target=/repo,readonly \
+            --mount type=bind,source="$REPORT_DIR",target=/reports \
             --workdir /repo \
             ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
-            git --log-opts="--all" --redact=100
+            git --log-opts="--all" --redact=100 \
+              --report-format json --report-path /reports/gitleaks.json
+          SCAN_RC="$?"
+          set -e
+
+          if [[ "$SCAN_RC" -ne 0 && -f "$REPORT_DIR/gitleaks.json" ]]; then
+            # Only print location and rule. Never print secret or matched text.
+            python3 - "$REPORT_DIR/gitleaks.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding='utf-8') as report:
+              findings=json.load(report)
+          for finding in findings:
+              print("Gitleaks finding metadata:", {
+                  "file": finding.get("File"),
+                  "line": finding.get("StartLine"),
+                  "rule": finding.get("RuleID"),
+                  "commit": finding.get("Commit")
+              })
+          PY
+          fi
+          exit "$SCAN_RC"
 
   test-and-build:
     runs-on: ubuntu-latest
@@ -76,6 +103,8 @@ jobs:
           --include=**/theme-management-panel.component.spec.ts
           --include=**/commerce-access.component.spec.ts
           --include=**/commerce-catalog.component.spec.ts
+          --include=**/commerce-finance.component.spec.ts
+          --include=**/commerce-finance.service.spec.ts
           --include=**/commerce-catalog.service.spec.ts
           --include=**/commerce-access.service.spec.ts
           --include=**/base-layout-dashboard.component.spec.ts

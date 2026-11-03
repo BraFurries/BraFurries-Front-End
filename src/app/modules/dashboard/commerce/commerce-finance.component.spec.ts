@@ -1,0 +1,159 @@
+import { CommonModule } from '@angular/common';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { FormsModule } from '@angular/forms';
+import { RouterTestingModule } from '@angular/router/testing';
+import { of, throwError } from 'rxjs';
+import { CommerceAccessService } from '../../../core/services/commerce-access.service';
+import { CommerceFinanceService, CommerceStatement } from '../../../core/services/commerce-finance.service';
+import { CommerceFinanceComponent } from './commerce-finance.component';
+
+describe('CommerceFinanceComponent', () => {
+  let fixture: ComponentFixture<CommerceFinanceComponent>;
+  let component: CommerceFinanceComponent;
+  let finance: jasmine.SpyObj<CommerceFinanceService>;
+  let access: jasmine.SpyObj<CommerceAccessService>;
+
+  const statement: CommerceStatement = {
+    id: 3, artistUserId: 12, artistName: 'Artista', periodYear: 2025,
+    periodMonth: 12, status: 'APPROVED', totalAmount: 100, paidAmount: 0,
+    createdAt: '2026-01-01', approvedAt: '2026-01-02'
+  };
+
+  async function init(permissions: string[], owner=false, enabled=true): Promise<void> {
+    access=jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService',['myAccess']);
+    access.myAccess.and.returnValue(of({ owner, enabled, permissions }));
+    finance=jasmine.createSpyObj<CommerceFinanceService>('CommerceFinanceService',[
+      'availableBatches','sales','saleItems','createSale','cancelSale',
+      'royalties','statements','createStatement','statementItems',
+      'approveStatement','discardStatement','payments','recordPayment'
+    ]);
+    finance.availableBatches.and.returnValue(of([
+      {batchId:1,productId:5,productName:'Caneca',sku:'MUG',suggestedPrice:60,availableUnits:10}
+    ]));
+    finance.sales.and.returnValue(of([]));
+    finance.saleItems.and.returnValue(of([]));
+    finance.royalties.and.returnValue(of([
+      { id:9,artistUserId:12,artistName:'Artista',artworkId:4,contractId:8,
+        periodYear:2025,periodMonth:12,eventKind:'SALE',royaltyMethod:'PERCENT_GROSS',
+        contractRate:10,fixedUnit:null,allocation:100,basisAmount:100,
+        amount:10,saleId:2,createdAt:'2025-12-14' }
+    ]));
+    finance.statements.and.returnValue(of([statement]));
+    finance.statementItems.and.returnValue(of([]));
+    finance.payments.and.returnValue(of([]));
+    finance.createSale.and.returnValue(of({id:18}));
+    finance.cancelSale.and.returnValue(of(void 0));
+    finance.createStatement.and.returnValue(of({id:6}));
+    finance.recordPayment.and.returnValue(of({id:7}));
+    finance.approveStatement.and.returnValue(of(void 0));
+    finance.discardStatement.and.returnValue(of(void 0));
+
+    await TestBed.configureTestingModule({
+      declarations:[CommerceFinanceComponent],
+      imports:[CommonModule,FormsModule,RouterTestingModule],
+      providers:[
+        {provide:CommerceAccessService,useValue:access},
+        {provide:CommerceFinanceService,useValue:finance}
+      ]
+    }).compileComponents();
+    fixture=TestBed.createComponent(CommerceFinanceComponent);
+    component=fixture.componentInstance;
+    fixture.detectChanges();
+  }
+
+  afterEach(() => fixture?.destroy());
+
+  it('does not request financial information for nonapproved users', async () => {
+    await init([]);
+    expect(component.visibleTabs()).toEqual([]);
+    expect(finance.sales).not.toHaveBeenCalled();
+    expect(finance.royalties).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('não possui autorização');
+  });
+
+  it('keeps supplier costs and payment history hidden from a sales-only staff member', async () => {
+    await init(['SALES_MANAGE']);
+    expect(component.visibleTabs().map(tab => tab.key)).toEqual(['sales']);
+    expect(finance.availableBatches).toHaveBeenCalled();
+    expect(finance.sales).toHaveBeenCalled();
+    expect(finance.royalties).not.toHaveBeenCalled();
+    expect(finance.payments).not.toHaveBeenCalled();
+  });
+
+  it('finance viewers can see royalties and statements but cannot create sales', async () => {
+    await init(['FINANCE_VIEW']);
+    expect(component.visibleTabs().map(tab => tab.key)).toEqual(['royalties','statements']);
+    expect(finance.availableBatches).not.toHaveBeenCalled();
+    expect(finance.royalties).toHaveBeenCalled();
+    component.addSaleLine();
+    expect(component.saleLines.length).toBe(0);
+    expect(finance.createSale).not.toHaveBeenCalled();
+  });
+
+  it('creates a sale with a stable idempotency key and no locally computed royalty', async () => {
+    await init(['SALES_MANAGE']);
+    component.addSaleLine();
+    component.saleRequestKey='e81e8ef8-7950-4a27-a350-9613ee2635c2';
+    component.saleReference='BRAF-42';
+    component.saleDate='2026-10-30';
+    component.createSale();
+    expect(finance.createSale).toHaveBeenCalledWith(jasmine.objectContaining({
+      requestKey:'e81e8ef8-7950-4a27-a350-9613ee2635c2',
+      channel:'DIRECT',externalReference:'BRAF-42',
+      items:[{batchId:1,quantity:1,unitPrice:60}]
+    }));
+    expect(component.saleRequestKey).toBe('');
+    expect(component.successMessage).toContain('Venda registrada');
+  });
+
+  it('reuses the sale key after a timeout instead of duplicating an order', async () => {
+    await init(['SALES_MANAGE']);
+    component.addSaleLine();
+    component.saleRequestKey='e81e8ef8-7950-4a27-a350-9613ee2635c2';
+    finance.createSale.and.returnValue(throwError(() => new Error('Timeout')));
+    component.createSale();
+    expect(component.saleRequestKey).toBe('e81e8ef8-7950-4a27-a350-9613ee2635c2');
+    finance.createSale.and.returnValue(of({id:18}));
+    component.createSale();
+    expect(finance.createSale.calls.count()).toBe(2);
+    expect(component.saleRequestKey).toBe('');
+  });
+
+  it('allows only a settlement manager with finance view to prepare a draft', async () => {
+    await init(['FINANCE_VIEW']);
+    component.statementArtistId=12;
+    component.periodYear=2025;
+    component.periodMonth=12;
+    component.createDraft();
+    expect(finance.createStatement).not.toHaveBeenCalled();
+    component.access={enabled:true,owner:false,
+      permissions:['FINANCE_VIEW','SETTLEMENTS_MANAGE']};
+    component.createDraft();
+    expect(finance.createStatement).toHaveBeenCalledWith(12,2025,12);
+  });
+
+  it('only records external payments with explicit payment and finance privileges', async () => {
+    await init(['FINANCE_VIEW','PAYMENTS_RECORD']);
+    component.periodYear=2025;
+    component.periodMonth=12;
+    component.changePeriod();
+    component.selectStatement(statement);
+    component.paymentRequestKey='d1d2d3d4-1234-4678-8abc-1234567890ab';
+    component.paymentAmount=25;
+    component.paymentReference='PIX-REFERENCE';
+    spyOn(window,'confirm').and.returnValue(true);
+    component.recordPayment();
+    expect(finance.recordPayment).toHaveBeenCalledWith(3,jasmine.objectContaining({
+      requestKey:'d1d2d3d4-1234-4678-8abc-1234567890ab',
+      amount:25,externalReference:'PIX-REFERENCE'
+    }));
+    expect(component.paymentRequestKey).toBe('');
+  });
+
+  it('owner has all finance operations without a Community Admin grant', async () => {
+    await init([],true);
+    expect(component.visibleTabs().length).toBe(3);
+    expect(finance.royalties).toHaveBeenCalled();
+    expect(finance.availableBatches).toHaveBeenCalled();
+  });
+});
