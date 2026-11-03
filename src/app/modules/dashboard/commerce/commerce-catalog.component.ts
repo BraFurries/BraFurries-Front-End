@@ -8,7 +8,7 @@ import {
 import {
   CommerceArtist, CommerceArtwork, CommerceBatch,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
-  CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier
+  CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
 } from '../../../core/services/commerce-catalog.service';
 
 type CatalogTab = 'artworks' | 'templates' | 'contracts' |
@@ -40,6 +40,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   templates: CommerceContractTemplate[] = [];
   artworks: CommerceArtwork[] = [];
   suppliers: CommerceSupplier[] = [];
+  supplierChoices: CommerceSupplierOption[] = [];
   products: CommerceProduct[] = [];
   batches: CommerceBatch[] = [];
   contracts: CommerceSignedAgreement[] = [];
@@ -58,7 +59,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   };
   artworkForm = { title: '', description: '', artistUserId: null as number | null, creationCost: 0 };
   supplierForm = { name: '', contactName: '', email: '', phone: '', notes: '' };
-  productForm = { sku: '', name: '', description: '', estimatedUnitCost: 0, suggestedPrice: 0 };
+  productForm = { sku: '', name: '', description: '', estimatedUnitCost: 0,
+    suggestedPrice: 0, preferredSupplierId: null as number | null };
   productionForm = {
     productId: null as number | null, supplierId: null as number | null,
     quantity: 1, unitCost: 0, additionalCost: 0,
@@ -134,6 +136,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     }
     if (this.can('PRODUCTS_MANAGE')) {
       tasks.push(this.fetch(this.catalog.products(), items => this.products = items));
+      tasks.push(this.fetch(this.catalog.supplierChoices(), items => this.supplierChoices = items));
     }
     if (this.can('SUPPLIERS_MANAGE') && this.can('PRODUCTS_MANAGE')) {
       tasks.push(this.fetch(this.catalog.productionBatches(), items => this.batches = items));
