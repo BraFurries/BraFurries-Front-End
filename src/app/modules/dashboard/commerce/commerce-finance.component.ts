@@ -4,10 +4,11 @@ import { CommerceAccess, CommerceAccessService, CommercePermissionCode } from
   '../../../core/services/commerce-access.service';
 import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
-  CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput
+  CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
+  CommerceCashMovement, CommerceCashSummary, CashMovementType, ContributionNature, ContributionSource
 } from '../../../core/services/commerce-finance.service';
 
-type FinanceTab = 'sales' | 'royalties' | 'statements';
+type FinanceTab = 'sales' | 'royalties' | 'statements' | 'cash';
 
 interface SaleDraftLine {
   batchId: number | null;
@@ -36,7 +37,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   readonly tabs: { key: FinanceTab; label: string; permissions: CommercePermissionCode[] }[] = [
     { key: 'sales', label: 'Vendas físicas', permissions: ['SALES_MANAGE'] },
     { key: 'royalties', label: 'Royalties', permissions: ['FINANCE_VIEW'] },
-    { key: 'statements', label: 'Fechamentos e repasses', permissions: ['FINANCE_VIEW'] }
+    { key: 'statements', label: 'Fechamentos e repasses', permissions: ['FINANCE_VIEW'] },
+    { key: 'cash', label: 'Caixa, despesas e aportes', permissions: ['FINANCE_VIEW'] }
   ];
 
   access: CommerceAccess | null = null;
@@ -54,6 +56,10 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   statementDetails: CommerceStatementItem[] = [];
   payments: CommercePayment[] = [];
   selectedStatementId: number | null = null;
+  cashMovements: CommerceCashMovement[] = [];
+  cashSummary: CommerceCashSummary | null = null;
+  cashReversalId: number | null = null;
+  cashReversalReason = '';
 
   periodYear = Number(brazilToday().slice(0, 4));
   periodMonth = Number(brazilToday().slice(5, 7));
@@ -65,7 +71,33 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   buyerLabel = '';
   saleDate = brazilToday();
   saleNotes = '';
+  salePaymentMethod = 'PIX';
+  saleProcessingProvider = '';
+  saleProcessingFeePercent = 0;
+  saleProcessingFeeFixed = 0;
   saleLines: SaleDraftLine[] = [];
+
+  cashRequestKey = '';
+  cashForm: {
+    movementType: CashMovementType;
+    amount: number;
+    occurredOn: string;
+    category: string;
+    description: string;
+    counterpartyLabel: string;
+    counterpartyUserId: number | null;
+    contributorType: ContributionSource;
+    contributionNature: ContributionNature;
+    paymentMethod: string;
+    externalReference: string;
+    notes: string;
+  } = {
+    movementType: 'EXPENSE', amount: 0, occurredOn: brazilToday(),
+    category: 'MATERIAIS', description: '', counterpartyLabel: '',
+    counterpartyUserId: null, contributorType: 'OWNER',
+    contributionNature: 'NON_REPAYABLE',
+    paymentMethod: 'PIX',externalReference: '',notes: ''
+  };
   cancellationTarget: number | null = null;
   cancellationReason = '';
 
@@ -152,13 +184,24 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       royalties: this.safe(this.can('FINANCE_VIEW') ?
         this.finance.royalties(this.periodYear,this.periodMonth) : of([])),
       statements: this.safe(this.can('FINANCE_VIEW') ?
-        this.finance.statements(this.periodYear,this.periodMonth) : of([]))
+        this.finance.statements(this.periodYear,this.periodMonth) : of([])),
+      cashMovements: this.safe(this.can('FINANCE_VIEW') ?
+        this.finance.cashMovements(this.periodYear,this.periodMonth) : of([])),
+      cashSummary: this.can('FINANCE_VIEW')
+        ? this.finance.cashSummary(this.periodYear,this.periodMonth).pipe(
+            catchError(() => {
+              this.errorMessage = 'Não foi possível carregar o resumo financeiro.';
+              return of(null);
+            }))
+        : of(null)
     }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ batches, sales, royalties, statements }) => {
+      next: ({ batches, sales, royalties, statements, cashMovements, cashSummary }) => {
         this.batches = batches;
         this.sales = sales;
         this.royalties = royalties;
         this.statements = statements;
+        this.cashMovements = cashMovements;
+        this.cashSummary = cashSummary;
         this.loading = false;
         if (this.selectedStatementId != null &&
             !statements.some(s => s.id === this.selectedStatementId)) {
@@ -226,13 +269,20 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       requestKey: this.saleRequestKey,channel: this.saleChannel,
       externalReference: this.saleReference.trim() || null,
       buyerLabel: this.buyerLabel.trim() || null,soldOn: this.saleDate,
-      notes: this.saleNotes.trim() || null,items
+      notes: this.saleNotes.trim() || null,items,
+      paymentMethod: this.salePaymentMethod,
+      processingProvider: this.saleProcessingProvider.trim() || null,
+      processingFeePercent: this.saleProcessingFeePercent,
+      processingFeeFixed: this.saleProcessingFeeFixed
     }), 'Venda registrada e royalties apurados.', () => {
       this.saleRequestKey = '';
       this.saleLines = [];
       this.saleReference = '';
       this.buyerLabel = '';
       this.saleNotes = '';
+      this.saleProcessingProvider = '';
+      this.saleProcessingFeePercent = 0;
+      this.saleProcessingFeeFixed = 0;
     });
   }
 
@@ -356,6 +406,65 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.paymentAmount=0;
       this.paymentReference='';
       this.paymentNotes='';
+    });
+  }
+
+  createCashMovement(): void {
+    if (!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW')) return;
+    const form=this.cashForm;
+    if (!Number.isFinite(form.amount) || form.amount <= 0
+        || !form.category.trim() || !form.description.trim()
+        || !form.counterpartyLabel.trim()) {
+      this.errorMessage = 'Informe valor, categoria, descrição e origem/destino.';
+      return;
+    }
+    if (!this.cashRequestKey) this.cashRequestKey=crypto.randomUUID();
+    this.mutate(this.finance.createCashMovement({
+      requestKey:this.cashRequestKey,
+      movementType:form.movementType,
+      amount:form.amount,
+      occurredOn:form.occurredOn,
+      category:form.category.trim(),
+      description:form.description.trim(),
+      counterpartyLabel:form.counterpartyLabel.trim(),
+      counterpartyUserId:form.counterpartyUserId,
+      contributorType:form.movementType === 'CONTRIBUTION' ? form.contributorType : null,
+      contributionNature:form.movementType === 'CONTRIBUTION' ? form.contributionNature : null,
+      paymentMethod:form.paymentMethod,
+      externalReference:form.externalReference.trim() || null,
+      notes:form.notes.trim() || null
+    }), 'Movimentação registrada com histórico e auditoria.', () => {
+      this.cashRequestKey = '';
+      this.cashForm.amount = 0;
+      this.cashForm.description = '';
+      this.cashForm.counterpartyLabel = '';
+      this.cashForm.counterpartyUserId = null;
+      this.cashForm.externalReference = '';
+      this.cashForm.notes = '';
+    });
+  }
+
+  startCashReversal(movement: CommerceCashMovement): void {
+    if (!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW')
+        || movement.eventKind !== 'POSTED') return;
+    this.cashReversalId = movement.id;
+    this.cashReversalReason = '';
+  }
+
+  reverseCashMovement(): void {
+    if (!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW')
+        || this.cashReversalId == null || this.cashReversalReason.trim().length < 3) {
+      this.errorMessage = 'Informe um motivo válido para o estorno.';
+      return;
+    }
+    if (!window.confirm('Confirmar estorno compensatório? O lançamento original permanecerá no histórico.')) {
+      return;
+    }
+    this.mutate(this.finance.reverseCashMovement(
+      this.cashReversalId,this.cashReversalReason.trim()
+    ), 'Movimentação estornada sem apagar o histórico.', () => {
+      this.cashReversalId = null;
+      this.cashReversalReason = '';
     });
   }
 
