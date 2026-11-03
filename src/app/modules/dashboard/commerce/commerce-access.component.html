@@ -5,7 +5,7 @@
     <p class="mt-2 max-w-3xl text-sm text-gray-600">
       Uma operação privada da BraFurries, independente dos acessos administrativos das Communities.
       Artes, contratos assinados, fornecedores, produtos e lotes são gerenciados no catálogo privado.
-      Vendas e fechamentos financeiros serão incluídos nas próximas etapas.
+      Vendas físicas, royalties, fechamentos e pagamentos externos são gerenciados no financeiro privado.
     </p>
   </header>
 
@@ -13,6 +13,14 @@
      routerLink="/painel/gestao-comercial/catalogo"
      class="inline-flex items-center rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white hover:opacity-90">
      Abrir cadastros comerciais
+  </a>
+
+  <a *ngIf="!loading && access?.enabled &&
+       (access?.owner || access?.permissions?.includes('SALES_MANAGE') ||
+        access?.permissions?.includes('FINANCE_VIEW'))"
+     routerLink="/painel/gestao-comercial/financeiro"
+     class="inline-flex items-center rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+     Abrir financeiro comercial
   </a>
 
   <p *ngIf="loading" class="rounded-xl bg-white p-5 text-gray-600" role="status">
