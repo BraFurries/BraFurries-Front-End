@@ -8,6 +8,7 @@ export interface CommerceContractTemplate {
   id: number; name: string; description: string | null; modality: string;
   royaltyMethod: string; royaltyPercent: number | null; royaltyFixedAmount: number | null; active: boolean;
 }
+export interface CommerceArtist { id: number; name: string; }
 export interface CommerceArtwork {
   id: number; title: string; description: string | null; artistUserId: number;
   artistName: string; creationCost: number; status: string;
@@ -71,6 +72,12 @@ export class CommerceCatalogService {
 
   artworks(): Observable<CommerceArtwork[]> {
     return this.http.get<CommerceArtwork[]>(`${this.base}/artworks`);
+  }
+
+  searchArtists(search: string): Observable<CommerceArtist[]> {
+    return this.http.get<CommerceArtist[]>(`${this.base}/artists/search`, {
+      params: { search }
+    });
   }
 
   createArtwork(input: CreateArtworkInput): Observable<CreatedCommerceEntity> {
