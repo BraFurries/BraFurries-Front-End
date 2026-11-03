@@ -4,9 +4,16 @@
     <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Gestão Comercial</h1>
     <p class="mt-2 max-w-3xl text-sm text-gray-600">
       Uma operação privada da BraFurries, independente dos acessos administrativos das Communities.
-      Cadastros de artes, contratos, produtos, vendas e fechamentos serão incluídos nas próximas etapas.
+      Artes, contratos assinados, fornecedores, produtos e lotes são gerenciados no catálogo privado.
+      Vendas e fechamentos financeiros serão incluídos nas próximas etapas.
     </p>
   </header>
+
+  <a *ngIf="!loading && access?.enabled && (access?.owner || access?.permissions?.length)"
+     routerLink="/painel/gestao-comercial/catalogo"
+     class="inline-flex items-center rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+     Abrir cadastros comerciais
+  </a>
 
   <p *ngIf="loading" class="rounded-xl bg-white p-5 text-gray-600" role="status">
     Verificando acesso à Gestão Comercial...
