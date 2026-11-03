@@ -13,6 +13,7 @@ export interface CommerceArtwork {
   id: number; title: string; description: string | null; artistUserId: number;
   artistName: string; creationCost: number; status: string;
 }
+export interface CommerceSupplierOption { id: number; name: string; }
 export interface CommerceSupplier {
   id: number; name: string; contactName: string | null; email: string | null;
   phone: string | null; notes: string | null; active: boolean;
@@ -20,6 +21,7 @@ export interface CommerceSupplier {
 export interface CommerceProduct {
   id: number; sku: string; name: string; description: string | null;
   estimatedUnitCost: number; suggestedPrice: number; active: boolean;
+  preferredSupplierId: number | null; preferredSupplierName: string | null;
 }
 export interface CommerceBatch {
   id: number; productId: number; productName: string; supplierId: number; supplierName: string;
@@ -49,7 +51,7 @@ export interface CreateSupplierInput {
 }
 export interface CreateProductInput {
   sku: string; name: string; description: string | null;
-  estimatedUnitCost: number; suggestedPrice: number;
+  estimatedUnitCost: number; suggestedPrice: number; preferredSupplierId: number | null;
 }
 export interface CreateBatchInput {
   productId: number; supplierId: number; quantity: number; unitCost: number;
@@ -90,6 +92,10 @@ export class CommerceCatalogService {
 
   createSupplier(input: CreateSupplierInput): Observable<CreatedCommerceEntity> {
     return this.http.post<CreatedCommerceEntity>(`${this.base}/suppliers`,input);
+  }
+
+  supplierChoices(): Observable<CommerceSupplierOption[]> {
+    return this.http.get<CommerceSupplierOption[]>(`${this.base}/suppliers/choices`);
   }
 
   products(): Observable<CommerceProduct[]> {
