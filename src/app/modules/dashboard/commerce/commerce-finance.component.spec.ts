@@ -25,7 +25,8 @@ describe('CommerceFinanceComponent', () => {
     finance=jasmine.createSpyObj<CommerceFinanceService>('CommerceFinanceService',[
       'availableBatches','sales','saleItems','createSale','cancelSale',
       'royalties','statements','createStatement','statementItems',
-      'approveStatement','discardStatement','payments','recordPayment'
+      'approveStatement','discardStatement','payments','recordPayment',
+      'cashMovements','cashSummary','createCashMovement','reverseCashMovement'
     ]);
     finance.availableBatches.and.returnValue(of([
       {batchId:1,productId:5,productName:'Caneca',sku:'MUG',suggestedPrice:60,availableUnits:10}
@@ -43,6 +44,14 @@ describe('CommerceFinanceComponent', () => {
     finance.payments.and.returnValue(of([]));
     finance.createSale.and.returnValue(of({id:18}));
     finance.cancelSale.and.returnValue(of(void 0));
+    finance.cashMovements.and.returnValue(of([]));
+    finance.cashSummary.and.returnValue(of({
+      year:2026,month:11,grossSales:100,processingFees:4.50,netSales:95.50,
+      otherIncome:0,operatingExpenses:0,fundingNonRepayable:0,
+      fundingRepayable:0,artistPayouts:0,netCashMovement:95.50
+    }));
+    finance.createCashMovement.and.returnValue(of({id:19}));
+    finance.reverseCashMovement.and.returnValue(of({id:20}));
     finance.createStatement.and.returnValue(of({id:6}));
     finance.recordPayment.and.returnValue(of({id:7}));
     finance.approveStatement.and.returnValue(of(void 0));
@@ -78,11 +87,12 @@ describe('CommerceFinanceComponent', () => {
     expect(finance.sales).toHaveBeenCalled();
     expect(finance.royalties).not.toHaveBeenCalled();
     expect(finance.payments).not.toHaveBeenCalled();
+    expect(finance.cashMovements).not.toHaveBeenCalled();
   });
 
   it('finance viewers can see royalties and statements but cannot create sales', async () => {
     await init(['FINANCE_VIEW']);
-    expect(component.visibleTabs().map(tab => tab.key)).toEqual(['royalties','statements']);
+    expect(component.visibleTabs().map(tab => tab.key)).toEqual(['royalties','statements','cash']);
     expect(finance.availableBatches).not.toHaveBeenCalled();
     expect(finance.royalties).toHaveBeenCalled();
     component.addSaleLine();
@@ -152,8 +162,63 @@ describe('CommerceFinanceComponent', () => {
 
   it('owner has all finance operations without a Community Admin grant', async () => {
     await init([],true);
-    expect(component.visibleTabs().length).toBe(3);
+    expect(component.visibleTabs().length).toBe(4);
     expect(finance.royalties).toHaveBeenCalled();
     expect(finance.availableBatches).toHaveBeenCalled();
+  });
+  it('cashflow posting requires a separate management grant and a finance read grant', async () => {
+    await init(['FINANCE_VIEW']);
+    component.cashForm.amount = 150;
+    component.cashForm.description = 'Compra de material';
+    component.cashForm.counterpartyLabel = 'Fornecedor';
+    component.createCashMovement();
+    expect(finance.createCashMovement).not.toHaveBeenCalled();
+
+    component.access={enabled:true,owner:false,
+      permissions:['FINANCE_VIEW','CASHFLOW_MANAGE']};
+    component.cashRequestKey=crypto.randomUUID();
+    component.createCashMovement();
+    expect(finance.createCashMovement).toHaveBeenCalledWith(jasmine.objectContaining({
+      movementType:'EXPENSE',amount:150,contributorType:null,contributionNature:null
+    }));
+  });
+
+  it('reports staff contributions as funding with refundable status, not sales', async () => {
+    await init(['FINANCE_VIEW','CASHFLOW_MANAGE']);
+    component.cashForm = {
+      ...component.cashForm,movementType:'CONTRIBUTION',
+      amount:80,description:'Aporte do time',counterpartyLabel:'Staff',
+      contributorType:'STAFF',contributionNature:'REPAYABLE'
+    };
+    component.cashRequestKey=crypto.randomUUID();
+    component.createCashMovement();
+    expect(finance.createCashMovement).toHaveBeenCalledWith(jasmine.objectContaining({
+      movementType:'CONTRIBUTION',contributorType:'STAFF',
+      contributionNature:'REPAYABLE',amount:80
+    }));
+  });
+
+  it('records maquininha fees with the sale and does not create a second expense', async () => {
+    await init(['SALES_MANAGE']);
+    component.addSaleLine();
+    component.saleRequestKey=crypto.randomUUID();
+    component.salePaymentMethod='CARD_CREDIT';
+    component.saleProcessingProvider='Maquininha';
+    component.saleProcessingFeePercent=3.5;
+    component.saleProcessingFeeFixed=1;
+    component.createSale();
+    expect(finance.createSale).toHaveBeenCalledWith(jasmine.objectContaining({
+      paymentMethod:'CARD_CREDIT',processingProvider:'Maquininha',
+      processingFeePercent:3.5,processingFeeFixed:1
+    }));
+    expect(finance.createCashMovement).not.toHaveBeenCalled();
+  });
+
+  it('does not allow sales managers to reverse cash movements without cashflow grant', async () => {
+    await init(['SALES_MANAGE']);
+    component.cashReversalId=4;
+    component.cashReversalReason='Registro incorreto';
+    component.reverseCashMovement();
+    expect(finance.reverseCashMovement).not.toHaveBeenCalled();
   });
 });
