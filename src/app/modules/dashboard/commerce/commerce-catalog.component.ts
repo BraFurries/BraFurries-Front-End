@@ -3,7 +3,7 @@ import { Observable, Subject, catchError, forkJoin, map, of, takeUntil, tap } fr
 import {
   PlatformAccess,
   PlatformAccessService,
-  CommercePermissionCode
+  PlatformPermissionCode
 } from '../../../core/services/platform-access.service';
 import {
   CommerceArtist, CommerceArtwork, CommerceBatch,
@@ -20,7 +20,7 @@ type CatalogTab = 'artworks' | 'templates' | 'contracts' |
   templateUrl: './commerce-catalog.component.html'
 })
 export class CommerceCatalogComponent implements OnInit, OnDestroy {
-  readonly tabs: { key: CatalogTab; label: string; permissions: CommercePermissionCode[] }[] = [
+  readonly tabs: { key: CatalogTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'artworks', label: 'Artes e artistas', permissions: ['ARTWORKS_MANAGE'] },
     { key: 'templates', label: 'Modelos de contratos', permissions: ['CONTRACTS_MANAGE'] },
     { key: 'contracts', label: 'Contratos assinados', permissions: ['CONTRACTS_MANAGE'] },
@@ -104,7 +104,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  can(permission: CommercePermissionCode): boolean {
+  can(permission: PlatformPermissionCode): boolean {
     return this.access?.enabled === true &&
       (this.access.owner || this.access.permissions.includes(permission));
   }
