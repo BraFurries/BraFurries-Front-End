@@ -8,7 +8,7 @@ import {
   CommunityScopedFeature
 } from '../../../services/community-context.service';
 import { CommunitySummary } from '../../../services/community-access.service';
-import { CommerceAccessService } from '../../../services/commerce-access.service';
+import { PlatformAccessService } from '../../../services/platform-access.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
@@ -58,7 +58,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     private readonly userPermissionsService: UserPermissionsService,
     private readonly userService: UserService,
     private readonly communityContext: CommunityContextService,
-    private readonly commerceAccess: CommerceAccessService,
+    private readonly commerceAccess: PlatformAccessService,
     private readonly router: Router
   ) {
     this.activePath = window.location.pathname;
