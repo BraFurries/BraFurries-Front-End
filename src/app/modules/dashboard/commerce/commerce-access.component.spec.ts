@@ -42,6 +42,7 @@ describe('CommerceAccessComponent', () => {
     }).compileComponents();
     fixture = TestBed.createComponent(CommerceAccessComponent);
     component = fixture.componentInstance;
+    component.isPermissionsManagementPage = owner;
     fixture.detectChanges();
   }
 
@@ -90,6 +91,14 @@ describe('CommerceAccessComponent', () => {
 
     expect(service.rolePermission).toHaveBeenCalledWith(42, 'FINANCE_VIEW', true);
     expect(component.successMessage).toBe('Permissão do cargo atualizada.');
+  });
+
+  it('lists partner management separately from financial permissions', async () => {
+    await init(true);
+    expect(component.permissionGroups.map(group => group.label)).toEqual(['Gestão Comercial', 'Parcerias']);
+    expect(component.permissionGroups[1].permissions.map(item => item.code)).toEqual(['PARTNERS_MANAGE']);
+    expect(fixture.nativeElement.textContent).toContain('Gerenciar parceiros');
+    expect(fixture.nativeElement.textContent).toContain('Permissões de acesso');
   });
 
   it('does not mutate access when the API denies ownership', async () => {
