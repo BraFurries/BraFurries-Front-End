@@ -81,28 +81,100 @@
   </section>
 
   <section class="partner-section">
-    <h2>Representante</h2><p class="mb-3 text-sm text-gray-500">Vincule uma pessoa cadastrada na BraFurries como representante desta parceria.</p>
-    <label>Buscar usuário<input [formControl]="representativeSearchControl" type="search" autocomplete="off" placeholder="Buscar usuário por nome, usuário ou e-mail" aria-label="Buscar representante"></label>
-    <div *ngIf="selectedRepresentative" class="selected-resource mt-3"><div class="flex gap-3"><img *ngIf="selectedRepresentative.avatarUrl" [src]="selectedRepresentative.avatarUrl" alt="" class="h-12 w-12 rounded-xl object-cover"><div><strong>{{ selectedRepresentative.name }}</strong><p *ngIf="selectedRepresentative.email">{{ selectedRepresentative.email }}</p><small *ngIf="selectedRepresentative.discordUsername">Discord: {{ selectedRepresentative.discordUsername }}</small><small *ngIf="selectedRepresentative.telegramUsername" class="block">Telegram: {{ selectedRepresentative.telegramUsername }}</small></div></div><button type="button" class="secondary-button" (click)="unlinkRepresentative()">Desvincular representante</button></div>
-    <p *ngIf="representativeSearchLoading" class="text-sm text-gray-500">Buscando...</p><p *ngIf="representativeSearchError" class="field-error">{{ representativeSearchError }}</p>
-    <p *ngIf="representativeSearchCompleted && !representativeSearchLoading && !representativeSearchError && representativeCandidates.length === 0" class="text-sm text-gray-500">Nenhum usuário encontrado.</p>
-    <div *ngIf="representativeCandidates.length" class="candidate-list mt-3"><button *ngFor="let user of representativeCandidates" type="button" class="candidate-item" (click)="selectRepresentative(user)" [attr.aria-label]="'Selecionar ' + user.name"><img *ngIf="user.avatarUrl" [src]="user.avatarUrl" alt="" class="h-11 w-11 rounded-xl object-cover"><span class="min-w-0 text-left"><strong class="block">{{ user.name }}</strong><small *ngIf="user.email" class="block">{{ user.email }}</small><small *ngIf="user.discordUsername">Discord: {{ user.discordUsername }}</small><small *ngIf="user.telegramUsername" class="block">Telegram: {{ user.telegramUsername }}</small></span></button></div>
+    <h2>Representante</h2>
+    <p class="mb-3 text-sm text-gray-500">Vincule uma pessoa cadastrada na BraFurries como representante desta parceria.</p>
+    <label>Buscar usuário
+      <input [formControl]="representativeSearchControl" type="search" autocomplete="off"
+             placeholder="Buscar por nome, usuário ou e-mail" aria-label="Buscar representante">
+    </label>
+    <div *ngIf="selectedRepresentative" class="selected-resource mt-3" role="status">
+      <div class="flex min-w-0 flex-1 items-center gap-3">
+        <img *ngIf="selectedRepresentative.avatarUrl" [src]="selectedRepresentative.avatarUrl" alt=""
+             class="h-12 w-12 shrink-0 rounded-xl object-cover">
+        <div class="min-w-0 space-y-2">
+          <strong class="block break-words text-sm text-gray-800">{{ selectedRepresentative.name }}</strong>
+          <p *ngIf="selectedRepresentative.email" class="break-all text-xs text-gray-500">{{ selectedRepresentative.email }}</p>
+          <div class="flex flex-wrap gap-2">
+            <span *ngIf="selectedRepresentative.discordUsername" class="channel-chip">
+              <span class="channel-chip-label">Discord</span>
+              <span class="break-all">{{ selectedRepresentative.discordUsername }}</span>
+            </span>
+            <span *ngIf="selectedRepresentative.telegramUsername" class="channel-chip">
+              <span class="channel-chip-label">Telegram</span>
+              <span class="break-all">{{ selectedRepresentative.telegramUsername }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="secondary-button shrink-0" (click)="unlinkRepresentative()">Desvincular representante</button>
+    </div>
+    <p *ngIf="representativeSearchLoading" class="mt-3 text-sm text-gray-500" role="status">Buscando...</p>
+    <p *ngIf="representativeSearchError" class="field-error mt-3" role="alert">{{ representativeSearchError }}</p>
+    <p *ngIf="representativeSearchCompleted && !representativeSearchLoading && !representativeSearchError && representativeCandidates.length === 0"
+       class="mt-3 text-sm text-gray-500">Nenhum usuário encontrado.</p>
+    <div *ngIf="representativeCandidates.length" class="candidate-list mt-3">
+      <button *ngFor="let user of representativeCandidates" type="button" class="candidate-item"
+              (click)="selectRepresentative(user)" [attr.aria-label]="'Selecionar ' + user.name">
+        <img *ngIf="user.avatarUrl" [src]="user.avatarUrl" alt="" class="h-11 w-11 shrink-0 rounded-xl object-cover">
+        <span class="min-w-0 text-left">
+          <strong class="block truncate">{{ user.name }}</strong>
+          <small *ngIf="user.email" class="mt-1 block break-all">{{ user.email }}</small>
+          <span class="mt-2 flex flex-wrap gap-2">
+            <span *ngIf="user.discordUsername" class="channel-chip">
+              <span class="channel-chip-label">Discord</span>
+              <span class="break-all">{{ user.discordUsername }}</span>
+            </span>
+            <span *ngIf="user.telegramUsername" class="channel-chip">
+              <span class="channel-chip-label">Telegram</span>
+              <span class="break-all">{{ user.telegramUsername }}</span>
+            </span>
+          </span>
+        </span>
+      </button>
+    </div>
   </section>
 
   <section class="partner-section"><h2>Contato adicional</h2><p class="mb-3 text-sm text-gray-500">Independente da conta do representante. Outras redes podem ser adicionadas nos links externos.</p><div class="grid gap-4 md:grid-cols-2"><label>Site<input formControlName="websiteUrl" type="url" placeholder="https://..." maxlength="1024"><span *ngIf="hasError('websiteUrl','url')" class="field-error">Use uma URL HTTP ou HTTPS.</span></label><label>Nome de contato adicional<input formControlName="contactName" autocomplete="name" maxlength="128"></label><label>E-mail de contato adicional<input formControlName="contactEmail" type="email" autocomplete="email" maxlength="255"><span *ngIf="hasError('contactEmail','email')" class="field-error">Informe um e-mail válido.</span></label></div></section>
 
   <section class="partner-section">
-    <div class="flex items-center justify-between gap-3"><h2>Links externos</h2><button type="button" (click)="addLink()" class="secondary-button">+ Adicionar link</button></div>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="!mb-0">Links externos</h2>
+      <button type="button" (click)="addLink()" class="secondary-button">+ Adicionar link</button>
+    </div>
+    <p class="mt-2 text-sm text-gray-500">O link principal será o destino do parceiro na página inicial. Apenas um pode ser principal.</p>
     <div formArrayName="links" class="mt-4 space-y-4">
-      <div *ngFor="let group of links.controls; let i = index" [formGroupName]="i" class="grid gap-3 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_2fr_auto]">
-        <label>Tipo<select formControlName="type"><option *ngIf="!isKnownLinkType(group.get('type')?.value)" [value]="group.get('type')?.value">{{ group.get('type')?.value }}</option><option *ngFor="let type of linkTypeOptions" [value]="type.value">{{ type.label }}</option></select></label>
-        <label>Label<input formControlName="label" maxlength="128"></label>
-        <label>URL<input formControlName="url" type="url" placeholder="https://..." maxlength="1024"><span *ngIf="linkHasError(i)" class="field-error">Use uma URL HTTP ou HTTPS.</span></label>
-        <button type="button" (click)="removeLink(i)" class="self-end text-sm font-bold text-red-600" [attr.aria-label]="'Remover link ' + (i + 1)">Remover</button>
+      <div *ngFor="let group of links.controls; let i = index" [formGroupName]="i"
+           class="partner-link-row rounded-xl border border-gray-200 bg-white p-4">
+        <label class="min-w-0">Tipo
+          <select formControlName="type">
+            <option *ngIf="!isKnownLinkType(group.get('type')?.value)" [value]="group.get('type')?.value">{{ group.get('type')?.value }}</option>
+            <option *ngFor="let type of linkTypeOptions" [value]="type.value">{{ type.label }}</option>
+          </select>
+        </label>
+        <label class="min-w-0">Rótulo (opcional)
+          <input formControlName="label" maxlength="128" placeholder="Ex.: servidor oficial">
+        </label>
+        <label class="min-w-0">URL
+          <input formControlName="url" type="url" placeholder="https://..." maxlength="1024">
+          <span *ngIf="linkHasError(i)" class="field-error">Use uma URL HTTP ou HTTPS.</span>
+        </label>
+        <div class="partner-link-actions">
+          <button type="button" class="link-choice-button"
+                  [class.link-choice-active]="group.get('primary')?.value === true"
+                  [attr.aria-pressed]="group.get('primary')?.value === true"
+                  [attr.aria-label]="'Definir link ' + (i + 1) + ' como principal'"
+                  (click)="setPrimaryLink(i)">
+            <span aria-hidden="true">★</span> {{ group.get('primary')?.value ? 'Principal' : 'Definir principal' }}
+          </button>
+          <button type="button" class="link-remove-button" (click)="removeLink(i)"
+                  [attr.aria-label]="'Remover link ' + (i + 1)">Remover</button>
+        </div>
       </div>
     </div>
     <p *ngIf="links.length === 0" class="mt-3 text-sm text-gray-500">Nenhum link adicional.</p>
   </section>
+
+
 
   <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
     <button type="button" (click)="cancelled.emit()" [disabled]="submitting" class="secondary-button">Cancelar</button>
