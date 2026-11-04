@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
-import { CommerceAccessService } from '../../../core/services/commerce-access.service';
-import { CommerceAccessComponent } from '../commerce/commerce-access.component';
+import { PlatformAccessService } from '../../../core/services/platform-access.service';
+import { PlatformAccessComponent } from '../commerce/commerce-access.component';
 
 /** Reuses the audited permission editor without maintaining a second grant UI. */
 @Component({
@@ -8,8 +8,8 @@ import { CommerceAccessComponent } from '../commerce/commerce-access.component';
   standalone: false,
   templateUrl: '../commerce/commerce-access.component.html'
 })
-export class AdminPermissionsComponent extends CommerceAccessComponent {
-  constructor(service: CommerceAccessService) {
+export class AdminPermissionsComponent extends PlatformAccessComponent {
+  constructor(service: PlatformAccessService) {
     super(service);
     this.isPermissionsManagementPage = true;
   }
