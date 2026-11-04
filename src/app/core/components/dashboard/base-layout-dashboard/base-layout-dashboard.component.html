@@ -152,13 +152,7 @@
                 <span class="mr-3">📅</span> Eventos
             </a>
 
-            <a *ngIf="showCommerceMenu" routerLink="/painel/gestao-comercial"
-                class="flex items-center rounded-xl px-4 py-3 font-amaranth font-bold transition"
-                [ngClass]="activePath.startsWith('/painel/gestao-comercial')
-                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30'
-                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
-                <span class="mr-3">🛍️</span> Gestão Comercial
-            </a>
+
 
             <button type="button" (click)="toggleCommunitySection()"
                 class="flex w-full items-center justify-between rounded-lg px-4 py-2 mt-4 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 transition hover:bg-white/10 hover:text-white"
@@ -254,14 +248,35 @@
 
             </div>
 
-            <ng-container *ngIf="showAdminMenu">
+            <ng-container *ngIf="showAdminMenu || showCommerceMenu || showPermissionsMenu || showPartnersMenu">
                 <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mt-4 mb-2 tracking-widest">Administração</p>
-                <a routerLink="/painel/admin"
+                <a *ngIf="showAdminMenu" routerLink="/painel/admin"
                     class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
-                    [ngClass]="activePath.includes('/painel/admin')
+                    [ngClass]="activePath.startsWith('/painel/admin') && !activePath.includes('/painel/admin/permissoes')
                     ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
                     : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
                     <span class="mr-3">⚙️</span> Administração
+                </a>
+                <a *ngIf="showPermissionsMenu" routerLink="/painel/admin/permissoes"
+                    class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                    [ngClass]="activePath.startsWith('/painel/admin/permissoes')
+                    ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                    : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                    <span class="mr-3">🔐</span> Permissões de acesso
+                </a>
+                <a *ngIf="showPartnersMenu && !showAdminMenu" routerLink="/painel/admin/parceiros"
+                    class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                    [ngClass]="activePath.startsWith('/painel/admin/parceiros')
+                    ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                    : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                    <span class="mr-3">🤝</span> Parceiros
+                </a>
+                <a *ngIf="showCommerceMenu" routerLink="/painel/gestao-comercial"
+                    class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                    [ngClass]="activePath.startsWith('/painel/gestao-comercial')
+                    ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
+                    : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                    <span class="mr-3">🛍️</span> Gestão Comercial
                 </a>
             </ng-container>
         </nav>
