@@ -48,10 +48,11 @@ describe('CommerceAccessService', () => {
     role.flush(null);
   });
 
-  it('exposes the nine distinct private permission codes', () => {
-    expect(COMMERCE_PERMISSIONS.length).toBe(9);
-    expect(new Set(COMMERCE_PERMISSIONS.map(permission => permission.code)).size).toBe(9);
+  it('exposes ten distinct private area permission codes', () => {
+    expect(COMMERCE_PERMISSIONS.length).toBe(10);
+    expect(new Set(COMMERCE_PERMISSIONS.map(permission => permission.code)).size).toBe(10);
     expect(COMMERCE_PERMISSIONS.some(permission => permission.code === 'PAYMENTS_RECORD')).toBeTrue();
     expect(COMMERCE_PERMISSIONS.some(permission => permission.code === 'CASHFLOW_MANAGE')).toBeTrue();
+    expect(COMMERCE_PERMISSIONS.some(permission => permission.code === 'PARTNERS_MANAGE')).toBeTrue();
   });
 });
