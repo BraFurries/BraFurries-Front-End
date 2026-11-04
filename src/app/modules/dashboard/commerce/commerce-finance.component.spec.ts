@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
-import { CommerceAccessService } from '../../../core/services/commerce-access.service';
+import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceFinanceService, CommerceStatement } from '../../../core/services/commerce-finance.service';
 import { CommerceFinanceComponent } from './commerce-finance.component';
 
@@ -11,7 +11,7 @@ describe('CommerceFinanceComponent', () => {
   let fixture: ComponentFixture<CommerceFinanceComponent>;
   let component: CommerceFinanceComponent;
   let finance: jasmine.SpyObj<CommerceFinanceService>;
-  let access: jasmine.SpyObj<CommerceAccessService>;
+  let access: jasmine.SpyObj<PlatformAccessService>;
 
   const statement: CommerceStatement = {
     id: 3, artistUserId: 12, artistName: 'Artista', periodYear: 2025,
@@ -20,7 +20,7 @@ describe('CommerceFinanceComponent', () => {
   };
 
   async function init(permissions: string[], owner=false, enabled=true): Promise<void> {
-    access=jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService',['myAccess']);
+    access=jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService',['myAccess']);
     access.myAccess.and.returnValue(of({ owner, enabled, permissions }));
     finance=jasmine.createSpyObj<CommerceFinanceService>('CommerceFinanceService',[
       'availableBatches','sales','saleItems','createSale','cancelSale',
@@ -61,7 +61,7 @@ describe('CommerceFinanceComponent', () => {
       declarations:[CommerceFinanceComponent],
       imports:[CommonModule,FormsModule,RouterTestingModule],
       providers:[
-        {provide:CommerceAccessService,useValue:access},
+        {provide:PlatformAccessService,useValue:access},
         {provide:CommerceFinanceService,useValue:finance}
       ]
     }).compileComponents();
