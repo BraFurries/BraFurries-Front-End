@@ -12,9 +12,9 @@ describe('ParceiroFormComponent', () => {
   let adminService: jasmine.SpyObj<AdminService>;
 
   beforeEach(async () => {
-    adminService = jasmine.createSpyObj<AdminService>('AdminService', ['getPartnerLinkableResources', 'getUsers']);
+    adminService = jasmine.createSpyObj<AdminService>('AdminService', ['getPartnerLinkableResources', 'getPartnerRepresentatives']);
     adminService.getPartnerLinkableResources.and.returnValue(of([]));
-    adminService.getUsers.and.returnValue(of({ items: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } }));
+    adminService.getPartnerRepresentatives.and.returnValue(of([]));
     await TestBed.configureTestingModule({
       imports: [CommonModule, ReactiveFormsModule],
       declarations: [ParceiroFormComponent],
@@ -269,8 +269,8 @@ describe('ParceiroFormComponent', () => {
   it('uses the administrative users endpoint for representative selection without touching contact fields', fakeAsync(() => {
     component.form.patchValue({ name: 'Parceiro', category: 'brand', contactEmail: 'contato@example.com' });
     component.representativeSearchControl.setValue('Nick'); tick(300);
-    expect(adminService.getUsers).toHaveBeenCalledWith({ search: 'Nick', page: 1, pageSize: 20 });
-    component.selectRepresentative({ id: 22, name: 'Nick', email: 'nick@example.com', status: 'active', role: 'member' });
+    expect(adminService.getPartnerRepresentatives).toHaveBeenCalledWith('Nick');
+    component.selectRepresentative({ id: 22, name: 'Nick', email: 'nick@example.com' });
     const emitted = jasmine.createSpy('submitted'); component.submitted.subscribe(emitted); component.submit();
     expect(emitted.calls.mostRecent().args[0].payload.representativeUserId).toBe(22);
     expect(emitted.calls.mostRecent().args[0].payload.contactEmail).toBe('contato@example.com');
@@ -287,24 +287,24 @@ describe('ParceiroFormComponent', () => {
   });
   it('emits the representative transition matrix without ambiguous payloads', () => {
     const emit = () => { const spy = jasmine.createSpy(); component.submitted.subscribe(spy); component.submit(); return spy.calls.mostRecent().args[0].payload; };
-    component.form.patchValue({ name: 'Parceiro', category: 'brand' }); component.selectRepresentative({ id: 22, name: 'Novo', status: 'active', role: 'member' });
+    component.form.patchValue({ name: 'Parceiro', category: 'brand' }); component.selectRepresentative({ id: 22, name: 'Novo' });
     let payload = emit(); expect(payload.representativeUserId).toBe(22); expect(payload.clearRepresentativeUser).toBeUndefined();
     component.partner = { id: 3, name: 'Parceiro', status: 'active', category: 'brand', representativeUserId: 10, representative: { id: 10, name: 'A' }, links: [], clicks: 0, invites: 0 }; component.ngOnChanges({ partner: { currentValue: component.partner, previousValue: null, firstChange: false, isFirstChange: () => false } });
     payload = emit(); expect(payload.representativeUserId).toBeUndefined(); expect(payload.clearRepresentativeUser).toBeUndefined();
-    component.selectRepresentative({ id: 20, name: 'B', status: 'active', role: 'member' }); payload = emit(); expect(payload.representativeUserId).toBe(20); expect(payload.clearRepresentativeUser).toBeUndefined();
+    component.selectRepresentative({ id: 20, name: 'B' }); payload = emit(); expect(payload.representativeUserId).toBe(20); expect(payload.clearRepresentativeUser).toBeUndefined();
     component.unlinkRepresentative(); payload = emit(); expect(payload.clearRepresentativeUser).toBeTrue(); expect(payload.representativeUserId).toBeUndefined();
   });
   it('cancels stale representative searches and completes only the latest search', fakeAsync(() => {
-    const nick = new Subject<any>(); const nina = new Subject<any>(); adminService.getUsers.and.callFake((f: any) => f.search === 'Nick' ? nick : nina);
-    component.representativeSearchControl.setValue('Nick'); tick(300); component.representativeSearchControl.setValue('N'); nick.next({ items: [{ id: 1, name: 'Nick', status: 'active', role: 'member' }], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } });
+    const nick = new Subject<any>(); const nina = new Subject<any>(); adminService.getPartnerRepresentatives.and.callFake((search: string) => search === 'Nick' ? nick : nina);
+    component.representativeSearchControl.setValue('Nick'); tick(300); component.representativeSearchControl.setValue('N'); nick.next([{ id: 1, name: 'Nick' }]);
     expect(component.representativeCandidates).toEqual([]); expect(component.representativeSearchCompleted).toBeFalse();
-    component.representativeSearchControl.setValue('Nick'); tick(300); component.representativeSearchControl.setValue('Nina'); tick(300); nick.next({ items: [{ id: 1, name: 'Old', status: 'active', role: 'member' }], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } }); nina.next({ items: [{ id: 2, name: 'Nina', status: 'active', role: 'member' }], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } });
+    component.representativeSearchControl.setValue('Nick'); tick(300); component.representativeSearchControl.setValue('Nina'); tick(300); nick.next([{ id: 1, name: 'Old' }]); nina.next([{ id: 2, name: 'Nina' }]);
     expect(component.representativeCandidates[0].name).toBe('Nina'); expect(component.representativeSearchCompleted).toBeTrue();
   }));
   it('handles short, empty and failed representative searches', fakeAsync(() => {
-    component.representativeSearchControl.setValue('N'); expect(adminService.getUsers).not.toHaveBeenCalled(); expect(component.representativeSearchCompleted).toBeFalse();
-    adminService.getUsers.and.returnValue(of({ items: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } })); component.representativeSearchControl.setValue('Nick'); tick(300); expect(component.representativeSearchCompleted).toBeTrue(); expect(component.representativeCandidates).toEqual([]);
-    adminService.getUsers.and.returnValue(throwError(() => new Error())); component.representativeSearchControl.setValue('Nina'); tick(300); expect(component.representativeSearchCompleted).toBeFalse(); expect(component.representativeSearchError).toContain('Não foi possível');
+    component.representativeSearchControl.setValue('N'); expect(adminService.getPartnerRepresentatives).not.toHaveBeenCalled(); expect(component.representativeSearchCompleted).toBeFalse();
+    adminService.getPartnerRepresentatives.and.returnValue(of([])); component.representativeSearchControl.setValue('Nick'); tick(300); expect(component.representativeSearchCompleted).toBeTrue(); expect(component.representativeCandidates).toEqual([]);
+    adminService.getPartnerRepresentatives.and.returnValue(throwError(() => new Error())); component.representativeSearchControl.setValue('Nina'); tick(300); expect(component.representativeSearchCompleted).toBeFalse(); expect(component.representativeSearchError).toContain('Não foi possível');
   }));
   it('accepts image formats, revokes previews and rejects invalid replacements', () => {
     const create = spyOn(URL, 'createObjectURL').and.returnValue('blob:a'); const revoke = spyOn(URL, 'revokeObjectURL');
