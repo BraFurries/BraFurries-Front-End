@@ -20,7 +20,7 @@ import {
   standalone: false,
   templateUrl: './commerce-access.component.html'
 })
-export class PlatformAccessComponent implements OnInit, OnDestroy {
+export class CommerceAccessComponent implements OnInit, OnDestroy {
   permissionDefinitions: PlatformPermissionDefinition[] = [];
   permissionGroups: { label: string; permissions: PlatformPermissionDefinition[] }[] = [];
   private applyPermissionCatalog(catalog: PlatformPermissionDefinition[]): void {
