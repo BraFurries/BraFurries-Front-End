@@ -21,7 +21,10 @@ import {
 })
 export class CommerceAccessComponent implements OnInit, OnDestroy {
   readonly permissionDefinitions = COMMERCE_PERMISSIONS;
-  readonly permissionGroups = [
+  readonly permissionGroups: ReadonlyArray<{
+    label: string;
+    permissions: ReadonlyArray<typeof COMMERCE_PERMISSIONS[number]>;
+  }> = [
     {
       label: 'Gestão Comercial',
       permissions: COMMERCE_PERMISSIONS.filter(item => item.code !== 'PARTNERS_MANAGE')
