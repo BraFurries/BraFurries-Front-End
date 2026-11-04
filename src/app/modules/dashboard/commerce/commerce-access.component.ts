@@ -21,6 +21,18 @@ import {
 })
 export class CommerceAccessComponent implements OnInit, OnDestroy {
   readonly permissionDefinitions = COMMERCE_PERMISSIONS;
+  readonly permissionGroups = [
+    {
+      label: 'Gestão Comercial',
+      permissions: COMMERCE_PERMISSIONS.filter(item => item.code !== 'PARTNERS_MANAGE')
+    },
+    {
+      label: 'Parcerias',
+      permissions: COMMERCE_PERMISSIONS.filter(item => item.code === 'PARTNERS_MANAGE')
+    }
+  ];
+  /** Administrative tab only. The old commerce page remains a read-only access summary. */
+  isPermissionsManagementPage = false;
 
   access: CommerceAccess | null = null;
   people: CommerceApprovedPerson[] = [];
@@ -48,7 +60,7 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
       next: access => {
         this.access = access;
         this.loading = false;
-        if (access.owner) this.loadOwnerData();
+        if (access.owner && this.isPermissionsManagementPage) this.loadOwnerData();
       },
       error: () => {
         this.loading = false;
