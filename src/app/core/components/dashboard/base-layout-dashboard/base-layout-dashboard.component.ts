@@ -23,6 +23,8 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   activePath = '';
   showAdminMenu = false;
   showCommerceMenu = false;
+  showPermissionsMenu = false;
+  showPartnersMenu = false;
   currentUser: User | null = null;
   isUserMenuOpen = false;
   isCommunityMenuOpen = false;
@@ -76,10 +78,13 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(user => {
         this.currentUser = user;
+        this.showAdminMenu = this.userPermissionsService.isAdmin(user);
+        this.showPartnersMenu = this.showAdminMenu;
         const userId = user?.id ?? null;
         if (userId === this.lastCommerceUserId) return;
         this.lastCommerceUserId = userId;
         this.showCommerceMenu = false;
+        this.showPermissionsMenu = false;
         if (userId == null) return;
 
         // Private commerce access is independent of the selected Community.
@@ -89,10 +94,17 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
             next: access => {
               if (this.lastCommerceUserId !== userId) return;
               this.showCommerceMenu = access.enabled &&
-                (access.owner || access.permissions.length > 0);
+                (access.owner || access.permissions.some(permission => permission !== 'PARTNERS_MANAGE'));
+              this.showPermissionsMenu = access.enabled && access.owner;
+              this.showPartnersMenu = this.showAdminMenu || (access.enabled &&
+                (access.owner || access.permissions.includes('PARTNERS_MANAGE')));
             },
             error: () => {
-              if (this.lastCommerceUserId === userId) this.showCommerceMenu = false;
+              if (this.lastCommerceUserId === userId) {
+                this.showCommerceMenu = false;
+                this.showPermissionsMenu = false;
+                this.showPartnersMenu = this.showAdminMenu;
+              }
             }
           });
       });
