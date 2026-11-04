@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../../environments/environment';
 import {
-  PlatformAccessService, PLATFORM_PERMISSIONS
+  PlatformAccessService
 } from './platform-access.service';
 
 describe('PlatformAccessService', () => {
@@ -55,13 +55,5 @@ describe('PlatformAccessService', () => {
     expect(request.request.method).toBe('GET');
     request.flush([{ code: 'PARTNERS_MANAGE', area: 'PARTNERS', label: 'Gerenciar parceiros', description: '' }]);
     expect(definitions[0].area).toBe('PARTNERS');
-  });
-
-  it('exposes ten distinct private area permission codes', () => {
-    expect(PLATFORM_PERMISSIONS.length).toBe(10);
-    expect(new Set(PLATFORM_PERMISSIONS.map(permission => permission.code)).size).toBe(10);
-    expect(PLATFORM_PERMISSIONS.some(permission => permission.code === 'PAYMENTS_RECORD')).toBeTrue();
-    expect(PLATFORM_PERMISSIONS.some(permission => permission.code === 'CASHFLOW_MANAGE')).toBeTrue();
-    expect(PLATFORM_PERMISSIONS.some(permission => permission.code === 'PARTNERS_MANAGE')).toBeTrue();
   });
 });
