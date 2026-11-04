@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Observable, Subject, forkJoin, of, takeUntil, catchError } from 'rxjs';
-import { CommerceAccess, CommerceAccessService, CommercePermissionCode } from
-  '../../../core/services/commerce-access.service';
+import { PlatformAccess, PlatformAccessService, CommercePermissionCode } from
+  '../../../core/services/platform-access.service';
 import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
   CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
@@ -41,7 +41,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     { key: 'cash', label: 'Caixa, despesas e aportes', permissions: ['FINANCE_VIEW'] }
   ];
 
-  access: CommerceAccess | null = null;
+  access: PlatformAccess | null = null;
   activeTab: FinanceTab = 'sales';
   loading = true;
   saving = false;
@@ -110,7 +110,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private readonly authorizer: CommerceAccessService,
+    private readonly authorizer: PlatformAccessService,
     private readonly finance: CommerceFinanceService
   ) {}
 
