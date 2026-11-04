@@ -1,10 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Observable, Subject, catchError, forkJoin, map, of, takeUntil, tap } from 'rxjs';
 import {
-  CommerceAccess,
-  CommerceAccessService,
+  PlatformAccess,
+  PlatformAccessService,
   CommercePermissionCode
-} from '../../../core/services/commerce-access.service';
+} from '../../../core/services/platform-access.service';
 import {
   CommerceArtist, CommerceArtwork, CommerceBatch,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
@@ -29,7 +29,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     { key: 'links', label: 'Artes nos produtos', permissions: ['PRODUCTS_MANAGE', 'CONTRACTS_MANAGE'] },
     { key: 'production', label: 'Lotes de produção', permissions: ['PRODUCTS_MANAGE', 'SUPPLIERS_MANAGE'] }
   ];
-  access: CommerceAccess | null = null;
+  access: PlatformAccess | null = null;
   activeTab: CatalogTab = 'artworks';
   loading = true;
   saving = false;
@@ -77,7 +77,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private readonly accessService: CommerceAccessService,
+    private readonly accessService: PlatformAccessService,
     private readonly catalog: CommerceCatalogService
   ) {}
 
