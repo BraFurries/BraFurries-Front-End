@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Observable, Subject, forkJoin, of, takeUntil, catchError } from 'rxjs';
-import { PlatformAccess, PlatformAccessService, CommercePermissionCode } from
+import { PlatformAccess, PlatformAccessService, PlatformPermissionCode } from
   '../../../core/services/platform-access.service';
 import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
@@ -34,7 +34,7 @@ function brazilToday(): string {
   templateUrl: './commerce-finance.component.html'
 })
 export class CommerceFinanceComponent implements OnInit, OnDestroy {
-  readonly tabs: { key: FinanceTab; label: string; permissions: CommercePermissionCode[] }[] = [
+  readonly tabs: { key: FinanceTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'sales', label: 'Vendas físicas', permissions: ['SALES_MANAGE'] },
     { key: 'royalties', label: 'Royalties', permissions: ['FINANCE_VIEW'] },
     { key: 'statements', label: 'Fechamentos e repasses', permissions: ['FINANCE_VIEW'] },
@@ -133,7 +133,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  can(permission: CommercePermissionCode): boolean {
+  can(permission: PlatformPermissionCode): boolean {
     return this.access?.enabled === true &&
       (this.access.owner || this.access.permissions.includes(permission));
   }
