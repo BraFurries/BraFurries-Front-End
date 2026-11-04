@@ -1,4 +1,5 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { SeoService } from '../../../../core/services/seo-service.service';
@@ -15,6 +16,7 @@ describe('HomePageComponent', () => {
     partnersService.getActive.and.returnValue(of([]));
     await TestBed.configureTestingModule({
       declarations: [HomePageComponent],
+      imports: [CommonModule],
       providers: [
         { provide: SeoService, useValue: jasmine.createSpyObj('SeoService', ['updateMetaTags']) },
         { provide: PublicPartnersService, useValue: partnersService }
