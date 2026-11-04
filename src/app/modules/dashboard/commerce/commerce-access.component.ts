@@ -7,8 +7,7 @@ import {
   PlatformEligiblePerson,
   PlatformPermissionCode,
   PlatformPermissionDefinition,
-  PlatformTeamRole,
-  PLATFORM_PERMISSIONS
+  PlatformTeamRole
 } from '../../../core/services/platform-access.service';
 
 /**
