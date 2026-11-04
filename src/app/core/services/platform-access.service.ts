@@ -27,20 +27,7 @@ export interface PlatformTeamRole {
   permissions: string[];
 }
 
-/** Platform areas, independent of Community tenant authorization. The live catalog comes from API. */
-export const PLATFORM_PERMISSIONS = [
-  { code: 'ARTWORKS_MANAGE', label: 'Gerenciar artes', description: 'Cadastrar obras, artistas e valores de criação.' },
-  { code: 'CONTRACTS_MANAGE', label: 'Gerenciar contratos', description: 'Cadastrar modelos e consultar contratos privados.' },
-  { code: 'SUPPLIERS_MANAGE', label: 'Gerenciar fornecedores', description: 'Cadastrar fornecedores e lotes de produção.' },
-  { code: 'PRODUCTS_MANAGE', label: 'Gerenciar produtos', description: 'Cadastrar produtos, custos e preços.' },
-  { code: 'SALES_MANAGE', label: 'Gerenciar vendas', description: 'Registrar vendas, cancelamentos e estornos.' },
-  { code: 'FINANCE_VIEW', label: 'Visualizar financeiro', description: 'Consultar receitas, custos, repasses e saldos.' },
-  { code: 'SETTLEMENTS_MANAGE', label: 'Realizar fechamentos', description: 'Apurar e aprovar fechamentos mensais.' },
-  { code: 'PAYMENTS_RECORD', label: 'Registrar pagamentos', description: 'Registrar baixas e comprovantes, sem transferir dinheiro.' },
-  { code: 'CASHFLOW_MANAGE', label: 'Gerenciar caixa e aportes', description: 'Registrar receitas, despesas, aportes e seus estornos, com FINANCE_VIEW.' },
-  { code: 'PARTNERS_MANAGE', label: 'Gerenciar parceiros', description: 'Consultar, cadastrar, editar e remover parcerias, incluindo links e representantes.' }
-] as const;
-
+/** No hardcoded catalog in frontend: GET /permissions is the source of truth. */
 export type PlatformPermissionCode = string;
 
 export interface PlatformPermissionDefinition {
