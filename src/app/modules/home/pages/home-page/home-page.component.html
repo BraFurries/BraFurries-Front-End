@@ -192,14 +192,14 @@
                     <ng-container *ngIf="partner.url; else partnerWithoutLink">
                         <a [href]="partner.url" target="_blank" rel="noopener noreferrer"
                            [attr.aria-label]="'Visitar ' + partner.name"
-                           class="flex aspect-square w-full max-w-36 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-braPurple">
+                           class="flex aspect-square w-full max-w-36 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:scale-105 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-braPurple">
                             <img *ngIf="partner.imageUrl; else partnerInitial" [src]="partner.imageUrl" alt=""
                                  width="128" height="128" loading="lazy" decoding="async" class="h-full w-full object-contain">
                             <ng-template #partnerInitial><span class="font-amaranth text-4xl font-bold text-braPurple" aria-hidden="true">{{ partner.name.charAt(0) }}</span></ng-template>
                         </a>
                     </ng-container>
                     <ng-template #partnerWithoutLink>
-                        <div class="flex aspect-square w-full max-w-36 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                        <div class="flex aspect-square w-full max-w-36 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:scale-105 hover:shadow-md">
                             <img *ngIf="partner.imageUrl; else partnerInitialNoLink" [src]="partner.imageUrl" alt=""
                                  width="128" height="128" loading="lazy" decoding="async" class="h-full w-full object-contain">
                             <ng-template #partnerInitialNoLink><span class="font-amaranth text-4xl font-bold text-braPurple" aria-hidden="true">{{ partner.name.charAt(0) }}</span></ng-template>
