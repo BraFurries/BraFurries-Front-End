@@ -53,6 +53,40 @@ describe('ParceiroFormComponent', () => {
     expect(payload.representativeUserId).toBeUndefined();
   });
 
+  it('marks one homepage destination at a time and keeps it in the request', () => {
+    component.form.patchValue({ name: 'Parceiro', category: 'brand' });
+    component.addLink({ type: 'discord', label: 'Servidor', url: 'https://discord.gg/indie' });
+    component.addLink({ type: 'website', label: 'Site', url: 'https://example.com' });
+    expect(component.links.at(0).get('primary')?.value).toBeTrue();
+    component.setPrimaryLink(1);
+    expect(component.links.at(0).get('primary')?.value).toBeFalse();
+    expect(component.links.at(1).get('primary')?.value).toBeTrue();
+
+    const spy = jasmine.createSpy('submitted');
+    component.submitted.subscribe(spy);
+    component.submit();
+    const payload = spy.calls.mostRecent().args[0].payload;
+    expect(payload.links.map((link: any) => link.primary)).toEqual([false, true]);
+  });
+
+  it('removing primary chooses another remaining link and does not lose the selection', () => {
+    component.addLink({ type: 'discord', url: 'https://discord.gg/indie' });
+    component.addLink({ type: 'website', url: 'https://example.org' });
+    component.removeLink(0);
+    expect(component.links.length).toBe(1);
+    expect(component.links.at(0).get('primary')?.value).toBeTrue();
+  });
+
+  it('allows a legacy partner to select the primary without losing its links', () => {
+    component.partner = partner();
+    component.ngOnChanges({ partner: { currentValue: component.partner, previousValue: null, firstChange: false, isFirstChange: () => false } });
+    expect(component.links.at(0).get('primary')?.value).toBeTrue();
+    const spy = jasmine.createSpy('submitted');
+    component.submitted.subscribe(spy);
+    component.submit();
+    expect(spy.calls.mostRecent().args[0].payload.links[0].primary).toBeTrue();
+  });
+
   it('loads an existing linked partner without resending the unchanged linked resource', () => {
     component.partner = partner();
     component.ngOnChanges({ partner: { currentValue: component.partner, previousValue: null, firstChange: false, isFirstChange: () => false } });
