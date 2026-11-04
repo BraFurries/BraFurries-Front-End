@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
-import { CommerceAccessService } from '../../../core/services/commerce-access.service';
+import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { UserPermissionsService } from '../../../core/services/user-permissions.service';
 import { UserService } from '../../../core/services/user.service';
 
@@ -21,7 +21,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   constructor(
     private readonly userService: UserService,
     private readonly permissions: UserPermissionsService,
-    private readonly access: CommerceAccessService
+    private readonly access: PlatformAccessService
   ) {}
 
   ngOnInit(): void {
