@@ -32,6 +32,7 @@ import {
   CreatePartnerRequest,
   PartnerImageResponse,
   PartnerLinkCandidate,
+  PartnerRepresentative,
   UpdatePartnerRequest,
   UserIdentityLinkStatus,
   UserIdentityLinkView
@@ -187,6 +188,13 @@ export class AdminService {
 
   getPartner(id: number): Observable<AdminPartnerItem> {
     return this.http.get<AdminPartnerItem>(`${this.baseUrl}/partners/${id}`);
+  }
+
+  /** Partner-only directory; does not require or expose global admin user access. */
+  getPartnerRepresentatives(search: string): Observable<PartnerRepresentative[]> {
+    return this.http.get<PartnerRepresentative[]>(`${this.baseUrl}/partners/representatives`, {
+      params: { search: search.trim() }
+    });
   }
 
   getPartnerLinkableResources(category: AdminPartnerCategory, search?: string, limit = 20): Observable<PartnerLinkCandidate[]> {
