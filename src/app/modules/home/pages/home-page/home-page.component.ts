@@ -38,7 +38,7 @@ export class HomePageComponent implements OnInit {
     // The public homepage is prerendered in CI/SSR. Do not block static
     // generation on an external API request; the browser loads live partners.
     if (!isPlatformBrowser(this.platformId)) {
-      this.partnersLoading = false;
+      // Preserve the same initial loading DOM for SSR hydration.
       return;
     }
     this.publicPartners.getActive().subscribe({
