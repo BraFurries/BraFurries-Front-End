@@ -1,3 +1,5 @@
+import { isPlatformBrowser } from '@angular/common';
+import { Inject, PLATFORM_ID } from '@angular/core';
 import { Component, OnInit } from '@angular/core';
 import { SeoService } from '../../../../core/services/seo-service.service';
 import { PublicPartner, PublicPartnersService } from '../../../../core/services/public-partners.service';
@@ -21,7 +23,8 @@ export class HomePageComponent implements OnInit {
 
   constructor(
     private readonly seoService: SeoService,
-    private readonly publicPartners: PublicPartnersService
+    private readonly publicPartners: PublicPartnersService,
+    @Inject(PLATFORM_ID) private readonly platformId: object
   ) { }
 
   trackPartner(_index: number, partner: PublicPartner): number { return partner.id; }
@@ -32,6 +35,12 @@ export class HomePageComponent implements OnInit {
       'Conheca a BraFurries, uma das maiores comunidades furry brasileiras para conversar, participar de eventos, fazer amizades e acompanhar novidades do fandom.'
     );
 
+    // The public homepage is prerendered in CI/SSR. Do not block static
+    // generation on an external API request; the browser loads live partners.
+    if (!isPlatformBrowser(this.platformId)) {
+      this.partnersLoading = false;
+      return;
+    }
     this.publicPartners.getActive().subscribe({
       next: partners => {
         this.partners = partners;
