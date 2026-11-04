@@ -7,7 +7,6 @@ import {
   AdminPartnerCategory,
   AdminPartnerItem,
   AdminPartnerStatus,
-  AdminUserItem,
   CreatePartnerRequest,
   PartnerExternalLinkItem,
   PartnerLinkCandidate,
@@ -98,7 +97,7 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
   selectedCandidate: PartnerLinkCandidate | null = null;
   candidateLoading = false;
   candidateError = '';
-  representativeCandidates: AdminUserItem[] = [];
+  representativeCandidates: PartnerRepresentative[] = [];
   selectedRepresentative: PartnerRepresentative | null = null;
   representativeSearchLoading = false;
   representativeSearchError = '';
@@ -325,7 +324,7 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
 
   markImageForRemoval(): void { this.clearImageFile(); this.imageFileError = ''; this.removeImage = true; }
   clearImageFile(): void { if (this.imageObjectUrl) URL.revokeObjectURL(this.imageObjectUrl); this.imageObjectUrl = null; this.imageFile = null; }
-  selectRepresentative(user: AdminUserItem): void {
+  selectRepresentative(user: PartnerRepresentative): void {
     this.selectedRepresentative = { id: user.id, name: user.name, avatarUrl: user.avatarUrl, email: user.email, discordUsername: user.discordUsername, telegramUsername: user.telegramUsername };
     this.representativeCandidates = []; this.representativeSearchCompleted = false; this.representativeSearchControl.setValue(user.name, { emitEvent: false });
   }
@@ -362,8 +361,8 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
         this.representativeSearchCompleted = false;
         if (search.length < 2) { this.representativeCandidates = []; this.representativeSearchLoading = false; this.representativeSearchError = ''; return of(null); }
         this.representativeSearchLoading = true; this.representativeSearchError = '';
-        return timer(300).pipe(switchMap(() => this.adminService.getUsers({ search, page: 1, pageSize: 20 }).pipe(
-          map(value => ({ items: value.items, error: '' })), catchError(() => of({ items: [] as AdminUserItem[], error: 'Não foi possível carregar usuários.' }))
+        return timer(300).pipe(switchMap(() => this.adminService.getPartnerRepresentatives(search).pipe(
+          map(value => ({ items: value, error: '' })), catchError(() => of({ items: [] as PartnerRepresentative[], error: 'Não foi possível carregar usuários.' }))
         )));
       })
     ).subscribe(result => { if (!result) return; this.representativeSearchLoading = false; this.representativeCandidates = result.items; this.representativeSearchError = result.error; this.representativeSearchCompleted = !result.error; }));
