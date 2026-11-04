@@ -37,7 +37,8 @@ export const COMMERCE_PERMISSIONS = [
   { code: 'FINANCE_VIEW', label: 'Visualizar financeiro', description: 'Consultar receitas, custos, repasses e saldos.' },
   { code: 'SETTLEMENTS_MANAGE', label: 'Realizar fechamentos', description: 'Apurar e aprovar fechamentos mensais.' },
   { code: 'PAYMENTS_RECORD', label: 'Registrar pagamentos', description: 'Registrar baixas e comprovantes, sem transferir dinheiro.' },
-  { code: 'CASHFLOW_MANAGE', label: 'Gerenciar caixa e aportes', description: 'Registrar receitas, despesas, aportes e seus estornos, com FINANCE_VIEW.' }
+  { code: 'CASHFLOW_MANAGE', label: 'Gerenciar caixa e aportes', description: 'Registrar receitas, despesas, aportes e seus estornos, com FINANCE_VIEW.' },
+  { code: 'PARTNERS_MANAGE', label: 'Gerenciar parceiros', description: 'Consultar, cadastrar, editar e remover parcerias, incluindo links e representantes.' }
 ] as const;
 
 export type CommercePermissionCode = typeof COMMERCE_PERMISSIONS[number]['code'];
