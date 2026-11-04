@@ -1,8 +1,12 @@
 <section class="mx-auto max-w-6xl space-y-6 p-5 md:p-10">
   <header>
     <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Área interna · BraFurries</p>
-    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Gestão Comercial</h1>
-    <p class="mt-2 max-w-3xl text-sm text-gray-600">
+    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">{{ isPermissionsManagementPage ? 'Permissões de acesso' : 'Gestão Comercial' }}</h1>
+    <p *ngIf="isPermissionsManagementPage" class="mt-2 max-w-3xl text-sm text-gray-600">
+      Gerencie quem pode acessar cada área da BraFurries, incluindo o financeiro e as parcerias.
+      O acesso delegado depende de aprovação individual e de um cargo ativo do Time oficial.
+    </p>
+    <p *ngIf="!isPermissionsManagementPage" class="mt-2 max-w-3xl text-sm text-gray-600">
       Uma operação privada da BraFurries, independente dos acessos administrativos das Communities.
       Artes, contratos assinados, fornecedores, produtos e lotes são gerenciados no catálogo privado.
       Vendas físicas, royalties, fechamentos e pagamentos externos são gerenciados no financeiro privado.
@@ -21,6 +25,12 @@
      routerLink="/painel/gestao-comercial/financeiro"
      class="inline-flex items-center rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white hover:opacity-90">
      Abrir financeiro comercial
+  </a>
+
+  <a *ngIf="!loading && !isPermissionsManagementPage && access?.owner"
+     routerLink="/painel/admin/permissoes"
+     class="inline-flex items-center rounded-xl border border-braPurple px-4 py-2 text-sm font-bold text-braPurple hover:bg-purple-50">
+    Gerenciar permissões administrativas
   </a>
 
   <p *ngIf="loading" class="rounded-xl bg-white p-5 text-gray-600" role="status">
@@ -58,7 +68,7 @@
     </ul>
   </div>
 
-  <ng-container *ngIf="!loading && access?.owner">
+  <ng-container *ngIf="!loading && isPermissionsManagementPage && access?.owner">
     <div class="rounded-2xl border border-braPurple/20 bg-purple-50 p-5 text-sm text-braDark">
       <strong>Controle exclusivo do proprietário.</strong>
       Cada pessoa precisa ser aprovada por você <strong>e</strong> possuir um cargo interno ativo da BraFurries
@@ -134,7 +144,9 @@
           <p class="text-xs text-gray-500">
             Os itens marcados são o limite máximo da pessoa. A permissão do cargo também é obrigatória.
           </p>
-          <label *ngFor="let permission of permissionDefinitions"
+          <ng-container *ngFor="let group of permissionGroups">
+          <h4 class="mt-4 text-xs font-bold uppercase tracking-wider text-braPurple">{{ group.label }}</h4>
+          <label *ngFor="let permission of group.permissions"
             class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
             <input type="checkbox" class="mt-1 accent-braPurple"
               [checked]="person.permissions.includes(permission.code)"
@@ -145,6 +157,7 @@
               <span class="block text-xs text-gray-500">{{ permission.description }}</span>
             </span>
           </label>
+          </ng-container>
         </div>
         <p *ngIf="!people.length" class="text-sm text-gray-500">
           Nenhuma pessoa aprovada. Use a pesquisa para começar.
@@ -173,7 +186,9 @@
           <p class="text-xs text-gray-500">
             Um cargo inativo não concede acesso. Alterar essas permissões não afeta os poderes normais dos Times.
           </p>
-          <label *ngFor="let permission of permissionDefinitions"
+          <ng-container *ngFor="let group of permissionGroups">
+          <h4 class="mt-4 text-xs font-bold uppercase tracking-wider text-braPurple">{{ group.label }}</h4>
+          <label *ngFor="let permission of group.permissions"
             class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
             <input type="checkbox" class="mt-1 accent-braPurple"
               [checked]="role.permissions.includes(permission.code)"
@@ -184,6 +199,7 @@
               <span class="block text-xs text-gray-500">{{ permission.description }}</span>
             </span>
           </label>
+          </ng-container>
         </div>
         <p *ngIf="!roles.length" class="text-sm text-gray-500">
           Nenhum cargo interno cadastrado na BraFurries.
