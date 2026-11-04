@@ -332,6 +332,40 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
   });
 
+  it('groups finance navigation under administration, not the general menu', () => {
+    commerce.myAccess.and.returnValue(of({ enabled: true, owner: false, permissions: ['FINANCE_VIEW'] }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+
+    const management = fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]') as HTMLElement;
+    expect(management).toBeTruthy();
+    expect(management.parentElement?.textContent).toContain('Administração');
+    expect(management.parentElement?.textContent).not.toContain('Permissões de acesso');
+  });
+
+  it('shows only partners, not commerce, for an isolated PARTNERS_MANAGE grant', () => {
+    commerce.myAccess.and.returnValue(of({ enabled: true, owner: false, permissions: ['PARTNERS_MANAGE'] }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/parceiros"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeNull();
+  });
+
+  it('shows owner-only permissions navigation independent of Community selection', () => {
+    commerce.myAccess.and.returnValue(of({ enabled: true, owner: true, permissions: [] }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeTruthy();
+
+    context$.next({ ...baseState, activeCommunity: null, activeAccess: null });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeTruthy();
+  });
+
   it('uses canonical Community management navigation', () => {
     const link = fixture.nativeElement.querySelector('a[href="/painel/comunidades"]');
     expect(link).toBeTruthy();
