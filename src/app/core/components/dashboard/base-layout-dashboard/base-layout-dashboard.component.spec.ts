@@ -9,7 +9,7 @@ import {
   CommunityContextState
 } from '../../../services/community-context.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
-import { CommerceAccessService } from '../../../services/commerce-access.service';
+import { PlatformAccessService } from '../../../services/platform-access.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
 import { BaseLayoutDashboardComponent } from './base-layout-dashboard.component';
@@ -23,7 +23,7 @@ describe('BaseLayoutDashboardComponent', () => {
   let user$: BehaviorSubject<User | null>;
   let context$: BehaviorSubject<CommunityContextState>;
   let context: jasmine.SpyObj<CommunityContextService>;
-  let commerce: jasmine.SpyObj<CommerceAccessService>;
+  let commerce: jasmine.SpyObj<PlatformAccessService>;
   let router: Router;
 
   const user: User = {
@@ -72,7 +72,7 @@ describe('BaseLayoutDashboardComponent', () => {
       ['initialize', 'selectCommunity', 'scopedLocation', 'communityImageUrl', 'canAccessFeature'],
       { state$: context$.asObservable() }
     );
-    commerce = jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService', ['myAccess']);
+    commerce = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
     commerce.myAccess.and.returnValue(of({ enabled: false, owner: false, permissions: [] }));
     context.initialize.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.selectCommunity.and.returnValue(of({ kind: 'ready', state: baseState }));
@@ -87,7 +87,7 @@ describe('BaseLayoutDashboardComponent', () => {
         { provide: UserPermissionsService, useValue: { isAdmin: () => false } },
         { provide: UserService, useValue: { user$: user$.asObservable(), logout: () => of(true) } },
         { provide: CommunityContextService, useValue: context },
-        { provide: CommerceAccessService, useValue: commerce }
+        { provide: PlatformAccessService, useValue: commerce }
       ]
     }).compileComponents();
 
