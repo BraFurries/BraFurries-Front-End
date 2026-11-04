@@ -216,14 +216,25 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   addLink(link: PartnerExternalLinkItem = { type: 'website', label: '', url: '' }): void {
+    const isFirst = this.links.length === 0;
     this.links.push(new FormGroup({
       type: new FormControl(link.type || 'website', { nonNullable: true, validators: [Validators.maxLength(32)] }),
       label: new FormControl(link.label ?? '', { nonNullable: true, validators: [Validators.maxLength(128)] }),
-      url: new FormControl(link.url ?? '', { nonNullable: true, validators: [Validators.maxLength(1024), httpUrlValidator] })
+      url: new FormControl(link.url ?? '', { nonNullable: true, validators: [Validators.maxLength(1024), httpUrlValidator] }),
+      primary: new FormControl(link.primary === true || isFirst, { nonNullable: true })
     }));
+    if (link.primary === true) this.setPrimaryLink(this.links.length - 1);
   }
 
-  removeLink(index: number): void { this.links.removeAt(index); }
+  setPrimaryLink(index: number): void {
+    this.links.controls.forEach((group, i) => group.get('primary')?.setValue(i === index));
+  }
+
+  removeLink(index: number): void {
+    const wasPrimary = this.links.at(index)?.get('primary')?.value === true;
+    this.links.removeAt(index);
+    if (wasPrimary && this.links.length) this.setPrimaryLink(0);
+  }
 
   isKnownLinkType(value: unknown): boolean {
     return typeof value === 'string' && this.linkTypeOptions.some(option => option.value === value);
@@ -254,8 +265,12 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
       .map(link => ({
         type: clean(String(link['type'] ?? '')) || 'other',
         label: clean(String(link['label'] ?? '')),
-        url: String(link['url'] ?? '').trim()
+        url: String(link['url'] ?? '').trim(),
+        primary: link['primary'] === true
       }));
+    // The selected blank row may have been discarded; keep one valid
+    // destination whenever links exist.
+    if (links.length && !links.some(link => link.primary)) links[0].primary = true;
     const payload: CreatePartnerRequest | UpdatePartnerRequest = {
       name: value.name.trim(), category,
       description: editableValue(value.description), imageUrl: editableValue(value.imageUrl), websiteUrl: editableValue(value.websiteUrl),

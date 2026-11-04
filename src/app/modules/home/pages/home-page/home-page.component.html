@@ -177,22 +177,36 @@
         </div>
     </section> -->
 
-    <section id="parceiros" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-6 text-center space-y-12">
-            <h2 class="text-3xl font-amaranth font-bold italic text-braDark uppercase tracking-tighter">Nossos Parceiros</h2>
-            <div class="flex flex-wrap justify-center gap-12">
-                <a href="https://nextfur.net" target="_blank" rel="noopener noreferrer">
-                    <img src="https://nextfur.net/_next/image?url=%2Fimages%2Fnextfur.png&w=256&q=75" alt="NextFur" title="NextFur"
-                        width="128" height="128" loading="lazy" decoding="async" class="w-32 h-32 object-contain bg-gray-200 rounded-xl p-2 flex items-center justify-center font-bold hover:scale-110 transition duration-600">
-                </a>
-                <a href="https://eventopatas.com" target="_blank" rel="noopener noreferrer">
-                    <img src="https://eventopatas.com/_astro/logo.Cg23fkgk_Z1I06No.webp" alt="Evento Patas" title="Evento Patas"
-                        width="128" height="128" loading="lazy" decoding="async" class="w-32 h-32 object-contain bg-gray-200 rounded-xl p-2 flex items-center justify-center font-bold hover:scale-110 transition duration-600">
-                </a>
-                <a href="https://furcamp.com" target="_blank" rel="noopener noreferrer">
-                    <img src="https://furcamp.com/_next/image?url=%2Flogos%2Fdefault.webp&w=128&q=75" alt="Furcamp" title="Furcamp"
-                        width="128" height="128" loading="lazy" decoding="async" class="w-32 h-32 object-contain bg-gray-200 rounded-xl p-2 flex items-center justify-center font-bold hover:scale-110 transition duration-600">
-                </a>
+    <section id="parceiros" class="py-20 bg-white" aria-labelledby="parceiros-title">
+        <div class="max-w-7xl mx-auto px-6 text-center space-y-10">
+            <div class="space-y-3">
+                <h2 id="parceiros-title" class="text-3xl font-amaranth font-bold italic text-braDark uppercase tracking-tighter">Nossos Parceiros</h2>
+                <p class="text-sm text-gray-500">Conheça as comunidades, eventos e iniciativas que caminham com a BraFurries.</p>
+            </div>
+            <p *ngIf="partnersLoading" class="text-sm text-gray-500" role="status">Carregando parceiros...</p>
+            <p *ngIf="partnersError" class="text-sm text-gray-500" role="status">Não foi possível carregar os parceiros neste momento.</p>
+            <p *ngIf="!partnersLoading && !partnersError && !partners.length" class="text-sm text-gray-500">Em breve, novas parcerias por aqui!</p>
+
+            <div *ngIf="partners.length" class="grid grid-cols-2 justify-items-center gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
+                <article *ngFor="let partner of partners; trackBy: trackPartner" class="flex w-full max-w-52 min-w-0 flex-col items-center gap-3">
+                    <ng-container *ngIf="partner.url; else partnerWithoutLink">
+                        <a [href]="partner.url" target="_blank" rel="noopener noreferrer"
+                           [attr.aria-label]="'Visitar ' + partner.name"
+                           class="flex aspect-square w-full max-w-36 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-braPurple">
+                            <img *ngIf="partner.imageUrl; else partnerInitial" [src]="partner.imageUrl" alt=""
+                                 width="128" height="128" loading="lazy" decoding="async" class="h-full w-full object-contain">
+                            <ng-template #partnerInitial><span class="font-amaranth text-4xl font-bold text-braPurple" aria-hidden="true">{{ partner.name.charAt(0) }}</span></ng-template>
+                        </a>
+                    </ng-container>
+                    <ng-template #partnerWithoutLink>
+                        <div class="flex aspect-square w-full max-w-36 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                            <img *ngIf="partner.imageUrl; else partnerInitialNoLink" [src]="partner.imageUrl" alt=""
+                                 width="128" height="128" loading="lazy" decoding="async" class="h-full w-full object-contain">
+                            <ng-template #partnerInitialNoLink><span class="font-amaranth text-4xl font-bold text-braPurple" aria-hidden="true">{{ partner.name.charAt(0) }}</span></ng-template>
+                        </div>
+                    </ng-template>
+                    <h3 class="max-w-full break-words font-amaranth text-base font-bold text-braDark">{{ partner.name }}</h3>
+                </article>
             </div>
         </div>
     </section>

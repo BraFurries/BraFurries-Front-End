@@ -439,6 +439,8 @@ export interface PartnerExternalLinkItem {
   type: string;
   label?: string | null;
   url: string;
+  /** Only one link per partner can be the homepage destination. */
+  primary?: boolean;
 }
 
 export interface PartnerPrefill {
