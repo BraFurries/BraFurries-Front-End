@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { SeoService } from '../../../../core/services/seo-service.service';
+import { PublicPartner, PublicPartnersService } from '../../../../core/services/public-partners.service';
 
 @Component({
   selector: 'app-home-page',
@@ -14,12 +15,34 @@ export class HomePageComponent implements OnInit {
     telegram: 'https://t.me/brafurros',
   }
 
-  constructor(private readonly seoService: SeoService) { }
+  partners: PublicPartner[] = [];
+  partnersLoading = true;
+  partnersError = false;
+
+  constructor(
+    private readonly seoService: SeoService,
+    private readonly publicPartners: PublicPartnersService
+  ) { }
+
+  trackPartner(_index: number, partner: PublicPartner): number { return partner.id; }
 
   ngOnInit() {
     this.seoService.updateMetaTags(
       'BraFurries — Comunidade Furry Brasileira',
       'Conheca a BraFurries, uma das maiores comunidades furry brasileiras para conversar, participar de eventos, fazer amizades e acompanhar novidades do fandom.'
     );
+
+    this.publicPartners.getActive().subscribe({
+      next: partners => {
+        this.partners = partners;
+        this.partnersLoading = false;
+        this.partnersError = false;
+      },
+      error: () => {
+        this.partners = [];
+        this.partnersLoading = false;
+        this.partnersError = true;
+      }
+    });
   }
 }
