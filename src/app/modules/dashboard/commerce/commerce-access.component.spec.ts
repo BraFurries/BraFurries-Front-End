@@ -5,13 +5,14 @@ import { of } from 'rxjs';
 import {
   PlatformAccessService,
   PlatformApprovedPerson,
-  PlatformTeamRole
+  PlatformTeamRole,
+  PlatformPermissionDefinition
 } from '../../../core/services/platform-access.service';
-import { PlatformAccessComponent } from './commerce-access.component';
+import { CommerceAccessComponent } from './commerce-access.component';
 
-describe('PlatformAccessComponent', () => {
-  let fixture: ComponentFixture<PlatformAccessComponent>;
-  let component: PlatformAccessComponent;
+describe('CommerceAccessComponent', () => {
+  let fixture: ComponentFixture<CommerceAccessComponent>;
+  let component: CommerceAccessComponent;
   let service: jasmine.SpyObj<PlatformAccessService>;
 
   const person: PlatformApprovedPerson = {
@@ -23,12 +24,17 @@ describe('PlatformAccessComponent', () => {
 
   async function init(owner: boolean, enabled = true, permissions: string[] = []): Promise<void> {
     service = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', [
-      'myAccess', 'approvedPeople', 'eligiblePeople', 'teamRoles',
+      'myAccess', 'approvedPeople', 'eligiblePeople', 'teamRoles', 'permissionCatalog',
       'approve', 'revoke', 'personPermission', 'rolePermission'
     ]);
     service.myAccess.and.returnValue(of({ enabled, owner, permissions }));
     service.approvedPeople.and.returnValue(of([person]));
     service.teamRoles.and.returnValue(of([role]));
+    const catalog: PlatformPermissionDefinition[] = [
+      { code: 'PRODUCTS_MANAGE', area: 'COMMERCE', label: 'Gerenciar produtos', description: 'Catálogo' },
+      { code: 'PARTNERS_MANAGE', area: 'PARTNERS', label: 'Gerenciar parceiros', description: 'Parcerias' }
+    ];
+    service.permissionCatalog.and.returnValue(of(catalog));
     service.eligiblePeople.and.returnValue(of([{ userId: 22, name: 'Membro elegível' }]));
     service.approve.and.returnValue(of(void 0));
     service.revoke.and.returnValue(of(void 0));
@@ -36,11 +42,11 @@ describe('PlatformAccessComponent', () => {
     service.rolePermission.and.returnValue(of(void 0));
 
     await TestBed.configureTestingModule({
-      declarations: [PlatformAccessComponent],
+      declarations: [CommerceAccessComponent],
       imports: [CommonModule, FormsModule],
       providers: [{ provide: PlatformAccessService, useValue: service }]
     }).compileComponents();
-    fixture = TestBed.createComponent(PlatformAccessComponent);
+    fixture = TestBed.createComponent(CommerceAccessComponent);
     component = fixture.componentInstance;
     component.isPermissionsManagementPage = owner;
     fixture.detectChanges();
