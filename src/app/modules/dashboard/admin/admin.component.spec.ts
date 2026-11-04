@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
-import { CommerceAccessService } from '../../../core/services/commerce-access.service';
+import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { UserPermissionsService } from '../../../core/services/user-permissions.service';
 import { UserService } from '../../../core/services/user.service';
 import { AdminComponent } from './admin.component';
@@ -9,20 +9,20 @@ import { AdminComponent } from './admin.component';
 describe('AdminComponent area tabs', () => {
   let fixture: ComponentFixture<AdminComponent>;
   let users: BehaviorSubject<any>;
-  let commerce: jasmine.SpyObj<CommerceAccessService>;
+  let commerce: jasmine.SpyObj<PlatformAccessService>;
   let globalAdmin = false;
 
   beforeEach(async () => {
     globalAdmin = false;
     users = new BehaviorSubject<any>({ id: 19, name: 'Membro', roles: [], permissions: [] });
-    commerce = jasmine.createSpyObj('CommerceAccessService', ['myAccess']);
+    commerce = jasmine.createSpyObj('PlatformAccessService', ['myAccess']);
     commerce.myAccess.and.returnValue(of({ enabled: true, owner: false, permissions: ['PARTNERS_MANAGE'] }));
 
     await TestBed.configureTestingModule({
       declarations: [AdminComponent],
       imports: [RouterModule.forRoot([])],
       providers: [
-        { provide: CommerceAccessService, useValue: commerce },
+        { provide: PlatformAccessService, useValue: commerce },
         { provide: UserService, useValue: { user$: users.asObservable() } },
         { provide: UserPermissionsService, useValue: { isAdmin: () => globalAdmin } }
       ]
