@@ -32,7 +32,10 @@ describe('PerfilComponent', () => {
   beforeEach(async () => {
     service = jasmine.createSpyObj<MemberProfileService>('MemberProfileService', ['getProfile', 'getCommunityContext', 'getModeration', 'updateDisplayName', 'uploadProfileImage', 'deleteProfileImage']);
     communityAccessService = jasmine.createSpyObj<CommunityAccessService>('CommunityAccessService', ['getAccess']);
-    userService = jasmine.createSpyObj<UserService>('UserService', ['updateCachedUser']);
+    userService = jasmine.createSpyObj<UserService>('UserService', [
+      'updateCachedUser', 'beginDiscordLink', 'openDiscordLinkOAuth',
+      'previewDiscordLink', 'confirmDiscordLink'
+    ]);
     service.getProfile.and.returnValue(of(profile()));
     communityAccessService.getAccess.and.callFake((communityId) => of({
       communityId,
@@ -175,6 +178,54 @@ describe('PerfilComponent', () => {
     component.onProfileImageSelected({ target: { files: [new File([new ArrayBuffer(5 * 1024 * 1024 + 1)], 'avatar.png', { type: 'image/png' })], value: '' } } as unknown as Event);
     expect(component.profileImageError).toContain('5 MB');
     expect(service.uploadProfileImage).not.toHaveBeenCalled();
+  });
+
+  it('starts Discord verification from the authenticated website profile', () => {
+    userService.beginDiscordLink.and.returnValue(of({ ticket: 'ticket-123' }));
+    component.startDiscordLink();
+    expect(userService.beginDiscordLink).toHaveBeenCalledTimes(1);
+    expect(userService.openDiscordLinkOAuth).toHaveBeenCalledWith('ticket-123');
+    expect(fixture.nativeElement.textContent).toContain('Conectar Discord');
+  });
+
+  it('requires explicit confirmation after seeing the verified Discord identity', () => {
+    component.discordLinkTicket = 'ticket-123';
+    component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: true,
+      notice: 'Histórico anterior preservado' };
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Furry');
+    expect(fixture.nativeElement.textContent).toContain('Confirmar conexão');
+    expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
+
+    userService.confirmDiscordLink.and.returnValue(of({
+      status: 'HISTORY_CONNECTED', notice: 'Conta vinculada'
+    }));
+    component.confirmDiscordLink();
+    expect(userService.confirmDiscordLink).toHaveBeenCalledOnceWith('ticket-123');
+    expect(component.discordLinkPreview).toBeNull();
+    expect(component.discordLinkTicket).toBe('');
+    expect(component.discordLinkSuccess).toContain('histórico Discord');
+  });
+
+  it('never consumes a proof when the member cancels the review', () => {
+    component.discordLinkTicket = 'ticket-123';
+    component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: false,
+      notice: 'Confirme seu Discord' };
+    component.cancelDiscordLink();
+    expect(component.discordLinkPreview).toBeNull();
+    expect(component.discordLinkTicket).toBe('');
+    expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
+  });
+
+  it('keeps a preview available when confirmation fails', () => {
+    component.discordLinkTicket = 'ticket-123';
+    component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: false,
+      notice: 'Confirme seu Discord' };
+    userService.confirmDiscordLink.and.returnValue(throwError(() => ({error: {message: 'Conflito de contas'}})));
+    component.confirmDiscordLink();
+    expect(component.discordLinkPreview).not.toBeNull();
+    expect(component.discordLinkError).toContain('Conflito de contas');
+    expect(component.discordLinkConfirming).toBeFalse();
   });
 
   it('updates the avatar after upload and restores its fallback after deletion', () => {
