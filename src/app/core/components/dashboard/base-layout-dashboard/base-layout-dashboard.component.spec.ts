@@ -342,6 +342,8 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(management).toBeTruthy();
     expect(management.parentElement?.textContent).toContain('Administração');
     expect(management.parentElement?.textContent).not.toContain('Permissões de acesso');
+    expect(fixture.nativeElement.querySelectorAll('a[href="/painel/admin/permissoes"]').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('a[href="/painel/admin/parceiros"]').length).toBe(0);
   });
 
   it('shows only partners, not commerce, for an isolated PARTNERS_MANAGE grant', () => {
@@ -352,6 +354,9 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(fixture.nativeElement.querySelector('a[href="/painel/admin/parceiros"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeNull();
+    const administration = fixture.nativeElement.querySelector('a[href="/painel/admin/parceiros"]') as HTMLElement;
+    expect(administration?.textContent).toContain('Administração');
+    expect(administration?.textContent).not.toContain('Permissões');
   });
 
   it('shows owner-only permissions navigation independent of Community selection', () => {
@@ -359,7 +364,10 @@ describe('BaseLayoutDashboardComponent', () => {
     user$.next(null);
     user$.next(user);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeTruthy();
+    const administration = fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]') as HTMLElement;
+    expect(administration).toBeTruthy();
+    expect(administration.textContent).toContain('Administração');
+    expect(administration.textContent).not.toContain('Permissões');
 
     context$.next({ ...baseState, activeCommunity: null, activeAccess: null });
     fixture.detectChanges();
