@@ -128,6 +128,17 @@ export class UserService {
     );
   }
 
+  /**
+   * This is deliberately NOT startSocialLogin('discord'): login would replace
+   * the current site session rather than prove ownership of both accounts.
+   */
+  requestDiscordAccountLink(): Observable<string> {
+    const endpoint = `${environment.apiBaseUrl}/user/me/account-link/discord/challenge`;
+    return this.http.post<{ url: string }>(endpoint, {
+      frontendOrigin: window.location.origin
+    }).pipe(map(response => response.url));
+  }
+
   startSocialLogin(provider: SocialAuthProvider, returnUrl: string = '/painel'): void {
     sessionStorage.setItem(this.socialLoginReturnUrlKey, returnUrl);
 
