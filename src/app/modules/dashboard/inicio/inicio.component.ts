@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { UserService } from '../../../core/services/user.service';
 import { DashboardResponse } from '../../../shared/models/api/dashboard/dashboardResponse';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-inicio',
@@ -142,12 +143,20 @@ export class InicioComponent implements OnInit {
     this.discordConnectError = '';
     this.userService.requestDiscordAccountLink().subscribe({
       next: (url) => {
-        if (!url || !url.startsWith('https://') && !url.startsWith('http://')) {
+        try {
+          const target = new URL(url);
+          const api = new URL(environment.apiBaseUrl);
+          // Only the API may initiate our OAuth connection. Never trust an
+          // arbitrary external redirect returned by a faulty endpoint.
+          if (target.origin !== api.origin
+              || !target.pathname.endsWith('/auth/oauth2/discord/link')) {
+            throw new Error('URL OAuth não autorizada');
+          }
+          window.location.assign(target.toString());
+        } catch {
           this.discordConnecting = false;
           this.discordConnectError = 'Não foi possível iniciar uma conexão segura com o Discord.';
-          return;
         }
-        window.location.assign(url);
       },
       error: (err) => {
         this.discordConnecting = false;
