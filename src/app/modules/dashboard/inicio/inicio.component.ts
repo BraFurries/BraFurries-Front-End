@@ -21,6 +21,8 @@ export class InicioComponent implements OnInit {
   userProfileImageUrl: string | null = null;
   userInitial: string = 'V';
   showDiscordWarning: boolean = true;
+  discordConnecting = false;
+  discordConnectError = '';
 
   constructor(private userService: UserService) {}
 
@@ -132,6 +134,27 @@ export class InicioComponent implements OnInit {
     }
     
     return `${startDay} de ${startMonth}`;
+  }
+
+  connectDiscord(): void {
+    if (this.discordConnecting || typeof window === 'undefined') return;
+    this.discordConnecting = true;
+    this.discordConnectError = '';
+    this.userService.requestDiscordAccountLink().subscribe({
+      next: (url) => {
+        if (!url || !url.startsWith('https://') && !url.startsWith('http://')) {
+          this.discordConnecting = false;
+          this.discordConnectError = 'Não foi possível iniciar uma conexão segura com o Discord.';
+          return;
+        }
+        window.location.assign(url);
+      },
+      error: (err) => {
+        this.discordConnecting = false;
+        this.discordConnectError = err?.error?.message
+          || 'Não foi possível conectar o Discord. Tente novamente.';
+      }
+    });
   }
 
   dismissDiscordWarning(): void {
