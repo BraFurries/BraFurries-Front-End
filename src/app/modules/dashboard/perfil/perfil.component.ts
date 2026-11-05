@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { EMPTY, Observable, Subject, catchError, forkJoin, map, of, switchMap, takeUntil, tap } from 'rxjs';
 import { CommunityAccess, CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
-import { UserService } from '../../../core/services/user.service';
+import { DiscordLinkPreview, UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { MemberCommunityContextResponse, MemberCommunitySummary, MemberModerationPage, MemberProfileResponse } from '../../../shared/models/api/member-profile/member-profile';
 
@@ -28,6 +28,13 @@ export class PerfilComponent implements OnInit, OnDestroy {
   profileImageUploading = false;
   profileImageDeleting = false;
   readonly moderationPageSize = 10;
+  discordLinkStarting = false;
+  discordLinkLoading = false;
+  discordLinkConfirming = false;
+  discordLinkTicket = '';
+  discordLinkPreview: DiscordLinkPreview | null = null;
+  discordLinkError = '';
+  discordLinkSuccess = '';
   private readonly destroy$ = new Subject<void>();
   private readonly communitySelection$ = new Subject<number>();
   private readonly moderationRequest$ = new Subject<{ communityId: number; page: number }>();
@@ -62,9 +69,87 @@ export class PerfilComponent implements OnInit, OnDestroy {
       this.moderationLoading = false;
     } });
     this.loadProfile();
+    this.handleDiscordLinkCallback();
   }
 
   ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
+
+  private handleDiscordLinkCallback(): void {
+    if (typeof window === 'undefined') return;
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const ticket = fragment.get('discord_link_ticket');
+    const query = new URLSearchParams(window.location.search);
+    const failure = query.get('discord_link_error');
+    if (failure) {
+      this.discordLinkError = failure;
+      query.delete('discord_link_error');
+    }
+    if (ticket || failure) {
+      // Remove short-lived bearer ticket from visible URL and browser history.
+      const rest = query.toString();
+      window.history.replaceState(window.history.state, '',
+        window.location.pathname + (rest ? '?' + rest : ''));
+    }
+    if (!ticket) return;
+
+    this.discordLinkTicket = ticket;
+    this.discordLinkLoading = true;
+    this.userService.previewDiscordLink(ticket).pipe(takeUntil(this.destroy$)).subscribe({
+      next: preview => {
+        this.discordLinkPreview = preview;
+        this.discordLinkLoading = false;
+      },
+      error: () => {
+        this.discordLinkTicket = '';
+        this.discordLinkLoading = false;
+        this.discordLinkError = 'A verificação expirou ou pertence a outra conta. Reinicie a conexão com Discord.';
+      }
+    });
+  }
+
+  startDiscordLink(): void {
+    if (this.discordLinkStarting) return;
+    this.discordLinkStarting = true;
+    this.discordLinkError = '';
+    this.discordLinkSuccess = '';
+    this.userService.beginDiscordLink().pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ ticket }) => this.userService.openDiscordLinkOAuth(ticket),
+      error: () => {
+        this.discordLinkStarting = false;
+        this.discordLinkError = 'Não foi possível abrir o Discord. Tente novamente.';
+      }
+    });
+  }
+
+  confirmDiscordLink(): void {
+    if (!this.discordLinkPreview || !this.discordLinkTicket || this.discordLinkConfirming) return;
+    this.discordLinkConfirming = true;
+    this.discordLinkError = '';
+    this.userService.confirmDiscordLink(this.discordLinkTicket)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.discordLinkConfirming = false;
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          this.discordLinkSuccess = result.status === 'HISTORY_CONNECTED'
+            ? 'Contas confirmadas! O histórico Discord permanece preservado e pode ser consultado neste perfil.'
+            : 'Discord conectado com sucesso!';
+          this.loadProfile();
+        },
+        error: (error) => {
+          this.discordLinkConfirming = false;
+          this.discordLinkError = error?.error?.message ||
+            'Não foi possível concluir a vinculação. Verifique sua conta e tente novamente.';
+        }
+      });
+  }
+
+  cancelDiscordLink(): void {
+    if (this.discordLinkConfirming) return;
+    this.discordLinkTicket = '';
+    this.discordLinkPreview = null;
+    this.discordLinkError = '';
+  }
 
   selectCommunity(communityId: number): void {
     if (this.selectedCommunityId === communityId && this.context) return;
