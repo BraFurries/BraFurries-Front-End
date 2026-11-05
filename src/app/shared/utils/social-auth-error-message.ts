@@ -13,7 +13,7 @@ export function getSocialAuthErrorMessage(message?: string | null): string | nul
     normalized === DISTINCT_SOCIAL_ACCOUNTS_ERROR ||
     normalized === LEGACY_ACCOUNT_MERGE_CONFIRMATION_ERROR
   ) {
-    return 'O e-mail e o provedor social pertencem a contas distintas. Por segurança, entre com a conta original e solicite a regularização à administração.';
+    return 'Encontramos um cadastro de site e uma identidade Discord diferente. Entre com Google na sua conta do site, depois use “Conectar Discord” no painel para comprovar as duas identidades e recuperar seus dados.';
   }
 
   return message;
