@@ -3,32 +3,38 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of } from 'rxjs';
 import {
-  CommerceAccessService,
-  CommerceApprovedPerson,
-  CommerceTeamRole
-} from '../../../core/services/commerce-access.service';
+  PlatformAccessService,
+  PlatformApprovedPerson,
+  PlatformTeamRole,
+  PlatformPermissionDefinition
+} from '../../../core/services/platform-access.service';
 import { CommerceAccessComponent } from './commerce-access.component';
 
 describe('CommerceAccessComponent', () => {
   let fixture: ComponentFixture<CommerceAccessComponent>;
   let component: CommerceAccessComponent;
-  let service: jasmine.SpyObj<CommerceAccessService>;
+  let service: jasmine.SpyObj<PlatformAccessService>;
 
-  const person: CommerceApprovedPerson = {
+  const person: PlatformApprovedPerson = {
     userId: 19, name: 'Artista autorizado', permissions: ['ARTWORKS_MANAGE']
   };
-  const role: CommerceTeamRole = {
+  const role: PlatformTeamRole = {
     roleId: 42, name: 'Gestor de loja', active: true, permissions: ['PRODUCTS_MANAGE']
   };
 
   async function init(owner: boolean, enabled = true, permissions: string[] = []): Promise<void> {
-    service = jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService', [
-      'myAccess', 'approvedPeople', 'eligiblePeople', 'teamRoles',
+    service = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', [
+      'myAccess', 'approvedPeople', 'eligiblePeople', 'teamRoles', 'permissionCatalog',
       'approve', 'revoke', 'personPermission', 'rolePermission'
     ]);
     service.myAccess.and.returnValue(of({ enabled, owner, permissions }));
     service.approvedPeople.and.returnValue(of([person]));
     service.teamRoles.and.returnValue(of([role]));
+    const catalog: PlatformPermissionDefinition[] = [
+      { code: 'PRODUCTS_MANAGE', area: 'COMMERCE', label: 'Gerenciar produtos', description: 'Catálogo' },
+      { code: 'PARTNERS_MANAGE', area: 'PARTNERS', label: 'Gerenciar parceiros', description: 'Parcerias' }
+    ];
+    service.permissionCatalog.and.returnValue(of(catalog));
     service.eligiblePeople.and.returnValue(of([{ userId: 22, name: 'Membro elegível' }]));
     service.approve.and.returnValue(of(void 0));
     service.revoke.and.returnValue(of(void 0));
@@ -38,10 +44,11 @@ describe('CommerceAccessComponent', () => {
     await TestBed.configureTestingModule({
       declarations: [CommerceAccessComponent],
       imports: [CommonModule, FormsModule],
-      providers: [{ provide: CommerceAccessService, useValue: service }]
+      providers: [{ provide: PlatformAccessService, useValue: service }]
     }).compileComponents();
     fixture = TestBed.createComponent(CommerceAccessComponent);
     component = fixture.componentInstance;
+    component.isPermissionsManagementPage = owner;
     fixture.detectChanges();
   }
 
@@ -90,6 +97,14 @@ describe('CommerceAccessComponent', () => {
 
     expect(service.rolePermission).toHaveBeenCalledWith(42, 'FINANCE_VIEW', true);
     expect(component.successMessage).toBe('Permissão do cargo atualizada.');
+  });
+
+  it('lists partner management separately from financial permissions', async () => {
+    await init(true);
+    expect(component.permissionGroups.map(group => group.label)).toEqual(['Gestão Comercial', 'Parcerias']);
+    expect(component.permissionGroups[1].permissions.map(item => item.code)).toEqual(['PARTNERS_MANAGE']);
+    expect(fixture.nativeElement.textContent).toContain('Gerenciar parceiros');
+    expect(fixture.nativeElement.textContent).toContain('Permissões de acesso');
   });
 
   it('does not mutate access when the API denies ownership', async () => {

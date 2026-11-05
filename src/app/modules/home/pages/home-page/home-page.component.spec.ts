@@ -41,6 +41,11 @@ describe('HomePageComponent', () => {
     expect(section.querySelector('a[href="https://discord.gg/indie"]')).toBeTruthy();
     expect(section.querySelectorAll('article').length).toBe(2);
     expect(section.querySelectorAll('article a').length).toBe(1);
+    const clickable = section.querySelector('article a') as HTMLElement;
+    const unlinked = section.querySelectorAll('article')[1]?.querySelector('div') as HTMLElement;
+    expect(clickable.className).toContain('hover:scale-105');
+    expect(unlinked.className).toContain('hover:scale-105');
+
     expect(section.textContent).not.toContain('NextFur');
   });
 

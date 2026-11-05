@@ -3,6 +3,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgModule } from '@angular/core';
 
 import { AdminComponent } from './admin.component';
+import { AdminPermissionsComponent } from './admin-permissions.component';
 import { AdminRoutingModule } from './admin-routing.module';
 import { AdminAnnouncementsComponent } from './pages/avisos/avisos.component';
 import { AdminBotComponent } from './pages/bot-coddy/bot-coddy.component';
@@ -20,6 +21,7 @@ import { AdminOverviewComponent } from './pages/visao-geral/visao-geral.componen
 @NgModule({
   declarations: [
     AdminComponent,
+    AdminPermissionsComponent,
     AdminOverviewComponent,
     AdminUsersComponent,
     AdminUserProfileComponent,

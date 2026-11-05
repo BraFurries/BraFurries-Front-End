@@ -9,7 +9,7 @@ import {
   CommunityContextState
 } from '../../../services/community-context.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
-import { CommerceAccessService } from '../../../services/commerce-access.service';
+import { PlatformAccessService } from '../../../services/platform-access.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
 import { BaseLayoutDashboardComponent } from './base-layout-dashboard.component';
@@ -23,7 +23,7 @@ describe('BaseLayoutDashboardComponent', () => {
   let user$: BehaviorSubject<User | null>;
   let context$: BehaviorSubject<CommunityContextState>;
   let context: jasmine.SpyObj<CommunityContextService>;
-  let commerce: jasmine.SpyObj<CommerceAccessService>;
+  let commerce: jasmine.SpyObj<PlatformAccessService>;
   let router: Router;
 
   const user: User = {
@@ -72,7 +72,7 @@ describe('BaseLayoutDashboardComponent', () => {
       ['initialize', 'selectCommunity', 'scopedLocation', 'communityImageUrl', 'canAccessFeature'],
       { state$: context$.asObservable() }
     );
-    commerce = jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService', ['myAccess']);
+    commerce = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
     commerce.myAccess.and.returnValue(of({ enabled: false, owner: false, permissions: [] }));
     context.initialize.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.selectCommunity.and.returnValue(of({ kind: 'ready', state: baseState }));
@@ -87,7 +87,7 @@ describe('BaseLayoutDashboardComponent', () => {
         { provide: UserPermissionsService, useValue: { isAdmin: () => false } },
         { provide: UserService, useValue: { user$: user$.asObservable(), logout: () => of(true) } },
         { provide: CommunityContextService, useValue: context },
-        { provide: CommerceAccessService, useValue: commerce }
+        { provide: PlatformAccessService, useValue: commerce }
       ]
     }).compileComponents();
 
@@ -330,6 +330,40 @@ describe('BaseLayoutDashboardComponent', () => {
     user$.next(null);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
+  });
+
+  it('groups finance navigation under administration, not the general menu', () => {
+    commerce.myAccess.and.returnValue(of({ enabled: true, owner: false, permissions: ['FINANCE_VIEW'] }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+
+    const management = fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]') as HTMLElement;
+    expect(management).toBeTruthy();
+    expect(management.parentElement?.textContent).toContain('Administração');
+    expect(management.parentElement?.textContent).not.toContain('Permissões de acesso');
+  });
+
+  it('shows only partners, not commerce, for an isolated PARTNERS_MANAGE grant', () => {
+    commerce.myAccess.and.returnValue(of({ enabled: true, owner: false, permissions: ['PARTNERS_MANAGE'] }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/parceiros"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeNull();
+  });
+
+  it('shows owner-only permissions navigation independent of Community selection', () => {
+    commerce.myAccess.and.returnValue(of({ enabled: true, owner: true, permissions: [] }));
+    user$.next(null);
+    user$.next(user);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeTruthy();
+
+    context$.next({ ...baseState, activeCommunity: null, activeAccess: null });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeTruthy();
   });
 
   it('uses canonical Community management navigation', () => {

@@ -3,19 +3,19 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../../environments/environment';
 import {
-  CommerceAccessService, COMMERCE_PERMISSIONS
-} from './commerce-access.service';
+  PlatformAccessService
+} from './platform-access.service';
 
-describe('CommerceAccessService', () => {
-  let service: CommerceAccessService;
+describe('PlatformAccessService', () => {
+  let service: PlatformAccessService;
   let http: HttpTestingController;
-  const base = `${environment.apiBaseUrl}/user/me/brafurries-commerce/access`;
+  const base = `${environment.apiBaseUrl}/user/me/platform-access`;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), CommerceAccessService]
+      providers: [provideHttpClient(), provideHttpClientTesting(), PlatformAccessService]
     });
-    service = TestBed.inject(CommerceAccessService);
+    service = TestBed.inject(PlatformAccessService);
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -48,10 +48,12 @@ describe('CommerceAccessService', () => {
     role.flush(null);
   });
 
-  it('exposes the nine distinct private permission codes', () => {
-    expect(COMMERCE_PERMISSIONS.length).toBe(9);
-    expect(new Set(COMMERCE_PERMISSIONS.map(permission => permission.code)).size).toBe(9);
-    expect(COMMERCE_PERMISSIONS.some(permission => permission.code === 'PAYMENTS_RECORD')).toBeTrue();
-    expect(COMMERCE_PERMISSIONS.some(permission => permission.code === 'CASHFLOW_MANAGE')).toBeTrue();
+  it('reads the live platform permission catalog instead of hardcoding module access', () => {
+    let definitions: Array<{ code: string; area: string }> = [];
+    service.permissionCatalog().subscribe(items => definitions = items);
+    const request = http.expectOne(`${base}/permissions`);
+    expect(request.request.method).toBe('GET');
+    request.flush([{ code: 'PARTNERS_MANAGE', area: 'PARTNERS', label: 'Gerenciar parceiros', description: '' }]);
+    expect(definitions[0].area).toBe('PARTNERS');
   });
 });

@@ -1,10 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Observable, Subject, catchError, forkJoin, map, of, takeUntil, tap } from 'rxjs';
 import {
-  CommerceAccess,
-  CommerceAccessService,
-  CommercePermissionCode
-} from '../../../core/services/commerce-access.service';
+  PlatformAccess,
+  PlatformAccessService,
+  PlatformPermissionCode
+} from '../../../core/services/platform-access.service';
 import {
   CommerceArtist, CommerceArtwork, CommerceBatch,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
@@ -20,7 +20,7 @@ type CatalogTab = 'artworks' | 'templates' | 'contracts' |
   templateUrl: './commerce-catalog.component.html'
 })
 export class CommerceCatalogComponent implements OnInit, OnDestroy {
-  readonly tabs: { key: CatalogTab; label: string; permissions: CommercePermissionCode[] }[] = [
+  readonly tabs: { key: CatalogTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'artworks', label: 'Artes e artistas', permissions: ['ARTWORKS_MANAGE'] },
     { key: 'templates', label: 'Modelos de contratos', permissions: ['CONTRACTS_MANAGE'] },
     { key: 'contracts', label: 'Contratos assinados', permissions: ['CONTRACTS_MANAGE'] },
@@ -29,7 +29,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     { key: 'links', label: 'Artes nos produtos', permissions: ['PRODUCTS_MANAGE', 'CONTRACTS_MANAGE'] },
     { key: 'production', label: 'Lotes de produção', permissions: ['PRODUCTS_MANAGE', 'SUPPLIERS_MANAGE'] }
   ];
-  access: CommerceAccess | null = null;
+  access: PlatformAccess | null = null;
   activeTab: CatalogTab = 'artworks';
   loading = true;
   saving = false;
@@ -77,7 +77,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private readonly accessService: CommerceAccessService,
+    private readonly accessService: PlatformAccessService,
     private readonly catalog: CommerceCatalogService
   ) {}
 
@@ -104,7 +104,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  can(permission: CommercePermissionCode): boolean {
+  can(permission: PlatformPermissionCode): boolean {
     return this.access?.enabled === true &&
       (this.access.owner || this.access.permissions.includes(permission));
   }

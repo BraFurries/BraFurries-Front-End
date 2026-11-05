@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Observable, Subject, forkJoin, of, takeUntil, catchError } from 'rxjs';
-import { CommerceAccess, CommerceAccessService, CommercePermissionCode } from
-  '../../../core/services/commerce-access.service';
+import { PlatformAccess, PlatformAccessService, PlatformPermissionCode } from
+  '../../../core/services/platform-access.service';
 import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
   CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
@@ -34,14 +34,14 @@ function brazilToday(): string {
   templateUrl: './commerce-finance.component.html'
 })
 export class CommerceFinanceComponent implements OnInit, OnDestroy {
-  readonly tabs: { key: FinanceTab; label: string; permissions: CommercePermissionCode[] }[] = [
+  readonly tabs: { key: FinanceTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'sales', label: 'Vendas físicas', permissions: ['SALES_MANAGE'] },
     { key: 'royalties', label: 'Royalties', permissions: ['FINANCE_VIEW'] },
     { key: 'statements', label: 'Fechamentos e repasses', permissions: ['FINANCE_VIEW'] },
     { key: 'cash', label: 'Caixa, despesas e aportes', permissions: ['FINANCE_VIEW'] }
   ];
 
-  access: CommerceAccess | null = null;
+  access: PlatformAccess | null = null;
   activeTab: FinanceTab = 'sales';
   loading = true;
   saving = false;
@@ -110,7 +110,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private readonly authorizer: CommerceAccessService,
+    private readonly authorizer: PlatformAccessService,
     private readonly finance: CommerceFinanceService
   ) {}
 
@@ -133,7 +133,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  can(permission: CommercePermissionCode): boolean {
+  can(permission: PlatformPermissionCode): boolean {
     return this.access?.enabled === true &&
       (this.access.owner || this.access.permissions.includes(permission));
   }

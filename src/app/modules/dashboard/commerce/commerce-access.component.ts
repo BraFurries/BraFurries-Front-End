@@ -1,14 +1,14 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Observable, Subject, forkJoin, takeUntil } from 'rxjs';
 import {
-  CommerceAccess,
-  CommerceAccessService,
-  CommerceApprovedPerson,
-  CommerceEligiblePerson,
-  CommercePermissionCode,
-  CommerceTeamRole,
-  COMMERCE_PERMISSIONS
-} from '../../../core/services/commerce-access.service';
+  PlatformAccess,
+  PlatformAccessService,
+  PlatformApprovedPerson,
+  PlatformEligiblePerson,
+  PlatformPermissionCode,
+  PlatformPermissionDefinition,
+  PlatformTeamRole
+} from '../../../core/services/platform-access.service';
 
 /**
  * BraFurries-private commercial area, independent of Community navigation.
@@ -20,12 +20,25 @@ import {
   templateUrl: './commerce-access.component.html'
 })
 export class CommerceAccessComponent implements OnInit, OnDestroy {
-  readonly permissionDefinitions = COMMERCE_PERMISSIONS;
+  permissionDefinitions: PlatformPermissionDefinition[] = [];
+  permissionGroups: { label: string; permissions: PlatformPermissionDefinition[] }[] = [];
+  private applyPermissionCatalog(catalog: PlatformPermissionDefinition[]): void {
+    this.permissionDefinitions = catalog;
+    const groups = new Map<string, PlatformPermissionDefinition[]>();
+    for (const permission of catalog) {
+      const area = permission.area === 'COMMERCE' ? 'Gestão Comercial'
+        : permission.area === 'PARTNERS' ? 'Parcerias' : permission.area;
+      groups.set(area, [...(groups.get(area) ?? []), permission]);
+    }
+    this.permissionGroups = Array.from(groups, ([label, permissions]) => ({ label, permissions }));
+  }
+  /** Administrative tab only. The old commerce page remains a read-only access summary. */
+  isPermissionsManagementPage = false;
 
-  access: CommerceAccess | null = null;
-  people: CommerceApprovedPerson[] = [];
-  roles: CommerceTeamRole[] = [];
-  candidates: CommerceEligiblePerson[] = [];
+  access: PlatformAccess | null = null;
+  people: PlatformApprovedPerson[] = [];
+  roles: PlatformTeamRole[] = [];
+  candidates: PlatformEligiblePerson[] = [];
 
   loading = true;
   loadingOwnerData = false;
@@ -41,18 +54,18 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private readonly service: CommerceAccessService) {}
+  constructor(private readonly service: PlatformAccessService) {}
 
   ngOnInit(): void {
     this.service.myAccess().pipe(takeUntil(this.destroy$)).subscribe({
       next: access => {
         this.access = access;
         this.loading = false;
-        if (access.owner) this.loadOwnerData();
+        if (access.owner && this.isPermissionsManagementPage) this.loadOwnerData();
       },
       error: () => {
         this.loading = false;
-        this.errorMessage = 'Não foi possível verificar seu acesso à Gestão Comercial.';
+        this.errorMessage = 'Não foi possível verificar seu acesso à plataforma.';
       }
     });
   }
@@ -62,11 +75,11 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  get selectedPerson(): CommerceApprovedPerson | undefined {
+  get selectedPerson(): PlatformApprovedPerson | undefined {
     return this.people.find(person => person.userId === this.selectedPersonId);
   }
 
-  get selectedRole(): CommerceTeamRole | undefined {
+  get selectedRole(): PlatformTeamRole | undefined {
     return this.roles.find(role => role.roleId === this.selectedRoleId);
   }
 
@@ -98,10 +111,10 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
       'Pessoa aprovada. Configure suas permissões individuais e as do cargo.');
   }
 
-  removePerson(person: CommerceApprovedPerson): void {
+  removePerson(person: PlatformApprovedPerson): void {
     if (!this.access?.owner) return;
     const confirmed = window.confirm(
-      `Revogar o acesso comercial de ${person.name}? Todas as permissões individuais serão removidas.`
+      `Revogar o acesso administrativo de ${person.name}? Todas as permissões individuais serão removidas.`
     );
     if (confirmed) {
       this.mutate(this.service.revoke(person.userId),
@@ -109,15 +122,15 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
     }
   }
 
-  changePersonPermission(person: CommerceApprovedPerson,
-    permission: CommercePermissionCode, granted: boolean): void {
+  changePersonPermission(person: PlatformApprovedPerson,
+    permission: PlatformPermissionCode, granted: boolean): void {
     if (!this.access?.owner) return;
     this.mutate(this.service.personPermission(person.userId, permission, granted),
       'Permissão individual atualizada.');
   }
 
-  changeRolePermission(role: CommerceTeamRole,
-    permission: CommercePermissionCode, granted: boolean): void {
+  changeRolePermission(role: PlatformTeamRole,
+    permission: PlatformPermissionCode, granted: boolean): void {
     if (!this.access?.owner) return;
     this.mutate(this.service.rolePermission(role.roleId, permission, granted),
       'Permissão do cargo atualizada.');
@@ -148,9 +161,11 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
     this.loadingOwnerData = true;
     forkJoin({
       people: this.service.approvedPeople(),
-      roles: this.service.teamRoles()
+      roles: this.service.teamRoles(),
+      catalog: this.service.permissionCatalog()
     }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ people, roles }) => {
+      next: ({ people, roles, catalog }) => {
+        this.applyPermissionCatalog(catalog);
         this.people = people;
         this.roles = roles;
         this.selectedPersonId = people.some(p => p.userId === this.selectedPersonId)

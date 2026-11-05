@@ -3,18 +3,18 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
-import { CommerceAccessService } from '../../../core/services/commerce-access.service';
+import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
 import { CommerceCatalogComponent } from './commerce-catalog.component';
 
 describe('CommerceCatalogComponent', () => {
   let fixture: ComponentFixture<CommerceCatalogComponent>;
   let component: CommerceCatalogComponent;
-  let access: jasmine.SpyObj<CommerceAccessService>;
+  let access: jasmine.SpyObj<PlatformAccessService>;
   let catalog: jasmine.SpyObj<CommerceCatalogService>;
 
   async function create(permissions: string[], owner = false, enabled = true): Promise<void> {
-    access = jasmine.createSpyObj<CommerceAccessService>('CommerceAccessService', ['myAccess']);
+    access = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
     catalog = jasmine.createSpyObj<CommerceCatalogService>('CommerceCatalogService', [
       'templates','artworks','suppliers','supplierChoices','products','productionBatches',
       'productArtworks','contracts','createArtwork','createTemplate',
@@ -48,7 +48,7 @@ describe('CommerceCatalogComponent', () => {
       declarations: [CommerceCatalogComponent],
       imports: [CommonModule, FormsModule, RouterTestingModule],
       providers: [
-        { provide: CommerceAccessService, useValue: access },
+        { provide: PlatformAccessService, useValue: access },
         { provide: CommerceCatalogService, useValue: catalog }
       ]
     }).compileComponents();
