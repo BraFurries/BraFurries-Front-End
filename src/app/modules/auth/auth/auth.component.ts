@@ -15,6 +15,7 @@ import { getSocialAuthErrorMessage } from '../../../shared/utils/social-auth-err
 })
 export class AuthComponent implements OnInit {
   errorMessage = '';
+  get hasExistingSession(): boolean { return this.userService.getUser() !== null; }
 
   constructor(
     private userService: UserService,
