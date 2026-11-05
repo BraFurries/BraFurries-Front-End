@@ -250,26 +250,13 @@
 
             <ng-container *ngIf="showAdminMenu || showCommerceMenu || showPermissionsMenu || showPartnersMenu">
                 <p class="text-[10px] font-bold text-gray-500 uppercase px-4 mt-4 mb-2 tracking-widest">Administração</p>
-                <a *ngIf="showAdminMenu" routerLink="/painel/admin"
+                <a *ngIf="showAdminMenu || showPermissionsMenu || showPartnersMenu"
+                    [routerLink]="showAdminMenu ? '/painel/admin' : (showPermissionsMenu ? '/painel/admin/permissoes' : '/painel/admin/parceiros')"
                     class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
-                    [ngClass]="activePath.startsWith('/painel/admin') && !activePath.includes('/painel/admin/permissoes')
+                    [ngClass]="activePath.startsWith('/painel/admin')
                     ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
                     : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
                     <span class="mr-3">⚙️</span> Administração
-                </a>
-                <a *ngIf="showPermissionsMenu" routerLink="/painel/admin/permissoes"
-                    class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
-                    [ngClass]="activePath.startsWith('/painel/admin/permissoes')
-                    ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
-                    : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
-                    <span class="mr-3">🔐</span> Permissões de acesso
-                </a>
-                <a *ngIf="showPartnersMenu && !showAdminMenu" routerLink="/painel/admin/parceiros"
-                    class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
-                    [ngClass]="activePath.startsWith('/painel/admin/parceiros')
-                    ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30 transform'
-                    : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
-                    <span class="mr-3">🤝</span> Parceiros
                 </a>
                 <a *ngIf="showCommerceMenu" routerLink="/painel/gestao-comercial"
                     class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
