@@ -6,7 +6,7 @@ describe('getSocialAuthErrorMessage', () => {
       getSocialAuthErrorMessage(
         'e-mail e provedor pertencem a contas distintas; regularização administrativa necessária'
       )
-    ).toContain('contas distintas');
+    ).toContain('Conectar Discord');
   });
 
   it('keeps the legacy merge-confirmation error user-friendly during rollout', () => {
@@ -14,7 +14,7 @@ describe('getSocialAuthErrorMessage', () => {
     const message = getSocialAuthErrorMessage(raw);
 
     expect(message).not.toBe(raw);
-    expect(message).toContain('contas distintas');
+    expect(message).toContain('Conectar Discord');
   });
 
   it('preserves unrelated errors', () => {
