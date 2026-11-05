@@ -60,12 +60,13 @@ describe('CommerceAccessComponent (legacy commercial landing)', () => {
     expect(fixture.nativeElement.textContent).toContain('indisponível');
   });
 
-  it('does not navigate on authentication/authorization failures', async () => {
+  it('does not navigate when the access API fails', async () => {
     await open(true, false, []);
-    service.myAccess.and.returnValue(throwError(() => new Error('network')));
-    fixture.componentInstance.ngOnDestroy();
     fixture.destroy();
-    // No navigation was attempted when the API reported no permissions.
+    service.myAccess.and.returnValue(throwError(() => new Error('network')));
+    fixture = TestBed.createComponent(CommerceAccessComponent);
+    fixture.detectChanges();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Não foi possível consultar');
   });
 });
