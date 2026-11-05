@@ -112,6 +112,15 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.downloadContract).not.toHaveBeenCalled();
   });
 
+  it('keeps only operational catalog and finance navigation, without Teams or Access', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    const header = fixture.nativeElement.querySelector('header') as HTMLElement;
+    expect(header.textContent).not.toContain('Equipe e Acessos');
+    expect(header.textContent).not.toContain('Gerenciar permissões');
+    expect(header.querySelector('a[href="/painel/gestao-comercial/financeiro"]')).toBeTruthy();
+    expect(header.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
+  });
+
   it('offers all seven catalog screens to an authorized owner', async () => {
     await create([],true);
     expect(component.visibleTabs().length).toBe(7);
