@@ -41,6 +41,16 @@ interface UserSession {
 type RefreshTokenResponse = Omit<AuthResponse, 'user'> & Partial<Pick<AuthResponse, 'user'>>;
 export type SocialAuthProvider = 'google' | 'discord';
 
+export interface DiscordLinkPreview {
+  discordUsername: string;
+  hasExistingHistory: boolean;
+  notice: string;
+}
+export interface DiscordLinkConfirmation {
+  status: 'CONNECTED' | 'ALREADY_CONNECTED' | 'HISTORY_CONNECTED';
+  notice: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -125,6 +135,34 @@ export class UserService {
         this.setSession(session);
         return session.user;
       })
+    );
+  }
+
+  /** Start a separate OAuth proof without logging out or replacing the current session. */
+  beginDiscordLink(): Observable<{ ticket: string }> {
+    return this.http.post<{ ticket: string }>(
+      `${environment.apiBaseUrl}/user/me/discord-link/start`, {}
+    );
+  }
+
+  openDiscordLinkOAuth(ticket: string): void {
+    const frontendOrigin = encodeURIComponent(window.location.origin);
+    const proof = encodeURIComponent(ticket);
+    window.location.assign(
+      `${environment.apiBaseUrl}/auth/oauth2/discord?link_ticket=${proof}&frontend_origin=${frontendOrigin}`
+    );
+  }
+
+  previewDiscordLink(ticket: string): Observable<DiscordLinkPreview> {
+    return this.http.get<DiscordLinkPreview>(
+      `${environment.apiBaseUrl}/user/me/discord-link/preview`,
+      { params: { ticket } }
+    );
+  }
+
+  confirmDiscordLink(ticket: string): Observable<DiscordLinkConfirmation> {
+    return this.http.post<DiscordLinkConfirmation>(
+      `${environment.apiBaseUrl}/user/me/discord-link/confirm`, { ticket }
     );
   }
 
