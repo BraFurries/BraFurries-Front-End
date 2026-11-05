@@ -18,9 +18,13 @@
             <ng-template #callbackError>
                 <h1 class="text-3xl font-amaranth font-bold text-braDark italic mb-3">Login nao concluido</h1>
                 <p class="text-sm font-semibold text-red-500 mb-6">{{ errorMessage }}</p>
-                <a routerLink="/login"
+                <a *ngIf="hasExistingSession" routerLink="/painel"
                     class="inline-flex items-center justify-center bg-braDark text-white font-amaranth font-bold px-6 py-3 rounded-2xl shadow-xl hover:bg-braPurple transition-all">
-                    Voltar ao login
+                    Voltar ao painel
+                </a>
+                <a *ngIf="!hasExistingSession" routerLink="/login"
+                    class="inline-flex items-center justify-center bg-braDark text-white font-amaranth font-bold px-6 py-3 rounded-2xl shadow-xl hover:bg-braPurple transition-all">
+                    Entrar com Google ou Discord
                 </a>
             </ng-template>
         </div>
