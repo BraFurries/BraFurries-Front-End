@@ -160,6 +160,15 @@ describe('CommerceFinanceComponent', () => {
     expect(component.paymentRequestKey).toBe('');
   });
 
+  it('does not expose the administrative grants editor from the finance screen', async () => {
+    await init(['FINANCE_VIEW']);
+    const header = fixture.nativeElement.querySelector('header') as HTMLElement;
+    expect(header.textContent).not.toContain('Equipe e acessos');
+    expect(header.textContent).not.toContain('Gerenciar permissões');
+    expect(header.querySelector('a[href="/painel/gestao-comercial/catalogo"]')).toBeTruthy();
+    expect(header.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
+  });
+
   it('owner has all finance operations without a Community Admin grant', async () => {
     await init([],true);
     expect(component.visibleTabs().length).toBe(4);
