@@ -10,10 +10,11 @@ export function getSocialAuthErrorMessage(message?: string | null): string | nul
 
   const normalized = message.trim().toLowerCase();
   if (
+    normalized === 'account_link_required' ||
     normalized === DISTINCT_SOCIAL_ACCOUNTS_ERROR ||
     normalized === LEGACY_ACCOUNT_MERGE_CONFIRMATION_ERROR
   ) {
-    return 'O e-mail e o provedor social pertencem a contas distintas. Por segurança, entre com a conta original e solicite a regularização à administração.';
+    return 'Seu Discord já possui registros em outra conta BraFurries. Entre com Google na sua conta do site e use “Conectar Discord” no painel para vincular as contas com segurança, sem precisar pedir intervenção da equipe.';
   }
 
   return message;
