@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { EMPTY, Observable, Subject, catchError, forkJoin, map, of, switchMap, takeUntil, tap } from 'rxjs';
 import { CommunityAccess, CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
@@ -31,6 +32,8 @@ export class PerfilComponent implements OnInit, OnDestroy {
   discordLinkStarting = false;
   discordLinkLoading = false;
   discordLinkConfirming = false;
+  discordLinkConsolidating = false;
+  discordHistoryOwnerConsent = false;
   discordLinkTicket = '';
   discordLinkPreview: DiscordLinkPreview | null = null;
   discordLinkError = '';
@@ -43,7 +46,8 @@ export class PerfilComponent implements OnInit, OnDestroy {
     private readonly memberProfileService: MemberProfileService,
     private readonly communityAccessService: CommunityAccessService,
     private readonly userService: UserService,
-    private readonly seoService: SeoService
+    private readonly seoService: SeoService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -97,6 +101,7 @@ export class PerfilComponent implements OnInit, OnDestroy {
     this.userService.previewDiscordLink(ticket).pipe(takeUntil(this.destroy$)).subscribe({
       next: preview => {
         this.discordLinkPreview = preview;
+        this.discordHistoryOwnerConsent = false;
         this.discordLinkLoading = false;
       },
       error: () => {
@@ -121,8 +126,49 @@ export class PerfilComponent implements OnInit, OnDestroy {
     });
   }
 
+  get canConsolidateDiscord(): boolean {
+    const preview = this.discordLinkPreview;
+    return preview?.status === 'PRECHECK_REQUIRED' &&
+      preview.consolidationPlan?.status === 'AUTO_MERGE_CANDIDATE' &&
+      preview.consolidationPlan.preferredCanonicalAccount === 'DISCORD_HISTORY_OWNER';
+  }
+
+  get discordConflictNeedsReview(): boolean {
+    const status = this.discordLinkPreview?.status;
+    return status === 'RESOLUTION_REQUIRED' || status === 'REVIEW_REQUIRED' ||
+      (status === 'PRECHECK_REQUIRED' && !this.canConsolidateDiscord);
+  }
+
+  consolidateDiscordAccounts(): void {
+    if (!this.canConsolidateDiscord || !this.discordHistoryOwnerConsent ||
+        !this.discordLinkTicket || this.discordLinkConsolidating || this.discordLinkConfirming) return;
+
+    this.discordLinkConsolidating = true;
+    this.discordLinkError = '';
+    this.userService.consolidateDiscordLink(this.discordLinkTicket, true)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.discordLinkConsolidating = false;
+          if (result.status !== 'CONSOLIDATED_RELOGIN_REQUIRED') {
+            this.discordLinkError = 'Não foi possível confirmar a conclusão da unificação.';
+            return;
+          }
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          this.discordHistoryOwnerConsent = false;
+          this.userService.finishAccountConsolidation();
+          this.router.navigate(['/login'], { queryParams: { conta_unificada: '1' } });
+        },
+        error: () => {
+          this.discordLinkConsolidating = false;
+          this.discordLinkError = 'A unificação não foi concluída. Seus dados foram preservados. ' +
+            'Pode haver informações ou permissões que precisem de revisão. Verifique novamente antes de continuar.';
+        }
+      });
+  }
+
   confirmDiscordLink(): void {
-    if (!this.discordLinkPreview || !this.discordLinkTicket || this.discordLinkConfirming) return;
+    if (this.discordLinkPreview?.status !== 'CONNECT_READY' || !this.discordLinkTicket || this.discordLinkConfirming || this.discordLinkConsolidating) return;
     this.discordLinkConfirming = true;
     this.discordLinkError = '';
     this.userService.confirmDiscordLink(this.discordLinkTicket)
@@ -131,8 +177,8 @@ export class PerfilComponent implements OnInit, OnDestroy {
           this.discordLinkConfirming = false;
           this.discordLinkTicket = '';
           this.discordLinkPreview = null;
-          this.discordLinkSuccess = result.status === 'HISTORY_CONNECTED'
-            ? 'Contas confirmadas! O histórico Discord permanece preservado e pode ser consultado neste perfil.'
+          this.discordLinkSuccess = result.status === 'ALREADY_CONNECTED'
+            ? 'Este Discord já estava conectado à sua conta.'
             : 'Discord conectado com sucesso!';
           this.loadProfile();
         },
@@ -145,8 +191,9 @@ export class PerfilComponent implements OnInit, OnDestroy {
   }
 
   cancelDiscordLink(): void {
-    if (this.discordLinkConfirming) return;
-    this.discordLinkTicket = '';
+    if (this.discordLinkConfirming || this.discordLinkConsolidating) return;
+    this.discordHistoryOwnerConsent = false;
+    this.discordLinkTicket = ''
     this.discordLinkPreview = null;
     this.discordLinkError = '';
   }
