@@ -24,6 +24,7 @@ export class LoginComponent implements OnDestroy {
   private errorTimeout: any;
 
   returnUrl: string = '/painel';
+  accountConsolidated = false;
   private readonly authReturnUrls = new Set([
     '/login',
     '/social-login',
@@ -45,6 +46,7 @@ export class LoginComponent implements OnDestroy {
       'Entre na sua conta BraFurries para acessar o painel, gerenciar seu perfil e acompanhar recursos da comunidade.'
     );
     this.returnUrl = this.getSafeReturnUrl(this.route.snapshot.queryParams['returnUrl']);
+    this.accountConsolidated = this.route.snapshot.queryParams['conta_unificada'] === '1';
 
     this.loginForm = new FormGroup({
       email: new FormControl('', [Validators.required]),
