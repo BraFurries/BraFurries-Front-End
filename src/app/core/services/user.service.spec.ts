@@ -178,6 +178,37 @@ describe('UserService cached user state', () => {
     expect(service.getUser()?.profileImageUrl).toBeNull();
   });
 
+  it('submits distinct, acknowledged account consolidation rather than link confirmation', () => {
+    let outcome: string | undefined;
+    service.consolidateDiscordLink('verified-ticket', true).subscribe(result => outcome = result.status);
+    const request = http.expectOne((r) => r.url.endsWith('/user/me/discord-link/consolidate'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      ticket: 'verified-ticket', acknowledgeDiscordHistoryOwner: true
+    });
+    request.flush({
+      status: 'CONSOLIDATED_RELOGIN_REQUIRED',
+      canonicalUserId: 20, notice: 'Entre novamente'
+    });
+    expect(outcome).toBe('CONSOLIDATED_RELOGIN_REQUIRED');
+  });
+
+  it('clears both access and refresh credentials immediately after merging users', () => {
+    service.login('luna@example.com', 'password', true).subscribe();
+    http.expectOne((r) => r.url.endsWith('/auth/login')).flush({
+      access_token: 'old-access', refresh_token: 'old-refresh', expires_in: 3600, user
+    });
+    const seen: Array<User | null> = [];
+    service.user$.subscribe(value => seen.push(value));
+
+    service.finishAccountConsolidation();
+
+    expect(service.getAccessToken()).toBeNull();
+    expect(service.hasRecoverableSession()).toBeFalse();
+    expect(localStorage.getItem('logged_user')).toBeNull();
+    expect(seen.at(-1)).toBeNull();
+  });
+
   it('publishes null on logout', () => {
     const emitted: Array<User | null> = [];
     service.user$.subscribe((value) => emitted.push(value));
