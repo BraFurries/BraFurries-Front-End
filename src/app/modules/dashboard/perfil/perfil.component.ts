@@ -193,7 +193,7 @@ export class PerfilComponent implements OnInit, OnDestroy {
   cancelDiscordLink(): void {
     if (this.discordLinkConfirming || this.discordLinkConsolidating) return;
     this.discordHistoryOwnerConsent = false;
-    this.discordLinkTicket = ''
+    this.discordLinkTicket = '';
     this.discordLinkPreview = null;
     this.discordLinkError = '';
   }
