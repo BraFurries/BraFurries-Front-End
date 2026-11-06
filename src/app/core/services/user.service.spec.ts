@@ -207,6 +207,8 @@ describe('UserService cached user state', () => {
     expect(service.hasRecoverableSession()).toBeFalse();
     expect(localStorage.getItem('logged_user')).toBeNull();
     expect(seen.at(-1)).toBeNull();
+    expect(service.consumeAccountConsolidationNotice()).toBeTrue();
+    expect(service.consumeAccountConsolidationNotice()).toBeFalse();
   });
 
   it('publishes null on logout', () => {
