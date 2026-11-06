@@ -157,7 +157,7 @@ export class PerfilComponent implements OnInit, OnDestroy {
           this.discordLinkPreview = null;
           this.discordHistoryOwnerConsent = false;
           this.userService.finishAccountConsolidation();
-          this.router.navigate(['/login'], { queryParams: { conta_unificada: '1' } });
+          this.router.navigate(['/login']);
         },
         error: () => {
           this.discordLinkConsolidating = false;
