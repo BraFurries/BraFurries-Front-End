@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
@@ -15,6 +16,7 @@ describe('PerfilComponent', () => {
   let service: jasmine.SpyObj<MemberProfileService>;
   let communityAccessService: jasmine.SpyObj<CommunityAccessService>;
   let userService: jasmine.SpyObj<UserService>;
+  let router: jasmine.SpyObj<Router>;
   const context = (state = 'AVAILABLE'): MemberCommunityContextResponse => ({
     community: { communityId: 7, communityName: 'Comunidade real', guildId: '123' },
     membership: { state: state as any, recordCount: 1, memberSince: '2025-01-01', lastJoinDate: null, approved: true, approvedAt: null, present: true, leftAt: null, vip: false, partner: false },
@@ -34,8 +36,11 @@ describe('PerfilComponent', () => {
     communityAccessService = jasmine.createSpyObj<CommunityAccessService>('CommunityAccessService', ['getAccess']);
     userService = jasmine.createSpyObj<UserService>('UserService', [
       'updateCachedUser', 'beginDiscordLink', 'openDiscordLinkOAuth',
-      'previewDiscordLink', 'confirmDiscordLink'
+      'previewDiscordLink', 'confirmDiscordLink', 'consolidateDiscordLink',
+      'finishAccountConsolidation'
     ]);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.returnValue(Promise.resolve(true));
     service.getProfile.and.returnValue(of(profile()));
     communityAccessService.getAccess.and.callFake((communityId) => of({
       communityId,
@@ -50,7 +55,8 @@ describe('PerfilComponent', () => {
     service.getCommunityContext.and.returnValue(of(context()));
     service.getModeration.and.returnValue(of({ items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 }));
     await TestBed.configureTestingModule({ declarations: [PerfilComponent], imports: [CommonModule, FormsModule], providers: [
-      { provide: MemberProfileService, useValue: service }, { provide: CommunityAccessService, useValue: communityAccessService }, { provide: UserService, useValue: userService }, { provide: SeoService, useValue: { updateMetaTags: jasmine.createSpy() } }
+      { provide: MemberProfileService, useValue: service }, { provide: CommunityAccessService, useValue: communityAccessService }, { provide: UserService, useValue: userService }, { provide: SeoService, useValue: { updateMetaTags: jasmine.createSpy() } },
+      { provide: Router, useValue: router }
     ] }).compileComponents();
     fixture = TestBed.createComponent(PerfilComponent); component = fixture.componentInstance; fixture.detectChanges();
   });
@@ -190,26 +196,28 @@ describe('PerfilComponent', () => {
 
   it('requires explicit confirmation after seeing the verified Discord identity', () => {
     component.discordLinkTicket = 'ticket-123';
-    component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: true,
-      notice: 'Histórico anterior preservado' };
+    component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: false,
+      status: 'CONNECT_READY', nextActions: ['CONFIRM_LINK'], consolidationPlan: null,
+      notice: 'Discord disponível para conectar' };
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Furry');
-    expect(fixture.nativeElement.textContent).toContain('Confirmar conexão');
+    expect(fixture.nativeElement.textContent).toContain('Conectar Discord');
     expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
 
     userService.confirmDiscordLink.and.returnValue(of({
-      status: 'HISTORY_CONNECTED', notice: 'Conta vinculada'
+      status: 'CONNECTED', notice: 'Conta vinculada'
     }));
     component.confirmDiscordLink();
     expect(userService.confirmDiscordLink).toHaveBeenCalledOnceWith('ticket-123');
     expect(component.discordLinkPreview).toBeNull();
     expect(component.discordLinkTicket).toBe('');
-    expect(component.discordLinkSuccess).toContain('histórico Discord');
+    expect(component.discordLinkSuccess).toContain('Discord conectado');
   });
 
   it('never consumes a proof when the member cancels the review', () => {
     component.discordLinkTicket = 'ticket-123';
     component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: false,
+      status: 'CONNECT_READY', nextActions: ['CONFIRM_LINK'], consolidationPlan: null,
       notice: 'Confirme seu Discord' };
     component.cancelDiscordLink();
     expect(component.discordLinkPreview).toBeNull();
@@ -220,12 +228,99 @@ describe('PerfilComponent', () => {
   it('keeps a preview available when confirmation fails', () => {
     component.discordLinkTicket = 'ticket-123';
     component.discordLinkPreview = { discordUsername: 'Furry', hasExistingHistory: false,
+      status: 'CONNECT_READY', nextActions: ['CONFIRM_LINK'], consolidationPlan: null,
       notice: 'Confirme seu Discord' };
     userService.confirmDiscordLink.and.returnValue(throwError(() => ({error: {message: 'Conflito de contas'}})));
     component.confirmDiscordLink();
     expect(component.discordLinkPreview).not.toBeNull();
     expect(component.discordLinkError).toContain('Conflito de contas');
     expect(component.discordLinkConfirming).toBeFalse();
+  });
+
+  const legacyPreview = () => ({
+    discordUsername: 'Furry', hasExistingHistory: true,
+    status: 'PRECHECK_REQUIRED' as const, nextActions: ['CHECK_ACCOUNT_CONFLICTS'],
+    notice: 'As duas identidades foram comprovadas.',
+    consolidationPlan: {
+      status: 'AUTO_MERGE_CANDIDATE' as const,
+      preferredCanonicalAccount: 'DISCORD_HISTORY_OWNER' as const,
+      preservationPolicies: ['PRESERVE_DISCORD_COMMUNITY_IN_PLACE'],
+      nextActions: ['VERIFY_CANONICAL_ACCOUNT_AND_TRANSACTION_POLICY']
+    }
+  });
+
+  it('never shows link-only confirmation for a Discord owned by another account', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = legacyPreview();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Unificar contas');
+    expect(fixture.nativeElement.textContent).not.toContain('Confirmar conexão');
+    expect(component.canConsolidateDiscord).toBeTrue();
+    component.confirmDiscordLink();
+    expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
+    expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
+  });
+
+  it('requires a distinct canonical-owner consent before performing an irreversible merge', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = legacyPreview();
+    fixture.detectChanges();
+
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((item: any) => item.textContent.includes('Unificar contas')) as HTMLButtonElement;
+    expect(button).toBeTruthy();
+    expect(button.disabled).toBeTrue();
+    component.consolidateDiscordAccounts();
+    expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
+
+    component.discordHistoryOwnerConsent = true;
+    userService.consolidateDiscordLink.and.returnValue(of({
+      status: 'CONSOLIDATED_RELOGIN_REQUIRED', canonicalUserId: 20,
+      notice: 'Entre novamente'
+    }));
+    component.consolidateDiscordAccounts();
+
+    expect(userService.consolidateDiscordLink).toHaveBeenCalledOnceWith('proof-123', true);
+    expect(userService.finishAccountConsolidation).toHaveBeenCalledTimes(1);
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { conta_unificada: '1' }
+    });
+    expect(component.discordLinkTicket).toBe('');
+    expect(component.discordLinkPreview).toBeNull();
+  });
+
+  it('keeps the original session and verified proof if consolidation fails', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = legacyPreview();
+    component.discordHistoryOwnerConsent = true;
+    userService.consolidateDiscordLink.and.returnValue(
+      throwError(() => ({ status: 409, error: { message: 'ACCOUNT_DATA_RECONCILIATION_REQUIRED' } }))
+    );
+    component.consolidateDiscordAccounts();
+    expect(userService.finishAccountConsolidation).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(component.discordLinkPreview).not.toBeNull();
+    expect(component.discordLinkError).toContain('não foi concluída');
+  });
+
+  it('does not present automatic merge action when ownership data require review', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = {
+      ...legacyPreview(),
+      status: 'REVIEW_REQUIRED',
+      consolidationPlan: {
+        status: 'REVIEW_REQUIRED', preferredCanonicalAccount: 'UNDECIDED',
+        preservationPolicies: [], nextActions: ['REQUEST_IDENTITY_REVIEW']
+      }
+    };
+    fixture.detectChanges();
+    expect(component.canConsolidateDiscord).toBeFalse();
+    expect(component.discordConflictNeedsReview).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('A unificação automática não está disponível');
+    component.consolidateDiscordAccounts();
+    component.confirmDiscordLink();
+    expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
+    expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
   });
 
   it('updates the avatar after upload and restores its fallback after deletion', () => {
