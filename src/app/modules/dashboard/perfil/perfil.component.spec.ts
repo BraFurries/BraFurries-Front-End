@@ -313,6 +313,31 @@ describe('PerfilComponent', () => {
     expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
   });
 
+  it('explains which Community records can transfer and which cannot', () => {
+    component.discordLinkTicket = 'verified-proof';
+    component.discordLinkPreview = {
+      ...legacyPreview(),
+      status: 'PRECHECK_REQUIRED',
+      consolidationPlan: {
+        status: 'AUTO_MERGE_CANDIDATE',
+        preferredCanonicalAccount: 'DISCORD_HISTORY_OWNER',
+        preservationPolicies: [
+          'PRESERVE_CANONICAL_COMMUNITIES',
+          'TRANSFER_ELIGIBLE_WEBSITE_MEMBERSHIP_ROWS_UNDER_LOCK'
+        ],
+        nextActions: ['VERIFY_ALL_OTHER_USER_REFERENCES_UNDER_LOCK']
+      }
+    };
+    fixture.detectChanges();
+
+    const content: string = fixture.nativeElement.textContent;
+    expect(content).toContain('Vínculos exclusivos de Community');
+    expect(content).toContain('preservando a aprovação');
+    expect(content).toContain('XP, moedas, pagamentos');
+    expect(component.canConsolidateDiscord).toBeTrue();
+    expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
+  });
+
   it('requires a distinct canonical-owner consent before performing an irreversible merge', () => {
     component.discordLinkTicket = 'proof-123';
     component.discordLinkPreview = legacyPreview();
