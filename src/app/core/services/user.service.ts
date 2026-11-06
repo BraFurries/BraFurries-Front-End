@@ -41,13 +41,30 @@ interface UserSession {
 type RefreshTokenResponse = Omit<AuthResponse, 'user'> & Partial<Pick<AuthResponse, 'user'>>;
 export type SocialAuthProvider = 'google' | 'discord';
 
+export type DiscordLinkStatus =
+  'CONNECT_READY' | 'PRECHECK_REQUIRED' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
+
+export interface DiscordConsolidationPlan {
+  status: 'AUTO_MERGE_CANDIDATE' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
+  preferredCanonicalAccount: 'DISCORD_HISTORY_OWNER' | 'UNDECIDED';
+  preservationPolicies: string[];
+  nextActions: string[];
+}
 export interface DiscordLinkPreview {
   discordUsername: string;
   hasExistingHistory: boolean;
+  status: DiscordLinkStatus;
+  nextActions: string[];
   notice: string;
+  consolidationPlan: DiscordConsolidationPlan | null;
 }
 export interface DiscordLinkConfirmation {
-  status: 'CONNECTED' | 'ALREADY_CONNECTED' | 'HISTORY_CONNECTED';
+  status: 'CONNECTED' | 'ALREADY_CONNECTED';
+  notice: string;
+}
+export interface DiscordConsolidationResult {
+  status: 'CONSOLIDATED_RELOGIN_REQUIRED';
+  canonicalUserId: number;
   notice: string;
 }
 
@@ -164,6 +181,20 @@ export class UserService {
     return this.http.post<DiscordLinkConfirmation>(
       `${environment.apiBaseUrl}/user/me/discord-link/confirm`, { ticket }
     );
+  }
+
+  /** A distinct endpoint: cross-user consolidation requires explicit canonical consent. */
+  consolidateDiscordLink(ticket: string, acknowledgeDiscordHistoryOwner: boolean): Observable<DiscordConsolidationResult> {
+    return this.http.post<DiscordConsolidationResult>(
+      `${environment.apiBaseUrl}/user/me/discord-link/consolidate`,
+      { ticket, acknowledgeDiscordHistoryOwner }
+    );
+  }
+
+  /** Both prior JWT and refresh token were revoked atomically by the API. */
+  finishAccountConsolidation(): void {
+    this.clearSession();
+    sessionStorage.removeItem(this.socialLoginReturnUrlKey);
   }
 
   startSocialLogin(provider: SocialAuthProvider, returnUrl: string = '/painel'): void {
