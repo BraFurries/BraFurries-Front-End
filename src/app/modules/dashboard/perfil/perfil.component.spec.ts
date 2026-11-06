@@ -282,9 +282,7 @@ describe('PerfilComponent', () => {
 
     expect(userService.consolidateDiscordLink).toHaveBeenCalledOnceWith('proof-123', true);
     expect(userService.finishAccountConsolidation).toHaveBeenCalledTimes(1);
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { conta_unificada: '1' }
-    });
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/login']);
     expect(component.discordLinkTicket).toBe('');
     expect(component.discordLinkPreview).toBeNull();
   });
