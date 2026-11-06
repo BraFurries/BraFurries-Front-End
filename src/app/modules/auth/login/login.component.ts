@@ -5,6 +5,7 @@ import { SocialAuthProvider, UserService } from '../../../core/services/user.ser
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiErrorResponse } from '../../../shared/models/api/errors/error';
+import { getSocialAuthErrorMessage } from '../../../shared/utils/social-auth-error-message';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { SharedModule } from '../../../shared/shared.module';
 import { WidgetsModule } from '../../../widgets/widgets.module';
@@ -113,7 +114,7 @@ export class LoginComponent implements OnDestroy {
           this.showError(apiError.details[firstErrorKey]);
         }
         else if (apiError?.message) {
-          this.showError(apiError.message);
+          this.showError(getSocialAuthErrorMessage(apiError.message) || apiError.message);
         }
         else {
           this.showError('Usuário ou senha inválidos.');
