@@ -14,11 +14,14 @@ describe('LoginComponent account consolidation recovery', () => {
       providers: [
         provideRouter([]),
         { provide: ActivatedRoute, useValue: {
-          snapshot: { queryParams: { conta_unificada: '1' } }
+          snapshot: { queryParams: {} }
         } },
-        { provide: UserService, useValue: jasmine.createSpyObj<UserService>(
-          'UserService', ['login', 'startSocialLogin']
-        ) },
+        { provide: UserService, useValue: {
+          login: jasmine.createSpy('login'),
+          startSocialLogin: jasmine.createSpy('startSocialLogin'),
+          consumeAccountConsolidationNotice: jasmine.createSpy('consumeAccountConsolidationNotice')
+            .and.returnValue(true)
+        } },
         { provide: SeoService, useValue: { updateMetaTags: jasmine.createSpy('updateMetaTags') } }
       ]
     }).compileComponents();
@@ -34,6 +37,12 @@ describe('LoginComponent account consolidation recovery', () => {
     expect(message).toBeTruthy();
     expect(message.textContent).toContain('sessões antigas foram encerradas');
     expect(message.textContent).toContain('Discord');
+  });
+
+  it('does not infer a completed merge from arbitrary URL parameters', () => {
+    const users = TestBed.inject(UserService);
+    expect(users.consumeAccountConsolidationNotice).toHaveBeenCalledTimes(1);
+    expect(component.accountConsolidated).toBeTrue();
   });
 
   it('does not trust consolidation success to recreate a previous session', () => {
