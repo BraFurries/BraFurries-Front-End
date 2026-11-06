@@ -41,12 +41,40 @@ interface UserSession {
 type RefreshTokenResponse = Omit<AuthResponse, 'user'> & Partial<Pick<AuthResponse, 'user'>>;
 export type SocialAuthProvider = 'google' | 'discord';
 
+export type DiscordLinkStatus =
+  'CONNECT_READY' | 'PRECHECK_REQUIRED' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
+
+export interface DiscordConsolidationPlan {
+  status: 'AUTO_MERGE_CANDIDATE' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
+  preferredCanonicalAccount: 'DISCORD_HISTORY_OWNER' | 'UNDECIDED';
+  preservationPolicies: string[];
+  nextActions: string[];
+}
+export interface DiscordLinkPreview {
+  discordUsername: string;
+  hasExistingHistory: boolean;
+  status: DiscordLinkStatus;
+  nextActions: string[];
+  notice: string;
+  consolidationPlan: DiscordConsolidationPlan | null;
+}
+export interface DiscordLinkConfirmation {
+  status: 'CONNECTED' | 'ALREADY_CONNECTED';
+  notice: string;
+}
+export interface DiscordConsolidationResult {
+  status: 'CONSOLIDATED_RELOGIN_REQUIRED';
+  canonicalUserId: number;
+  notice: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class UserService {
   private readonly storageKey = 'logged_user';
   private readonly socialLoginReturnUrlKey = 'social_login_return_url';
+  private readonly accountConsolidatedNoticeKey = 'account_consolidated_notice';
   private session: UserSession | null = this.loadUserFromStorage();
   private refreshInFlight$: Observable<boolean> | null = null;
   private readonly currentUserSubject = new BehaviorSubject<User | null>(this.session?.user ?? null);
@@ -126,6 +154,55 @@ export class UserService {
         return session.user;
       })
     );
+  }
+
+  /** Start a separate OAuth proof without logging out or replacing the current session. */
+  beginDiscordLink(): Observable<{ ticket: string }> {
+    return this.http.post<{ ticket: string }>(
+      `${environment.apiBaseUrl}/user/me/discord-link/start`, {}
+    );
+  }
+
+  openDiscordLinkOAuth(ticket: string): void {
+    const frontendOrigin = encodeURIComponent(window.location.origin);
+    const proof = encodeURIComponent(ticket);
+    window.location.assign(
+      `${environment.apiBaseUrl}/auth/oauth2/discord?link_ticket=${proof}&frontend_origin=${frontendOrigin}`
+    );
+  }
+
+  previewDiscordLink(ticket: string): Observable<DiscordLinkPreview> {
+    return this.http.get<DiscordLinkPreview>(
+      `${environment.apiBaseUrl}/user/me/discord-link/preview`,
+      { params: { ticket } }
+    );
+  }
+
+  confirmDiscordLink(ticket: string): Observable<DiscordLinkConfirmation> {
+    return this.http.post<DiscordLinkConfirmation>(
+      `${environment.apiBaseUrl}/user/me/discord-link/confirm`, { ticket }
+    );
+  }
+
+  /** A distinct endpoint: cross-user consolidation requires explicit canonical consent. */
+  consolidateDiscordLink(ticket: string, acknowledgeDiscordHistoryOwner: boolean): Observable<DiscordConsolidationResult> {
+    return this.http.post<DiscordConsolidationResult>(
+      `${environment.apiBaseUrl}/user/me/discord-link/consolidate`,
+      { ticket, acknowledgeDiscordHistoryOwner }
+    );
+  }
+
+  /** Both prior JWT and refresh token were revoked atomically by the API. */
+  finishAccountConsolidation(): void {
+    this.clearSession();
+    sessionStorage.removeItem(this.socialLoginReturnUrlKey);
+    sessionStorage.setItem(this.accountConsolidatedNoticeKey, '1');
+  }
+
+  consumeAccountConsolidationNotice(): boolean {
+    const confirmed = sessionStorage.getItem(this.accountConsolidatedNoticeKey) === '1';
+    sessionStorage.removeItem(this.accountConsolidatedNoticeKey);
+    return confirmed;
   }
 
   startSocialLogin(provider: SocialAuthProvider, returnUrl: string = '/painel'): void {

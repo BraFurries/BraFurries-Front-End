@@ -1,8 +1,9 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { EMPTY, Observable, Subject, catchError, forkJoin, map, of, switchMap, takeUntil, tap } from 'rxjs';
 import { CommunityAccess, CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
-import { UserService } from '../../../core/services/user.service';
+import { DiscordLinkPreview, UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { MemberCommunityContextResponse, MemberCommunitySummary, MemberModerationPage, MemberProfileResponse } from '../../../shared/models/api/member-profile/member-profile';
 
@@ -28,6 +29,15 @@ export class PerfilComponent implements OnInit, OnDestroy {
   profileImageUploading = false;
   profileImageDeleting = false;
   readonly moderationPageSize = 10;
+  discordLinkStarting = false;
+  discordLinkLoading = false;
+  discordLinkConfirming = false;
+  discordLinkConsolidating = false;
+  discordHistoryOwnerConsent = false;
+  discordLinkTicket = '';
+  discordLinkPreview: DiscordLinkPreview | null = null;
+  discordLinkError = '';
+  discordLinkSuccess = '';
   private readonly destroy$ = new Subject<void>();
   private readonly communitySelection$ = new Subject<number>();
   private readonly moderationRequest$ = new Subject<{ communityId: number; page: number }>();
@@ -36,7 +46,8 @@ export class PerfilComponent implements OnInit, OnDestroy {
     private readonly memberProfileService: MemberProfileService,
     private readonly communityAccessService: CommunityAccessService,
     private readonly userService: UserService,
-    private readonly seoService: SeoService
+    private readonly seoService: SeoService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -62,9 +73,130 @@ export class PerfilComponent implements OnInit, OnDestroy {
       this.moderationLoading = false;
     } });
     this.loadProfile();
+    this.handleDiscordLinkCallback();
   }
 
   ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
+
+  private handleDiscordLinkCallback(): void {
+    if (typeof window === 'undefined') return;
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const ticket = fragment.get('discord_link_ticket');
+    const query = new URLSearchParams(window.location.search);
+    const failure = query.get('discord_link_error');
+    if (failure) {
+      this.discordLinkError = failure;
+      query.delete('discord_link_error');
+    }
+    if (ticket || failure) {
+      // Remove short-lived bearer ticket from visible URL and browser history.
+      const rest = query.toString();
+      window.history.replaceState(window.history.state, '',
+        window.location.pathname + (rest ? '?' + rest : ''));
+    }
+    if (!ticket) return;
+
+    this.discordLinkTicket = ticket;
+    this.discordLinkLoading = true;
+    this.userService.previewDiscordLink(ticket).pipe(takeUntil(this.destroy$)).subscribe({
+      next: preview => {
+        this.discordLinkPreview = preview;
+        this.discordHistoryOwnerConsent = false;
+        this.discordLinkLoading = false;
+      },
+      error: () => {
+        this.discordLinkTicket = '';
+        this.discordLinkLoading = false;
+        this.discordLinkError = 'A verificação expirou ou pertence a outra conta. Reinicie a conexão com Discord.';
+      }
+    });
+  }
+
+  startDiscordLink(): void {
+    if (this.discordLinkStarting) return;
+    this.discordLinkStarting = true;
+    this.discordLinkError = '';
+    this.discordLinkSuccess = '';
+    this.userService.beginDiscordLink().pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ ticket }) => this.userService.openDiscordLinkOAuth(ticket),
+      error: () => {
+        this.discordLinkStarting = false;
+        this.discordLinkError = 'Não foi possível abrir o Discord. Tente novamente.';
+      }
+    });
+  }
+
+  get canConsolidateDiscord(): boolean {
+    const preview = this.discordLinkPreview;
+    return preview?.status === 'PRECHECK_REQUIRED' &&
+      preview.consolidationPlan?.status === 'AUTO_MERGE_CANDIDATE' &&
+      preview.consolidationPlan.preferredCanonicalAccount === 'DISCORD_HISTORY_OWNER';
+  }
+
+  get discordConflictNeedsReview(): boolean {
+    const status = this.discordLinkPreview?.status;
+    return status === 'RESOLUTION_REQUIRED' || status === 'REVIEW_REQUIRED' ||
+      (status === 'PRECHECK_REQUIRED' && !this.canConsolidateDiscord);
+  }
+
+  consolidateDiscordAccounts(): void {
+    if (!this.canConsolidateDiscord || !this.discordHistoryOwnerConsent ||
+        !this.discordLinkTicket || this.discordLinkConsolidating || this.discordLinkConfirming) return;
+
+    this.discordLinkConsolidating = true;
+    this.discordLinkError = '';
+    this.userService.consolidateDiscordLink(this.discordLinkTicket, true)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.discordLinkConsolidating = false;
+          if (result.status !== 'CONSOLIDATED_RELOGIN_REQUIRED') {
+            this.discordLinkError = 'Não foi possível confirmar a conclusão da unificação.';
+            return;
+          }
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          this.discordHistoryOwnerConsent = false;
+          this.userService.finishAccountConsolidation();
+          this.router.navigate(['/login']);
+        },
+        error: () => {
+          this.discordLinkConsolidating = false;
+          this.discordLinkError = 'A unificação não foi concluída. Seus dados foram preservados. ' +
+            'Pode haver informações ou permissões que precisem de revisão. Verifique novamente antes de continuar.';
+        }
+      });
+  }
+
+  confirmDiscordLink(): void {
+    if (this.discordLinkPreview?.status !== 'CONNECT_READY' || !this.discordLinkTicket || this.discordLinkConfirming || this.discordLinkConsolidating) return;
+    this.discordLinkConfirming = true;
+    this.discordLinkError = '';
+    this.userService.confirmDiscordLink(this.discordLinkTicket)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.discordLinkConfirming = false;
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          this.discordLinkSuccess = result.status === 'ALREADY_CONNECTED'
+            ? 'Este Discord já estava conectado à sua conta.'
+            : 'Discord conectado com sucesso!';
+          this.loadProfile();
+        },
+        error: (error) => {
+          this.discordLinkConfirming = false;
+          this.discordLinkError = error?.error?.message ||
+            'Não foi possível concluir a vinculação. Verifique sua conta e tente novamente.';
+        }
+      });
+  }
+
+  cancelDiscordLink(): void {
+    if (this.discordLinkConfirming || this.discordLinkConsolidating) return;
+    this.discordHistoryOwnerConsent = false;
+    this.discordLinkTicket = '';
+    this.discordLinkPreview = null;
+    this.discordLinkError = '';
+  }
 
   selectCommunity(communityId: number): void {
     if (this.selectedCommunityId === communityId && this.context) return;

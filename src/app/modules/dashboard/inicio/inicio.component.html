@@ -188,10 +188,13 @@
                                         recursos exclusivos.</p>
                                 </div>
                             </div>
-                            <button
-                                class="w-full xl:w-auto bg-[#5865F2] text-white font-bold px-6 py-3 rounded-xl text-sm hover:brightness-110 transition shadow-md whitespace-nowrap relative z-10 mt-2 xl:mt-0 xl:mr-8">
-                                Conectar Discord
-                            </button>
+                            <div class="relative z-10 w-full xl:w-auto mt-2 xl:mt-0 xl:mr-8">
+                                <button type="button" (click)="connectDiscord()" [disabled]="discordLinkLoading"
+                                    class="w-full bg-[#5865F2] text-white font-bold px-6 py-3 rounded-xl text-sm hover:brightness-110 transition shadow-md whitespace-nowrap disabled:opacity-60">
+                                    {{ discordLinkLoading ? 'Abrindo Discord...' : 'Conectar Discord' }}
+                                </button>
+                                <p *ngIf="discordLinkError" role="alert" class="mt-2 max-w-xs text-xs text-red-700">{{ discordLinkError }}</p>
+                            </div>
                         </div>
                         }
 

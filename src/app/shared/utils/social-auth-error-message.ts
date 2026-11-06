@@ -9,11 +9,20 @@ export function getSocialAuthErrorMessage(message?: string | null): string | nul
   }
 
   const normalized = message.trim().toLowerCase();
+  if (normalized === 'account_consolidated') {
+    return 'Esta conta foi unificada. Entre novamente com um dos provedores já comprovados.';
+  }
+
+  if (normalized === 'account_reconciliation_required') {
+    return 'Detectamos dados de contas que precisam de reconciliação. Acesse a conta original do site para verificar seus provedores. Se houver conflitos, solicite uma revisão de identidade.';
+  }
+
   if (
+    normalized === 'account_link_required' ||
     normalized === DISTINCT_SOCIAL_ACCOUNTS_ERROR ||
     normalized === LEGACY_ACCOUNT_MERGE_CONFIRMATION_ERROR
   ) {
-    return 'O e-mail e o provedor social pertencem a contas distintas. Por segurança, entre com a conta original e solicite a regularização à administração.';
+    return 'Se você já tem conta no site, entre com Google ou e-mail e use “Conectar Discord” no painel para comprovar as duas identidades. Caso não consiga acessar sua conta antiga, use “Esqueceu a senha?” para recuperá-la.';
   }
 
   return message;

@@ -5,6 +5,7 @@ import { SocialAuthProvider, UserService } from '../../../core/services/user.ser
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiErrorResponse } from '../../../shared/models/api/errors/error';
+import { getSocialAuthErrorMessage } from '../../../shared/utils/social-auth-error-message';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { SharedModule } from '../../../shared/shared.module';
 import { WidgetsModule } from '../../../widgets/widgets.module';
@@ -24,6 +25,7 @@ export class LoginComponent implements OnDestroy {
   private errorTimeout: any;
 
   returnUrl: string = '/painel';
+  accountConsolidated = false;
   private readonly authReturnUrls = new Set([
     '/login',
     '/social-login',
@@ -45,6 +47,7 @@ export class LoginComponent implements OnDestroy {
       'Entre na sua conta BraFurries para acessar o painel, gerenciar seu perfil e acompanhar recursos da comunidade.'
     );
     this.returnUrl = this.getSafeReturnUrl(this.route.snapshot.queryParams['returnUrl']);
+    this.accountConsolidated = this.userService.consumeAccountConsolidationNotice();
 
     this.loginForm = new FormGroup({
       email: new FormControl('', [Validators.required]),
@@ -111,7 +114,7 @@ export class LoginComponent implements OnDestroy {
           this.showError(apiError.details[firstErrorKey]);
         }
         else if (apiError?.message) {
-          this.showError(apiError.message);
+          this.showError(getSocialAuthErrorMessage(apiError.message) || apiError.message);
         }
         else {
           this.showError('Usuário ou senha inválidos.');
