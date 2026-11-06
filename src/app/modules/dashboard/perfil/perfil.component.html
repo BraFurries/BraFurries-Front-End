@@ -31,7 +31,8 @@
 
         <div *ngIf="canConsolidateDiscord" class="mt-4 space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p class="font-bold">Unificar em uma única conta BraFurries</p>
-          <p>Seus dados e histórico comunitário do Discord continuarão na conta original do Discord. Sua identidade Google comprovada e seu acesso ao site serão reunidos nessa conta.</p>
+          <p>Os dados e o histórico comunitário do Discord permanecerão na conta original. O acesso do site por e-mail e senha, quando existente, e as identidades OAuth já comprovadas serão preservados nessa conta.</p>
+          <p>Se sua conta foi criada apenas com e-mail e senha, você <strong>não precisa vincular o Google</strong> para unificá-la. A posse da conta do site e do Discord deve ser comprovada separadamente.</p>
           <p>A conta atual do site deixará de funcionar separadamente. Suas sessões serão encerradas e você precisará entrar novamente.</p>
           <label class="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" [(ngModel)]="discordHistoryOwnerConsent" [disabled]="discordLinkConsolidating"
@@ -43,7 +44,20 @@
         <div *ngIf="discordConflictNeedsReview" role="status"
              class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p class="font-bold">A unificação automática não está disponível para estas contas.</p>
-          <p class="mt-2">Há dados ou vínculos que exigem outra forma de resolução. Nenhuma conta será alterada nesta etapa. Mantenha o acesso aos dois provedores e solicite revisão de identidade se necessário.</p>
+          <p class="mt-2">Há dados ou vínculos que exigem uma política específica de reconciliação. Nenhuma conta será alterada nesta etapa.</p>
+          <p *ngIf="verified.nextActions.includes('VERIFY_GOOGLE_OR_RECOVER_LOCAL_LOGIN')" class="mt-2">
+            É necessário preservar um método de acesso ao site. Se sua conta não possui senha, você pode recuperar o acesso pelo e-mail cadastrado na tela de login ou comprovar seu Google antes de prosseguir.
+          </p>
+          <p *ngIf="verified.nextActions.includes('TRANSFER_WEBSITE_COMMUNITY_DATA') || verified.nextActions.includes('RECONCILE_COMMUNITY_MEMBERSHIP')" class="mt-2">
+            Há participação em comunidades nas duas identidades ou dados comunitários na conta do site. É preciso conferir os vínculos de cada Community antes de unificar.
+          </p>
+          <p *ngIf="verified.nextActions.includes('RECONCILE_DOMAIN_DATA')" class="mt-2">
+            Há registros operacionais, como progressão, economia, histórico ou recursos associados à conta do site. Esses dados não serão descartados nem somados automaticamente.
+          </p>
+          <p *ngIf="verified.nextActions.includes('REVIEW_ACCESS_GRANTS') || verified.nextActions.includes('PRESERVE_COMMUNITY_RESTRICTIONS')" class="mt-2">
+            Permissões ou restrições exigem revisão para impedir alterações indevidas de acesso.
+          </p>
+          <p class="mt-2">Você pode manter as duas contas enquanto verificamos o caminho seguro. Caso não consiga continuar, solicite revisão de identidade à equipe.</p>
         </div>
 
         <div class="mt-5 flex flex-wrap gap-3">
