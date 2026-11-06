@@ -33,6 +33,13 @@
           <p class="font-bold">Unificar em uma única conta BraFurries</p>
           <p>Os dados e o histórico comunitário do Discord permanecerão na conta original. O acesso do site por e-mail e senha, quando existente, e as identidades OAuth já comprovadas serão preservados nessa conta.</p>
           <p>Se sua conta foi criada apenas com e-mail e senha, você <strong>não precisa vincular o Google</strong> para unificá-la. A posse da conta do site e do Discord deve ser comprovada separadamente.</p>
+          <div *ngIf="verified.consolidationPlan?.preservationPolicies?.includes('TRANSFER_ELIGIBLE_WEBSITE_MEMBERSHIP_ROWS_UNDER_LOCK')"
+               role="status" class="rounded-xl border border-amber-300 bg-white p-4">
+            <p class="font-bold">Vínculos exclusivos de Community</p>
+            <p class="mt-2">As fichas de participação que existem apenas na sua conta do site podem ser transferidas para a conta principal do Discord, preservando a aprovação, datas de entrada e saída e dados da portaria.</p>
+            <p class="mt-2">Antes da confirmação, a API verificará novamente cada Community e as dependências entre registros. Se houver outra ficha, cargo especial, restrição ou histórico que precise de conciliação, a unificação será recusada sem transferir dados parcialmente.</p>
+            <p class="mt-2">XP, moedas, pagamentos, inventário e permissões não são transferidos por este fluxo.</p>
+          </div>
           <p>A conta atual do site deixará de funcionar separadamente. Suas sessões serão encerradas e você precisará entrar novamente.</p>
           <label class="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" [(ngModel)]="discordHistoryOwnerConsent" [disabled]="discordLinkConsolidating"
