@@ -47,7 +47,7 @@ export class LoginComponent implements OnDestroy {
       'Entre na sua conta BraFurries para acessar o painel, gerenciar seu perfil e acompanhar recursos da comunidade.'
     );
     this.returnUrl = this.getSafeReturnUrl(this.route.snapshot.queryParams['returnUrl']);
-    this.accountConsolidated = this.route.snapshot.queryParams['conta_unificada'] === '1';
+    this.accountConsolidated = this.userService.consumeAccountConsolidationNotice();
 
     this.loginForm = new FormGroup({
       email: new FormControl('', [Validators.required]),
