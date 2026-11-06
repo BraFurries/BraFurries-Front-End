@@ -22,6 +22,17 @@ describe('getSocialAuthErrorMessage', () => {
     expect(getSocialAuthErrorMessage('ACCOUNT_LINK_REQUIRED')).toContain('Conectar Discord');
   });
 
+  it('never describes conflicted identities as already connected', () => {
+    const message = getSocialAuthErrorMessage('ACCOUNT_RECONCILIATION_REQUIRED');
+    expect(message).toContain('reconciliação');
+    expect(message).not.toContain('já foram unificadas');
+  });
+
+  it('explains authentication when the old account became a provenance alias', () => {
+    const message = getSocialAuthErrorMessage('ACCOUNT_CONSOLIDATED');
+    expect(message).toContain('Entre novamente');
+  });
+
   it('preserves unrelated errors', () => {
     expect(getSocialAuthErrorMessage('erro qualquer')).toBe('erro qualquer');
   });
