@@ -261,6 +261,58 @@ describe('PerfilComponent', () => {
     expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
   });
 
+  it('explains that email/password-only accounts do not need Google OAuth', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = legacyPreview();
+    fixture.detectChanges();
+
+    const content = fixture.nativeElement.textContent as string;
+    expect(content).toContain('não precisa vincular o Google');
+    expect(content).toContain('e-mail e senha');
+    expect(content).toContain('Unificar contas');
+  });
+
+  it('explains operational and Community conflicts without enabling an unsafe merge', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = {
+      ...legacyPreview(),
+      status: 'RESOLUTION_REQUIRED',
+      nextActions: ['TRANSFER_WEBSITE_COMMUNITY_DATA', 'RECONCILE_DOMAIN_DATA'],
+      consolidationPlan: {
+        status: 'RESOLUTION_REQUIRED',
+        preferredCanonicalAccount: 'UNDECIDED',
+        preservationPolicies: [],
+        nextActions: ['TRANSFER_WEBSITE_COMMUNITY_DATA']
+      }
+    };
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('vínculos de cada Community');
+    expect(text).toContain('não serão descartados nem somados automaticamente');
+    expect(component.canConsolidateDiscord).toBeFalse();
+    expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
+  });
+
+  it('offers an access recovery explanation instead of requiring Google for a local-only user', () => {
+    component.discordLinkTicket = 'proof-123';
+    component.discordLinkPreview = {
+      ...legacyPreview(),
+      status: 'RESOLUTION_REQUIRED',
+      nextActions: ['VERIFY_GOOGLE_OR_RECOVER_LOCAL_LOGIN'],
+      consolidationPlan: {
+        status: 'RESOLUTION_REQUIRED',
+        preferredCanonicalAccount: 'UNDECIDED',
+        preservationPolicies: [],
+        nextActions: ['VERIFY_GOOGLE_OR_RECOVER_LOCAL_LOGIN']
+      }
+    };
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('pode recuperar o acesso pelo e-mail');
+    expect(component.canConsolidateDiscord).toBeFalse();
+    expect(userService.consolidateDiscordLink).not.toHaveBeenCalled();
+  });
+
   it('requires a distinct canonical-owner consent before performing an irreversible merge', () => {
     component.discordLinkTicket = 'proof-123';
     component.discordLinkPreview = legacyPreview();
