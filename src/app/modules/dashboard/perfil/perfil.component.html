@@ -18,24 +18,49 @@
       <p *ngIf="discordLinkLoading" role="status" class="rounded-2xl bg-white p-5 text-sm text-gray-600">
         Conferindo a identidade Discord verificada...
       </p>
-      <section *ngIf="discordLinkPreview as verified" class="rounded-2xl border border-[#5865F2]/30 bg-white p-6 shadow-md" aria-labelledby="discord-link-confirm-title">
+      <section *ngIf="discordLinkPreview as verified" class="rounded-2xl border border-[#5865F2]/30 bg-white p-5 sm:p-6 shadow-md" aria-labelledby="discord-link-confirm-title">
         <h3 id="discord-link-confirm-title" class="font-amaranth text-xl font-bold text-braDark">
-          Confirmar conexão com Discord
+          Identidade Discord verificada
         </h3>
-        <p class="mt-3 text-sm text-gray-700">Você autenticou o Discord <b>{{ verified.discordUsername }}</b>.</p>
+        <p class="mt-3 text-sm text-gray-700">Você comprovou o acesso ao Discord <b>{{ verified.discordUsername }}</b>.</p>
         <p class="mt-2 text-sm text-gray-600">{{ verified.notice }}</p>
-        <p *ngIf="verified.hasExistingHistory" class="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-900">
-          Seu registro antigo será preservado e vinculado à sua conta atual. Não haverá transferência de
-          itens, saldo, punições, cargos ou permissões administrativas entre os usuários.
-        </p>
+
+        <div *ngIf="verified.status === 'CONNECT_READY'" class="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-950">
+          Este Discord está disponível para conexão com sua conta atual. A confirmação não transfere dados de outro usuário.
+        </div>
+
+        <div *ngIf="canConsolidateDiscord" class="mt-4 space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p class="font-bold">Unificar em uma única conta BraFurries</p>
+          <p>Seus dados e histórico comunitário do Discord continuarão na conta original do Discord. Sua identidade Google comprovada e seu acesso ao site serão reunidos nessa conta.</p>
+          <p>A conta atual do site deixará de funcionar separadamente. Suas sessões serão encerradas e você precisará entrar novamente.</p>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" [(ngModel)]="discordHistoryOwnerConsent" [disabled]="discordLinkConsolidating"
+                   class="mt-0.5 h-4 w-4 shrink-0 accent-[#5865F2]" />
+            <span>Compreendo que a conta com histórico Discord permanecerá como minha conta principal e autorizo a unificação.</span>
+          </label>
+        </div>
+
+        <div *ngIf="discordConflictNeedsReview" role="status"
+             class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p class="font-bold">A unificação automática não está disponível para estas contas.</p>
+          <p class="mt-2">Há dados ou vínculos que exigem outra forma de resolução. Nenhuma conta será alterada nesta etapa. Mantenha o acesso aos dois provedores e solicite revisão de identidade se necessário.</p>
+        </div>
+
         <div class="mt-5 flex flex-wrap gap-3">
-          <button type="button" (click)="confirmDiscordLink()" [disabled]="discordLinkConfirming"
+          <button *ngIf="verified.status === 'CONNECT_READY'" type="button" (click)="confirmDiscordLink()"
+                  [disabled]="discordLinkConfirming || discordLinkConsolidating"
                   class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-            {{ discordLinkConfirming ? 'Confirmando...' : 'Confirmar conexão' }}
+            {{ discordLinkConfirming ? 'Conectando...' : 'Conectar Discord' }}
           </button>
-          <button type="button" (click)="cancelDiscordLink()" [disabled]="discordLinkConfirming"
-                  class="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-bold text-gray-700">
-            Cancelar
+          <button *ngIf="canConsolidateDiscord" type="button" (click)="consolidateDiscordAccounts()"
+                  [disabled]="!discordHistoryOwnerConsent || discordLinkConsolidating || discordLinkConfirming"
+                  class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            {{ discordLinkConsolidating ? 'Unificando...' : 'Unificar contas' }}
+          </button>
+          <button type="button" (click)="cancelDiscordLink()"
+                  [disabled]="discordLinkConfirming || discordLinkConsolidating"
+                  class="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-bold text-gray-700 disabled:opacity-50">
+            {{ discordConflictNeedsReview ? 'Fechar' : 'Cancelar' }}
           </button>
         </div>
       </section>
