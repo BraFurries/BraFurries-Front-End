@@ -74,6 +74,7 @@ export interface DiscordConsolidationResult {
 export class UserService {
   private readonly storageKey = 'logged_user';
   private readonly socialLoginReturnUrlKey = 'social_login_return_url';
+  private readonly accountConsolidatedNoticeKey = 'account_consolidated_notice';
   private session: UserSession | null = this.loadUserFromStorage();
   private refreshInFlight$: Observable<boolean> | null = null;
   private readonly currentUserSubject = new BehaviorSubject<User | null>(this.session?.user ?? null);
@@ -195,6 +196,13 @@ export class UserService {
   finishAccountConsolidation(): void {
     this.clearSession();
     sessionStorage.removeItem(this.socialLoginReturnUrlKey);
+    sessionStorage.setItem(this.accountConsolidatedNoticeKey, '1');
+  }
+
+  consumeAccountConsolidationNotice(): boolean {
+    const confirmed = sessionStorage.getItem(this.accountConsolidatedNoticeKey) === '1';
+    sessionStorage.removeItem(this.accountConsolidatedNoticeKey);
+    return confirmed;
   }
 
   startSocialLogin(provider: SocialAuthProvider, returnUrl: string = '/painel'): void {
