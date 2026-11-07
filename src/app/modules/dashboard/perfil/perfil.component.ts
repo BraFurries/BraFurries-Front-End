@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { EMPTY, Observable, Subject, catchError, forkJoin, map, of, switchMap, takeUntil, tap } from 'rxjs';
 import { CommunityAccess, CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
-import { DiscordLinkPreview, SocialProviderLogin, UserService } from '../../../core/services/user.service';
+import { DiscordLinkPreview, LocalEmailProofStatus, SocialProviderLogin, UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { MemberCommunityContextResponse, MemberCommunitySummary, MemberModerationPage, MemberProfileResponse } from '../../../shared/models/api/member-profile/member-profile';
 
@@ -43,6 +43,11 @@ export class PerfilComponent implements OnInit, OnDestroy {
   socialLoginsError = '';
   socialLoginPassword = '';
   socialLoginChanging = false;
+  localEmailProof: LocalEmailProofStatus | null = null;
+  localEmailDraft = '';
+  localEmailProofLoading = false;
+  localEmailProofSaving = false;
+  localEmailProofError = '';
   private readonly destroy$ = new Subject<void>();
   private readonly communitySelection$ = new Subject<number>();
   private readonly moderationRequest$ = new Subject<{ communityId: number; page: number }>();
@@ -79,6 +84,7 @@ export class PerfilComponent implements OnInit, OnDestroy {
     } });
     this.loadProfile();
     this.loadSocialLogins();
+    this.loadLocalEmailProof();
     this.handleDiscordLinkCallback();
   }
 
@@ -116,6 +122,51 @@ export class PerfilComponent implements OnInit, OnDestroy {
         this.discordLinkError = 'A verificação expirou ou pertence a outra conta. Reinicie a conexão com Discord.';
       }
     });
+  }
+
+  loadLocalEmailProof(): void {
+    this.localEmailProofLoading = true;
+    this.userService.getLocalEmailProof().pipe(takeUntil(this.destroy$)).subscribe({
+      next: proof => {
+        this.localEmailProofLoading = false;
+        this.localEmailProof = proof;
+        this.localEmailDraft = proof.email || '';
+      },
+      error: () => {
+        this.localEmailProofLoading = false;
+        this.localEmailProofError = 'Não foi possível consultar a verificação do e-mail.';
+      }
+    });
+  }
+
+  requestLocalEmailProof(): void {
+    if (this.localEmailProofSaving || this.localEmailProof?.verified) return;
+    const selected = this.localEmailDraft.trim();
+    if (!selected || !this.socialLoginPassword) {
+      this.localEmailProofError = 'Escolha o e-mail BraFurries e confirme sua senha.';
+      return;
+    }
+    this.localEmailProofSaving = true;
+    this.localEmailProofError = '';
+    this.userService.requestLocalEmailProof(selected, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.localEmailProofSaving = false;
+          this.socialLoginPassword = '';
+          if (result.status === 'VERIFICATION_SENT_RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadLocalEmailProof();
+          }
+        },
+        error: () => {
+          this.localEmailProofSaving = false;
+          this.socialLoginPassword = '';
+          this.localEmailProofError =
+            'Não foi possível enviar a confirmação. Confira a senha e se o e-mail está disponível.';
+        }
+      });
   }
 
   loadSocialLogins(): void {
