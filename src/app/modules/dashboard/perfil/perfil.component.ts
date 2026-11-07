@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { EMPTY, Observable, Subject, catchError, forkJoin, map, of, switchMap, takeUntil, tap } from 'rxjs';
 import { CommunityAccess, CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
-import { DiscordLinkPreview, UserService } from '../../../core/services/user.service';
+import { DiscordLinkPreview, SocialProviderLogin, UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { MemberCommunityContextResponse, MemberCommunitySummary, MemberModerationPage, MemberProfileResponse } from '../../../shared/models/api/member-profile/member-profile';
 
@@ -38,6 +38,11 @@ export class PerfilComponent implements OnInit, OnDestroy {
   discordLinkPreview: DiscordLinkPreview | null = null;
   discordLinkError = '';
   discordLinkSuccess = '';
+  socialLogins: SocialProviderLogin[] = [];
+  socialLoginsLoading = false;
+  socialLoginsError = '';
+  socialLoginPassword = '';
+  socialLoginChanging = false;
   private readonly destroy$ = new Subject<void>();
   private readonly communitySelection$ = new Subject<number>();
   private readonly moderationRequest$ = new Subject<{ communityId: number; page: number }>();
@@ -73,6 +78,7 @@ export class PerfilComponent implements OnInit, OnDestroy {
       this.moderationLoading = false;
     } });
     this.loadProfile();
+    this.loadSocialLogins();
     this.handleDiscordLinkCallback();
   }
 
@@ -110,6 +116,84 @@ export class PerfilComponent implements OnInit, OnDestroy {
         this.discordLinkError = 'A verificação expirou ou pertence a outra conta. Reinicie a conexão com Discord.';
       }
     });
+  }
+
+  loadSocialLogins(): void {
+    this.socialLoginsLoading = true;
+    this.socialLoginsError = '';
+    this.userService.getSocialLogins().pipe(takeUntil(this.destroy$)).subscribe({
+      next: identities => {
+        this.socialLogins = identities;
+        this.socialLoginsLoading = false;
+      },
+      error: () => {
+        this.socialLoginsLoading = false;
+        this.socialLoginsError = 'Não foi possível consultar os métodos de acesso.';
+      }
+    });
+  }
+
+  hasDisabledSocialLogin(provider: 'google' | 'discord'): boolean {
+    return this.socialLogins.some(identity =>
+      identity.provider === provider && !identity.loginEnabled);
+  }
+
+  disableSocialLogin(identity: SocialProviderLogin): void {
+    if (this.socialLoginChanging || !identity.loginEnabled) return;
+    if (!this.socialLoginPassword) {
+      this.socialLoginsError = 'Informe sua senha BraFurries antes de desativar o login.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.socialLoginsError = '';
+    this.userService.disableSocialLogin(identity.identityId, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.socialLoginsError = 'Não foi possível desativar o provedor. Confira a senha e a verificação de e-mail.';
+        }
+      });
+  }
+
+  reenableDiscordLogin(): void {
+    if (!this.hasDisabledSocialLogin('discord') || !this.discordLinkTicket ||
+        !this.socialLoginPassword || this.socialLoginChanging) {
+      this.socialLoginsError = 'Confirme sua senha e a identidade Discord antes de reativar.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.socialLoginsError = '';
+    this.userService.enableDiscordLogin(this.discordLinkTicket, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.socialLoginsError = 'Falha ao reativar. Confira a senha e tente comprovar o Discord novamente.';
+        }
+      });
   }
 
   startDiscordLink(): void {
