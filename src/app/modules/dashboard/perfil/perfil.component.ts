@@ -48,6 +48,9 @@ export class PerfilComponent implements OnInit, OnDestroy {
   localEmailProofLoading = false;
   localEmailProofSaving = false;
   localEmailProofError = '';
+  googleLoginStarting = false;
+  googleLoginTicket = '';
+  googleLoginError = '';
   private readonly destroy$ = new Subject<void>();
   private readonly communitySelection$ = new Subject<number>();
   private readonly moderationRequest$ = new Subject<{ communityId: number; page: number }>();
@@ -85,27 +88,34 @@ export class PerfilComponent implements OnInit, OnDestroy {
     this.loadProfile();
     this.loadSocialLogins();
     this.loadLocalEmailProof();
-    this.handleDiscordLinkCallback();
+    this.handleSocialLinkCallbacks();
   }
 
   ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
 
-  private handleDiscordLinkCallback(): void {
+  private handleSocialLinkCallbacks(): void {
     if (typeof window === 'undefined') return;
     const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const ticket = fragment.get('discord_link_ticket');
+    const googleTicket = fragment.get('google_login_ticket');
     const query = new URLSearchParams(window.location.search);
     const failure = query.get('discord_link_error');
+    const googleFailure = query.get('google_login_error');
+    if (googleFailure) {
+      this.googleLoginError = googleFailure;
+      query.delete('google_login_error');
+    }
     if (failure) {
       this.discordLinkError = failure;
       query.delete('discord_link_error');
     }
-    if (ticket || failure) {
+    if (ticket || failure || googleTicket || googleFailure) {
       // Remove short-lived bearer ticket from visible URL and browser history.
       const rest = query.toString();
       window.history.replaceState(window.history.state, '',
         window.location.pathname + (rest ? '?' + rest : ''));
     }
+    if (googleTicket) this.googleLoginTicket = googleTicket;
     if (!ticket) return;
 
     this.discordLinkTicket = ticket;
@@ -122,6 +132,49 @@ export class PerfilComponent implements OnInit, OnDestroy {
         this.discordLinkError = 'A verificação expirou ou pertence a outra conta. Reinicie a conexão com Discord.';
       }
     });
+  }
+
+  startGoogleLoginReactivation(): void {
+    if (this.googleLoginStarting || !this.hasDisabledSocialLogin('google')) return;
+    this.googleLoginStarting = true;
+    this.googleLoginError = '';
+    this.userService.beginGoogleLoginProof().pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ ticket }) => this.userService.openGoogleReactivationOAuth(ticket),
+      error: () => {
+        this.googleLoginStarting = false;
+        this.googleLoginError = 'Não foi possível iniciar a comprovação Google.';
+      }
+    });
+  }
+
+  reenableGoogleLogin(): void {
+    if (!this.googleLoginTicket || !this.hasDisabledSocialLogin('google') ||
+        !this.socialLoginPassword || this.socialLoginChanging) {
+      this.googleLoginError = 'Comprove o Google e confirme sua senha BraFurries.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.googleLoginError = '';
+    this.userService.enableGoogleLogin(this.googleLoginTicket, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.googleLoginTicket = '';
+          this.socialLoginPassword = '';
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.googleLoginError =
+            'Falha ao reativar o Google. Confira a senha e faça uma nova comprovação.';
+        }
+      });
   }
 
   loadLocalEmailProof(): void {
