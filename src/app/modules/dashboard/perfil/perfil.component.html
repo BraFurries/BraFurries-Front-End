@@ -60,6 +60,12 @@
                   class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
             {{ socialLoginChanging ? 'Alterando...' : 'Desativar login' }}
           </button>
+          <button *ngIf="!identity.loginEnabled && identity.provider === 'google' && !googleLoginTicket"
+                  type="button" (click)="startGoogleLoginReactivation()"
+                  [disabled]="googleLoginStarting || socialLoginChanging"
+                  class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+            {{ googleLoginStarting ? 'Abrindo Google...' : 'Comprovar Google para reativar' }}
+          </button>
           <button *ngIf="!identity.loginEnabled && identity.provider === 'discord' && !discordLinkPreview"
                   type="button" (click)="startDiscordLink()" [disabled]="discordLinkStarting || socialLoginChanging"
                   class="rounded-lg bg-[#5865F2] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
@@ -76,10 +82,18 @@
                autocomplete="current-password" [disabled]="socialLoginChanging" maxlength="256"
                placeholder="Senha da conta BraFurries"
                class="w-full sm:max-w-sm rounded-xl border border-gray-300 px-4 py-2 text-sm" />
-        <p *ngIf="hasDisabledSocialLogin('google')" class="text-xs text-gray-600">
-          Seu vínculo Google está preservado. A reativação exige uma nova comprovação Google
-          vinculada à sessão BraFurries; a interface dessa reativação ainda não está disponível.
-        </p>
+        <p *ngIf="googleLoginError" role="alert" class="text-sm text-red-700">{{ googleLoginError }}</p>
+        <div *ngIf="googleLoginTicket && hasDisabledSocialLogin('google')" class="rounded-xl border border-braPurple/30 p-4 space-y-3">
+          <p class="text-sm text-gray-700">
+            Sua identidade Google foi comprovada novamente. Confirme a senha BraFurries
+            informada acima para reativar esse método de login.
+          </p>
+          <button type="button" (click)="reenableGoogleLogin()"
+                  [disabled]="socialLoginChanging || !socialLoginPassword"
+                  class="rounded-lg bg-braPurple px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+            {{ socialLoginChanging ? 'Reativando...' : 'Reativar login com Google' }}
+          </button>
+        </div>
       </section>
 
       <p *ngIf="discordLinkError" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
