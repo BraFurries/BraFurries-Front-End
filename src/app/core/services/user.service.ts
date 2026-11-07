@@ -236,6 +236,27 @@ export class UserService {
     );
   }
 
+  beginGoogleLoginProof(): Observable<{ticket: string}> {
+    return this.http.post<{ticket: string}>(
+      `${environment.apiBaseUrl}/user/me/social-logins/google/start`, {}
+    );
+  }
+
+  openGoogleReactivationOAuth(ticket: string): void {
+    const frontendOrigin = encodeURIComponent(window.location.origin);
+    const proof = encodeURIComponent(ticket);
+    window.location.assign(
+      `${environment.apiBaseUrl}/auth/oauth2/google?reenable_ticket=${proof}&frontend_origin=${frontendOrigin}`
+    );
+  }
+
+  enableGoogleLogin(ticket: string, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/google/enable-oauth`,
+      { ticket, password }
+    );
+  }
+
   getLocalEmailProof(): Observable<LocalEmailProofStatus> {
     return this.http.get<LocalEmailProofStatus>(
       `${environment.apiBaseUrl}/user/me/local-email-verification`
