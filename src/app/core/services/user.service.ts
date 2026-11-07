@@ -134,6 +134,12 @@ export class UserService {
     return this.http.post<void>(endpoint, { token });
   }
 
+  resendEmailConfirmation(email: string, password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${environment.apiBaseUrl}/auth/resend-confirmation`, { email, password }
+    );
+  }
+
   forgotPassword(email: string): Observable<{ message: string }> {
     const endpoint = `${environment.apiBaseUrl}/auth/forgot-password`;
     return this.http.post<{ message: string }>(endpoint, { email });
