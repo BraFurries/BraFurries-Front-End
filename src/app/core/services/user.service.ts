@@ -50,6 +50,15 @@ interface UserSession {
 type RefreshTokenResponse = Omit<AuthResponse, 'user'> & Partial<Pick<AuthResponse, 'user'>>;
 export type SocialAuthProvider = 'google' | 'discord';
 
+export interface SocialProviderLogin {
+  identityId: number;
+  provider: SocialAuthProvider;
+  loginEnabled: boolean;
+}
+export interface SocialLoginChangeResult {
+  status: 'RELOGIN_REQUIRED' | 'ALREADY_DISABLED' | 'ALREADY_ENABLED';
+}
+
 export type DiscordLinkStatus =
   'CONNECT_READY' | 'PRECHECK_REQUIRED' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
 
@@ -199,6 +208,31 @@ export class UserService {
     return this.http.post<DiscordLinkConfirmation>(
       `${environment.apiBaseUrl}/user/me/discord-link/confirm`, { ticket }
     );
+  }
+
+  /** Manage login permission only; never delete a provider subject or Discord history. */
+  getSocialLogins(): Observable<SocialProviderLogin[]> {
+    return this.http.get<SocialProviderLogin[]>(
+      `${environment.apiBaseUrl}/user/me/social-logins`
+    );
+  }
+
+  disableSocialLogin(identityId: number, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/${identityId}/disable`, { password }
+    );
+  }
+
+  enableDiscordLogin(ticket: string, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/discord/enable`, { ticket, password }
+    );
+  }
+
+  /** A security change increments auth_version and invalidates all sessions. */
+  finishSocialLoginSecurityChange(): void {
+    this.clearSession();
+    sessionStorage.removeItem(this.socialLoginReturnUrlKey);
   }
 
   /** A distinct endpoint: cross-user consolidation requires explicit canonical consent. */
