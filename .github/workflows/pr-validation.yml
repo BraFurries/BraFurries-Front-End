@@ -117,6 +117,7 @@ jobs:
           --include=**/perfil.component.spec.ts
           --include=**/social-auth-error-message.spec.ts
           --include=**/login.component.spec.ts
+          --include=**/social-register.component.spec.ts
 
       - name: Build
         run: npm run build
