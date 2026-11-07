@@ -23,7 +23,16 @@ interface RegisterRequest {
 interface SocialRegisterRequest {
   registrationToken: string;
   displayName: string;
+  email: string;
+  password: string;
+  passwordConfirmation: string;
   termsAgreement: boolean;
+}
+
+export interface SocialOnboardingPreview {
+  provider: 'google' | 'discord';
+  suggestedEmail: string | null;
+  displayName: string | null;
 }
 
 interface LogoutRequest {
@@ -135,25 +144,27 @@ export class UserService {
     return this.http.post<void>(endpoint, { token, password });
   }
 
+  /** The provider's optional e-mail is merely a suggestion fetched by opaque proof. */
+  previewSocialRegistration(registrationToken: string): Observable<SocialOnboardingPreview> {
+    return this.http.post<SocialOnboardingPreview>(
+      `${environment.apiBaseUrl}/auth/social-register/preview`, { registrationToken }
+    );
+  }
+
+  /** Onboarding never creates a logged-in session before local e-mail verification. */
   completeSocialRegistration(
     registrationToken: string,
     displayName: string,
+    email: string,
+    password: string,
+    passwordConfirmation: string,
     termsAgreement: boolean
-  ): Observable<User> {
+  ): Observable<{ id: number; email: string; message: string }> {
     const endpoint = `${environment.apiBaseUrl}/auth/social-register`;
     const payload: SocialRegisterRequest = {
-      registrationToken,
-      displayName,
-      termsAgreement
+      registrationToken, displayName, email, password, passwordConfirmation, termsAgreement
     };
-
-    return this.http.post<AuthResponse>(endpoint, payload).pipe(
-      map((response) => {
-        const session = this.mapAuthResponseToSession(response);
-        this.setSession(session);
-        return session.user;
-      })
-    );
+    return this.http.post<{ id: number; email: string; message: string }>(endpoint, payload);
   }
 
   /** Start a separate OAuth proof without logging out or replacing the current session. */
