@@ -9,6 +9,48 @@
       <div *ngIf="profileLoading" class="bg-white rounded-[2rem] border border-gray-100 p-8 text-gray-500">Carregando seu perfil...</div>
       <div *ngIf="profileError" class="bg-red-50 text-red-700 rounded-2xl border border-red-100 p-5">{{ profileError }}</div>
 
+      <section class="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-4" aria-labelledby="social-login-title">
+        <h3 id="social-login-title" class="font-amaranth text-xl font-bold text-braDark">Métodos de login</h3>
+        <p class="text-sm text-gray-600">
+          Desativar um login pelo Google ou Discord <strong>não apaga seu vínculo comunitário</strong>,
+          permissões ou histórico. Você continuará podendo entrar com e-mail e senha BraFurries.
+        </p>
+        <p *ngIf="socialLoginsLoading" class="text-sm text-gray-500">Consultando métodos de acesso...</p>
+        <p *ngIf="socialLoginsError" role="alert" class="text-sm font-semibold text-red-700">{{ socialLoginsError }}</p>
+        <div *ngFor="let identity of socialLogins" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 p-3">
+          <div class="text-sm">
+            <strong>{{ identity.provider === 'discord' ? 'Discord' : 'Google' }}</strong>
+            <span class="ml-2" [class.text-green-700]="identity.loginEnabled" [class.text-gray-500]="!identity.loginEnabled">
+              {{ identity.loginEnabled ? 'Login habilitado' : 'Login desativado — identidade preservada' }}
+            </span>
+          </div>
+          <button *ngIf="identity.loginEnabled" type="button" (click)="disableSocialLogin(identity)"
+                  [disabled]="socialLoginChanging || !socialLoginPassword"
+                  class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
+            {{ socialLoginChanging ? 'Alterando...' : 'Desativar login' }}
+          </button>
+          <button *ngIf="!identity.loginEnabled && identity.provider === 'discord' && !discordLinkPreview"
+                  type="button" (click)="startDiscordLink()" [disabled]="discordLinkStarting || socialLoginChanging"
+                  class="rounded-lg bg-[#5865F2] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+            Comprovar Discord para reativar
+          </button>
+        </div>
+        <p *ngIf="!socialLoginsLoading && !socialLogins.length" class="text-sm text-gray-500">
+          Nenhum método OAuth verificado está registrado nesta conta.
+        </p>
+        <label class="block text-xs font-semibold text-gray-700" for="social-login-password">
+          Confirme sua senha BraFurries para alterar um método
+        </label>
+        <input id="social-login-password" type="password" [(ngModel)]="socialLoginPassword"
+               autocomplete="current-password" [disabled]="socialLoginChanging" maxlength="256"
+               placeholder="Senha da conta BraFurries"
+               class="w-full sm:max-w-sm rounded-xl border border-gray-300 px-4 py-2 text-sm" />
+        <p *ngIf="hasDisabledSocialLogin('google')" class="text-xs text-gray-600">
+          Seu vínculo Google está preservado. A reativação exige uma nova comprovação Google
+          vinculada à sessão BraFurries; a interface dessa reativação ainda não está disponível.
+        </p>
+      </section>
+
       <p *ngIf="discordLinkError" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
         {{ discordLinkError }}
       </p>
@@ -61,7 +103,13 @@
         </div>
 
         <div class="mt-5 flex flex-wrap gap-3">
-          <button *ngIf="verified.status === 'CONNECT_READY'" type="button" (click)="confirmDiscordLink()"
+          <button *ngIf="verified.status === 'CONNECT_READY' && hasDisabledSocialLogin('discord')"
+                  type="button" (click)="reenableDiscordLogin()"
+                  [disabled]="socialLoginChanging || !socialLoginPassword"
+                  class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            {{ socialLoginChanging ? 'Reativando...' : 'Reativar login com Discord' }}
+          </button>
+          <button *ngIf="verified.status === 'CONNECT_READY' && !hasDisabledSocialLogin('discord')" type="button" (click)="confirmDiscordLink()"
                   [disabled]="discordLinkConfirming || discordLinkConsolidating"
                   class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             {{ discordLinkConfirming ? 'Conectando...' : 'Conectar Discord' }}
