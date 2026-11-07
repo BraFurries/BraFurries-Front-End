@@ -58,6 +58,13 @@ export interface SocialProviderLogin {
 export interface SocialLoginChangeResult {
   status: 'RELOGIN_REQUIRED' | 'ALREADY_DISABLED' | 'ALREADY_ENABLED';
 }
+export interface LocalEmailProofStatus {
+  email: string | null;
+  verified: boolean;
+}
+export interface LocalEmailProofRequestResult {
+  status: 'ALREADY_VERIFIED' | 'VERIFICATION_SENT_RELOGIN_REQUIRED';
+}
 
 export type DiscordLinkStatus =
   'CONNECT_READY' | 'PRECHECK_REQUIRED' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
@@ -226,6 +233,18 @@ export class UserService {
   enableDiscordLogin(ticket: string, password: string): Observable<SocialLoginChangeResult> {
     return this.http.post<SocialLoginChangeResult>(
       `${environment.apiBaseUrl}/user/me/social-logins/discord/enable`, { ticket, password }
+    );
+  }
+
+  getLocalEmailProof(): Observable<LocalEmailProofStatus> {
+    return this.http.get<LocalEmailProofStatus>(
+      `${environment.apiBaseUrl}/user/me/local-email-verification`
+    );
+  }
+
+  requestLocalEmailProof(email: string, password: string): Observable<LocalEmailProofRequestResult> {
+    return this.http.post<LocalEmailProofRequestResult>(
+      `${environment.apiBaseUrl}/user/me/local-email-verification`, { email, password }
     );
   }
 
