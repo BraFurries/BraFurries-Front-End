@@ -39,7 +39,8 @@ describe('PerfilComponent', () => {
       'previewDiscordLink', 'confirmDiscordLink', 'consolidateDiscordLink',
       'finishAccountConsolidation', 'getSocialLogins', 'disableSocialLogin',
       'enableDiscordLogin', 'finishSocialLoginSecurityChange',
-      'getLocalEmailProof', 'requestLocalEmailProof'
+      'getLocalEmailProof', 'requestLocalEmailProof',
+      'beginGoogleLoginProof', 'openGoogleReactivationOAuth', 'enableGoogleLogin'
     ]);
     userService.getSocialLogins.and.returnValue(of([]));
     userService.getLocalEmailProof.and.returnValue(of({email: 'luna@example.com', verified: true}));
@@ -451,6 +452,29 @@ describe('PerfilComponent', () => {
     expect(userService.requestLocalEmailProof).toHaveBeenCalledOnceWith('new@example.com', 'local-password');
     expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('starts a fresh Google OAuth proof without logging in through Google', () => {
+    component.socialLogins = [{identityId: 19, provider: 'google', loginEnabled: false}];
+    userService.beginGoogleLoginProof.and.returnValue(of({ticket: 'fresh-google-ticket'}));
+    component.startGoogleLoginReactivation();
+    expect(userService.beginGoogleLoginProof).toHaveBeenCalled();
+    expect(userService.openGoogleReactivationOAuth).toHaveBeenCalledOnceWith('fresh-google-ticket');
+    expect(userService.enableGoogleLogin).not.toHaveBeenCalled();
+  });
+
+  it('reenables Google with the OAuth ticket plus BraFurries password', () => {
+    component.socialLogins = [{identityId: 19, provider: 'google', loginEnabled: false}];
+    component.googleLoginTicket = 'verified-google-ticket';
+    component.socialLoginPassword = 'local-password';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Reativar login com Google');
+    userService.enableGoogleLogin.and.returnValue(of({status: 'RELOGIN_REQUIRED'}));
+    component.reenableGoogleLogin();
+    expect(userService.enableGoogleLogin).toHaveBeenCalledOnceWith('verified-google-ticket', 'local-password');
+    expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(component.googleLoginTicket).toBe('');
   });
 
 });
