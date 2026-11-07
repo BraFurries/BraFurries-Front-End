@@ -92,6 +92,13 @@
                     <span>{{ isSubmitting ? 'Autenticando...' : 'Entrar na Alcateia' }}</span>
                 </button>
             </form>
+            <div *ngIf="pendingEmailConfirmation" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p class="text-sm text-amber-900">Seu e-mail BraFurries ainda não foi confirmado.</p>
+                <button type="button" (click)="resendConfirmation()" [disabled]="isSubmitting || confirmationResent"
+                    class="mt-3 text-sm font-bold text-braPurple underline disabled:opacity-50">
+                    {{ confirmationResent ? 'Solicitação registrada' : 'Reenviar confirmação por e-mail' }}
+                </button>
+            </div>
 
             <div class="relative flex items-center py-8">
                 <div class="flex-grow border-t border-gray-100"></div>
