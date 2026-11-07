@@ -38,9 +38,11 @@ describe('PerfilComponent', () => {
       'updateCachedUser', 'beginDiscordLink', 'openDiscordLinkOAuth',
       'previewDiscordLink', 'confirmDiscordLink', 'consolidateDiscordLink',
       'finishAccountConsolidation', 'getSocialLogins', 'disableSocialLogin',
-      'enableDiscordLogin', 'finishSocialLoginSecurityChange'
+      'enableDiscordLogin', 'finishSocialLoginSecurityChange',
+      'getLocalEmailProof', 'requestLocalEmailProof'
     ]);
     userService.getSocialLogins.and.returnValue(of([]));
+    userService.getLocalEmailProof.and.returnValue(of({email: 'luna@example.com', verified: true}));
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.returnValue(Promise.resolve(true));
     service.getProfile.and.returnValue(of(profile()));
@@ -425,6 +427,30 @@ describe('PerfilComponent', () => {
     expect(userService.enableDiscordLogin).toHaveBeenCalledOnceWith('fresh-verified-ticket', 'local-password');
     expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
     expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
+  });
+
+  it('shows an unverified legacy email as unknown rather than importing provider proof', () => {
+    userService.getLocalEmailProof.and.returnValue(of({email: 'legacy@example.com', verified: false}));
+    const fresh = TestBed.createComponent(PerfilComponent); fresh.detectChanges();
+    expect(fresh.nativeElement.textContent).toContain('ainda não tem confirmação local comprovada');
+    expect(fresh.componentInstance.localEmailDraft).toBe('legacy@example.com');
+    expect(userService.requestLocalEmailProof).not.toHaveBeenCalled();
+  });
+
+  it('requests local email verification only after password and clears revoked session', () => {
+    component.localEmailProof = {email: 'old@example.com', verified: false};
+    component.localEmailDraft = 'new@example.com';
+    component.requestLocalEmailProof();
+    expect(userService.requestLocalEmailProof).not.toHaveBeenCalled();
+    expect(component.localEmailProofError).toContain('senha');
+    component.socialLoginPassword = 'local-password';
+    userService.requestLocalEmailProof.and.returnValue(of({
+      status: 'VERIFICATION_SENT_RELOGIN_REQUIRED'
+    }));
+    component.requestLocalEmailProof();
+    expect(userService.requestLocalEmailProof).toHaveBeenCalledOnceWith('new@example.com', 'local-password');
+    expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
 
 });
