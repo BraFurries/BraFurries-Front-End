@@ -37,8 +37,10 @@ describe('PerfilComponent', () => {
     userService = jasmine.createSpyObj<UserService>('UserService', [
       'updateCachedUser', 'beginDiscordLink', 'openDiscordLinkOAuth',
       'previewDiscordLink', 'confirmDiscordLink', 'consolidateDiscordLink',
-      'finishAccountConsolidation'
+      'finishAccountConsolidation', 'getSocialLogins', 'disableSocialLogin',
+      'enableDiscordLogin', 'finishSocialLoginSecurityChange'
     ]);
+    userService.getSocialLogins.and.returnValue(of([]));
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.returnValue(Promise.resolve(true));
     service.getProfile.and.returnValue(of(profile()));
@@ -384,4 +386,45 @@ describe('PerfilComponent', () => {
     expect(component.profile?.profileImageUrl).toBeNull();
     expect(userService.updateCachedUser).toHaveBeenCalledWith({ profileImageUrl: null });
   });
+  it('keeps community identities when explaining provider login controls', () => {
+    component.socialLogins = [{identityId: 15, provider: 'discord', loginEnabled: true}];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('não apaga seu vínculo comunitário');
+    expect(fixture.nativeElement.textContent).toContain('Discord');
+    expect(userService.disableSocialLogin).not.toHaveBeenCalled();
+  });
+
+  it('requires local password to disable a provider and clears the revoked session', () => {
+    component.socialLogins = [{identityId: 15, provider: 'discord', loginEnabled: true}];
+    component.disableSocialLogin(component.socialLogins[0]);
+    expect(userService.disableSocialLogin).not.toHaveBeenCalled();
+    expect(component.socialLoginsError).toContain('senha');
+    component.socialLoginPassword = 'local-password';
+    userService.disableSocialLogin.and.returnValue(of({status: 'RELOGIN_REQUIRED'}));
+    component.disableSocialLogin(component.socialLogins[0]);
+    expect(userService.disableSocialLogin).toHaveBeenCalledOnceWith(15, 'local-password');
+    expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(component.socialLoginPassword).toBe('');
+  });
+
+  it('only re-enables Discord after both OAuth ticket and local password', () => {
+    component.socialLogins = [{identityId: 15, provider: 'discord', loginEnabled: false}];
+    component.discordLinkTicket = 'fresh-verified-ticket';
+    component.socialLoginPassword = 'local-password';
+    component.discordLinkPreview = {
+      discordUsername: 'Furry', hasExistingHistory: false,
+      status: 'CONNECT_READY', nextActions: ['CONFIRM_LINK'], consolidationPlan: null,
+      notice: 'Discord comprovado'
+    };
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Reativar login com Discord');
+    expect(fixture.nativeElement.textContent).not.toContain('Desvincular Discord');
+    userService.enableDiscordLogin.and.returnValue(of({status: 'RELOGIN_REQUIRED'}));
+    component.reenableDiscordLogin();
+    expect(userService.enableDiscordLogin).toHaveBeenCalledOnceWith('fresh-verified-ticket', 'local-password');
+    expect(userService.confirmDiscordLink).not.toHaveBeenCalled();
+    expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
+  });
+
 });
