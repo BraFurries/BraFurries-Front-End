@@ -36,15 +36,15 @@ export class AuthComponent implements OnInit {
     const requiresRegistration = params.get('requires_registration') === 'true';
 
     if (registrationToken || requiresRegistration) {
-      this.router.navigate(['/social-register'], {
-        queryParams: {
-          registrationToken,
-          email: params.get('email'),
-          displayName: params.get('display_name') ?? params.get('name'),
-          provider: params.get('provider'),
-          returnUrl
-        }
-      });
+      if (!registrationToken) {
+        this.errorMessage = 'A comprovação OAuth expirou. Inicie novamente o cadastro.';
+        return;
+      }
+      // Do not leak OAuth onboarding proof or provider e-mail through URL
+      // query params, analytics, browser history or referrers.
+      sessionStorage.setItem('pending_social_registration_token', registrationToken);
+      window.history.replaceState(null, '', window.location.pathname);
+      this.router.navigate(['/social-register']);
       return;
     }
 

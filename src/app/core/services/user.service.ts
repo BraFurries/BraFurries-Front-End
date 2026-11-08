@@ -23,7 +23,16 @@ interface RegisterRequest {
 interface SocialRegisterRequest {
   registrationToken: string;
   displayName: string;
+  email: string;
+  password: string;
+  passwordConfirmation: string;
   termsAgreement: boolean;
+}
+
+export interface SocialOnboardingPreview {
+  provider: 'google' | 'discord';
+  suggestedEmail: string | null;
+  displayName: string | null;
 }
 
 interface LogoutRequest {
@@ -41,12 +50,56 @@ interface UserSession {
 type RefreshTokenResponse = Omit<AuthResponse, 'user'> & Partial<Pick<AuthResponse, 'user'>>;
 export type SocialAuthProvider = 'google' | 'discord';
 
+export interface SocialProviderLogin {
+  identityId: number;
+  provider: SocialAuthProvider;
+  loginEnabled: boolean;
+}
+export interface SocialLoginChangeResult {
+  status: 'RELOGIN_REQUIRED' | 'ALREADY_DISABLED' | 'ALREADY_ENABLED';
+}
+export interface LocalEmailProofStatus {
+  email: string | null;
+  verified: boolean;
+}
+export interface LocalEmailProofRequestResult {
+  status: 'ALREADY_VERIFIED' | 'VERIFICATION_SENT_RELOGIN_REQUIRED';
+}
+
+export type DiscordLinkStatus =
+  'CONNECT_READY' | 'PRECHECK_REQUIRED' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
+
+export interface DiscordConsolidationPlan {
+  status: 'AUTO_MERGE_CANDIDATE' | 'RESOLUTION_REQUIRED' | 'REVIEW_REQUIRED';
+  preferredCanonicalAccount: 'DISCORD_HISTORY_OWNER' | 'UNDECIDED';
+  preservationPolicies: string[];
+  nextActions: string[];
+}
+export interface DiscordLinkPreview {
+  discordUsername: string;
+  hasExistingHistory: boolean;
+  status: DiscordLinkStatus;
+  nextActions: string[];
+  notice: string;
+  consolidationPlan: DiscordConsolidationPlan | null;
+}
+export interface DiscordLinkConfirmation {
+  status: 'CONNECTED' | 'ALREADY_CONNECTED';
+  notice: string;
+}
+export interface DiscordConsolidationResult {
+  status: 'CONSOLIDATED_RELOGIN_REQUIRED';
+  canonicalUserId: number;
+  notice: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class UserService {
   private readonly storageKey = 'logged_user';
   private readonly socialLoginReturnUrlKey = 'social_login_return_url';
+  private readonly accountConsolidatedNoticeKey = 'account_consolidated_notice';
   private session: UserSession | null = this.loadUserFromStorage();
   private refreshInFlight$: Observable<boolean> | null = null;
   private readonly currentUserSubject = new BehaviorSubject<User | null>(this.session?.user ?? null);
@@ -97,6 +150,12 @@ export class UserService {
     return this.http.post<void>(endpoint, { token });
   }
 
+  resendEmailConfirmation(email: string, password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${environment.apiBaseUrl}/auth/resend-confirmation`, { email, password }
+    );
+  }
+
   forgotPassword(email: string): Observable<{ message: string }> {
     const endpoint = `${environment.apiBaseUrl}/auth/forgot-password`;
     return this.http.post<{ message: string }>(endpoint, { email });
@@ -107,25 +166,134 @@ export class UserService {
     return this.http.post<void>(endpoint, { token, password });
   }
 
+  /** The provider's optional e-mail is merely a suggestion fetched by opaque proof. */
+  previewSocialRegistration(registrationToken: string): Observable<SocialOnboardingPreview> {
+    return this.http.post<SocialOnboardingPreview>(
+      `${environment.apiBaseUrl}/auth/social-register/preview`, { registrationToken }
+    );
+  }
+
+  /** Onboarding never creates a logged-in session before local e-mail verification. */
   completeSocialRegistration(
     registrationToken: string,
     displayName: string,
+    email: string,
+    password: string,
+    passwordConfirmation: string,
     termsAgreement: boolean
-  ): Observable<User> {
+  ): Observable<{ id: number; email: string; message: string }> {
     const endpoint = `${environment.apiBaseUrl}/auth/social-register`;
     const payload: SocialRegisterRequest = {
-      registrationToken,
-      displayName,
-      termsAgreement
+      registrationToken, displayName, email, password, passwordConfirmation, termsAgreement
     };
+    return this.http.post<{ id: number; email: string; message: string }>(endpoint, payload);
+  }
 
-    return this.http.post<AuthResponse>(endpoint, payload).pipe(
-      map((response) => {
-        const session = this.mapAuthResponseToSession(response);
-        this.setSession(session);
-        return session.user;
-      })
+  /** Start a separate OAuth proof without logging out or replacing the current session. */
+  beginDiscordLink(): Observable<{ ticket: string }> {
+    return this.http.post<{ ticket: string }>(
+      `${environment.apiBaseUrl}/user/me/discord-link/start`, {}
     );
+  }
+
+  openDiscordLinkOAuth(ticket: string): void {
+    const frontendOrigin = encodeURIComponent(window.location.origin);
+    const proof = encodeURIComponent(ticket);
+    window.location.assign(
+      `${environment.apiBaseUrl}/auth/oauth2/discord?link_ticket=${proof}&frontend_origin=${frontendOrigin}`
+    );
+  }
+
+  previewDiscordLink(ticket: string): Observable<DiscordLinkPreview> {
+    return this.http.get<DiscordLinkPreview>(
+      `${environment.apiBaseUrl}/user/me/discord-link/preview`,
+      { params: { ticket } }
+    );
+  }
+
+  confirmDiscordLink(ticket: string): Observable<DiscordLinkConfirmation> {
+    return this.http.post<DiscordLinkConfirmation>(
+      `${environment.apiBaseUrl}/user/me/discord-link/confirm`, { ticket }
+    );
+  }
+
+  /** Manage login permission only; never delete a provider subject or Discord history. */
+  getSocialLogins(): Observable<SocialProviderLogin[]> {
+    return this.http.get<SocialProviderLogin[]>(
+      `${environment.apiBaseUrl}/user/me/social-logins`
+    );
+  }
+
+  disableSocialLogin(identityId: number, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/${identityId}/disable`, { password }
+    );
+  }
+
+  enableDiscordLogin(ticket: string, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/discord/enable`, { ticket, password }
+    );
+  }
+
+  beginGoogleLoginProof(): Observable<{ticket: string}> {
+    return this.http.post<{ticket: string}>(
+      `${environment.apiBaseUrl}/user/me/social-logins/google/start`, {}
+    );
+  }
+
+  openGoogleReactivationOAuth(ticket: string): void {
+    const frontendOrigin = encodeURIComponent(window.location.origin);
+    const proof = encodeURIComponent(ticket);
+    window.location.assign(
+      `${environment.apiBaseUrl}/auth/oauth2/google?reenable_ticket=${proof}&frontend_origin=${frontendOrigin}`
+    );
+  }
+
+  enableGoogleLogin(ticket: string, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/google/enable-oauth`,
+      { ticket, password }
+    );
+  }
+
+  getLocalEmailProof(): Observable<LocalEmailProofStatus> {
+    return this.http.get<LocalEmailProofStatus>(
+      `${environment.apiBaseUrl}/user/me/local-email-verification`
+    );
+  }
+
+  requestLocalEmailProof(email: string, password: string): Observable<LocalEmailProofRequestResult> {
+    return this.http.post<LocalEmailProofRequestResult>(
+      `${environment.apiBaseUrl}/user/me/local-email-verification`, { email, password }
+    );
+  }
+
+  /** A security change increments auth_version and invalidates all sessions. */
+  finishSocialLoginSecurityChange(): void {
+    this.clearSession();
+    sessionStorage.removeItem(this.socialLoginReturnUrlKey);
+  }
+
+  /** A distinct endpoint: cross-user consolidation requires explicit canonical consent. */
+  consolidateDiscordLink(ticket: string, acknowledgeDiscordHistoryOwner: boolean): Observable<DiscordConsolidationResult> {
+    return this.http.post<DiscordConsolidationResult>(
+      `${environment.apiBaseUrl}/user/me/discord-link/consolidate`,
+      { ticket, acknowledgeDiscordHistoryOwner }
+    );
+  }
+
+  /** Both prior JWT and refresh token were revoked atomically by the API. */
+  finishAccountConsolidation(): void {
+    this.clearSession();
+    sessionStorage.removeItem(this.socialLoginReturnUrlKey);
+    sessionStorage.setItem(this.accountConsolidatedNoticeKey, '1');
+  }
+
+  consumeAccountConsolidationNotice(): boolean {
+    const confirmed = sessionStorage.getItem(this.accountConsolidatedNoticeKey) === '1';
+    sessionStorage.removeItem(this.accountConsolidatedNoticeKey);
+    return confirmed;
   }
 
   startSocialLogin(provider: SocialAuthProvider, returnUrl: string = '/painel'): void {

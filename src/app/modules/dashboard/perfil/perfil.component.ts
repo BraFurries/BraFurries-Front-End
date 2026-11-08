@@ -1,8 +1,9 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { EMPTY, Observable, Subject, catchError, forkJoin, map, of, switchMap, takeUntil, tap } from 'rxjs';
 import { CommunityAccess, CommunityAccessService } from '../../../core/services/community-access.service';
 import { MemberProfileService } from '../../../core/services/member-profile.service';
-import { UserService } from '../../../core/services/user.service';
+import { DiscordLinkPreview, LocalEmailProofStatus, SocialProviderLogin, UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { MemberCommunityContextResponse, MemberCommunitySummary, MemberModerationPage, MemberProfileResponse } from '../../../shared/models/api/member-profile/member-profile';
 
@@ -28,6 +29,28 @@ export class PerfilComponent implements OnInit, OnDestroy {
   profileImageUploading = false;
   profileImageDeleting = false;
   readonly moderationPageSize = 10;
+  discordLinkStarting = false;
+  discordLinkLoading = false;
+  discordLinkConfirming = false;
+  discordLinkConsolidating = false;
+  discordHistoryOwnerConsent = false;
+  discordLinkTicket = '';
+  discordLinkPreview: DiscordLinkPreview | null = null;
+  discordLinkError = '';
+  discordLinkSuccess = '';
+  socialLogins: SocialProviderLogin[] = [];
+  socialLoginsLoading = false;
+  socialLoginsError = '';
+  socialLoginPassword = '';
+  socialLoginChanging = false;
+  localEmailProof: LocalEmailProofStatus | null = null;
+  localEmailDraft = '';
+  localEmailProofLoading = false;
+  localEmailProofSaving = false;
+  localEmailProofError = '';
+  googleLoginStarting = false;
+  googleLoginTicket = '';
+  googleLoginError = '';
   private readonly destroy$ = new Subject<void>();
   private readonly communitySelection$ = new Subject<number>();
   private readonly moderationRequest$ = new Subject<{ communityId: number; page: number }>();
@@ -36,7 +59,8 @@ export class PerfilComponent implements OnInit, OnDestroy {
     private readonly memberProfileService: MemberProfileService,
     private readonly communityAccessService: CommunityAccessService,
     private readonly userService: UserService,
-    private readonly seoService: SeoService
+    private readonly seoService: SeoService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -62,9 +86,305 @@ export class PerfilComponent implements OnInit, OnDestroy {
       this.moderationLoading = false;
     } });
     this.loadProfile();
+    this.loadSocialLogins();
+    this.loadLocalEmailProof();
+    this.handleSocialLinkCallbacks();
   }
 
   ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
+
+  private handleSocialLinkCallbacks(): void {
+    if (typeof window === 'undefined') return;
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const ticket = fragment.get('discord_link_ticket');
+    const googleTicket = fragment.get('google_login_ticket');
+    const query = new URLSearchParams(window.location.search);
+    const failure = query.get('discord_link_error');
+    const googleFailure = query.get('google_login_error');
+    if (googleFailure) {
+      this.googleLoginError = googleFailure;
+      query.delete('google_login_error');
+    }
+    if (failure) {
+      this.discordLinkError = failure;
+      query.delete('discord_link_error');
+    }
+    if (ticket || failure || googleTicket || googleFailure) {
+      // Remove short-lived bearer ticket from visible URL and browser history.
+      const rest = query.toString();
+      window.history.replaceState(window.history.state, '',
+        window.location.pathname + (rest ? '?' + rest : ''));
+    }
+    if (googleTicket) this.googleLoginTicket = googleTicket;
+    if (!ticket) return;
+
+    this.discordLinkTicket = ticket;
+    this.discordLinkLoading = true;
+    this.userService.previewDiscordLink(ticket).pipe(takeUntil(this.destroy$)).subscribe({
+      next: preview => {
+        this.discordLinkPreview = preview;
+        this.discordHistoryOwnerConsent = false;
+        this.discordLinkLoading = false;
+      },
+      error: () => {
+        this.discordLinkTicket = '';
+        this.discordLinkLoading = false;
+        this.discordLinkError = 'A verificação expirou ou pertence a outra conta. Reinicie a conexão com Discord.';
+      }
+    });
+  }
+
+  startGoogleLoginReactivation(): void {
+    if (this.googleLoginStarting || !this.hasDisabledSocialLogin('google')) return;
+    this.googleLoginStarting = true;
+    this.googleLoginError = '';
+    this.userService.beginGoogleLoginProof().pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ ticket }) => this.userService.openGoogleReactivationOAuth(ticket),
+      error: () => {
+        this.googleLoginStarting = false;
+        this.googleLoginError = 'Não foi possível iniciar a comprovação Google.';
+      }
+    });
+  }
+
+  reenableGoogleLogin(): void {
+    if (!this.googleLoginTicket || !this.hasDisabledSocialLogin('google') ||
+        !this.socialLoginPassword || this.socialLoginChanging) {
+      this.googleLoginError = 'Comprove o Google e confirme sua senha BraFurries.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.googleLoginError = '';
+    this.userService.enableGoogleLogin(this.googleLoginTicket, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.googleLoginTicket = '';
+          this.socialLoginPassword = '';
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.googleLoginError =
+            'Falha ao reativar o Google. Confira a senha e faça uma nova comprovação.';
+        }
+      });
+  }
+
+  loadLocalEmailProof(): void {
+    this.localEmailProofLoading = true;
+    this.userService.getLocalEmailProof().pipe(takeUntil(this.destroy$)).subscribe({
+      next: proof => {
+        this.localEmailProofLoading = false;
+        this.localEmailProof = proof;
+        this.localEmailDraft = proof.email || '';
+      },
+      error: () => {
+        this.localEmailProofLoading = false;
+        this.localEmailProofError = 'Não foi possível consultar a verificação do e-mail.';
+      }
+    });
+  }
+
+  requestLocalEmailProof(): void {
+    if (this.localEmailProofSaving || this.localEmailProof?.verified) return;
+    const selected = this.localEmailDraft.trim();
+    if (!selected || !this.socialLoginPassword) {
+      this.localEmailProofError = 'Escolha o e-mail BraFurries e confirme sua senha.';
+      return;
+    }
+    this.localEmailProofSaving = true;
+    this.localEmailProofError = '';
+    this.userService.requestLocalEmailProof(selected, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.localEmailProofSaving = false;
+          this.socialLoginPassword = '';
+          if (result.status === 'VERIFICATION_SENT_RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadLocalEmailProof();
+          }
+        },
+        error: () => {
+          this.localEmailProofSaving = false;
+          this.socialLoginPassword = '';
+          this.localEmailProofError =
+            'Não foi possível enviar a confirmação. Confira a senha e se o e-mail está disponível.';
+        }
+      });
+  }
+
+  loadSocialLogins(): void {
+    this.socialLoginsLoading = true;
+    this.socialLoginsError = '';
+    this.userService.getSocialLogins().pipe(takeUntil(this.destroy$)).subscribe({
+      next: identities => {
+        this.socialLogins = identities;
+        this.socialLoginsLoading = false;
+      },
+      error: () => {
+        this.socialLoginsLoading = false;
+        this.socialLoginsError = 'Não foi possível consultar os métodos de acesso.';
+      }
+    });
+  }
+
+  hasDisabledSocialLogin(provider: 'google' | 'discord'): boolean {
+    return this.socialLogins.some(identity =>
+      identity.provider === provider && !identity.loginEnabled);
+  }
+
+  disableSocialLogin(identity: SocialProviderLogin): void {
+    if (this.socialLoginChanging || !identity.loginEnabled) return;
+    if (!this.socialLoginPassword) {
+      this.socialLoginsError = 'Informe sua senha BraFurries antes de desativar o login.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.socialLoginsError = '';
+    this.userService.disableSocialLogin(identity.identityId, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.socialLoginsError = 'Não foi possível desativar o provedor. Confira a senha e a verificação de e-mail.';
+        }
+      });
+  }
+
+  reenableDiscordLogin(): void {
+    if (!this.hasDisabledSocialLogin('discord') || !this.discordLinkTicket ||
+        !this.socialLoginPassword || this.socialLoginChanging) {
+      this.socialLoginsError = 'Confirme sua senha e a identidade Discord antes de reativar.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.socialLoginsError = '';
+    this.userService.enableDiscordLogin(this.discordLinkTicket, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.socialLoginsError = 'Falha ao reativar. Confira a senha e tente comprovar o Discord novamente.';
+        }
+      });
+  }
+
+  startDiscordLink(): void {
+    if (this.discordLinkStarting) return;
+    this.discordLinkStarting = true;
+    this.discordLinkError = '';
+    this.discordLinkSuccess = '';
+    this.userService.beginDiscordLink().pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ ticket }) => this.userService.openDiscordLinkOAuth(ticket),
+      error: () => {
+        this.discordLinkStarting = false;
+        this.discordLinkError = 'Não foi possível abrir o Discord. Tente novamente.';
+      }
+    });
+  }
+
+  get canConsolidateDiscord(): boolean {
+    const preview = this.discordLinkPreview;
+    return preview?.status === 'PRECHECK_REQUIRED' &&
+      preview.consolidationPlan?.status === 'AUTO_MERGE_CANDIDATE' &&
+      preview.consolidationPlan.preferredCanonicalAccount === 'DISCORD_HISTORY_OWNER';
+  }
+
+  get discordConflictNeedsReview(): boolean {
+    const status = this.discordLinkPreview?.status;
+    return status === 'RESOLUTION_REQUIRED' || status === 'REVIEW_REQUIRED' ||
+      (status === 'PRECHECK_REQUIRED' && !this.canConsolidateDiscord);
+  }
+
+  consolidateDiscordAccounts(): void {
+    if (!this.canConsolidateDiscord || !this.discordHistoryOwnerConsent ||
+        !this.discordLinkTicket || this.discordLinkConsolidating || this.discordLinkConfirming) return;
+
+    this.discordLinkConsolidating = true;
+    this.discordLinkError = '';
+    this.userService.consolidateDiscordLink(this.discordLinkTicket, true)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.discordLinkConsolidating = false;
+          if (result.status !== 'CONSOLIDATED_RELOGIN_REQUIRED') {
+            this.discordLinkError = 'Não foi possível confirmar a conclusão da unificação.';
+            return;
+          }
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          this.discordHistoryOwnerConsent = false;
+          this.userService.finishAccountConsolidation();
+          this.router.navigate(['/login']);
+        },
+        error: () => {
+          this.discordLinkConsolidating = false;
+          this.discordLinkError = 'A unificação não foi concluída. Seus dados foram preservados. ' +
+            'Pode haver informações ou permissões que precisem de revisão. Verifique novamente antes de continuar.';
+        }
+      });
+  }
+
+  confirmDiscordLink(): void {
+    if (this.discordLinkPreview?.status !== 'CONNECT_READY' || !this.discordLinkTicket || this.discordLinkConfirming || this.discordLinkConsolidating) return;
+    this.discordLinkConfirming = true;
+    this.discordLinkError = '';
+    this.userService.confirmDiscordLink(this.discordLinkTicket)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.discordLinkConfirming = false;
+          this.discordLinkTicket = '';
+          this.discordLinkPreview = null;
+          this.discordLinkSuccess = result.status === 'ALREADY_CONNECTED'
+            ? 'Este Discord já estava conectado à sua conta.'
+            : 'Discord conectado com sucesso!';
+          this.loadProfile();
+        },
+        error: (error) => {
+          this.discordLinkConfirming = false;
+          this.discordLinkError = error?.error?.message ||
+            'Não foi possível concluir a vinculação. Verifique sua conta e tente novamente.';
+        }
+      });
+  }
+
+  cancelDiscordLink(): void {
+    if (this.discordLinkConfirming || this.discordLinkConsolidating) return;
+    this.discordHistoryOwnerConsent = false;
+    this.discordLinkTicket = '';
+    this.discordLinkPreview = null;
+    this.discordLinkError = '';
+  }
 
   selectCommunity(communityId: number): void {
     if (this.selectedCommunityId === communityId && this.context) return;

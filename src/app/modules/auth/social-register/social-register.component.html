@@ -2,66 +2,82 @@
     <div class="fixed inset-0 bg-pattern z-0 pointer-events-none"></div>
     <div class="blob bg-braPurple top-[-10%] left-[-10%]"></div>
     <div class="blob bg-braCyan bottom-[-10%] right-[-10%]"></div>
-    <div class="blob bg-braYellow top-[20%] right-[10%] opacity-10"></div>
-
     <div class="relative z-10 w-full max-w-lg px-4">
-        <div class="w-full bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-2xl p-8 md:p-12 relative z-10 border border-white/50">
+        <div class="w-full bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-2xl p-8 md:p-12 border border-white/50">
             <div class="flex flex-col items-center text-center mb-8">
-                <a href="/" class="w-20 h-20 flex justify-center items-center group mb-4">
+                <a href="/" class="w-20 h-20 flex justify-center items-center mb-4">
                     <img src="../../../../assets/images/logo-Brafurries/brafurries-sticker-low.avif"
-                        alt="Logo BraFurries"
-                        class="w-full h-full object-contain transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_#45bced90] group-hover:scale-105">
+                        alt="Logo BraFurries" class="w-full h-full object-contain">
                 </a>
                 <h2 class="text-3xl font-amaranth font-bold text-braDark italic mb-2">Finalize seu cadastro</h2>
-                <p class="text-gray-500 text-sm font-semibold uppercase tracking-widest">
-                    Conta {{ provider || 'social' }} conectada
+                <p class="text-gray-500 text-sm font-semibold">
+                    Você escolhe o e-mail e a senha da BraFurries, independentemente do {{ provider || 'provedor' }}.
                 </p>
             </div>
 
-            <form class="space-y-4" [formGroup]="registerForm" (ngSubmit)="completeRegistration()">
-                <div *ngIf="email">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">E-mail confirmado</label>
-                    <div class="w-full bg-gray-100 border border-gray-200 text-gray-500 font-semibold rounded-2xl px-5 py-4">
-                        {{ email }}
+            <div *ngIf="completed" role="status" class="rounded-2xl bg-green-50 border border-green-200 p-5 text-green-900">
+                <p class="font-bold mb-2">Cadastro recebido!</p>
+                <p>Enviamos uma confirmação para <strong>{{ submittedEmail }}</strong>. Confira esse e-mail
+                   antes de entrar na sua conta BraFurries.</p>
+                <a routerLink="/login" href="/login"
+                   class="mt-4 inline-block text-braMagenta font-bold hover:underline">Voltar ao login</a>
+            </div>
+
+            <form *ngIf="!completed" class="space-y-4" [formGroup]="registerForm"
+                  (ngSubmit)="completeRegistration()">
+                <p *ngIf="isLoadingSuggestion" role="status" class="text-sm text-gray-600">
+                    Confirmando sua identidade com o provedor...
+                </p>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-2 ml-4">Como quer ser chamado?</label>
+                    <app-input-wrapper formControlName="displayName" placeholder="Seu nome ou apelido"
+                        [required]="true" class="input"></app-input-wrapper>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-2 ml-4">E-mail BraFurries</label>
+                    <app-input-wrapper formControlName="email" placeholder="seu@email.com"
+                        [required]="true" class="input"></app-input-wrapper>
+                    <p *ngIf="suggestedEmail" class="mt-2 px-4 text-xs text-gray-600">
+                        Sugestão do {{ provider }}: {{ suggestedEmail }}. Você pode escolher outro e-mail.
+                    </p>
+                    <p *ngIf="!suggestedEmail" class="mt-2 px-4 text-xs text-gray-600">
+                        Informe o endereço que deseja usar para contato e recuperação de conta.
+                    </p>
+                    <p class="mt-1 px-4 text-xs text-gray-500">
+                        O e-mail escolhido será verificado pela BraFurries antes de liberar o acesso.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-2 ml-4">Crie sua senha</label>
+                        <app-input-wrapper formControlName="password" type="password" placeholder="Mínimo de 8 caracteres"
+                            [required]="true" class="input"></app-input-wrapper>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-2 ml-4">Confirme sua senha</label>
+                        <app-input-wrapper formControlName="passwordConfirmation" type="password"
+                            placeholder="Repita sua senha" [required]="true" class="input"></app-input-wrapper>
                     </div>
                 </div>
-
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-4">Como quer ser chamado?</label>
-                    <app-input-wrapper
-                        formControlName="displayName"
-                        placeholder="Seu nome ou apelido"
-                        [required]="true"
-                        class="input"
-                    ></app-input-wrapper>
-                </div>
-
-                <p *ngIf="errorMessage" class="px-4 text-sm font-semibold text-red-500">
+                <p *ngIf="errorMessage" role="alert" class="px-4 text-sm font-semibold text-red-600">
                     {{ errorMessage }}
                 </p>
-
-                <div class="pt-2 px-4">
-                    <div class="flex items-start gap-3 group">
-                        <input type="checkbox" id="terms" formControlName="termsAgreement"
-                            class="mt-1 w-4 h-4 bg-white border border-gray-300 rounded focus:ring-2 focus:ring-braMagenta focus:outline-none accent-braMagenta cursor-pointer transition-all">
-
-                        <label for="terms" class="text-[11px] font-bold text-gray-500 cursor-pointer select-none leading-tight">
-                            Eu li e concordo com os <a href="/tos" target="_blank" class="text-braMagenta hover:underline">Termos de Uso</a> e a <a href="/privacidade" target="_blank" class="text-braMagenta hover:underline">Politica de Privacidade</a> da comunidade.
-                        </label>
-                    </div>
+                <div class="pt-2 px-4 flex items-start gap-3">
+                    <input type="checkbox" id="terms" formControlName="termsAgreement"
+                        class="mt-1 w-4 h-4 accent-braMagenta">
+                    <label for="terms" class="text-xs text-gray-600">
+                        Li e concordo com os <a href="/tos" target="_blank" class="text-braMagenta underline">Termos de Uso</a>
+                        e a <a href="/privacidade" target="_blank" class="text-braMagenta underline">Política de Privacidade</a>.
+                    </label>
                 </div>
-
-                <button
-                    type="submit"
-                    [disabled]="isSubmitting"
-                    class="w-full bg-braDark text-white font-amaranth font-bold text-lg py-4 rounded-2xl shadow-xl hover:bg-braMagenta transform hover:scale-[1.02] mt-4 active:scale-95 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 disabled:hover:bg-braDark">
-                    {{ isSubmitting ? 'Finalizando...' : 'Concluir cadastro' }}
+                <button type="submit" [disabled]="isSubmitting || isLoadingSuggestion || !registrationToken"
+                    class="w-full bg-braDark text-white font-amaranth font-bold text-lg py-4 rounded-2xl shadow-xl
+                           hover:bg-braMagenta disabled:cursor-not-allowed disabled:opacity-50">
+                    {{ isSubmitting ? 'Enviando...' : 'Criar minha conta' }}
                 </button>
             </form>
-
-            <p class="text-center mt-8 text-xs font-bold text-gray-400">
-                Quer usar outra conta?
-                <a href="/login" class="text-braCyan hover:underline">Voltar ao login</a>
+            <p class="text-center mt-8 text-xs text-gray-500">
+                Já tem uma conta? <a href="/login" class="font-bold text-braCyan hover:underline">Entrar</a>
             </p>
         </div>
     </div>

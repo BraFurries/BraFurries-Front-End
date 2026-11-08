@@ -21,6 +21,8 @@ export class InicioComponent implements OnInit {
   userProfileImageUrl: string | null = null;
   userInitial: string = 'V';
   showDiscordWarning: boolean = true;
+  discordLinkLoading = false;
+  discordLinkError = '';
 
   constructor(private userService: UserService) {}
 
@@ -132,6 +134,19 @@ export class InicioComponent implements OnInit {
     }
     
     return `${startDay} de ${startMonth}`;
+  }
+
+  connectDiscord(): void {
+    if (this.discordLinkLoading) return;
+    this.discordLinkLoading = true;
+    this.discordLinkError = '';
+    this.userService.beginDiscordLink().subscribe({
+      next: ({ ticket }) => this.userService.openDiscordLinkOAuth(ticket),
+      error: () => {
+        this.discordLinkLoading = false;
+        this.discordLinkError = 'Não foi possível iniciar a conexão com o Discord. Tente novamente.';
+      }
+    });
   }
 
   dismissDiscordWarning(): void {

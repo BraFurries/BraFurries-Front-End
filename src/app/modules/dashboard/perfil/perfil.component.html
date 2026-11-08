@@ -9,6 +9,169 @@
       <div *ngIf="profileLoading" class="bg-white rounded-[2rem] border border-gray-100 p-8 text-gray-500">Carregando seu perfil...</div>
       <div *ngIf="profileError" class="bg-red-50 text-red-700 rounded-2xl border border-red-100 p-5">{{ profileError }}</div>
 
+      <section class="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-4" aria-labelledby="social-login-title">
+        <h3 id="social-login-title" class="font-amaranth text-xl font-bold text-braDark">Métodos de login</h3>
+        <p class="text-sm text-gray-600">
+          Desativar um login pelo Google ou Discord <strong>não apaga seu vínculo comunitário</strong>,
+          permissões ou histórico. Você continuará podendo entrar com e-mail e senha BraFurries.
+        </p>
+        <p *ngIf="localEmailProofLoading" class="text-sm text-gray-500">Verificando e-mail BraFurries...</p>
+        <div *ngIf="localEmailProof as proof" class="rounded-xl border border-gray-200 p-4 space-y-3">
+          <p class="text-sm" *ngIf="proof.verified">
+            <strong>E-mail BraFurries verificado.</strong> As alterações de método de login exigem a senha local.
+          </p>
+          <ng-container *ngIf="!proof.verified">
+            <p class="text-sm text-amber-800">
+              Seu e-mail antigo ainda não tem confirmação local comprovada. Escolha o endereço que
+              deseja usar na BraFurries e confirme-o por um link enviado pela plataforma.
+              Até essa confirmação, você não poderá desativar o login OAuth.
+            </p>
+            <label class="block text-xs font-semibold text-gray-700" for="local-email-draft">
+              E-mail BraFurries que deseja confirmar
+            </label>
+            <input id="local-email-draft" type="email" [(ngModel)]="localEmailDraft"
+                   autocomplete="email" [disabled]="localEmailProofSaving" maxlength="255"
+                   class="w-full sm:max-w-sm rounded-xl border border-gray-300 px-4 py-2 text-sm" />
+            <p class="text-xs text-gray-600">
+              Ao solicitar, as sessões atuais serão encerradas. Confirme o link enviado
+              para o endereço escolhido antes de entrar novamente.
+            </p>
+            <button type="button" (click)="requestLocalEmailProof()"
+                    [disabled]="localEmailProofSaving || !socialLoginPassword || !localEmailDraft.trim()"
+                    class="rounded-lg bg-braPurple px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+              {{ localEmailProofSaving ? 'Enviando...' : 'Enviar confirmação do e-mail' }}
+            </button>
+          </ng-container>
+        </div>
+        <p *ngIf="localEmailProofError" role="alert" class="text-sm font-semibold text-red-700">
+          {{ localEmailProofError }}
+        </p>
+        <p *ngIf="socialLoginsLoading" class="text-sm text-gray-500">Consultando métodos de acesso...</p>
+        <p *ngIf="socialLoginsError" role="alert" class="text-sm font-semibold text-red-700">{{ socialLoginsError }}</p>
+        <div *ngFor="let identity of socialLogins" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 p-3">
+          <div class="text-sm">
+            <strong>{{ identity.provider === 'discord' ? 'Discord' : 'Google' }}</strong>
+            <span class="ml-2" [class.text-green-700]="identity.loginEnabled" [class.text-gray-500]="!identity.loginEnabled">
+              {{ identity.loginEnabled ? 'Login habilitado' : 'Login desativado — identidade preservada' }}
+            </span>
+          </div>
+          <button *ngIf="identity.loginEnabled" type="button" (click)="disableSocialLogin(identity)"
+                  [disabled]="socialLoginChanging || !socialLoginPassword"
+                  class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
+            {{ socialLoginChanging ? 'Alterando...' : 'Desativar login' }}
+          </button>
+          <button *ngIf="!identity.loginEnabled && identity.provider === 'google' && !googleLoginTicket"
+                  type="button" (click)="startGoogleLoginReactivation()"
+                  [disabled]="googleLoginStarting || socialLoginChanging"
+                  class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+            {{ googleLoginStarting ? 'Abrindo Google...' : 'Comprovar Google para reativar' }}
+          </button>
+          <button *ngIf="!identity.loginEnabled && identity.provider === 'discord' && !discordLinkPreview"
+                  type="button" (click)="startDiscordLink()" [disabled]="discordLinkStarting || socialLoginChanging"
+                  class="rounded-lg bg-[#5865F2] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+            Comprovar Discord para reativar
+          </button>
+        </div>
+        <p *ngIf="!socialLoginsLoading && !socialLogins.length" class="text-sm text-gray-500">
+          Nenhum método OAuth verificado está registrado nesta conta.
+        </p>
+        <label class="block text-xs font-semibold text-gray-700" for="social-login-password">
+          Confirme sua senha BraFurries para alterar um método
+        </label>
+        <input id="social-login-password" type="password" [(ngModel)]="socialLoginPassword"
+               autocomplete="current-password" [disabled]="socialLoginChanging" maxlength="256"
+               placeholder="Senha da conta BraFurries"
+               class="w-full sm:max-w-sm rounded-xl border border-gray-300 px-4 py-2 text-sm" />
+        <p *ngIf="googleLoginError" role="alert" class="text-sm text-red-700">{{ googleLoginError }}</p>
+        <div *ngIf="googleLoginTicket && hasDisabledSocialLogin('google')" class="rounded-xl border border-braPurple/30 p-4 space-y-3">
+          <p class="text-sm text-gray-700">
+            Sua identidade Google foi comprovada novamente. Confirme a senha BraFurries
+            informada acima para reativar esse método de login.
+          </p>
+          <button type="button" (click)="reenableGoogleLogin()"
+                  [disabled]="socialLoginChanging || !socialLoginPassword"
+                  class="rounded-lg bg-braPurple px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+            {{ socialLoginChanging ? 'Reativando...' : 'Reativar login com Google' }}
+          </button>
+        </div>
+      </section>
+
+      <p *ngIf="discordLinkError" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+        {{ discordLinkError }}
+      </p>
+      <p *ngIf="discordLinkSuccess" role="status" class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">
+        {{ discordLinkSuccess }}
+      </p>
+      <p *ngIf="discordLinkLoading" role="status" class="rounded-2xl bg-white p-5 text-sm text-gray-600">
+        Conferindo a identidade Discord verificada...
+      </p>
+      <section *ngIf="discordLinkPreview as verified" class="rounded-2xl border border-[#5865F2]/30 bg-white p-5 sm:p-6 shadow-md" aria-labelledby="discord-link-confirm-title">
+        <h3 id="discord-link-confirm-title" class="font-amaranth text-xl font-bold text-braDark">
+          Identidade Discord verificada
+        </h3>
+        <p class="mt-3 text-sm text-gray-700">Você comprovou o acesso ao Discord <b>{{ verified.discordUsername }}</b>.</p>
+        <p class="mt-2 text-sm text-gray-600">{{ verified.notice }}</p>
+
+        <div *ngIf="verified.status === 'CONNECT_READY'" class="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-950">
+          Este Discord está disponível para conexão com sua conta atual. A confirmação não transfere dados de outro usuário.
+        </div>
+
+        <div *ngIf="canConsolidateDiscord" class="mt-4 space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p class="font-bold">Unificar em uma única conta BraFurries</p>
+          <p>Os dados e o histórico comunitário do Discord permanecerão na conta original. O acesso do site por e-mail e senha, quando existente, e as identidades OAuth já comprovadas serão preservados nessa conta.</p>
+          <p>Se sua conta foi criada apenas com e-mail e senha, você <strong>não precisa vincular o Google</strong> para unificá-la. A posse da conta do site e do Discord deve ser comprovada separadamente.</p>
+          <p>A conta atual do site deixará de funcionar separadamente. Suas sessões serão encerradas e você precisará entrar novamente.</p>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" [(ngModel)]="discordHistoryOwnerConsent" [disabled]="discordLinkConsolidating"
+                   class="mt-0.5 h-4 w-4 shrink-0 accent-[#5865F2]" />
+            <span>Compreendo que a conta com histórico Discord permanecerá como minha conta principal e autorizo a unificação.</span>
+          </label>
+        </div>
+
+        <div *ngIf="discordConflictNeedsReview" role="status"
+             class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p class="font-bold">A unificação automática não está disponível para estas contas.</p>
+          <p class="mt-2">Há dados ou vínculos que exigem uma política específica de reconciliação. Nenhuma conta será alterada nesta etapa.</p>
+          <p *ngIf="verified.nextActions.includes('VERIFY_GOOGLE_OR_RECOVER_LOCAL_LOGIN')" class="mt-2">
+            É necessário preservar um método de acesso ao site. Se sua conta não possui senha, você pode recuperar o acesso pelo e-mail cadastrado na tela de login ou comprovar seu Google antes de prosseguir.
+          </p>
+          <p *ngIf="verified.nextActions.includes('TRANSFER_WEBSITE_COMMUNITY_DATA') || verified.nextActions.includes('RECONCILE_COMMUNITY_MEMBERSHIP')" class="mt-2">
+            Há participação em comunidades nas duas identidades ou dados comunitários na conta do site. É preciso conferir os vínculos de cada Community antes de unificar.
+          </p>
+          <p *ngIf="verified.nextActions.includes('RECONCILE_DOMAIN_DATA')" class="mt-2">
+            Há registros operacionais, como progressão, economia, histórico ou recursos associados à conta do site. Esses dados não serão descartados nem somados automaticamente.
+          </p>
+          <p *ngIf="verified.nextActions.includes('REVIEW_ACCESS_GRANTS') || verified.nextActions.includes('PRESERVE_COMMUNITY_RESTRICTIONS')" class="mt-2">
+            Permissões ou restrições exigem revisão para impedir alterações indevidas de acesso.
+          </p>
+          <p class="mt-2">Você pode manter as duas contas enquanto verificamos o caminho seguro. Caso não consiga continuar, solicite revisão de identidade à equipe.</p>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button *ngIf="verified.status === 'CONNECT_READY' && hasDisabledSocialLogin('discord')"
+                  type="button" (click)="reenableDiscordLogin()"
+                  [disabled]="socialLoginChanging || !socialLoginPassword"
+                  class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            {{ socialLoginChanging ? 'Reativando...' : 'Reativar login com Discord' }}
+          </button>
+          <button *ngIf="verified.status === 'CONNECT_READY' && !hasDisabledSocialLogin('discord')" type="button" (click)="confirmDiscordLink()"
+                  [disabled]="discordLinkConfirming || discordLinkConsolidating"
+                  class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            {{ discordLinkConfirming ? 'Conectando...' : 'Conectar Discord' }}
+          </button>
+          <button *ngIf="canConsolidateDiscord" type="button" (click)="consolidateDiscordAccounts()"
+                  [disabled]="!discordHistoryOwnerConsent || discordLinkConsolidating || discordLinkConfirming"
+                  class="rounded-xl bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            {{ discordLinkConsolidating ? 'Unificando...' : 'Unificar contas' }}
+          </button>
+          <button type="button" (click)="cancelDiscordLink()"
+                  [disabled]="discordLinkConfirming || discordLinkConsolidating"
+                  class="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-bold text-gray-700 disabled:opacity-50">
+            {{ discordConflictNeedsReview ? 'Fechar' : 'Cancelar' }}
+          </button>
+        </div>
+      </section>
+
       <ng-container *ngIf="profile as member">
         <section class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
           <div class="absolute right-0 top-0 w-64 h-64 bg-braCyan/5 rounded-full blur-3xl pointer-events-none"></div>
@@ -28,6 +191,11 @@
             <div class="flex flex-wrap justify-center md:justify-start gap-3">
               <ng-container *ngIf="member.discord.state === 'AVAILABLE'; else discordAmbiguous"><span class="text-xs font-bold bg-[#5865F2]/10 text-[#5865F2] px-3 py-1.5 rounded-xl">Discord: {{ accountLabel(member.discord) }}</span></ng-container>
               <ng-template #discordAmbiguous><span *ngIf="member.discord.state === 'AMBIGUOUS'" class="text-xs font-bold bg-gray-100 text-gray-500 px-3 py-1.5 rounded-xl">Discord: vínculo não pôde ser determinado</span></ng-template>
+              <button *ngIf="member.discord.state !== 'AVAILABLE' && !discordLinkPreview"
+                      type="button" (click)="startDiscordLink()" [disabled]="discordLinkStarting || discordLinkLoading"
+                      class="rounded-xl bg-[#5865F2] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60">
+                {{ discordLinkStarting ? 'Abrindo Discord...' : 'Conectar Discord' }}
+              </button>
               <ng-container *ngIf="member.telegram.state === 'AVAILABLE'; else telegramAmbiguous"><span class="text-xs font-bold bg-[#26A5E4]/10 text-[#26A5E4] px-3 py-1.5 rounded-xl">Telegram: {{ accountLabel(member.telegram) }}</span></ng-container>
               <ng-template #telegramAmbiguous><span *ngIf="member.telegram.state === 'AMBIGUOUS'" class="text-xs font-bold bg-gray-100 text-gray-500 px-3 py-1.5 rounded-xl">Telegram: vínculo não pôde ser determinado</span></ng-template>
             </div>
