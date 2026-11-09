@@ -541,13 +541,16 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     }
     if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
     this.batchHistoryId=id;
+    this.batchRevisions=[];
     this.batchHistoryLoading=true;
     this.catalog.productionBatchHistory(id).pipe(takeUntil(this.destroy$)).subscribe({
       next:rows=>{
+        if(this.batchHistoryId!==id) return;
         this.batchRevisions=rows;
         this.batchHistoryLoading=false;
       },
       error:err=>{
+        if(this.batchHistoryId!==id) return;
         this.batchRevisions=[];
         this.batchHistoryLoading=false;
         this.errorMessage=err?.error?.message || 'Não foi possível carregar as correções do lote.';
