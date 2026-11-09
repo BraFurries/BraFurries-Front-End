@@ -9,7 +9,7 @@ import {
   CommercialArtist, CommerceArtistService, IssuedArtistInvitation
 } from '../../../core/services/commerce-artist.service';
 import {
-  CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch,
+  CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch, CommerceBatchRevision,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
 } from '../../../core/services/commerce-catalog.service';
@@ -48,6 +48,11 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   supplierChoices: CommerceSupplierOption[] = [];
   products: CommerceProduct[] = [];
   batches: CommerceBatch[] = [];
+  editingBatchId: number | null = null;
+  batchCorrectionReason = '';
+  batchHistoryId: number | null = null;
+  batchRevisions: CommerceBatchRevision[] = [];
+  batchHistoryLoading = false;
   contracts: CommerceSignedAgreement[] = [];
   links: CommerceProductArtwork[] = [];
   artistCandidates: CommerceArtist[] = [];
@@ -507,17 +512,92 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     ), 'Vínculo entre produto e arte atualizado.');
   }
 
+  startEditBatch(batch: CommerceBatch): void {
+    if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
+    this.activeTab='production';
+    this.editingBatchId=batch.id;
+    this.productionForm={
+      productId:batch.productId,supplierId:batch.supplierId,quantity:batch.quantity,
+      unitCost:batch.unitCost,additionalCost:batch.additionalCost,
+      producedOn:batch.producedOn,reference:batch.reference || ''
+    };
+    this.batchCorrectionReason='';
+    this.errorMessage='';
+  }
+
+  cancelEditBatch(): void {
+    this.editingBatchId=null;
+    this.batchCorrectionReason='';
+    this.productionForm={productId:null,supplierId:null,quantity:1,
+      unitCost:0,additionalCost:0,
+      producedOn:new Date().toLocaleDateString('en-CA'),reference:''};
+  }
+
+  loadBatchHistory(id: number): void {
+    if(this.batchHistoryId===id) {
+      this.batchHistoryId=null;
+      this.batchRevisions=[];
+      return;
+    }
+    if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
+    this.batchHistoryId=id;
+    this.batchHistoryLoading=true;
+    this.catalog.productionBatchHistory(id).pipe(takeUntil(this.destroy$)).subscribe({
+      next:rows=>{
+        this.batchRevisions=rows;
+        this.batchHistoryLoading=false;
+      },
+      error:err=>{
+        this.batchRevisions=[];
+        this.batchHistoryLoading=false;
+        this.errorMessage=err?.error?.message || 'Não foi possível carregar as correções do lote.';
+      }
+    });
+  }
+
+  describeBatchSnapshot(json: string): string {
+    try {
+      const snapshot=JSON.parse(json) as {
+        productId:number;supplierId:number;quantity:number;
+        unitCost:number;additionalCost:number;producedOn:string;reference:string|null;
+      };
+      return `${snapshot.quantity} un. · produto #${snapshot.productId} · ` +
+        `fornecedor #${snapshot.supplierId} · ` +
+        `custo R$ ${Number(snapshot.unitCost).toFixed(2)} + R$ ${Number(snapshot.additionalCost).toFixed(2)} · ` +
+        `${snapshot.producedOn} · ref.: ${snapshot.reference || 'sem referência'}`;
+    } catch {
+      return 'Snapshot indisponível';
+    }
+  }
+
   createProduction(): void {
     if (!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')
       || this.productionForm.productId == null || this.productionForm.supplierId == null) {
-      this.errorMessage = 'Selecione o produto e o fornecedor do lote.';
+      this.errorMessage='Selecione o produto e o fornecedor do lote.';
       return;
     }
-    this.mutate(this.catalog.createProductionBatch({
-      ...this.productionForm, productId: this.productionForm.productId,
-      supplierId: this.productionForm.supplierId,
-      reference: this.productionForm.reference || null
-    }), 'Lote de produção registrado.');
+    const payload={
+      ...this.productionForm,productId:this.productionForm.productId,
+      supplierId:this.productionForm.supplierId,
+      reference:this.productionForm.reference.trim() || null
+    };
+    const id=this.editingBatchId;
+    const reason=this.batchCorrectionReason.trim();
+    if(id!=null && reason.length<3) {
+      this.errorMessage='Informe o motivo da correção (mínimo 3 caracteres).';
+      return;
+    }
+    const request=id==null
+      ? this.catalog.createProductionBatch(payload)
+      : this.catalog.correctProductionBatch(id,payload,reason);
+    this.mutate(request,id==null?'Lote de produção registrado.':
+      'Lote corrigido; histórico anterior preservado.',()=>{
+        if(id!=null && this.batchHistoryId===id) {
+          this.batchHistoryId=null;
+          this.batchRevisions=[];
+        }
+        this.cancelEditBatch();
+    });
   }
 
   onContractFile(event: Event): void {

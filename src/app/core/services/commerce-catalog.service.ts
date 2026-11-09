@@ -62,6 +62,10 @@ export interface CreateProductInput {
   sku: string; name: string; description: string | null;
   estimatedUnitCost: number; suggestedPrice: number; preferredSupplierId: number | null;
 }
+export interface CommerceBatchRevision {
+  id: number; beforeJson: string; afterJson: string; reason: string;
+  actorUserId: number; createdAt: string;
+}
 export interface CreateBatchInput {
   productId: number; supplierId: number; quantity: number; unitCost: number;
   additionalCost: number; producedOn: string; reference: string | null;
@@ -208,6 +212,16 @@ export class CommerceCatalogService {
 
   createProductionBatch(input: CreateBatchInput): Observable<CreatedCommerceEntity> {
     return this.http.post<CreatedCommerceEntity>(`${this.base}/production-batches`,input);
+  }
+
+  correctProductionBatch(id: number,input: CreateBatchInput,reason: string): Observable<void> {
+    return this.http.put<void>(`${this.base}/production-batches/${id}`,{data:input,reason});
+  }
+
+  productionBatchHistory(id: number): Observable<CommerceBatchRevision[]> {
+    return this.http.get<CommerceBatchRevision[]>(
+      `${this.base}/production-batches/${id}/revisions`
+    );
   }
 
   contracts(artworkId: number): Observable<CommerceSignedAgreement[]> {
