@@ -21,6 +21,7 @@ describe('CommerceCatalogComponent', () => {
       'templates','artworks','suppliers','supplierChoices','products','productionBatches',
       'productArtworks','contracts','createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
+      'correctProductionBatch','productionBatchHistory',
       'searchArtists','signContract','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
@@ -37,6 +38,8 @@ describe('CommerceCatalogComponent', () => {
     catalog.setArtworkArchived.and.returnValue(of(void 0));
     catalog.deleteArtwork.and.returnValue(of(void 0));
     catalog.unlinkArtwork.and.returnValue(of(void 0));
+    catalog.correctProductionBatch.and.returnValue(of(void 0));
+    catalog.productionBatchHistory.and.returnValue(of([]));
     artists.issueInvitation.and.returnValue(of({
       id:62,token:'a'.repeat(64),confirmationCode:'ABCD1234EF56',
       expiresAt:'2026-11-11T10:00:00'
@@ -254,5 +257,49 @@ describe('CommerceCatalogComponent', () => {
       artistName:'Artista revisada',telegramHandle:'@ar'
     }));
     expect(artists.registerExternal).not.toHaveBeenCalled();
+  });
+
+  it('corrects a lot with reason and never creates another lot', async () => {
+    await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
+    component.startEditBatch({
+      id:45,productId:3,productName:'Caneca',supplierId:8,supplierName:'Oficina',
+      quantity:20,unitCost:8,additionalCost:10,totalCost:170,
+      producedOn:'2026-11-03',reference:'NF-1'
+    });
+    component.productionForm.reference='NF-2';
+    component.batchCorrectionReason='Referência fiscal incorreta';
+    component.createProduction();
+    expect(catalog.correctProductionBatch).toHaveBeenCalledWith(45,
+      jasmine.objectContaining({
+        productId:3,supplierId:8,quantity:20,unitCost:8,reference:'NF-2'
+      }),'Referência fiscal incorreta');
+    expect(catalog.createProductionBatch).not.toHaveBeenCalled();
+    expect(component.editingBatchId).toBeNull();
+  });
+
+  it('does not submit a production correction without justification', async () => {
+    await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
+    component.startEditBatch({
+      id:45,productId:3,productName:'Caneca',supplierId:8,supplierName:'Oficina',
+      quantity:20,unitCost:8,additionalCost:10,totalCost:170,
+      producedOn:'2026-11-03',reference:'NF-1'
+    });
+    component.batchCorrectionReason='';
+    component.createProduction();
+    expect(catalog.correctProductionBatch).not.toHaveBeenCalled();
+  });
+
+  it('loads and displays before/after production revision history', async () => {
+    await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
+    catalog.productionBatchHistory.and.returnValue(of([{
+      id:1,beforeJson:'{"quantity":10,"productId":3,"supplierId":8,"unitCost":10,"additionalCost":0,"producedOn":"2026-11-02","reference":"OLD"}',
+      afterJson:'{"quantity":12,"productId":3,"supplierId":8,"unitCost":10,"additionalCost":0,"producedOn":"2026-11-02","reference":"NEW"}',
+      reason:'Quantidade digitada errada',actorUserId:7,createdAt:'2026-11-09T13:00:00'
+    }]));
+    component.loadBatchHistory(45);
+    expect(catalog.productionBatchHistory).toHaveBeenCalledWith(45);
+    expect(component.batchRevisions.length).toBe(1);
+    expect(component.describeBatchSnapshot(component.batchRevisions[0].afterJson))
+      .toContain('12 un.');
   });
 });
