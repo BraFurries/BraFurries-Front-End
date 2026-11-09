@@ -75,6 +75,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   orderReceiptNotes = '';
   orderReversalReason = '';
   orderReversalKey = '';
+  orderReversalDate = '';
+  orderReversalTargetId: number | null = null;
   saleDetails: CommerceSaleItem[] = [];
   selectedSaleId: number | null = null;
   royalties: CommerceRoyaltyEvent[] = [];
@@ -386,6 +388,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     this.selectedOrderId = order.id;
     this.orderReceiptKey = '';
     this.orderReversalKey = '';
+    this.orderReversalDate = '';
+    this.orderReversalTargetId = null;
     this.loadOrderDetails();
   }
 
@@ -454,12 +458,18 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       return;
     }
     if (!window.confirm('Estornar o recebimento na encomenda sem excluir o histórico?')) return;
-    if (!this.orderReversalKey) this.orderReversalKey = crypto.randomUUID();
+    if (!this.orderReversalKey || this.orderReversalTargetId !== payment.id) {
+      this.orderReversalKey = crypto.randomUUID();
+      this.orderReversalDate = brazilToday();
+      this.orderReversalTargetId = payment.id;
+    }
     this.mutate(this.finance.reverseOrderPayment(order.id,payment.id,
-      this.orderReversalKey,brazilToday(),reason),
+      this.orderReversalKey,this.orderReversalDate,reason),
       'Estorno de recebimento registrado.',() => {
         this.orderReversalReason = '';
         this.orderReversalKey = '';
+        this.orderReversalDate = '';
+        this.orderReversalTargetId = null;
       });
   }
 
