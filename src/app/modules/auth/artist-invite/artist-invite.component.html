@@ -1,0 +1,123 @@
+<main class="mx-auto max-w-2xl space-y-6 px-4 py-10 md:py-16">
+  <header class="space-y-3 text-center">
+    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">BraFurries · convite privado</p>
+    <h1 class="font-amaranth text-3xl font-bold text-braDark">Ativar minhas artes e royalties</h1>
+    <p class="text-sm text-gray-600">
+      A equipe da BraFurries enviou este convite para vincular seu histórico
+      comercial à sua conta. O link é individual e tem validade de 48 horas.
+      Você também precisa do código de confirmação enviado separadamente.
+    </p>
+  </header>
+
+  <div *ngIf="!token" role="alert"
+    class="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+    Link incompleto. Peça um novo convite à equipe.
+  </div>
+
+  <p *ngIf="errorMessage" role="alert"
+    class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    {{ errorMessage }}
+  </p>
+  <p *ngIf="completed" role="status"
+    class="rounded-xl border border-green-200 bg-green-50 p-5 text-sm text-green-800">
+    {{ responseMessage }}
+  </p>
+
+  <section *ngIf="token && !completed"
+    class="space-y-5 rounded-2xl border bg-white p-5 shadow-sm md:p-7">
+    <h2 class="font-amaranth text-xl font-bold">Como você deseja continuar?</h2>
+    <div class="grid gap-2 sm:grid-cols-2" role="group" aria-label="Tipo de conta">
+      <button type="button" (click)="mode='existing'"
+        [class.border-purple-500]="mode==='existing'"
+        [class.bg-purple-50]="mode==='existing'"
+        class="rounded-xl border p-4 text-left text-sm font-semibold">
+        Já tenho conta na BraFurries
+      </button>
+      <button type="button" (click)="mode='new'"
+        [class.border-purple-500]="mode==='new'"
+        [class.bg-purple-50]="mode==='new'"
+        class="rounded-xl border p-4 text-left text-sm font-semibold">
+        Ainda não tenho conta
+      </button>
+    </div>
+
+    <label class="block text-sm font-semibold">
+      Código recebido separadamente *
+      <input type="text" inputmode="text" autocomplete="off"
+        maxlength="12" [(ngModel)]="confirmationCode"
+        placeholder="12 caracteres" aria-label="Código de confirmação do convite"
+        class="mt-1 block w-full rounded-lg border px-3 py-3 font-mono tracking-widest">
+    </label>
+
+    <div *ngIf="mode==='existing'" class="space-y-4">
+      <div *ngIf="!loggedIn" class="space-y-3 rounded-lg bg-gray-50 p-4 text-sm">
+        <p>Entre primeiro com sua conta BraFurries, usando e-mail e senha,
+          Google ou Discord. Voltaremos ao convite depois do login.</p>
+        <a [routerLink]="['/login']" [queryParams]="{returnUrl:loginReturnUrl}"
+          class="inline-block rounded-lg bg-braPurple px-4 py-2 font-bold text-white">
+          Entrar na minha conta
+        </a>
+      </div>
+      <div *ngIf="loggedIn" class="space-y-3">
+        <p class="text-sm text-gray-600">
+          Para consolidar os registros na conta autenticada, confirme sua senha
+          BraFurries. A consolidação preserva contratos assinados, apurações e repasses.
+        </p>
+        <label class="block text-sm font-semibold">
+          Senha da minha conta *
+          <input type="password" autocomplete="current-password"
+            [(ngModel)]="accountPassword" class="mt-1 block w-full rounded-lg border px-3 py-3">
+        </label>
+        <button type="button" [disabled]="submitting || !confirmationCode.trim() || !accountPassword"
+          (click)="redeem()" class="rounded-lg bg-braPurple px-5 py-3 font-bold text-white disabled:opacity-50">
+          {{ submitting ? 'Consolidando...' : 'Vincular histórico à minha conta' }}
+        </button>
+        <button type="button" (click)="changeAccount()"
+          class="ml-2 text-sm font-bold text-braPurple hover:underline">
+          Usar outra conta
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="mode==='new'" class="space-y-4">
+      <p class="text-sm text-gray-600">
+        Seu cadastro comercial será ativado diretamente, mantendo o mesmo
+        identificador das obras. Escolha seu próprio e-mail e senha para o site;
+        nenhum contato informado pela equipe vira credencial automaticamente.
+      </p>
+      <label class="block text-sm font-semibold">
+        E-mail que você deseja usar *
+        <input type="email" autocomplete="email" [(ngModel)]="email"
+          maxlength="255" class="mt-1 block w-full rounded-lg border px-3 py-3">
+      </label>
+      <label class="block text-sm font-semibold">
+        Senha *
+        <input type="password" autocomplete="new-password" [(ngModel)]="password"
+          minlength="8" class="mt-1 block w-full rounded-lg border px-3 py-3">
+      </label>
+      <label class="block text-sm font-semibold">
+        Confirmar senha *
+        <input type="password" autocomplete="new-password" [(ngModel)]="passwordConfirmation"
+          minlength="8" class="mt-1 block w-full rounded-lg border px-3 py-3">
+      </label>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" [(ngModel)]="termsAgreement" class="mt-1">
+        <span>Li e aceito os <a routerLink="/tos" target="_blank"
+          rel="noopener noreferrer" class="font-bold text-braPurple underline">Termos de Uso</a>.</span>
+      </label>
+      <button type="button"
+        [disabled]="submitting || !confirmationCode.trim() || !email.trim() ||
+          !password || !passwordConfirmation || !termsAgreement"
+        (click)="activate()"
+        class="rounded-lg bg-braPurple px-5 py-3 font-bold text-white disabled:opacity-50">
+        {{ submitting ? 'Ativando...' : 'Ativar conta e verificar meu e-mail' }}
+      </button>
+    </div>
+
+    <p class="text-xs text-gray-500">
+      Se você já tem outras informações, permissões ou movimentações na
+      plataforma e existir um conflito real, a operação será interrompida
+      para revisão. Nunca consolide uma conta de outra pessoa.
+    </p>
+  </section>
+</main>
