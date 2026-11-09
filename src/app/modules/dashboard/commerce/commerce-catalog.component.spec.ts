@@ -5,6 +5,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
+import { CommerceArtistService } from '../../../core/services/commerce-artist.service';
 import { CommerceCatalogComponent } from './commerce-catalog.component';
 
 describe('CommerceCatalogComponent', () => {
@@ -12,6 +13,7 @@ describe('CommerceCatalogComponent', () => {
   let component: CommerceCatalogComponent;
   let access: jasmine.SpyObj<PlatformAccessService>;
   let catalog: jasmine.SpyObj<CommerceCatalogService>;
+  let artists: jasmine.SpyObj<CommerceArtistService>;
 
   async function create(permissions: string[], owner = false, enabled = true): Promise<void> {
     access = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
@@ -22,6 +24,15 @@ describe('CommerceCatalogComponent', () => {
       'searchArtists','signContract','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile'
     ]);
+    artists = jasmine.createSpyObj<CommerceArtistService>('CommerceArtistService', [
+      'profiles','registerExternal','pendingClaims','approve','reject','revoke'
+    ]);
+    artists.profiles.and.returnValue(of([]));
+    artists.pendingClaims.and.returnValue(of([]));
+    artists.registerExternal.and.returnValue(of({ id: 44 }));
+    artists.approve.and.returnValue(of(void 0));
+    artists.reject.and.returnValue(of(void 0));
+    artists.revoke.and.returnValue(of(void 0));
     access.myAccess.and.returnValue(of({ enabled, owner, permissions }));
     catalog.artworks.and.returnValue(of([
       { id: 12, title: 'Arte A', artistUserId: 31, artistName: 'Artista',
@@ -53,7 +64,8 @@ describe('CommerceCatalogComponent', () => {
       imports: [CommonModule, FormsModule, RouterTestingModule],
       providers: [
         { provide: PlatformAccessService, useValue: access },
-        { provide: CommerceCatalogService, useValue: catalog }
+        { provide: CommerceCatalogService, useValue: catalog },
+        { provide: CommerceArtistService, useValue: artists }
       ]
     }).compileComponents();
 
@@ -154,4 +166,37 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.suppliers).toHaveBeenCalled();
     expect(catalog.products).toHaveBeenCalled();
   });
+  it('lets managers create Telegram artists without losing the pending artwork', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    component.artworkForm.title = 'Arte encomendada';
+    component.externalArtistForm.artistName = 'Artista Telegram';
+    component.externalArtistForm.telegramHandle = '@canal';
+    component.createExternalArtist();
+    expect(artists.registerExternal).toHaveBeenCalledWith(jasmine.objectContaining({
+      artistName: 'Artista Telegram', telegramHandle: '@canal',
+      contactEmail: null
+    }));
+    expect(component.artworkForm.artistUserId).toBe(44);
+    expect(component.artworkForm.title).toBe('Arte encomendada');
+    expect(component.artistCandidates.some(a => a.id === 44)).toBeTrue();
+  });
+
+  it('never fetches pending artist claim private details for non-owner', async () => {
+    await create(['ARTWORKS_MANAGE'], false);
+    expect(artists.pendingClaims).not.toHaveBeenCalled();
+  });
+
+  it('owner can approve only with verification notes and explicit request selection', async () => {
+    await create([],true);
+    component.reviewClaimId = 7;
+    component.reviewMethod = 'TELEGRAM';
+    component.reviewNotes = '';
+    component.approveArtistClaim();
+    expect(artists.approve).not.toHaveBeenCalled();
+    component.reviewNotes = 'Contato previamente cadastrado confirmou pessoalmente';
+    component.approveArtistClaim();
+    expect(artists.approve).toHaveBeenCalledWith(7,'TELEGRAM',
+      'Contato previamente cadastrado confirmou pessoalmente');
+  });
+
 });
