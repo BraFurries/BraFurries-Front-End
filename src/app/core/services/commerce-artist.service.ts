@@ -10,8 +10,7 @@ export interface CommercialArtist {
   instagramHandle: string | null;
   contactEmail: string | null;
   internalNotes: string | null;
-  claimedByUserId: number | null;
-  claimedAt: string | null;
+  canInvite: number | boolean;
   createdAt: string;
 }
 
@@ -23,27 +22,16 @@ export interface RegisterCommercialArtist {
   internalNotes: string | null;
 }
 
-export interface ArtistClaim {
+export interface IssuedArtistInvitation {
   id: number;
-  artistUserId: number;
-  artistName: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVOKED';
-  createdAt: string;
-  reviewedAt: string | null;
+  token: string;
+  confirmationCode: string;
+  expiresAt: string;
 }
 
-export interface PendingArtistClaim {
-  id: number;
-  artistUserId: number;
-  artistName: string;
-  telegramHandle: string | null;
-  instagramHandle: string | null;
-  contactEmail: string | null;
-  requesterUserId: number;
-  requesterName: string;
-  requesterEmail: string | null;
-  message: string | null;
-  createdAt: string;
+export interface InvitationResult {
+  status: 'VERIFY_EMAIL' | 'RELOGIN_REQUIRED';
+  message: string;
 }
 
 export interface ArtistPortfolioArtwork {
@@ -78,6 +66,10 @@ export interface ArtistPortfolio {
   settlements: ArtistPortfolioStatement[];
 }
 
+/**
+ * The only ownership entry is an admin-issued, short-lived invitation.
+ * No artist ID search, spontaneous claim, or permanent alias ownership.
+ */
 @Injectable({ providedIn: 'root' })
 export class CommerceArtistService {
   private readonly base = `${environment.apiBaseUrl}/user/me/brafurries-commerce/artist`;
@@ -98,31 +90,28 @@ export class CommerceArtistService {
     });
   }
 
-  myClaims(): Observable<ArtistClaim[]> {
-    return this.http.get<ArtistClaim[]>(`${this.base}/me/claims`);
+  issueInvitation(artistUserId: number): Observable<IssuedArtistInvitation> {
+    return this.http.post<IssuedArtistInvitation>(`${this.base}/invitations`, { artistUserId });
   }
 
-  requestClaim(artistUserId: number, message: string): Observable<{ id: number }> {
-    return this.http.post<{ id: number }>(`${this.base}/me/claims`, {
-      artistUserId, message: message.trim() || null
+  revokeInvitation(id: number): Observable<void> {
+    return this.http.post<void>(`${this.base}/invitations/${id}/revoke`, {});
+  }
+
+  redeemInvitation(token: string, confirmationCode: string,
+                   accountPassword: string): Observable<InvitationResult> {
+    return this.http.post<InvitationResult>(`${this.base}/invitations/redeem`, {
+      token, confirmationCode, accountPassword
     });
   }
 
-  pendingClaims(): Observable<PendingArtistClaim[]> {
-    return this.http.get<PendingArtistClaim[]>(`${this.base}/claims/pending`);
-  }
-
-  approve(claimId: number, verificationMethod: string, verificationNotes: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/claims/${claimId}/approve`, {
-      verificationMethod, verificationNotes
-    });
-  }
-
-  reject(claimId: number, reason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/claims/${claimId}/reject`, { reason });
-  }
-
-  revoke(artistUserId: number, reason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/profiles/${artistUserId}/revoke`, { reason });
+  activateInvitation(token: string, confirmationCode: string,
+                     email: string, password: string,
+                     passwordConfirmation: string,
+                     termsAgreement: boolean): Observable<InvitationResult> {
+    return this.http.post<InvitationResult>(
+      `${environment.apiBaseUrl}/auth/artist-invitation/activate`,
+      { token, confirmationCode, email, password, passwordConfirmation, termsAgreement }
+    );
   }
 }
