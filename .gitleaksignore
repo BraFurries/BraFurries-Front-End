@@ -12,3 +12,5 @@ bbc65b267b9b955ecca32d5454dbd0276e2dedd0:src/app/core/services/commerce-finance.
 # Reviewed synthetic confirmation code in invitation UI unit test.
 # Scope: exactly the historical commit, path, rule, and line; real secrets still block CI.
 ed88c2b8ac2758429c0b68f6f81bebfe3ef1e45f:src/app/modules/auth/artist-invite/artist-invite.component.spec.ts:generic-api-key:65
+# Exact historical false positive: synthetic confirmation code in invitation spec.
+ec2694a463be39ad19500e2d510f271dc331907b:src/app/modules/auth/artist-invite/artist-invite.component.spec.ts:generic-api-key:65
