@@ -709,12 +709,19 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       return;
     }
     this.paymentMetadataHistoryId=paymentId;
+    this.paymentMetadataHistoryRows=[];
     this.paymentMetadataHistoryLoading=true;
     this.finance.artistPaymentMetadataHistory(statement.id,paymentId)
       .pipe(takeUntil(this.destroy$)).subscribe({
-        next:rows=>{this.paymentMetadataHistoryRows=rows;this.paymentMetadataHistoryLoading=false;},
-        error:()=>{this.paymentMetadataHistoryLoading=false;
-          this.errorMessage='Não foi possível consultar o histórico de retificações do repasse.';}
+        next:rows=>{
+          if(this.paymentMetadataHistoryId!==paymentId) return;
+          this.paymentMetadataHistoryRows=rows;this.paymentMetadataHistoryLoading=false;
+        },
+        error:()=>{
+          if(this.paymentMetadataHistoryId!==paymentId) return;
+          this.paymentMetadataHistoryLoading=false;
+          this.errorMessage='Não foi possível consultar o histórico de retificações do repasse.';
+        }
       });
   }
 
@@ -794,11 +801,18 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       return;
     }
     this.cashMetadataHistoryId=id;
+    this.cashMetadataHistoryRows=[];
     this.cashMetadataHistoryLoading=true;
     this.finance.cashMetadataHistory(id).pipe(takeUntil(this.destroy$)).subscribe({
-      next:rows=>{this.cashMetadataHistoryRows=rows;this.cashMetadataHistoryLoading=false;},
-      error:()=>{this.cashMetadataHistoryLoading=false;
-        this.errorMessage='Não foi possível consultar o histórico de retificações do caixa.';}
+      next:rows=>{
+        if(this.cashMetadataHistoryId!==id) return;
+        this.cashMetadataHistoryRows=rows;this.cashMetadataHistoryLoading=false;
+      },
+      error:()=>{
+        if(this.cashMetadataHistoryId!==id) return;
+        this.cashMetadataHistoryLoading=false;
+        this.errorMessage='Não foi possível consultar o histórico de retificações do caixa.';
+      }
     });
   }
 
