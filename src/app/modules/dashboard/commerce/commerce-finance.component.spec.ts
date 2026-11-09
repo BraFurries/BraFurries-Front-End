@@ -29,7 +29,7 @@ describe('CommerceFinanceComponent', () => {
       'royalties','statements','createStatement','statementItems',
       'approveStatement','discardStatement','payments','recordPayment',
       'cashMovements','cashSummary','createCashMovement','reverseCashMovement',
-      'orders','orderProductChoices','createOrder','orderItems','transitionOrder','orderPayments',
+      'orders','orderProductChoices','createOrder','updateOrder','deleteUnusedOrder','orderItems','transitionOrder','orderPayments',
       'receiveOrderPayment','reverseOrderPayment'
     ]);
     finance.availableBatches.and.returnValue(of([
@@ -41,6 +41,8 @@ describe('CommerceFinanceComponent', () => {
     finance.orderItems.and.returnValue(of([]));
     finance.orderPayments.and.returnValue(of([]));
     finance.createOrder.and.returnValue(of({ id: 40 }));
+    finance.updateOrder.and.returnValue(of(void 0));
+    finance.deleteUnusedOrder.and.returnValue(of(void 0));
     finance.transitionOrder.and.returnValue(of(void 0));
     finance.receiveOrderPayment.and.returnValue(of({ id: 41 }));
     finance.reverseOrderPayment.and.returnValue(of({ id: 42 }));
@@ -330,5 +332,47 @@ describe('CommerceFinanceComponent', () => {
     component.cashReversalReason='Registro incorreto';
     component.reverseCashMovement();
     expect(finance.reverseCashMovement).not.toHaveBeenCalled();
+  });
+
+  it('edits only unpaid open orders, without touching recorded payments', async () => {
+    await init(['SALES_MANAGE']);
+    const order = {
+      id:25,buyerLabel:'Kéti',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN' as const,
+      totalAmount:100,paidAmount:0,notes:null,readyAt:null,
+      deliveredOn:null,cancellationReason:null
+    };
+    finance.orderItems.and.returnValue(of([{
+      id:1,productId:null,label:'Camiseta',size:'GG',quantity:2,
+      unitPrice:50,lineAmount:100
+    }]));
+    finance.orderPayments.and.returnValue(of([]));
+    component.editOpenOrder(order);
+    expect(component.editingOrderId).toBe(25);
+    component.orderNotes='Ajuste do tamanho';
+    component.createOrder();
+    expect(finance.updateOrder).toHaveBeenCalledWith(25,jasmine.objectContaining({
+      buyerLabel:'Kéti',notes:'Ajuste do tamanho',
+      items:[{productId:null,label:'Camiseta',size:'GG',quantity:2,unitPrice:50}]
+    }));
+    expect(finance.createOrder).not.toHaveBeenCalled();
+    expect(component.editingOrderId).toBeNull();
+  });
+
+  it('disallows editing zero-balance orders that have receipt history', async () => {
+    await init(['SALES_MANAGE']);
+    const order = {
+      id:25,buyerLabel:'Kéti',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN' as const,
+      totalAmount:100,paidAmount:0,notes:null,readyAt:null,
+      deliveredOn:null,cancellationReason:null
+    };
+    finance.orderPayments.and.returnValue(of([{
+      id:88,eventKind:'RECEIPT',originalEventId:null,amount:50,
+      receivedOn:'2026-11-03',paymentMethod:'PIX',externalReference:null,notes:null
+    }]));
+    component.editOpenOrder(order);
+    expect(component.editingOrderId).toBeNull();
+    expect(finance.updateOrder).not.toHaveBeenCalled();
   });
 });
