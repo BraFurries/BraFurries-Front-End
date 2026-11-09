@@ -13,6 +13,7 @@ import { CommunityContextLayoutComponent } from './community-context/community-c
 import { CommerceAccessComponent } from './commerce/commerce-access.component';
 import { CommerceCatalogComponent } from './commerce/commerce-catalog.component';
 import { CommerceFinanceComponent } from './commerce/commerce-finance.component';
+import { CommerceArtistPortalComponent } from './commerce/commerce-artist-portal.component';
 import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
 import { InscricoesComponent } from './inscricoes/inscricoes.component';
 import { TriagemComponent } from './triagem/triagem.component';
@@ -24,6 +25,7 @@ const routes: Routes = [
     children: [
       { path: '', component: InicioComponent },
       { path: 'perfil', component: PerfilComponent },
+      { path: 'minhas-artes', component: CommerceArtistPortalComponent },
       { path: 'gestao-comercial/financeiro', component: CommerceFinanceComponent },
       { path: 'gestao-comercial/catalogo', component: CommerceCatalogComponent },
       { path: 'gestao-comercial', component: CommerceAccessComponent },
