@@ -368,7 +368,7 @@ describe('CommerceFinanceComponent', () => {
       deliveredOn:null,cancellationReason:null
     };
     finance.orderPayments.and.returnValue(of([{
-      id:88,eventKind:'RECEIPT',originalEventId:null,amount:50,
+      id:88,eventKind:'RECEIPT' as const,originalEventId:null,amount:50,
       receivedOn:'2026-11-03',paymentMethod:'PIX',externalReference:null,notes:null
     }]));
     component.editOpenOrder(order);
