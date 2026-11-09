@@ -140,6 +140,10 @@ export interface CommercePayment {
   externalReference: string;
   notes: string | null;
   createdAt: string;
+  eventKind: 'PAYMENT' | 'REVERSAL';
+  originalPaymentId: number | null;
+  reversalReason: string | null;
+  reversedAt: string | null;
 }
 export interface CreateCommercePayment {
   requestKey: string;
@@ -225,6 +229,14 @@ export class CommerceFinanceService {
     return this.http.get<CommerceOrderProductChoice[]>(`${this.ordersBase}/product-choices`);
   }
 
+  updateOrder(id: number,order: Omit<CreateCommerceOrder,'requestKey'>): Observable<void> {
+    return this.http.put<void>(`${this.ordersBase}/${id}`,order);
+  }
+
+  deleteUnusedOrder(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.ordersBase}/${id}`);
+  }
+
   orders(): Observable<CommerceOrder[]> {
     return this.http.get<CommerceOrder[]>(this.ordersBase);
   }
@@ -290,6 +302,14 @@ export class CommerceFinanceService {
 
   recordPayment(id: number, payment: CreateCommercePayment): Observable<FinanceCreated> {
     return this.http.post<FinanceCreated>(`${this.base}/statements/${id}/payments`, payment);
+  }
+
+  reverseArtistPayment(statementId: number, paymentId: number,
+                       reversedOn: string, reason: string): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(
+      `${this.base}/statements/${statementId}/payments/${paymentId}/reverse`,
+      {reversedOn,reason}
+    );
   }
 
   cashMovements(year: number, month: number): Observable<CommerceCashMovement[]> {

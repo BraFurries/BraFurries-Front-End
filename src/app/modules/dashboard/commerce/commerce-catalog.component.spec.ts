@@ -22,13 +22,21 @@ describe('CommerceCatalogComponent', () => {
       'productArtworks','contracts','createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'searchArtists','signContract','downloadContract','terminateContract',
-      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile'
+      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
+      'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
+      'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
+      'updateTemplate','setTemplateActive','deleteTemplate','unlinkArtwork'
     ]);
     artists = jasmine.createSpyObj<CommerceArtistService>('CommerceArtistService', [
-      'profiles','registerExternal','issueInvitation','revokeInvitation'
+      'profiles','registerExternal','updateArtist','issueInvitation','revokeInvitation'
     ]);
     artists.profiles.and.returnValue(of([]));
     artists.registerExternal.and.returnValue(of({ id: 44 }));
+    artists.updateArtist.and.returnValue(of(void 0));
+    catalog.updateArtwork.and.returnValue(of(void 0));
+    catalog.setArtworkArchived.and.returnValue(of(void 0));
+    catalog.deleteArtwork.and.returnValue(of(void 0));
+    catalog.unlinkArtwork.and.returnValue(of(void 0));
     artists.issueInvitation.and.returnValue(of({
       id:62,token:'a'.repeat(64),confirmationCode:'ABCD1234EF56',
       expiresAt:'2026-11-11T10:00:00'
@@ -209,5 +217,42 @@ describe('CommerceCatalogComponent', () => {
       canInvite:0,createdAt:'2026-11-09'
     });
     expect(artists.issueInvitation).not.toHaveBeenCalled();
+  });
+
+  it('edits an artwork without creating a second artwork or changing its owner', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const artwork=component.artworks[0];
+    component.startEditArtwork(artwork);
+    expect(component.editingArtworkId).toBe(12);
+    component.artworkForm.title='Arte corrigida';
+    component.createArtwork();
+    expect(catalog.updateArtwork).toHaveBeenCalledWith(12,jasmine.objectContaining({
+      title:'Arte corrigida',artistUserId:31,creationCost:100
+    }));
+    expect(catalog.createArtwork).not.toHaveBeenCalled();
+  });
+
+  it('uses the API to archive an artwork and only deletes after confirmation', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const artwork=component.artworks[0];
+    spyOn(window,'confirm').and.returnValue(true);
+    component.toggleArtwork(artwork);
+    expect(catalog.setArtworkArchived).toHaveBeenCalledWith(12,true);
+    component.deleteArtwork(artwork);
+    expect(catalog.deleteArtwork).toHaveBeenCalledWith(12);
+  });
+
+  it('allows updating administrative artist information without changing account credentials', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const artist={userId:35,artistName:'Artista externa',telegramHandle:'@ar',
+      instagramHandle:null,contactEmail:null,internalNotes:null,
+      canInvite:true,createdAt:'2026-11-09'};
+    component.startEditArtist(artist);
+    component.externalArtistForm.artistName='Artista revisada';
+    component.createExternalArtist();
+    expect(artists.updateArtist).toHaveBeenCalledWith(35,jasmine.objectContaining({
+      artistName:'Artista revisada',telegramHandle:'@ar'
+    }));
+    expect(artists.registerExternal).not.toHaveBeenCalled();
   });
 });
