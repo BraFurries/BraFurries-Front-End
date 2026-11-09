@@ -251,7 +251,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       contactEmail:form.contactEmail.trim() || null,internalNotes:form.internalNotes.trim() || null
     };
     const editing=this.editingArtistId;
-    const request=editing==null
+    const request: Observable<{id:number} | void> = editing==null
       ? this.artistService.registerExternal(payload)
       : this.artistService.updateArtist(editing,payload);
     request.pipe(takeUntil(this.destroy$)).subscribe({
