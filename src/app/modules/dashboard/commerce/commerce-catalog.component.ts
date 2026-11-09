@@ -257,8 +257,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     request.pipe(takeUntil(this.destroy$)).subscribe({
       next: result => {
         this.saving=false;
-        if(editing==null && 'id' in result) {
-          const id=result.id as number;
+        if(editing==null) {
+          const id=(result as {id:number}).id;
           this.artistCandidates=[{id,name:payload.artistName},
             ...this.artistCandidates.filter(item=>item.id!==id)];
           this.artworkForm.artistUserId=id;
