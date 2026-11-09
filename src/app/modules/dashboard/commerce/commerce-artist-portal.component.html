@@ -72,7 +72,7 @@
       <h2 class="font-amaranth text-xl font-bold text-braDark">Minhas obras</h2>
       <p *ngIf="!data.artworks.length" class="text-sm text-gray-600">
         Nenhuma arte vinculada a esta conta ainda. Se você já tem uma obra registrada
-        conosco, solicite a reivindicação do cadastro correspondente abaixo.
+        conosco, peça à equipe administrativa que envie seu convite de ativação.
       </p>
       <div *ngFor="let art of data.artworks" class="rounded-xl border p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -110,35 +110,14 @@
     </section>
   </ng-container>
 
-  <section class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-    <h2 class="font-amaranth text-xl font-bold text-braDark">Reivindicar uma arte já cadastrada</h2>
-    <p class="max-w-3xl text-sm text-gray-600">
-      Se a equipe registrou sua arte antes de você criar sua conta, informe o
-      <strong>ID de artista</strong> que recebeu da BraFurries. A solicitação não dá acesso
-      imediato: o responsável verificará sua identidade pelo contato que já conhecia
-      antes do pedido. Nunca basta coincidir nome, e-mail ou usuário do Telegram.
+  <section class="rounded-2xl border bg-white p-5 shadow-sm">
+    <h2 class="font-amaranth text-xl font-bold text-braDark">Já possui uma arte cadastrada?</h2>
+    <p class="mt-2 text-sm text-gray-600">
+      Se a BraFurries registrou sua obra antes de você ter uma conta, a equipe
+      poderá enviar um convite individual de ativação ou consolidação. Depois
+      de confirmar sua identidade pelo convite, suas obras e royalties
+      aparecerão automaticamente aqui. Você não precisa informar IDs internos
+      nem reivindicar publicamente uma obra.
     </p>
-    <div class="flex flex-wrap items-end gap-3">
-      <label class="text-sm font-semibold">ID do artista
-        <input type="number" min="1" step="1" [(ngModel)]="claimArtistId"
-          class="mt-1 block w-32 rounded-lg border px-3 py-2">
-      </label>
-      <label class="min-w-56 flex-1 text-sm font-semibold">Mensagem opcional
-        <input maxlength="1000" [(ngModel)]="claimMessage"
-          placeholder="Ex.: Sou a artista responsável por esta obra"
-          class="mt-1 block w-full rounded-lg border px-3 py-2">
-      </label>
-      <button type="button" [disabled]="saving || claimArtistId === null" (click)="requestClaim()"
-        class="rounded-lg bg-braPurple px-5 py-2 font-bold text-white disabled:opacity-50">
-        {{ saving ? 'Enviando...' : 'Solicitar reivindicação' }}
-      </button>
-    </div>
-
-    <h3 class="pt-2 font-semibold text-braDark">Minhas solicitações</h3>
-    <p *ngIf="!claims.length" class="text-sm text-gray-500">Nenhuma solicitação registrada.</p>
-    <div *ngFor="let claim of claims" class="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
-      <span>{{ claim.artistName }} · Artista ID {{ claim.artistUserId }}</span>
-      <span class="font-bold">{{ claim.status }}</span>
-    </div>
   </section>
 </section>
