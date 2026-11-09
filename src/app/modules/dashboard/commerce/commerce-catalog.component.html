@@ -78,7 +78,7 @@
             <h3 class="font-semibold text-braDark">Nova artista externa</h3>
             <p class="text-xs text-gray-600">
               Criará apenas um registro comercial, sem e-mail de login, senha ou associação
-              fictícia ao Discord. A artista poderá reivindicá-lo depois.
+              fictícia ao Discord. A administração poderá enviar um convite de ativação.
             </p>
             <label class="block text-sm font-semibold">Nome artístico *
               <input [(ngModel)]="externalArtistForm.artistName" maxlength="120"
@@ -133,93 +133,64 @@
     </section>
 
     <section *ngIf="activeTab === 'artworks' && can('ARTWORKS_MANAGE')"
-      class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
-      <h2 class="font-amaranth text-xl font-bold">Artistas externas cadastradas</h2>
-      <p *ngIf="!externalArtists.length" class="text-sm text-gray-500">
-        Nenhuma artista externa cadastrada ainda.
+      class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <h2 class="font-amaranth text-xl font-bold">Artistas externas</h2>
+      <p class="text-sm text-gray-600">
+        Cadastre a artista antes de criar a obra. Quando quiser conceder acesso
+        ao histórico comercial, o proprietário envia um convite individual.
+        A artista não precisa conhecer IDs internos nem estar no Discord.
       </p>
-      <div *ngFor="let artist of externalArtists" class="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4 text-sm">
+      <p *ngIf="!externalArtists.length" class="text-sm text-gray-500">
+        Nenhuma artista externa cadastrada.
+      </p>
+      <div *ngFor="let artist of externalArtists"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm">
         <div class="space-y-1">
-          <p class="font-semibold">{{ artist.artistName }} · ID {{ artist.userId }}</p>
+          <p class="font-semibold">{{ artist.artistName }}</p>
           <p *ngIf="artist.telegramHandle" class="text-gray-600">Telegram: {{ artist.telegramHandle }}</p>
           <p *ngIf="artist.instagramHandle" class="text-gray-600">Instagram: {{ artist.instagramHandle }}</p>
           <p *ngIf="artist.contactEmail" class="text-gray-600">Contato: {{ artist.contactEmail }}</p>
-          <p class="text-xs" [ngClass]="artist.claimedByUserId == null ? 'text-amber-700' : 'text-green-700'">
-            {{ artist.claimedByUserId == null ? 'Ainda não reivindicado' : 'Reivindicado por conta ID ' + artist.claimedByUserId }}
+          <p class="text-xs" [ngClass]="artist.canInvite ? 'text-amber-700' : 'text-green-700'">
+            {{ artist.canInvite ? 'Aguardando ativação da conta' : 'Cadastro comercial já associado a uma conta' }}
           </p>
         </div>
-        <button *ngIf="access?.owner && artist.claimedByUserId != null" type="button"
-          [disabled]="reviewingClaim" (click)="revokeArtistClaim(artist)"
-          class="rounded-lg border border-red-200 px-3 py-2 font-semibold text-red-700 disabled:opacity-50">
-          Revogar acesso
+        <button *ngIf="access?.owner && artist.canInvite" type="button"
+          [disabled]="issuingInvitation" (click)="issueInvitation(artist)"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          {{ issuingInvitation ? 'Gerando...' : 'Gerar convite de ativação' }}
         </button>
       </div>
-      <p class="text-xs text-gray-500">
-        Contatos são internos e não comprovam automaticamente a identidade de quem solicita reivindicação.
-      </p>
     </section>
 
-    <section *ngIf="activeTab === 'artworks' && access?.owner"
-      class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="font-amaranth text-xl font-bold">Reivindicações de artistas</h2>
-        <button type="button" (click)="reloadPendingArtistClaims()" class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold">
-          Atualizar pedidos
-        </button>
-      </div>
-      <p class="text-sm text-amber-800">
-        Somente aprove depois de confirmar com a artista pelo contato que a equipe já
-        conhecia antes da solicitação. Nunca confie apenas em nome, e-mail ou mensagem enviada pela solicitante.
+    <section *ngIf="activeTab === 'artworks' && access?.owner && issuedInvitation as invite"
+      class="space-y-4 rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
+      <h2 class="font-amaranth text-xl font-bold">Convite criado para {{ issuedArtistName }}</h2>
+      <p class="text-sm text-red-700 font-semibold">
+        Atenção: o link e o código aparecem apenas uma vez. Envie por canais
+        diferentes e confirme o destinatário por um contato já conhecido.
+        O link sozinho não permite ativar a conta nem acessar valores financeiros.
       </p>
-      <p *ngIf="!pendingArtistClaims.length" class="text-sm text-gray-500">
-        Nenhuma reivindicação pendente.
-      </p>
-      <div *ngFor="let claim of pendingArtistClaims" class="space-y-2 rounded-xl border p-4 text-sm">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <strong>{{ claim.artistName }} · ID {{ claim.artistUserId }}</strong>
-          <button type="button" (click)="reviewClaimId = claim.id"
-            class="rounded-lg border px-3 py-1 font-bold text-braPurple">
-            Analisar #{{ claim.id }}
-          </button>
-        </div>
-        <p>Solicitante: {{ claim.requesterName }} · ID {{ claim.requesterUserId }}</p>
-        <p *ngIf="claim.requesterEmail">Conta: {{ claim.requesterEmail }}</p>
-        <p *ngIf="claim.telegramHandle">Contato conhecido: Telegram {{ claim.telegramHandle }}</p>
-        <p *ngIf="claim.instagramHandle">Contato conhecido: Instagram {{ claim.instagramHandle }}</p>
-        <p *ngIf="claim.contactEmail">Contato conhecido: {{ claim.contactEmail }}</p>
-        <p *ngIf="claim.message" class="text-gray-600">Mensagem: {{ claim.message }}</p>
-      </div>
-      <div *ngIf="reviewClaimId !== null" class="space-y-3 rounded-xl bg-purple-50 p-4">
-        <p class="font-semibold">Revisando solicitação #{{ reviewClaimId }}</p>
-        <label class="block text-sm font-semibold">Canal utilizado para comprovação
-          <select [(ngModel)]="reviewMethod" class="mt-1 w-full rounded-lg border px-3 py-2">
-            <option value="TELEGRAM">Telegram</option>
-            <option value="EMAIL">E-mail</option>
-            <option value="IN_PERSON">Pessoalmente</option>
-            <option value="OTHER">Outro</option>
-          </select>
-        </label>
-        <label class="block text-sm font-semibold">Evidência da verificação ou motivo da recusa *
-          <textarea [(ngModel)]="reviewNotes" rows="2" maxlength="1000"
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-            placeholder="Descreva como a posse foi confirmada, sem incluir credenciais"></textarea>
-        </label>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" [disabled]="reviewingClaim || !reviewNotes.trim()"
-            (click)="approveArtistClaim()"
-            class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
-            Aprovar e liberar extrato
-          </button>
-          <button type="button" [disabled]="reviewingClaim || !reviewNotes.trim()"
-            (click)="rejectArtistClaim()"
-            class="rounded-lg border border-red-200 px-4 py-2 font-bold text-red-700 disabled:opacity-50">
-            Recusar
-          </button>
-          <button type="button" (click)="reviewClaimId = null" class="px-4 py-2 text-sm font-semibold">
-            Cancelar
-          </button>
-        </div>
-      </div>
+      <label class="block text-sm font-semibold">Link para enviar
+        <textarea rows="2" readonly [value]="issuedInvitationLink"
+          class="mt-1 block w-full rounded-lg border p-3 text-sm"></textarea>
+      </label>
+      <button type="button" (click)="copyInvitationLink()"
+        class="rounded-lg border border-purple-200 px-4 py-2 text-sm font-bold text-braPurple">
+        Copiar link
+      </button>
+      <label class="block text-sm font-semibold">Código de confirmação (enviar separadamente)
+        <input readonly [value]="invite.confirmationCode"
+          class="mt-1 block w-full max-w-xs rounded-lg border p-3 font-mono text-lg tracking-widest">
+      </label>
+      <button type="button" (click)="copyInvitationCode()"
+        class="rounded-lg border border-purple-200 px-4 py-2 text-sm font-bold text-braPurple">
+        Copiar código
+      </button>
+      <p class="text-sm text-gray-600">O convite vale por 48 horas e só pode ser utilizado uma vez.</p>
+      <button type="button" (click)="clearIssuedInvitation()"
+        class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-bold">
+        Ocultar informações do convite
+      </button>
     </section>
 
     <section *ngIf="activeTab === 'files' && can('ARTWORKS_MANAGE')"
