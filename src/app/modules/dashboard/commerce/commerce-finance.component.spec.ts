@@ -13,6 +13,8 @@ describe('CommerceFinanceComponent', () => {
   let finance: jasmine.SpyObj<CommerceFinanceService>;
   let access: jasmine.SpyObj<PlatformAccessService>;
 
+  const ORDER_KEY = ['fb74829b','c186','46a9','9fdb','7d683a998884'].join('-');
+
   const statement: CommerceStatement = {
     id: 3, artistUserId: 12, artistName: 'Artista', periodYear: 2025,
     periodMonth: 12, status: 'APPROVED', totalAmount: 100, paidAmount: 0,
@@ -26,12 +28,22 @@ describe('CommerceFinanceComponent', () => {
       'availableBatches','sales','saleItems','createSale','cancelSale',
       'royalties','statements','createStatement','statementItems',
       'approveStatement','discardStatement','payments','recordPayment',
-      'cashMovements','cashSummary','createCashMovement','reverseCashMovement'
+      'cashMovements','cashSummary','createCashMovement','reverseCashMovement',
+      'orders','orderProductChoices','createOrder','orderItems','transitionOrder','orderPayments',
+      'receiveOrderPayment','reverseOrderPayment'
     ]);
     finance.availableBatches.and.returnValue(of([
       {batchId:1,productId:5,productName:'Caneca',sku:'MUG',suggestedPrice:60,availableUnits:10}
     ]));
     finance.sales.and.returnValue(of([]));
+    finance.orders.and.returnValue(of([]));
+    finance.orderProductChoices.and.returnValue(of([{id:5,name:'Caneca',suggestedPrice:65}]));
+    finance.orderItems.and.returnValue(of([]));
+    finance.orderPayments.and.returnValue(of([]));
+    finance.createOrder.and.returnValue(of({ id: 40 }));
+    finance.transitionOrder.and.returnValue(of(void 0));
+    finance.receiveOrderPayment.and.returnValue(of({ id: 41 }));
+    finance.reverseOrderPayment.and.returnValue(of({ id: 42 }));
     finance.saleItems.and.returnValue(of([]));
     finance.royalties.and.returnValue(of([
       { id:9,artistUserId:12,artistName:'Artista',artworkId:4,contractId:8,
@@ -82,7 +94,7 @@ describe('CommerceFinanceComponent', () => {
 
   it('keeps supplier costs and payment history hidden from a sales-only staff member', async () => {
     await init(['SALES_MANAGE']);
-    expect(component.visibleTabs().map(tab => tab.key)).toEqual(['sales']);
+    expect(component.visibleTabs().map(tab => tab.key)).toEqual(['sales','orders']);
     expect(finance.availableBatches).toHaveBeenCalled();
     expect(finance.sales).toHaveBeenCalled();
     expect(finance.royalties).not.toHaveBeenCalled();
@@ -98,6 +110,95 @@ describe('CommerceFinanceComponent', () => {
     component.addSaleLine();
     expect(component.saleLines.length).toBe(0);
     expect(finance.createSale).not.toHaveBeenCalled();
+  });
+
+  it('does not query operational orders without SALES_MANAGE permission', async () => {
+    await init(['FINANCE_VIEW']);
+    expect(finance.orders).not.toHaveBeenCalled();
+    expect(component.visibleTabs().some(tab => tab.key === 'orders')).toBeFalse();
+    component.addOrderLine();
+    expect(component.orderDraftLines).toEqual([]);
+  });
+
+  it('allows picking a product using only the minimal sales permission', async () => {
+    await init(['SALES_MANAGE']);
+    component.addOrderLine();
+    component.orderDraftLines[0].productId = 5;
+    component.onOrderProductSelected(component.orderDraftLines[0]);
+    expect(component.orderDraftLines[0].label).toBe('Caneca');
+    expect(component.orderDraftLines[0].unitPrice).toBe(65);
+    expect(finance.orderProductChoices).toHaveBeenCalled();
+  });
+
+  it('creates a custom preorder without creating a financial sale', async () => {
+    await init(['SALES_MANAGE']);
+    component.orderBuyer = 'Kéti';
+    component.orderRequestKey = ORDER_KEY;
+    component.orderDate = '2026-11-03';
+    component.orderDueDate = '2026-11-20';
+    component.addOrderLine();
+    component.orderDraftLines[0] = {
+      productId: null, label: 'Camiseta', size: 'GG',quantity: 2,unitPrice: 55
+    };
+    component.createOrder();
+    expect(finance.createOrder).toHaveBeenCalledWith(jasmine.objectContaining({
+      requestKey:ORDER_KEY,
+      buyerLabel:'Kéti',expectedDeliveryOn:'2026-11-20',
+      items:[{productId:null,label:'Camiseta',size:'GG',quantity:2,unitPrice:55}]
+    }));
+    expect(finance.createSale).not.toHaveBeenCalled();
+    expect(component.orderRequestKey).toBe('');
+  });
+
+  it('retains order idempotency key after a timeout', async () => {
+    await init(['SALES_MANAGE']);
+    component.orderBuyer = 'Comprador';
+    component.orderRequestKey = ORDER_KEY;
+    component.orderDate = '2026-11-03';
+    component.addOrderLine();
+    component.orderDraftLines[0] = {
+      productId:null,label:'Poster',size:null,quantity:1,unitPrice:45
+    };
+    finance.createOrder.and.returnValue(throwError(() => new Error('Timeout')));
+    component.createOrder();
+    expect(component.orderRequestKey).toBe(ORDER_KEY);
+    finance.createOrder.and.returnValue(of({ id: 40 }));
+    component.createOrder();
+    expect(finance.createOrder).toHaveBeenCalledTimes(2);
+    expect(component.orderRequestKey).toBe('');
+  });
+
+  it('retries a receipt reversal with the original request key and date', async () => {
+    await init(['SALES_MANAGE']);
+    spyOn(window,'confirm').and.returnValue(true);
+    component.orders = [{
+      id:25,buyerLabel:'Guto',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN',
+      totalAmount:65,paidAmount:65,notes:null,readyAt:null,
+      deliveredOn:null,cancellationReason:null
+    }];
+    component.selectedOrderId = 25;
+    const receipt = {
+      id:88,eventKind:'RECEIPT' as const,originalEventId:null,amount:65,
+      receivedOn:'2026-11-03',paymentMethod:'PIX',externalReference:null,notes:null
+    };
+    component.orderPayments=[receipt];
+    component.orderReversalReason='Pagamento duplicado';
+    finance.reverseOrderPayment.and.returnValue(throwError(() => new Error('Timeout')));
+    component.reverseOrderPayment(receipt);
+    const first=finance.reverseOrderPayment.calls.mostRecent().args;
+    component.reverseOrderPayment(receipt);
+    const second=finance.reverseOrderPayment.calls.mostRecent().args;
+    expect(second[0]).toBe(25);
+    expect(second[1]).toBe(88);
+    expect(second[2]).toBe(first[2]);
+    expect(second[3]).toBe(first[3]);
+
+    const different={...receipt,id:89};
+    component.orderPayments=[receipt,different];
+    component.reverseOrderPayment(different);
+    const third=finance.reverseOrderPayment.calls.mostRecent().args;
+    expect(third[2]).not.toBe(first[2]);
   });
 
   it('creates a sale with a stable idempotency key and no locally computed royalty', async () => {
@@ -171,7 +272,7 @@ describe('CommerceFinanceComponent', () => {
 
   it('owner has all finance operations without a Community Admin grant', async () => {
     await init([],true);
-    expect(component.visibleTabs().length).toBe(4);
+    expect(component.visibleTabs().length).toBe(5);
     expect(finance.royalties).toHaveBeenCalled();
     expect(finance.availableBatches).toHaveBeenCalled();
   });

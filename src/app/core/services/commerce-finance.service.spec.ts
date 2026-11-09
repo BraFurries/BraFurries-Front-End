@@ -118,6 +118,52 @@ describe('CommerceFinanceService', () => {
     request.flush({id:22});
   });
 
+  it('uses separate BraFurries preorder endpoints and does not post financial sale', () => {
+    const baseOrders = environment.apiBaseUrl + '/user/me/brafurries-commerce/orders';
+    service.createOrder({
+      requestKey:crypto.randomUUID(),
+      buyerLabel:'Kéti',channel:'DIRECT',
+      externalReference:null,orderedOn:'2026-11-03',
+      expectedDeliveryOn:'2026-11-20',notes:null,
+      items:[{ productId:null,label:'Camiseta',size:'GG',quantity:2,unitPrice:55 }]
+    }).subscribe();
+    const create=http.expectOne(baseOrders);
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body.items[0].size).toBe('GG');
+    create.flush({id:40});
+
+    service.orderProductChoices().subscribe();
+    const choices=http.expectOne(baseOrders+'/product-choices');
+    expect(choices.request.method).toBe('GET');
+    choices.flush([{id:5,name:'Caneca',suggestedPrice:65}]);
+
+    service.orders().subscribe();
+    const list=http.expectOne(baseOrders);
+    expect(list.request.method).toBe('GET');
+    list.flush([]);
+
+    service.transitionOrder(40,'READY',null,null).subscribe();
+    const status=http.expectOne(baseOrders+'/40/status');
+    expect(status.request.body.status).toBe('READY');
+    status.flush(null);
+
+    service.receiveOrderPayment(40,{
+      requestKey:crypto.randomUUID(),
+      amount:50,receivedOn:'2026-11-03',paymentMethod:'PIX',
+      externalReference:null,notes:null
+    }).subscribe();
+    const receipt=http.expectOne(baseOrders+'/40/payments');
+    expect(receipt.request.body.amount).toBe(50);
+    receipt.flush({id:41});
+
+    service.reverseOrderPayment(40,41,
+      crypto.randomUUID(),'2026-11-04','Duplicado').subscribe();
+    const reversal=http.expectOne(baseOrders+'/40/payments/41/reverse');
+    expect(reversal.request.method).toBe('POST');
+    expect(reversal.request.body.reason).toBe('Duplicado');
+    reversal.flush({id:42});
+  });
+
   it('cancels an existing sale only through the explicit compensation endpoint', () => {
     service.cancelSale(31,'Cliente desistiu').subscribe();
     const request=http.expectOne(`${base}/sales/31/cancel`);

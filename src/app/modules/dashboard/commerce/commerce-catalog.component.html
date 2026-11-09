@@ -93,6 +93,80 @@
       </div>
     </section>
 
+    <section *ngIf="activeTab === 'files' && can('ARTWORKS_MANAGE')"
+      class="grid gap-6 lg:grid-cols-2">
+      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Arquivos privados da arte</h2>
+        <p class="text-sm text-gray-600">
+          Guarde arquivos originais e versões de impressão sem publicar no site ou no Discord.
+          O download exige permissão comercial e preserva o nome do arquivo.
+        </p>
+        <label class="block text-sm font-semibold">Arte
+          <select [(ngModel)]="selectedArtworkId" (ngModelChange)="reloadFiles()"
+            class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option [ngValue]="null">Selecione a arte</option>
+            <option *ngFor="let art of artworks" [ngValue]="art.id">{{ art.title }} — {{ art.artistName }}</option>
+          </select>
+        </label>
+        <label class="block text-sm font-semibold">Tipo de arquivo
+          <select [(ngModel)]="artworkFileKind" class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="SOURCE">Arquivo original / editável</option>
+            <option value="PRINT_READY">Pronto para impressão</option>
+            <option value="EXPORT">Exportação</option>
+            <option value="REFERENCE">Referência</option>
+          </select>
+        </label>
+        <label class="block text-sm font-semibold">Descrição (opcional)
+          <input type="text" maxlength="500" [(ngModel)]="artworkFileDescription"
+            placeholder="Ex.: impressão 300 DPI, versão revisada"
+            class="mt-1 w-full rounded-lg border px-3 py-2">
+        </label>
+        <label class="block text-sm font-semibold">Arquivo
+          <input type="file" (change)="onArtworkFile($event)"
+            accept=".png,.jpg,.jpeg,.webp,.pdf,.svg,.psd,.ai,.eps,.zip"
+            class="mt-1 block w-full text-sm">
+        </label>
+        <p class="text-xs text-gray-500">
+          PNG, JPG, WebP, PDF, SVG, PSD, AI, EPS ou ZIP (até 25 MiB). Os arquivos
+          ficam em armazenamento privado e nunca são exibidos como conteúdo ativo.
+        </p>
+        <button type="button" [disabled]="saving || selectedArtworkId == null || !artworkUpload"
+          (click)="uploadArtworkFile()"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          Enviar arquivo privado
+        </button>
+      </div>
+      <div class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Histórico de arquivos</h2>
+        <p *ngIf="selectedArtworkId == null" class="text-sm text-gray-500">Escolha uma arte.</p>
+        <p *ngIf="selectedArtworkId != null && !artworkFiles.length"
+          class="text-sm text-gray-500">Nenhum arquivo cadastrado.</p>
+        <article *ngFor="let file of artworkFiles" class="space-y-2 rounded-xl border p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <strong class="break-all text-sm">{{ file.originalName }}</strong>
+            <span class="text-xs font-semibold"
+              [ngClass]="file.status === 'ARCHIVED' ? 'text-gray-500' : 'text-green-700'">
+              {{ file.status === 'ACTIVE' ? 'Ativo' : 'Arquivado' }}
+            </span>
+          </div>
+          <p class="text-xs text-gray-600">
+            {{ file.kind }} · {{ file.sizeBytes / 1024 / 1024 | number:'1.1-2' }} MiB
+            · {{ file.createdAt | date:'dd/MM/yyyy HH:mm' }}
+          </p>
+          <p *ngIf="file.description" class="text-xs text-gray-600">{{ file.description }}</p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" (click)="downloadArtworkFile(file)"
+              class="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold">Baixar</button>
+            <button *ngIf="file.status === 'ACTIVE'" type="button" [disabled]="saving"
+              (click)="archiveArtworkFile(file)"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+              Arquivar versão
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section *ngIf="activeTab === 'templates' && can('CONTRACTS_MANAGE')"
       class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
       <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">

@@ -19,7 +19,8 @@ describe('CommerceCatalogComponent', () => {
       'templates','artworks','suppliers','supplierChoices','products','productionBatches',
       'productArtworks','contracts','createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
-      'searchArtists','signContract','downloadContract','terminateContract'
+      'searchArtists','signContract','downloadContract','terminateContract',
+      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile'
     ]);
     access.myAccess.and.returnValue(of({ enabled, owner, permissions }));
     catalog.artworks.and.returnValue(of([
@@ -39,6 +40,9 @@ describe('CommerceCatalogComponent', () => {
     }]));
     catalog.productionBatches.and.returnValue(of([]));
     catalog.contracts.and.returnValue(of([]));
+    catalog.artworkFiles.and.returnValue(of([]));
+    catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
+    catalog.archiveArtworkFile.and.returnValue(of(void 0));
     catalog.productArtworks.and.returnValue(of([]));
     catalog.searchArtists.and.returnValue(of([{ id: 31, name: 'Artista' }]));
     catalog.createArtwork.and.returnValue(of({ id: 14 }));
@@ -121,9 +125,30 @@ describe('CommerceCatalogComponent', () => {
     expect(header.querySelector('a[href="/painel/gestao-comercial"]')).toBeNull();
   });
 
-  it('offers all seven catalog screens to an authorized owner', async () => {
+  it('restricts artwork file listing to explicitly authorized artwork managers', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    expect(component.visibleTabs().some(tab => tab.key === 'files')).toBeFalse();
+    expect(catalog.artworkFiles).not.toHaveBeenCalled();
+    component.reloadFiles();
+    expect(catalog.artworkFiles).not.toHaveBeenCalled();
+  });
+
+  it('uploads artwork source files only for authorized accounts and selected artwork', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const file = new File(['sample'], 'source.psd', { type: 'application/octet-stream' });
+    component.artworkUpload = file;
+    component.selectedArtworkId = 12;
+    component.artworkFileKind = 'SOURCE';
+    component.artworkFileDescription = 'Original editável';
+    component.uploadArtworkFile();
+    expect(catalog.uploadArtworkFile).toHaveBeenCalledWith(
+      12,'SOURCE','Original editável',file);
+    expect(component.successMessage).toContain('Arquivo da arte');
+  });
+
+  it('offers all eight catalog screens to an authorized owner', async () => {
     await create([],true);
-    expect(component.visibleTabs().length).toBe(7);
+    expect(component.visibleTabs().length).toBe(8);
     expect(catalog.artworks).toHaveBeenCalled();
     expect(catalog.templates).toHaveBeenCalled();
     expect(catalog.suppliers).toHaveBeenCalled();

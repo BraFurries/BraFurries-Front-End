@@ -5,10 +5,12 @@ import { PlatformAccess, PlatformAccessService, PlatformPermissionCode } from
 import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
   CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
-  CommerceCashMovement, CommerceCashSummary, CashMovementType, ContributionNature, ContributionSource
+  CommerceCashMovement, CommerceCashSummary, CashMovementType, ContributionNature, ContributionSource,
+  CommerceOrder, CommerceOrderItem, CommerceOrderLineInput, CommerceOrderPayment, CommerceOrderStatus,
+  CommerceOrderProductChoice
 } from '../../../core/services/commerce-finance.service';
 
-type FinanceTab = 'sales' | 'royalties' | 'statements' | 'cash';
+type FinanceTab = 'sales' | 'orders' | 'royalties' | 'statements' | 'cash';
 
 interface SaleDraftLine {
   batchId: number | null;
@@ -36,6 +38,7 @@ function brazilToday(): string {
 export class CommerceFinanceComponent implements OnInit, OnDestroy {
   readonly tabs: { key: FinanceTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'sales', label: 'Vendas físicas', permissions: ['SALES_MANAGE'] },
+    { key: 'orders', label: 'Encomendas', permissions: ['SALES_MANAGE'] },
     { key: 'royalties', label: 'Royalties', permissions: ['FINANCE_VIEW'] },
     { key: 'statements', label: 'Fechamentos e repasses', permissions: ['FINANCE_VIEW'] },
     { key: 'cash', label: 'Caixa, despesas e aportes', permissions: ['FINANCE_VIEW'] }
@@ -49,6 +52,31 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   successMessage = '';
   batches: CommerceBatchForSale[] = [];
   sales: CommercePhysicalSale[] = [];
+  orders: CommerceOrder[] = [];
+  orderProductChoices: CommerceOrderProductChoice[] = [];
+  orderItems: CommerceOrderItem[] = [];
+  orderPayments: CommerceOrderPayment[] = [];
+  selectedOrderId: number | null = null;
+  orderRequestKey = '';
+  orderBuyer = '';
+  orderChannel: 'EVENT' | 'DIRECT' | 'ONLINE' | 'OTHER' = 'DIRECT';
+  orderReference = '';
+  orderDate = brazilToday();
+  orderDueDate = '';
+  orderNotes = '';
+  orderDraftLines: CommerceOrderLineInput[] = [];
+  orderDeliveryDate = brazilToday();
+  orderCancellationReason = '';
+  orderReceiptKey = '';
+  orderReceiptAmount = 0;
+  orderReceiptDate = brazilToday();
+  orderReceiptMethod = 'PIX';
+  orderReceiptReference = '';
+  orderReceiptNotes = '';
+  orderReversalReason = '';
+  orderReversalKey = '';
+  orderReversalDate = '';
+  orderReversalTargetId: number | null = null;
   saleDetails: CommerceSaleItem[] = [];
   selectedSaleId: number | null = null;
   royalties: CommerceRoyaltyEvent[] = [];
@@ -159,6 +187,10 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     return statement ? Math.max(0,statement.totalAmount - statement.paidAmount) : null;
   }
 
+  get selectedOrder(): CommerceOrder | undefined {
+    return this.orders.find(o => o.id === this.selectedOrderId);
+  }
+
   get selectedSale(): CommercePhysicalSale | undefined {
     return this.sales.find(s => s.id === this.selectedSaleId);
   }
@@ -181,6 +213,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     forkJoin({
       batches: this.safe(this.can('SALES_MANAGE') ? this.finance.availableBatches() : of([])),
       sales: this.safe(canReadSales ? this.finance.sales() : of([])),
+      orders: this.safe(this.can('SALES_MANAGE') ? this.finance.orders() : of([])),
+      orderChoices: this.safe(this.can('SALES_MANAGE') ? this.finance.orderProductChoices() : of([])),
       royalties: this.safe(this.can('FINANCE_VIEW') ?
         this.finance.royalties(this.periodYear,this.periodMonth) : of([])),
       statements: this.safe(this.can('FINANCE_VIEW') ?
@@ -195,9 +229,17 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
             }))
         : of(null)
     }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ batches, sales, royalties, statements, cashMovements, cashSummary }) => {
+      next: ({ batches, sales, orders, orderChoices, royalties, statements, cashMovements, cashSummary }) => {
         this.batches = batches;
         this.sales = sales;
+        this.orders = orders;
+        this.orderProductChoices = orderChoices;
+        if (this.selectedOrderId != null && !orders.some(o => o.id === this.selectedOrderId)) {
+          this.selectedOrderId = null;
+          this.orderItems = [];
+          this.orderPayments = [];
+        }
+        if (this.selectedOrderId != null) this.loadOrderDetails();
         this.royalties = royalties;
         this.statements = statements;
         this.cashMovements = cashMovements;
@@ -284,6 +326,151 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.saleProcessingFeePercent = 0;
       this.saleProcessingFeeFixed = 0;
     });
+  }
+
+
+  addOrderLine(): void {
+    if (!this.can('SALES_MANAGE')) return;
+    this.orderDraftLines.push({ productId:null,label:'',size:null,quantity:1,unitPrice:0 });
+  }
+
+  onOrderProductSelected(line: CommerceOrderLineInput): void {
+    const product = this.orderProductChoices.find(item => item.id === line.productId);
+    if (product) {
+      line.label = product.name;
+      line.unitPrice = product.suggestedPrice;
+    }
+  }
+
+  removeOrderLine(index: number): void {
+    this.orderDraftLines.splice(index,1);
+  }
+
+  createOrder(): void {
+    if (!this.can('SALES_MANAGE') || !this.orderBuyer.trim() ||
+        !this.orderDraftLines.length || !this.orderDate) {
+      this.errorMessage = 'Informe comprador, data e pelo menos um item.';
+      return;
+    }
+    const lines = this.orderDraftLines.map(item => ({
+      productId: item.productId || null,
+      label: item.label.trim(),
+      size: item.size?.trim() || null,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice
+    }));
+    if (lines.some(item => !item.label || !Number.isInteger(item.quantity) ||
+        item.quantity < 1 || item.quantity > 100000 ||
+        !Number.isFinite(item.unitPrice) || item.unitPrice < 0 ||
+        Math.abs(Math.round(item.unitPrice * 100) - item.unitPrice * 100) > 0.0000001 ||
+        (item.productId != null && (!Number.isInteger(item.productId) || item.productId < 1)))) {
+      this.errorMessage = 'Revise descrições, tamanhos, quantidades e preços.';
+      return;
+    }
+    if (!this.orderRequestKey) this.orderRequestKey = crypto.randomUUID();
+    this.mutate(this.finance.createOrder({
+      requestKey:this.orderRequestKey,buyerLabel:this.orderBuyer.trim(),
+      channel:this.orderChannel,externalReference:this.orderReference.trim() || null,
+      orderedOn:this.orderDate,expectedDeliveryOn:this.orderDueDate || null,
+      notes:this.orderNotes.trim() || null,items:lines
+    }), 'Encomenda cadastrada sem movimentação de estoque ou royalties.', () => {
+      this.orderRequestKey = '';
+      this.orderBuyer = '';
+      this.orderReference = '';
+      this.orderDueDate = '';
+      this.orderNotes = '';
+      this.orderDraftLines = [];
+    });
+  }
+
+  selectOrder(order: CommerceOrder): void {
+    if (!this.can('SALES_MANAGE')) return;
+    this.selectedOrderId = order.id;
+    this.orderReceiptKey = '';
+    this.orderReversalKey = '';
+    this.orderReversalDate = '';
+    this.orderReversalTargetId = null;
+    this.loadOrderDetails();
+  }
+
+  private loadOrderDetails(): void {
+    if (!this.can('SALES_MANAGE') || this.selectedOrderId == null) return;
+    const id = this.selectedOrderId;
+    forkJoin({
+      items:this.finance.orderItems(id),
+      payments:this.finance.orderPayments(id)
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({items,payments}) => {
+        if (this.selectedOrderId !== id) return;
+        this.orderItems = items;
+        this.orderPayments = payments;
+      },
+      error: () => this.errorMessage = 'Falha ao carregar os detalhes da encomenda.'
+    });
+  }
+
+  changeOrderStatus(status: CommerceOrderStatus): void {
+    const order = this.selectedOrder;
+    if (!this.can('SALES_MANAGE') || !order) return;
+    const reason = status === 'CANCELLED' ? this.orderCancellationReason.trim() : null;
+    if (status === 'CANCELLED' && (!reason || reason.length < 3)) {
+      this.errorMessage = 'Informe um motivo de cancelamento.';
+      return;
+    }
+    if (!window.confirm('Confirmar a mudança de status? Esta ação fica no histórico de auditoria.')) return;
+    this.mutate(this.finance.transitionOrder(order.id,status,
+      status === 'DELIVERED' ? this.orderDeliveryDate : null,reason),
+      'Status operacional da encomenda atualizado.');
+  }
+
+  receiveOrderPayment(): void {
+    const order = this.selectedOrder;
+    if (!this.can('SALES_MANAGE') || !order || order.status === 'CANCELLED' ||
+        !Number.isFinite(this.orderReceiptAmount) || this.orderReceiptAmount <= 0 ||
+        this.orderReceiptAmount > order.totalAmount - order.paidAmount) {
+      this.errorMessage = 'Informe recebimento positivo que não ultrapasse o saldo da encomenda.';
+      return;
+    }
+    if (!this.orderReceiptKey) this.orderReceiptKey = crypto.randomUUID();
+    this.mutate(this.finance.receiveOrderPayment(order.id,{
+      requestKey:this.orderReceiptKey,amount:this.orderReceiptAmount,
+      receivedOn:this.orderReceiptDate,paymentMethod:this.orderReceiptMethod,
+      externalReference:this.orderReceiptReference.trim() || null,
+      notes:this.orderReceiptNotes.trim() || null
+    }), 'Recebimento registrado apenas na encomenda (não no caixa).',() => {
+      this.orderReceiptKey = '';
+      this.orderReceiptAmount = 0;
+      this.orderReceiptReference = '';
+      this.orderReceiptNotes = '';
+    });
+  }
+
+  hasOrderPaymentReversal(receiptId: number): boolean {
+    return this.orderPayments.some(payment => payment.originalEventId === receiptId);
+  }
+
+  reverseOrderPayment(payment: CommerceOrderPayment): void {
+    const order = this.selectedOrder;
+    const reason = this.orderReversalReason.trim();
+    if (!this.can('SALES_MANAGE') || !order || payment.eventKind !== 'RECEIPT' ||
+        reason.length < 3 || this.orderPayments.some(p => p.originalEventId === payment.id)) {
+      this.errorMessage = 'Informe motivo e selecione recebimento ainda não estornado.';
+      return;
+    }
+    if (!window.confirm('Estornar o recebimento na encomenda sem excluir o histórico?')) return;
+    if (!this.orderReversalKey || this.orderReversalTargetId !== payment.id) {
+      this.orderReversalKey = crypto.randomUUID();
+      this.orderReversalDate = brazilToday();
+      this.orderReversalTargetId = payment.id;
+    }
+    this.mutate(this.finance.reverseOrderPayment(order.id,payment.id,
+      this.orderReversalKey,this.orderReversalDate,reason),
+      'Estorno de recebimento registrado.',() => {
+        this.orderReversalReason = '';
+        this.orderReversalKey = '';
+        this.orderReversalDate = '';
+        this.orderReversalTargetId = null;
+      });
   }
 
   selectSale(sale: CommercePhysicalSale): void {

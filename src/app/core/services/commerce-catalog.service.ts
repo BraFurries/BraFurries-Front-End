@@ -13,6 +13,15 @@ export interface CommerceArtwork {
   id: number; title: string; description: string | null; artistUserId: number;
   artistName: string; creationCost: number; status: string;
 }
+export interface CommerceArtworkFile {
+  id: number; artworkId: number;
+  kind: 'SOURCE' | 'PRINT_READY' | 'EXPORT' | 'REFERENCE';
+  originalName: string; extension: string; mediaType: string;
+  description: string | null; sha256: string; sizeBytes: number;
+  status: 'ACTIVE' | 'ARCHIVED'; uploadedByUserId: number;
+  createdAt: string; archivedAt: string | null;
+}
+
 export interface CommerceSupplierOption { id: number; name: string; }
 export interface CommerceSupplier {
   id: number; name: string; contactName: string | null; email: string | null;
@@ -84,6 +93,31 @@ export class CommerceCatalogService {
 
   createArtwork(input: CreateArtworkInput): Observable<CreatedCommerceEntity> {
     return this.http.post<CreatedCommerceEntity>(`${this.base}/artworks`,input);
+  }
+
+
+  artworkFiles(artworkId: number): Observable<CommerceArtworkFile[]> {
+    return this.http.get<CommerceArtworkFile[]>(`${this.base}/artworks/${artworkId}/files`);
+  }
+
+  uploadArtworkFile(artworkId: number, kind: CommerceArtworkFile['kind'],
+                    description: string | null, file: File): Observable<CreatedCommerceEntity> {
+    const form = new FormData();
+    form.append('kind',kind);
+    if (description) form.append('description',description);
+    form.append('file',file,file.name);
+    return this.http.post<CreatedCommerceEntity>(
+      `${this.base}/artworks/${artworkId}/files`,form);
+  }
+
+  downloadArtworkFile(artworkId: number, fileId: number): Observable<Blob> {
+    return this.http.get(`${this.base}/artworks/${artworkId}/files/${fileId}/download`,
+      { responseType: 'blob' });
+  }
+
+  archiveArtworkFile(artworkId: number, fileId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/artworks/${artworkId}/files/${fileId}/archive`,{});
   }
 
   suppliers(): Observable<CommerceSupplier[]> {

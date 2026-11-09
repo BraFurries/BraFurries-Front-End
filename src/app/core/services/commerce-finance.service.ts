@@ -30,6 +30,44 @@ export interface CreateCommerceSale {
   processingFeePercent?: number;
   processingFeeFixed?: number;
 }
+export type CommerceOrderStatus = 'OPEN' | 'READY' | 'DELIVERED' | 'CANCELLED';
+export interface CommerceOrder {
+  id: number; buyerLabel: string; channel: string;
+  externalReference: string | null; orderedOn: string;
+  expectedDeliveryOn: string | null; status: CommerceOrderStatus;
+  totalAmount: number; paidAmount: number;
+  notes: string | null; readyAt: string | null;
+  deliveredOn: string | null; cancellationReason: string | null;
+}
+export interface CommerceOrderProductChoice {
+  id: number; name: string; suggestedPrice: number;
+}
+export interface CommerceOrderLineInput {
+  productId: number | null; label: string; size: string | null;
+  quantity: number; unitPrice: number;
+}
+export interface CreateCommerceOrder {
+  requestKey: string; buyerLabel: string;
+  channel: 'EVENT' | 'DIRECT' | 'ONLINE' | 'OTHER';
+  externalReference: string | null; orderedOn: string;
+  expectedDeliveryOn: string | null; notes: string | null;
+  items: CommerceOrderLineInput[];
+}
+export interface CommerceOrderItem extends CommerceOrderLineInput {
+  id: number; lineAmount: number;
+}
+export interface CommerceOrderPayment {
+  id: number; eventKind: 'RECEIPT' | 'REVERSAL';
+  originalEventId: number | null; amount: number;
+  receivedOn: string; paymentMethod: string;
+  externalReference: string | null; notes: string | null;
+}
+export interface OrderReceiptInput {
+  requestKey: string; amount: number; receivedOn: string;
+  paymentMethod: string; externalReference: string | null;
+  notes: string | null;
+}
+
 export interface CommercePhysicalSale {
   id: number;
   channel: string;
@@ -159,6 +197,7 @@ export interface CommerceCashSummary {
 @Injectable({ providedIn: 'root' })
 export class CommerceFinanceService {
   private readonly base = `${environment.apiBaseUrl}/user/me/brafurries-commerce/finance`;
+  private readonly ordersBase = `${environment.apiBaseUrl}/user/me/brafurries-commerce/orders`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -180,6 +219,42 @@ export class CommerceFinanceService {
 
   cancelSale(id: number, reason: string): Observable<void> {
     return this.http.post<void>(`${this.base}/sales/${id}/cancel`, { reason });
+  }
+
+  orderProductChoices(): Observable<CommerceOrderProductChoice[]> {
+    return this.http.get<CommerceOrderProductChoice[]>(`${this.ordersBase}/product-choices`);
+  }
+
+  orders(): Observable<CommerceOrder[]> {
+    return this.http.get<CommerceOrder[]>(this.ordersBase);
+  }
+
+  createOrder(order: CreateCommerceOrder): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(this.ordersBase,order);
+  }
+
+  orderItems(id: number): Observable<CommerceOrderItem[]> {
+    return this.http.get<CommerceOrderItem[]>(`${this.ordersBase}/${id}/items`);
+  }
+
+  transitionOrder(id: number, status: CommerceOrderStatus,
+                  deliveredOn: string | null, reason: string | null): Observable<void> {
+    return this.http.post<void>(`${this.ordersBase}/${id}/status`,
+      { status, deliveredOn, reason });
+  }
+
+  orderPayments(id: number): Observable<CommerceOrderPayment[]> {
+    return this.http.get<CommerceOrderPayment[]>(`${this.ordersBase}/${id}/payments`);
+  }
+
+  receiveOrderPayment(id: number, input: OrderReceiptInput): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(`${this.ordersBase}/${id}/payments`,input);
+  }
+
+  reverseOrderPayment(id: number, paymentId: number,
+                      requestKey: string, reversedOn: string, reason: string): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(`${this.ordersBase}/${id}/payments/${paymentId}/reverse`,
+      { requestKey,reversedOn,reason });
   }
 
   royalties(year: number, month: number): Observable<CommerceRoyaltyEvent[]> {
