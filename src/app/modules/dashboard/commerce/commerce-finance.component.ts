@@ -134,6 +134,9 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   paymentDate = brazilToday();
   paymentReference = '';
   paymentNotes = '';
+  reversingArtistPaymentId: number | null = null;
+  reversingArtistPaymentReason = '';
+  reversingArtistPaymentDate = brazilToday();
 
   private readonly destroy$ = new Subject<void>();
 
@@ -593,6 +596,44 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.paymentAmount=0;
       this.paymentReference='';
       this.paymentNotes='';
+    });
+  }
+
+  artistPaymentWasReversed(id: number): boolean {
+    return this.payments.some(p=>p.eventKind==='REVERSAL' && p.originalPaymentId===id);
+  }
+
+  beginReverseArtistPayment(payment: CommercePayment): void {
+    if(this.access?.owner!==true || payment.eventKind!=='PAYMENT' ||
+       this.artistPaymentWasReversed(payment.id)) return;
+    this.reversingArtistPaymentId=payment.id;
+    this.reversingArtistPaymentReason='';
+    this.reversingArtistPaymentDate=brazilToday();
+  }
+
+  cancelReverseArtistPayment(): void {
+    this.reversingArtistPaymentId=null;
+    this.reversingArtistPaymentReason='';
+  }
+
+  reverseArtistPayment(): void {
+    const statement=this.selectedStatement;
+    const paymentId=this.reversingArtistPaymentId;
+    const reason=this.reversingArtistPaymentReason.trim();
+    if(this.access?.owner!==true || !this.can('FINANCE_VIEW') ||
+       !statement || paymentId==null || reason.length<3 ||
+       !this.reversingArtistPaymentDate) {
+      this.errorMessage='Informe o pagamento, a data e o motivo do estorno.';
+      return;
+    }
+    if(!window.confirm('Registrar compensação contábil? Isto NÃO reembolsa o artista no banco. O pagamento original será mantido no histórico.')) {
+      return;
+    }
+    this.mutate(this.finance.reverseArtistPayment(
+      statement.id,paymentId,this.reversingArtistPaymentDate,reason
+    ),'Estorno contábil registrado. Verifique o saldo do fechamento.',()=>{
+      this.cancelReverseArtistPayment();
+      this.selectStatement(statement);
     });
   }
 

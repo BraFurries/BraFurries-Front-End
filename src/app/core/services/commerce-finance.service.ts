@@ -140,6 +140,10 @@ export interface CommercePayment {
   externalReference: string;
   notes: string | null;
   createdAt: string;
+  eventKind: 'PAYMENT' | 'REVERSAL';
+  originalPaymentId: number | null;
+  reversalReason: string | null;
+  reversedAt: string | null;
 }
 export interface CreateCommercePayment {
   requestKey: string;
@@ -290,6 +294,14 @@ export class CommerceFinanceService {
 
   recordPayment(id: number, payment: CreateCommercePayment): Observable<FinanceCreated> {
     return this.http.post<FinanceCreated>(`${this.base}/statements/${id}/payments`, payment);
+  }
+
+  reverseArtistPayment(statementId: number, paymentId: number,
+                       reversedOn: string, reason: string): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(
+      `${this.base}/statements/${statementId}/payments/${paymentId}/reverse`,
+      {reversedOn,reason}
+    );
   }
 
   cashMovements(year: number, month: number): Observable<CommerceCashMovement[]> {
