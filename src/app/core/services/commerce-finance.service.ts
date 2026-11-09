@@ -225,6 +225,14 @@ export class CommerceFinanceService {
     return this.http.get<CommerceOrderProductChoice[]>(`${this.ordersBase}/product-choices`);
   }
 
+  updateOrder(id: number,order: Omit<CreateCommerceOrder,'requestKey'>): Observable<void> {
+    return this.http.put<void>(`${this.ordersBase}/${id}`,order);
+  }
+
+  deleteUnusedOrder(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.ordersBase}/${id}`);
+  }
+
   orders(): Observable<CommerceOrder[]> {
     return this.http.get<CommerceOrder[]>(this.ordersBase);
   }
