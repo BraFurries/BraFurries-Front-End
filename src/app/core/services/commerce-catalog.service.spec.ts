@@ -56,6 +56,34 @@ describe('CommerceCatalogService', () => {
     request.flush(new Blob(['pdf'],{type:'application/pdf'}));
   });
 
+  it('uses private multipart and authenticated routes for artwork versions', () => {
+    const file = new File(['file'], 'original.psd', { type:'application/octet-stream' });
+    catalog.uploadArtworkFile(20,'SOURCE','Camadas originais',file).subscribe();
+    const upload=http.expectOne(base+'/artworks/20/files');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body instanceof FormData).toBeTrue();
+    expect(upload.request.body.get('kind')).toBe('SOURCE');
+    expect(upload.request.body.get('description')).toBe('Camadas originais');
+    expect((upload.request.body.get('file') as File).name).toBe('original.psd');
+    expect(upload.request.headers.has('Content-Type')).toBeFalse();
+    upload.flush({ id: 55 });
+
+    catalog.artworkFiles(20).subscribe();
+    const list=http.expectOne(base+'/artworks/20/files');
+    expect(list.request.method).toBe('GET');
+    list.flush([]);
+
+    catalog.downloadArtworkFile(20,55).subscribe();
+    const download=http.expectOne(base+'/artworks/20/files/55/download');
+    expect(download.request.responseType).toBe('blob');
+    download.flush(new Blob(['file']));
+
+    catalog.archiveArtworkFile(20,55).subscribe();
+    const archive=http.expectOne(base+'/artworks/20/files/55/archive');
+    expect(archive.request.method).toBe('POST');
+    archive.flush(null);
+  });
+
   it('preserves an explicit royalty allocation when connecting artwork to product', () => {
     catalog.linkArtwork(9,20,25.125).subscribe();
     const request=http.expectOne(`${base}/products/9/artworks/20`);
