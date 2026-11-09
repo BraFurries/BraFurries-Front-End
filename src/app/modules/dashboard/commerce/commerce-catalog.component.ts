@@ -9,7 +9,7 @@ import {
   CommercialArtist, CommerceArtistService, IssuedArtistInvitation
 } from '../../../core/services/commerce-artist.service';
 import {
-  CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch,
+  CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch, CommerceBatchRevision,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
 } from '../../../core/services/commerce-catalog.service';
@@ -48,6 +48,11 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   supplierChoices: CommerceSupplierOption[] = [];
   products: CommerceProduct[] = [];
   batches: CommerceBatch[] = [];
+  editingBatchId: number | null = null;
+  batchCorrectionReason = '';
+  batchHistoryId: number | null = null;
+  batchRevisions: CommerceBatchRevision[] = [];
+  batchHistoryLoading = false;
   contracts: CommerceSignedAgreement[] = [];
   links: CommerceProductArtwork[] = [];
   artistCandidates: CommerceArtist[] = [];
@@ -57,6 +62,11 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   issuedInvitationLink = '';
   issuedArtistName = '';
   issuingInvitation = false;
+  editingArtworkId: number | null = null;
+  editingArtistId: number | null = null;
+  editingTemplateId: number | null = null;
+  editingSupplierId: number | null = null;
+  editingProductId: number | null = null;
   externalArtistForm = {
     artistName: '', telegramHandle: '', instagramHandle: '',
     contactEmail: '', internalNotes: ''
@@ -212,6 +222,27 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       });
   }
 
+  startEditArtist(artist: CommercialArtist): void {
+    // The edit form lives inside the Artworks tab; reveal it when launched
+    // from the external artists list rather than leaving the form invisible.
+    this.activeTab='artworks';
+    this.editingArtistId=artist.userId;
+    this.externalArtistForm={
+      artistName:artist.artistName,telegramHandle:artist.telegramHandle || '',
+      instagramHandle:artist.instagramHandle || '',
+      contactEmail:artist.contactEmail || '',internalNotes:artist.internalNotes || ''
+    };
+    this.showExternalArtistForm=true;
+    this.errorMessage='';
+  }
+
+  cancelEditArtist(): void {
+    this.editingArtistId=null;
+    this.externalArtistForm={artistName:'',telegramHandle:'',instagramHandle:'',
+      contactEmail:'',internalNotes:''};
+    this.showExternalArtistForm=false;
+  }
+
   createExternalArtist(): void {
     if (!this.can('ARTWORKS_MANAGE') || this.saving ||
         !this.externalArtistForm.artistName.trim()) {
@@ -221,33 +252,34 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.saving = true;
     this.errorMessage = '';
     this.successMessage = '';
-    const form = this.externalArtistForm;
-    this.artistService.registerExternal({
-      artistName: form.artistName.trim(),
-      telegramHandle: form.telegramHandle.trim() || null,
-      instagramHandle: form.instagramHandle.trim() || null,
-      contactEmail: form.contactEmail.trim() || null,
-      internalNotes: form.internalNotes.trim() || null
-    }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ id }) => {
-        this.saving = false;
-        this.artistCandidates = [
-          { id, name: form.artistName.trim() },
-          ...this.artistCandidates.filter(artist => artist.id !== id)
-        ];
-        this.artworkForm.artistUserId = id;
-        this.artistSearch = form.artistName.trim();
-        this.externalArtistForm = {
-          artistName: '', telegramHandle: '', instagramHandle: '',
-          contactEmail: '', internalNotes: ''
-        };
-        this.showExternalArtistForm = false;
-        this.successMessage = 'Artista externa cadastrada. Já está selecionada para esta arte.';
+    const form=this.externalArtistForm;
+    const payload={
+      artistName:form.artistName.trim(),telegramHandle:form.telegramHandle.trim() || null,
+      instagramHandle:form.instagramHandle.trim() || null,
+      contactEmail:form.contactEmail.trim() || null,internalNotes:form.internalNotes.trim() || null
+    };
+    const editing=this.editingArtistId;
+    const request: Observable<{id:number} | void> = editing==null
+      ? this.artistService.registerExternal(payload)
+      : this.artistService.updateArtist(editing,payload);
+    request.pipe(takeUntil(this.destroy$)).subscribe({
+      next: result => {
+        this.saving=false;
+        if(editing==null) {
+          const id=(result as {id:number}).id;
+          this.artistCandidates=[{id,name:payload.artistName},
+            ...this.artistCandidates.filter(item=>item.id!==id)];
+          this.artworkForm.artistUserId=id;
+          this.artistSearch=payload.artistName;
+        }
+        this.cancelEditArtist();
+        this.successMessage=editing==null
+          ? 'Artista externa cadastrada e selecionada.' : 'Dados da artista atualizados.';
         this.reload();
       },
-      error: () => {
-        this.saving = false;
-        this.errorMessage = 'Não foi possível cadastrar esta artista externa.';
+      error:err => {
+        this.saving=false;
+        this.errorMessage=err?.error?.message || 'Não foi possível salvar os dados da artista.';
       }
     });
   }
@@ -298,43 +330,175 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.issuedArtistName = '';
   }
 
+  startEditArtwork(item: CommerceArtwork): void {
+    this.editingArtworkId=item.id;
+    this.artworkForm={
+      title:item.title,description:item.description || '',
+      artistUserId:item.artistUserId,creationCost:item.creationCost
+    };
+    this.artistCandidates=[
+      {id:item.artistUserId,name:item.artistName},
+      ...this.artistCandidates.filter(candidate=>candidate.id!==item.artistUserId)
+    ];
+    this.artistSearch=item.artistName;
+    this.errorMessage='';
+  }
+
+  cancelEditArtwork(): void {
+    this.editingArtworkId=null;
+    this.artworkForm={title:'',description:'',artistUserId:null,creationCost:0};
+  }
+
   createArtwork(): void {
     if (!this.can('ARTWORKS_MANAGE') || this.artworkForm.artistUserId == null) {
-      this.errorMessage = 'Selecione um artista cadastrado na BraFurries.';
+      this.errorMessage='Selecione um artista cadastrado na BraFurries.';
       return;
     }
-    this.mutate(this.catalog.createArtwork({
-      ...this.artworkForm, artistUserId: this.artworkForm.artistUserId
-    }), 'Arte cadastrada.');
+    const id=this.editingArtworkId;
+    const payload={...this.artworkForm,artistUserId:this.artworkForm.artistUserId};
+    const request=id==null
+      ? this.catalog.createArtwork(payload) : this.catalog.updateArtwork(id,payload);
+    this.mutate(request,id==null?'Arte cadastrada.':'Obra atualizada.',
+      ()=>this.cancelEditArtwork());
+  }
+
+  toggleArtwork(item: CommerceArtwork): void {
+    if(!this.can('ARTWORKS_MANAGE') || this.saving) return;
+    const archived=item.status!=='ARCHIVED';
+    if(!window.confirm(archived
+      ? 'Arquivar esta obra? Contratos e histórico serão preservados.'
+      : 'Reativar esta obra para administração?')) return;
+    this.mutate(this.catalog.setArtworkArchived(item.id,archived),
+      archived?'Obra arquivada.':'Obra reativada.');
+  }
+
+  deleteArtwork(item: CommerceArtwork): void {
+    if(!this.can('ARTWORKS_MANAGE') || this.saving) return;
+    if(!window.confirm('Excluir definitivamente a obra '+item.title+
+        '? Só é permitido sem contratos, arquivos ou vínculos.')) return;
+    this.mutate(this.catalog.deleteArtwork(item.id),'Obra sem histórico excluída.');
+  }
+
+  startEditTemplate(model: CommerceContractTemplate): void {
+    this.editingTemplateId=model.id;
+    this.templateForm={
+      name:model.name,description:model.description || '',modality:model.modality,
+      royaltyMethod:model.royaltyMethod,royaltyPercent:model.royaltyPercent,
+      royaltyFixedAmount:model.royaltyFixedAmount
+    };
+  }
+
+  cancelEditTemplate(): void {
+    this.editingTemplateId=null;
+    this.templateForm={name:'',description:'',modality:'ROYALTY',royaltyMethod:'PERCENT_GROSS',
+      royaltyPercent:10,royaltyFixedAmount:null};
   }
 
   createTemplate(): void {
     if (!this.can('CONTRACTS_MANAGE')) return;
-    const form = this.templateForm;
-    this.mutate(this.catalog.createTemplate({
-      name: form.name, description: form.description || null,
-      modality: form.modality, royaltyMethod: form.royaltyMethod,
-      royaltyPercent: form.royaltyMethod.startsWith('PERCENT_') ? form.royaltyPercent : null,
-      royaltyFixedAmount: form.royaltyMethod.startsWith('FIXED_') ? form.royaltyFixedAmount : null
-    }), 'Modelo de contrato cadastrado.');
+    const form=this.templateForm;
+    const payload={
+      name:form.name,description:form.description || null,modality:form.modality,
+      royaltyMethod:form.royaltyMethod,
+      royaltyPercent:form.royaltyMethod.startsWith('PERCENT_')?form.royaltyPercent:null,
+      royaltyFixedAmount:form.royaltyMethod.startsWith('FIXED_')?form.royaltyFixedAmount:null
+    };
+    const id=this.editingTemplateId;
+    this.mutate(id==null?this.catalog.createTemplate(payload):
+      this.catalog.updateTemplate(id,payload),
+      id==null?'Modelo de contrato cadastrado.':'Modelo atualizado (contratos assinados não mudam).',
+      ()=>this.cancelEditTemplate());
+  }
+
+  toggleTemplate(model: CommerceContractTemplate): void {
+    if(!this.can('CONTRACTS_MANAGE') || this.saving) return;
+    this.mutate(this.catalog.setTemplateActive(model.id,!model.active),
+      model.active?'Modelo desativado.':'Modelo reativado.');
+  }
+
+  deleteTemplate(model: CommerceContractTemplate): void {
+    if(!this.can('CONTRACTS_MANAGE') || this.saving ||
+       !window.confirm('Excluir modelo sem contratos assinados: '+model.name+'?')) return;
+    this.mutate(this.catalog.deleteTemplate(model.id),'Modelo excluído.');
+  }
+
+  startEditSupplier(supplier: CommerceSupplier): void {
+    this.editingSupplierId=supplier.id;
+    this.supplierForm={name:supplier.name,contactName:supplier.contactName || '',
+      email:supplier.email || '',phone:supplier.phone || '',notes:supplier.notes || ''};
+  }
+
+  cancelEditSupplier(): void {
+    this.editingSupplierId=null;
+    this.supplierForm={name:'',contactName:'',email:'',phone:'',notes:''};
   }
 
   createSupplier(): void {
     if (!this.can('SUPPLIERS_MANAGE')) return;
-    this.mutate(this.catalog.createSupplier({
-      name: this.supplierForm.name,
-      contactName: this.supplierForm.contactName || null,
-      email: this.supplierForm.email || null,
-      phone: this.supplierForm.phone || null,
-      notes: this.supplierForm.notes || null
-    }), 'Fornecedor cadastrado.');
+    const form=this.supplierForm;
+    const payload={name:form.name,contactName:form.contactName || null,
+      email:form.email || null,phone:form.phone || null,notes:form.notes || null};
+    const id=this.editingSupplierId;
+    this.mutate(id==null?this.catalog.createSupplier(payload):
+      this.catalog.updateSupplier(id,payload),
+      id==null?'Fornecedor cadastrado.':'Fornecedor atualizado.',
+      ()=>this.cancelEditSupplier());
+  }
+
+  toggleSupplier(supplier: CommerceSupplier): void {
+    if(!this.can('SUPPLIERS_MANAGE') || this.saving) return;
+    this.mutate(this.catalog.setSupplierActive(supplier.id,!supplier.active),
+      supplier.active?'Fornecedor desativado.':'Fornecedor reativado.');
+  }
+
+  deleteSupplier(supplier: CommerceSupplier): void {
+    if(!this.can('SUPPLIERS_MANAGE') || this.saving ||
+       !window.confirm('Excluir fornecedor sem uso: '+supplier.name+'?')) return;
+    this.mutate(this.catalog.deleteSupplier(supplier.id),'Fornecedor excluído.');
+  }
+
+  startEditProduct(product: CommerceProduct): void {
+    this.editingProductId=product.id;
+    this.productForm={sku:product.sku,name:product.name,
+      description:product.description || '',
+      estimatedUnitCost:product.estimatedUnitCost,suggestedPrice:product.suggestedPrice,
+      preferredSupplierId:product.preferredSupplierId};
+  }
+
+  cancelEditProduct(): void {
+    this.editingProductId=null;
+    this.productForm={sku:'',name:'',description:'',estimatedUnitCost:0,
+      suggestedPrice:0,preferredSupplierId:null};
   }
 
   createProduct(): void {
     if (!this.can('PRODUCTS_MANAGE')) return;
-    this.mutate(this.catalog.createProduct({
-      ...this.productForm, description: this.productForm.description || null
-    }), 'Produto cadastrado.');
+    const payload={...this.productForm,description:this.productForm.description || null};
+    const id=this.editingProductId;
+    this.mutate(id==null?this.catalog.createProduct(payload):
+      this.catalog.updateProduct(id,payload),
+      id==null?'Produto cadastrado.':'Produto atualizado.',
+      ()=>this.cancelEditProduct());
+  }
+
+  toggleProduct(product: CommerceProduct): void {
+    if(!this.can('PRODUCTS_MANAGE') || this.saving) return;
+    this.mutate(this.catalog.setProductActive(product.id,!product.active),
+      product.active?'Produto desativado.':'Produto reativado.');
+  }
+
+  deleteProduct(product: CommerceProduct): void {
+    if(!this.can('PRODUCTS_MANAGE') || this.saving ||
+       !window.confirm('Excluir produto sem lotes, encomendas nem vínculos: '+product.name+'?')) return;
+    this.mutate(this.catalog.deleteProduct(product.id),'Produto excluído.');
+  }
+
+  unlinkArtworkFromProduct(artworkId: number): void {
+    if(!this.can('PRODUCTS_MANAGE') || !this.can('CONTRACTS_MANAGE') ||
+       this.selectedProductId==null || this.saving ||
+       !window.confirm('Remover vínculo da arte deste produto? Royalties passados permanecem.')) return;
+    this.mutate(this.catalog.unlinkArtwork(this.selectedProductId,artworkId),
+      'Vínculo removido; lançamentos históricos preservados.');
   }
 
   linkArtwork(): void {
@@ -348,17 +512,95 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     ), 'Vínculo entre produto e arte atualizado.');
   }
 
+  startEditBatch(batch: CommerceBatch): void {
+    if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
+    this.activeTab='production';
+    this.editingBatchId=batch.id;
+    this.productionForm={
+      productId:batch.productId,supplierId:batch.supplierId,quantity:batch.quantity,
+      unitCost:batch.unitCost,additionalCost:batch.additionalCost,
+      producedOn:batch.producedOn,reference:batch.reference || ''
+    };
+    this.batchCorrectionReason='';
+    this.errorMessage='';
+  }
+
+  cancelEditBatch(): void {
+    this.editingBatchId=null;
+    this.batchCorrectionReason='';
+    this.productionForm={productId:null,supplierId:null,quantity:1,
+      unitCost:0,additionalCost:0,
+      producedOn:new Date().toLocaleDateString('en-CA'),reference:''};
+  }
+
+  loadBatchHistory(id: number): void {
+    if(this.batchHistoryId===id) {
+      this.batchHistoryId=null;
+      this.batchRevisions=[];
+      return;
+    }
+    if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
+    this.batchHistoryId=id;
+    this.batchRevisions=[];
+    this.batchHistoryLoading=true;
+    this.catalog.productionBatchHistory(id).pipe(takeUntil(this.destroy$)).subscribe({
+      next:rows=>{
+        if(this.batchHistoryId!==id) return;
+        this.batchRevisions=rows;
+        this.batchHistoryLoading=false;
+      },
+      error:err=>{
+        if(this.batchHistoryId!==id) return;
+        this.batchRevisions=[];
+        this.batchHistoryLoading=false;
+        this.errorMessage=err?.error?.message || 'Não foi possível carregar as correções do lote.';
+      }
+    });
+  }
+
+  describeBatchSnapshot(json: string): string {
+    try {
+      const snapshot=JSON.parse(json) as {
+        productId:number;supplierId:number;quantity:number;
+        unitCost:number;additionalCost:number;producedOn:string;reference:string|null;
+      };
+      return `${snapshot.quantity} un. · produto #${snapshot.productId} · ` +
+        `fornecedor #${snapshot.supplierId} · ` +
+        `custo R$ ${Number(snapshot.unitCost).toFixed(2)} + R$ ${Number(snapshot.additionalCost).toFixed(2)} · ` +
+        `${snapshot.producedOn} · ref.: ${snapshot.reference || 'sem referência'}`;
+    } catch {
+      return 'Snapshot indisponível';
+    }
+  }
+
   createProduction(): void {
     if (!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')
       || this.productionForm.productId == null || this.productionForm.supplierId == null) {
-      this.errorMessage = 'Selecione o produto e o fornecedor do lote.';
+      this.errorMessage='Selecione o produto e o fornecedor do lote.';
       return;
     }
-    this.mutate(this.catalog.createProductionBatch({
-      ...this.productionForm, productId: this.productionForm.productId,
-      supplierId: this.productionForm.supplierId,
-      reference: this.productionForm.reference || null
-    }), 'Lote de produção registrado.');
+    const payload={
+      ...this.productionForm,productId:this.productionForm.productId,
+      supplierId:this.productionForm.supplierId,
+      reference:this.productionForm.reference.trim() || null
+    };
+    const id=this.editingBatchId;
+    const reason=this.batchCorrectionReason.trim();
+    if(id!=null && reason.length<3) {
+      this.errorMessage='Informe o motivo da correção (mínimo 3 caracteres).';
+      return;
+    }
+    const request=id==null
+      ? this.catalog.createProductionBatch(payload)
+      : this.catalog.correctProductionBatch(id,payload,reason);
+    this.mutate(request,id==null?'Lote de produção registrado.':
+      'Lote corrigido; histórico anterior preservado.',()=>{
+        if(id!=null && this.batchHistoryId===id) {
+          this.batchHistoryId=null;
+          this.batchRevisions=[];
+        }
+        this.cancelEditBatch();
+    });
   }
 
   onContractFile(event: Event): void {
@@ -502,7 +744,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       });
   }
 
-  private mutate(request: Observable<unknown>, message: string): void {
+  private mutate(request: Observable<unknown>, message: string,
+                 afterSuccess?: () => void): void {
     if (this.saving) return;
     this.saving = true;
     this.errorMessage = '';
@@ -511,6 +754,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       next: () => {
         this.saving = false;
         this.successMessage = message;
+        afterSuccess?.();
         this.reload();
       },
       error: error => {

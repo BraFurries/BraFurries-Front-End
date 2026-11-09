@@ -164,11 +164,56 @@ describe('CommerceFinanceService', () => {
     reversal.flush({id:42});
   });
 
+  it('posts a dedicated owner-only compensation with reason and date', () => {
+    service.reverseArtistPayment(21,99,'2026-11-09','Repasse cadastrado duas vezes').subscribe();
+    const request=http.expectOne(`${base}/statements/21/payments/99/reverse`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      reversedOn:'2026-11-09',reason:'Repasse cadastrado duas vezes'
+    });
+    request.flush({id:100});
+  });
+
   it('cancels an existing sale only through the explicit compensation endpoint', () => {
     service.cancelSale(31,'Cliente desistiu').subscribe();
     const request=http.expectOne(`${base}/sales/31/cancel`);
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({reason:'Cliente desistiu'});
     request.flush(null);
+  });
+
+  it('does not use payout DELETE or PUT when correcting only metadata', () => {
+    service.correctArtistPaymentMetadata(21,99,'PIX-C','Código corrigido',
+      'Registro incorreto').subscribe();
+    const request=http.expectOne(
+      `${base}/statements/21/payments/99/metadata-corrections`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      reference:'PIX-C',notes:'Código corrigido',reason:'Registro incorreto'
+    });
+    request.flush(null);
+
+    service.artistPaymentMetadataHistory(21,99).subscribe();
+    const history=http.expectOne(
+      `${base}/statements/21/payments/99/metadata-corrections`);
+    expect(history.request.method).toBe('GET');
+    history.flush([]);
+  });
+
+  it('corrects only cash descriptions and references in the append-only journal', () => {
+    service.correctCashMetadata(10,'Cartazes','NF-42',null,
+      'Nota fiscal retificada').subscribe();
+    const request=http.expectOne(`${base}/cash-movements/10/metadata-corrections`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      description:'Cartazes',reference:'NF-42',notes:null,
+      reason:'Nota fiscal retificada'
+    });
+    request.flush(null);
+
+    service.cashMetadataHistory(10).subscribe();
+    const history=http.expectOne(`${base}/cash-movements/10/metadata-corrections`);
+    expect(history.request.method).toBe('GET');
+    history.flush([]);
   });
 });

@@ -6,6 +6,7 @@ import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
   CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
   CommerceCashMovement, CommerceCashSummary, CashMovementType, ContributionNature, ContributionSource,
+  CommercePaymentMetadataRevision, CommerceCashMetadataRevision,
   CommerceOrder, CommerceOrderItem, CommerceOrderLineInput, CommerceOrderPayment, CommerceOrderStatus,
   CommerceOrderProductChoice
 } from '../../../core/services/commerce-finance.service';
@@ -57,6 +58,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   orderItems: CommerceOrderItem[] = [];
   orderPayments: CommerceOrderPayment[] = [];
   selectedOrderId: number | null = null;
+  editingOrderId: number | null = null;
   orderRequestKey = '';
   orderBuyer = '';
   orderChannel: 'EVENT' | 'DIRECT' | 'ONLINE' | 'OTHER' = 'DIRECT';
@@ -88,6 +90,14 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   cashSummary: CommerceCashSummary | null = null;
   cashReversalId: number | null = null;
   cashReversalReason = '';
+  editingCashMetadataId: number | null = null;
+  cashMetadataDescription = '';
+  cashMetadataReference = '';
+  cashMetadataNotes = '';
+  cashMetadataReason = '';
+  cashMetadataHistoryId: number | null = null;
+  cashMetadataHistoryRows: CommerceCashMetadataRevision[] = [];
+  cashMetadataHistoryLoading = false;
 
   periodYear = Number(brazilToday().slice(0, 4));
   periodMonth = Number(brazilToday().slice(5, 7));
@@ -134,6 +144,16 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   paymentDate = brazilToday();
   paymentReference = '';
   paymentNotes = '';
+  reversingArtistPaymentId: number | null = null;
+  reversingArtistPaymentReason = '';
+  reversingArtistPaymentDate = brazilToday();
+  editingPaymentMetadataId: number | null = null;
+  paymentMetadataReference = '';
+  paymentMetadataNotes = '';
+  paymentMetadataReason = '';
+  paymentMetadataHistoryId: number | null = null;
+  paymentMetadataHistoryRows: CommercePaymentMetadataRevision[] = [];
+  paymentMetadataHistoryLoading = false;
 
   private readonly destroy$ = new Subject<void>();
 
@@ -367,20 +387,74 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Revise descrições, tamanhos, quantidades e preços.';
       return;
     }
-    if (!this.orderRequestKey) this.orderRequestKey = crypto.randomUUID();
-    this.mutate(this.finance.createOrder({
-      requestKey:this.orderRequestKey,buyerLabel:this.orderBuyer.trim(),
-      channel:this.orderChannel,externalReference:this.orderReference.trim() || null,
+    const payload={
+      buyerLabel:this.orderBuyer.trim(),channel:this.orderChannel,
+      externalReference:this.orderReference.trim() || null,
       orderedOn:this.orderDate,expectedDeliveryOn:this.orderDueDate || null,
       notes:this.orderNotes.trim() || null,items:lines
-    }), 'Encomenda cadastrada sem movimentação de estoque ou royalties.', () => {
-      this.orderRequestKey = '';
-      this.orderBuyer = '';
-      this.orderReference = '';
-      this.orderDueDate = '';
-      this.orderNotes = '';
-      this.orderDraftLines = [];
+    };
+    const editing=this.editingOrderId;
+    if(editing==null && !this.orderRequestKey) this.orderRequestKey=crypto.randomUUID();
+    const request: Observable<unknown>=editing==null
+      ? this.finance.createOrder({...payload,requestKey:this.orderRequestKey})
+      : this.finance.updateOrder(editing,payload);
+    this.mutate(request,editing==null
+      ? 'Encomenda cadastrada sem movimentação de estoque ou royalties.'
+      : 'Encomenda aberta corrigida; histórico financeiro preservado.', () => {
+      this.cancelEditOrder();
     });
+  }
+
+  editOpenOrder(order: CommerceOrder): void {
+    if(!this.can('SALES_MANAGE') || this.saving || order.status!=='OPEN') return;
+    // Net paid = zero is insufficient: reversed receipts also freeze the
+    // original order amount. The API rechecks this under the order lock.
+    forkJoin({
+      items:this.finance.orderItems(order.id),
+      payments:this.finance.orderPayments(order.id)
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next:({items,payments})=>{
+        if(payments.length) {
+          this.errorMessage='Há recebimentos registrados nesta encomenda. Não é possível alterar valores.';
+          return;
+        }
+        this.editingOrderId=order.id;
+        this.orderBuyer=order.buyerLabel;
+        this.orderChannel=order.channel as 'EVENT'|'DIRECT'|'ONLINE'|'OTHER';
+        this.orderReference=order.externalReference || '';
+        this.orderDate=order.orderedOn;
+        this.orderDueDate=order.expectedDeliveryOn || '';
+        this.orderNotes=order.notes || '';
+        this.orderDraftLines=items.map(item=>({
+          productId:item.productId,label:item.label,size:item.size,
+          quantity:item.quantity,unitPrice:item.unitPrice
+        }));
+        this.errorMessage='';
+      },
+      error:()=>this.errorMessage='Não foi possível carregar os dados para correção.'
+    });
+  }
+
+  cancelEditOrder(): void {
+    this.editingOrderId=null;
+    this.orderRequestKey='';
+    this.orderBuyer='';
+    this.orderChannel='DIRECT';
+    this.orderReference='';
+    this.orderDate=brazilToday();
+    this.orderDueDate='';
+    this.orderNotes='';
+    this.orderDraftLines=[];
+  }
+
+  deleteUnusedOrder(order: CommerceOrder): void {
+    if(!this.can('SALES_MANAGE') || this.saving || order.status!=='OPEN' ||
+       !window.confirm('Excluir definitivamente esta encomenda sem recebimentos?')) return;
+    this.mutate(this.finance.deleteUnusedOrder(order.id),
+      'Encomenda nunca utilizada excluída.',()=>{
+        if(this.editingOrderId===order.id) this.cancelEditOrder();
+        if(this.selectedOrderId===order.id) this.selectedOrderId=null;
+      });
   }
 
   selectOrder(order: CommerceOrder): void {
@@ -593,6 +667,152 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.paymentAmount=0;
       this.paymentReference='';
       this.paymentNotes='';
+    });
+  }
+
+  startPaymentMetadataEdit(payment: CommercePayment): void {
+    if(!this.can('PAYMENTS_RECORD') || !this.can('FINANCE_VIEW')
+      || payment.eventKind!=='PAYMENT') return;
+    this.editingPaymentMetadataId=payment.id;
+    this.paymentMetadataReference=payment.externalReference;
+    this.paymentMetadataNotes=payment.notes || '';
+    this.paymentMetadataReason='';
+  }
+
+  cancelPaymentMetadataEdit(): void {
+    this.editingPaymentMetadataId=null;
+    this.paymentMetadataReason='';
+  }
+
+  submitPaymentMetadataCorrection(): void {
+    const statement=this.selectedStatement;
+    const id=this.editingPaymentMetadataId;
+    if(!this.can('PAYMENTS_RECORD') || !this.can('FINANCE_VIEW') ||
+       !statement || id==null || !this.paymentMetadataReference.trim() ||
+       this.paymentMetadataReason.trim().length<3) {
+      this.errorMessage='Informe a nova referência e o motivo da retificação.';
+      return;
+    }
+    this.mutate(this.finance.correctArtistPaymentMetadata(statement.id,id,
+      this.paymentMetadataReference.trim(),this.paymentMetadataNotes.trim() || null,
+      this.paymentMetadataReason.trim()),
+      'Referência/observação retificada; valor do repasse e histórico preservados.',
+      ()=>this.cancelPaymentMetadataEdit());
+  }
+
+  togglePaymentMetadataHistory(paymentId:number): void {
+    const statement=this.selectedStatement;
+    if(!statement || !this.can('FINANCE_VIEW')) return;
+    if(this.paymentMetadataHistoryId===paymentId) {
+      this.paymentMetadataHistoryId=null;
+      this.paymentMetadataHistoryRows=[];
+      return;
+    }
+    this.paymentMetadataHistoryId=paymentId;
+    this.paymentMetadataHistoryRows=[];
+    this.paymentMetadataHistoryLoading=true;
+    this.finance.artistPaymentMetadataHistory(statement.id,paymentId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next:rows=>{
+          if(this.paymentMetadataHistoryId!==paymentId) return;
+          this.paymentMetadataHistoryRows=rows;this.paymentMetadataHistoryLoading=false;
+        },
+        error:()=>{
+          if(this.paymentMetadataHistoryId!==paymentId) return;
+          this.paymentMetadataHistoryLoading=false;
+          this.errorMessage='Não foi possível consultar o histórico de retificações do repasse.';
+        }
+      });
+  }
+
+  artistPaymentWasReversed(id: number): boolean {
+    return this.payments.some(p=>p.eventKind==='REVERSAL' && p.originalPaymentId===id);
+  }
+
+  beginReverseArtistPayment(payment: CommercePayment): void {
+    if(this.access?.owner!==true || payment.eventKind!=='PAYMENT' ||
+       this.artistPaymentWasReversed(payment.id)) return;
+    this.reversingArtistPaymentId=payment.id;
+    this.reversingArtistPaymentReason='';
+    this.reversingArtistPaymentDate=brazilToday();
+  }
+
+  cancelReverseArtistPayment(): void {
+    this.reversingArtistPaymentId=null;
+    this.reversingArtistPaymentReason='';
+  }
+
+  reverseArtistPayment(): void {
+    const statement=this.selectedStatement;
+    const paymentId=this.reversingArtistPaymentId;
+    const reason=this.reversingArtistPaymentReason.trim();
+    if(this.access?.owner!==true || !this.can('FINANCE_VIEW') ||
+       !statement || paymentId==null || reason.length<3 ||
+       !this.reversingArtistPaymentDate) {
+      this.errorMessage='Informe o pagamento, a data e o motivo do estorno.';
+      return;
+    }
+    if(!window.confirm('Registrar compensação contábil? Isto NÃO reembolsa o artista no banco. O pagamento original será mantido no histórico.')) {
+      return;
+    }
+    this.mutate(this.finance.reverseArtistPayment(
+      statement.id,paymentId,this.reversingArtistPaymentDate,reason
+    ),'Estorno contábil registrado. Verifique o saldo do fechamento.',()=>{
+      this.cancelReverseArtistPayment();
+      this.selectStatement(statement);
+    });
+  }
+
+  startCashMetadataEdit(movement:CommerceCashMovement): void {
+    if(!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW')
+      || movement.eventKind!=='POSTED') return;
+    this.editingCashMetadataId=movement.id;
+    this.cashMetadataDescription=movement.description;
+    this.cashMetadataReference=movement.externalReference || '';
+    this.cashMetadataNotes=movement.notes || '';
+    this.cashMetadataReason='';
+  }
+
+  cancelCashMetadataEdit(): void {
+    this.editingCashMetadataId=null;
+    this.cashMetadataReason='';
+  }
+
+  submitCashMetadataCorrection(): void {
+    const id=this.editingCashMetadataId;
+    if(!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW') ||
+       id==null || !this.cashMetadataDescription.trim() ||
+       this.cashMetadataReason.trim().length<3) {
+      this.errorMessage='Informe a descrição e o motivo da retificação.';
+      return;
+    }
+    this.mutate(this.finance.correctCashMetadata(id,
+      this.cashMetadataDescription.trim(),this.cashMetadataReference.trim() || null,
+      this.cashMetadataNotes.trim() || null,this.cashMetadataReason.trim()),
+      'Dados administrativos retificados; valor financeiro preservado.',
+      ()=>this.cancelCashMetadataEdit());
+  }
+
+  toggleCashMetadataHistory(id:number): void {
+    if(!this.can('FINANCE_VIEW')) return;
+    if(this.cashMetadataHistoryId===id) {
+      this.cashMetadataHistoryId=null;
+      this.cashMetadataHistoryRows=[];
+      return;
+    }
+    this.cashMetadataHistoryId=id;
+    this.cashMetadataHistoryRows=[];
+    this.cashMetadataHistoryLoading=true;
+    this.finance.cashMetadataHistory(id).pipe(takeUntil(this.destroy$)).subscribe({
+      next:rows=>{
+        if(this.cashMetadataHistoryId!==id) return;
+        this.cashMetadataHistoryRows=rows;this.cashMetadataHistoryLoading=false;
+      },
+      error:()=>{
+        if(this.cashMetadataHistoryId!==id) return;
+        this.cashMetadataHistoryLoading=false;
+        this.errorMessage='Não foi possível consultar o histórico de retificações do caixa.';
+      }
     });
   }
 

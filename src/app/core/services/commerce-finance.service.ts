@@ -133,13 +133,29 @@ export interface CommerceStatementItem {
   eventKind: string;
   saleId: number;
 }
+export interface CommercePaymentMetadataRevision {
+  id:number; previousReference:string; updatedReference:string;
+  previousNotes:string|null; updatedNotes:string|null;
+  reason:string; actorUserId:number; createdAt:string;
+}
+export interface CommerceCashMetadataRevision {
+  id:number; previousDescription:string; updatedDescription:string;
+  previousReference:string|null; updatedReference:string|null;
+  previousNotes:string|null; updatedNotes:string|null;
+  reason:string; actorUserId:number; createdAt:string;
+}
 export interface CommercePayment {
   id: number;
+  metadataCorrected?: boolean;
   amount: number;
   paidOn: string;
   externalReference: string;
   notes: string | null;
   createdAt: string;
+  eventKind: 'PAYMENT' | 'REVERSAL';
+  originalPaymentId: number | null;
+  reversalReason: string | null;
+  reversedAt: string | null;
 }
 export interface CreateCommercePayment {
   requestKey: string;
@@ -174,6 +190,7 @@ export interface CreateCashMovement {
 }
 export interface CommerceCashMovement extends CreateCashMovement {
   id: number;
+  metadataCorrected?: boolean;
   eventKind: 'POSTED' | 'REVERSAL';
   reversalOfId: number | null;
   signedAmount: number;
@@ -223,6 +240,14 @@ export class CommerceFinanceService {
 
   orderProductChoices(): Observable<CommerceOrderProductChoice[]> {
     return this.http.get<CommerceOrderProductChoice[]>(`${this.ordersBase}/product-choices`);
+  }
+
+  updateOrder(id: number,order: Omit<CreateCommerceOrder,'requestKey'>): Observable<void> {
+    return this.http.put<void>(`${this.ordersBase}/${id}`,order);
+  }
+
+  deleteUnusedOrder(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.ordersBase}/${id}`);
   }
 
   orders(): Observable<CommerceOrder[]> {
@@ -290,6 +315,38 @@ export class CommerceFinanceService {
 
   recordPayment(id: number, payment: CreateCommercePayment): Observable<FinanceCreated> {
     return this.http.post<FinanceCreated>(`${this.base}/statements/${id}/payments`, payment);
+  }
+
+  correctArtistPaymentMetadata(statementId:number,paymentId:number,
+                               reference:string,notes:string|null,reason:string):Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/statements/${statementId}/payments/${paymentId}/metadata-corrections`,
+      {reference,notes,reason});
+  }
+
+  artistPaymentMetadataHistory(statementId:number,paymentId:number):
+      Observable<CommercePaymentMetadataRevision[]> {
+    return this.http.get<CommercePaymentMetadataRevision[]>(
+      `${this.base}/statements/${statementId}/payments/${paymentId}/metadata-corrections`);
+  }
+
+  correctCashMetadata(id:number,description:string,reference:string|null,
+                      notes:string|null,reason:string):Observable<void> {
+    return this.http.post<void>(`${this.base}/cash-movements/${id}/metadata-corrections`,
+      {description,reference,notes,reason});
+  }
+
+  cashMetadataHistory(id:number):Observable<CommerceCashMetadataRevision[]> {
+    return this.http.get<CommerceCashMetadataRevision[]>(
+      `${this.base}/cash-movements/${id}/metadata-corrections`);
+  }
+
+  reverseArtistPayment(statementId: number, paymentId: number,
+                       reversedOn: string, reason: string): Observable<FinanceCreated> {
+    return this.http.post<FinanceCreated>(
+      `${this.base}/statements/${statementId}/payments/${paymentId}/reverse`,
+      {reversedOn,reason}
+    );
   }
 
   cashMovements(year: number, month: number): Observable<CommerceCashMovement[]> {
