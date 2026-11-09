@@ -5,6 +5,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
+import { CommerceArtistService } from '../../../core/services/commerce-artist.service';
 import { CommerceCatalogComponent } from './commerce-catalog.component';
 
 describe('CommerceCatalogComponent', () => {
@@ -12,6 +13,7 @@ describe('CommerceCatalogComponent', () => {
   let component: CommerceCatalogComponent;
   let access: jasmine.SpyObj<PlatformAccessService>;
   let catalog: jasmine.SpyObj<CommerceCatalogService>;
+  let artists: jasmine.SpyObj<CommerceArtistService>;
 
   async function create(permissions: string[], owner = false, enabled = true): Promise<void> {
     access = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
@@ -22,6 +24,16 @@ describe('CommerceCatalogComponent', () => {
       'searchArtists','signContract','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile'
     ]);
+    artists = jasmine.createSpyObj<CommerceArtistService>('CommerceArtistService', [
+      'profiles','registerExternal','issueInvitation','revokeInvitation'
+    ]);
+    artists.profiles.and.returnValue(of([]));
+    artists.registerExternal.and.returnValue(of({ id: 44 }));
+    artists.issueInvitation.and.returnValue(of({
+      id:62,token:'a'.repeat(64),confirmationCode:'ABCD1234EF56',
+      expiresAt:'2026-11-11T10:00:00'
+    }));
+    artists.revokeInvitation.and.returnValue(of(void 0));
     access.myAccess.and.returnValue(of({ enabled, owner, permissions }));
     catalog.artworks.and.returnValue(of([
       { id: 12, title: 'Arte A', artistUserId: 31, artistName: 'Artista',
@@ -53,7 +65,8 @@ describe('CommerceCatalogComponent', () => {
       imports: [CommonModule, FormsModule, RouterTestingModule],
       providers: [
         { provide: PlatformAccessService, useValue: access },
-        { provide: CommerceCatalogService, useValue: catalog }
+        { provide: CommerceCatalogService, useValue: catalog },
+        { provide: CommerceArtistService, useValue: artists }
       ]
     }).compileComponents();
 
@@ -153,5 +166,48 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.templates).toHaveBeenCalled();
     expect(catalog.suppliers).toHaveBeenCalled();
     expect(catalog.products).toHaveBeenCalled();
+  });
+  it('lets managers create Telegram artists without losing the pending artwork', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    component.artworkForm.title = 'Arte encomendada';
+    component.externalArtistForm.artistName = 'Artista Telegram';
+    component.externalArtistForm.telegramHandle = '@canal';
+    component.createExternalArtist();
+    expect(artists.registerExternal).toHaveBeenCalledWith(jasmine.objectContaining({
+      artistName: 'Artista Telegram', telegramHandle: '@canal',
+      contactEmail: null
+    }));
+    expect(component.artworkForm.artistUserId).toBe(44);
+    expect(component.artworkForm.title).toBe('Arte encomendada');
+    expect(component.artistCandidates.some(a => a.id === 44)).toBeTrue();
+  });
+
+  it('only an owner can issue invitations for unactivated external artists', async () => {
+    await create(['ARTWORKS_MANAGE'],false);
+    const external = {
+      userId:44,artistName:'Artista Telegram',telegramHandle:'@canal',
+      instagramHandle:null,contactEmail:null,internalNotes:null,
+      canInvite:1,createdAt:'2026-11-09'
+    };
+    component.issueInvitation(external);
+    expect(artists.issueInvitation).not.toHaveBeenCalled();
+    component.access={enabled:true,owner:true,permissions:[]};
+    component.issueInvitation(external);
+    expect(artists.issueInvitation).toHaveBeenCalledWith(44);
+    expect(component.issuedInvitationLink).toContain('/artist-invite?token=');
+    expect(component.issuedInvitationLink).not.toContain('artistUserId');
+    expect(component.issuedInvitation?.confirmationCode).toBe('ABCD1234EF56');
+    component.clearIssuedInvitation();
+    expect(component.issuedInvitation).toBeNull();
+  });
+
+  it('never issues a new invite for already activated accounts', async () => {
+    await create([],true);
+    component.issueInvitation({
+      userId:44,artistName:'Ativada',telegramHandle:null,
+      instagramHandle:null,contactEmail:null,internalNotes:null,
+      canInvite:0,createdAt:'2026-11-09'
+    });
+    expect(artists.issueInvitation).not.toHaveBeenCalled();
   });
 });

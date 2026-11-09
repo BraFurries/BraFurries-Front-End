@@ -8,3 +8,7 @@ bbc65b267b9b955ecca32d5454dbd0276e2dedd0:src/app/core/services/commerce-finance.
 096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:112
 096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:141
 096f562e7501030d1065e06f055a178b2d6a55e1:src/app/modules/dashboard/commerce/commerce-finance.component.spec.ts:generic-api-key:147
+
+# Reviewed synthetic confirmation code in invitation UI unit test.
+# Scope: exactly the historical commit, path, rule, and line; real secrets still block CI.
+ed88c2b8ac2758429c0b68f6f81bebfe3ef1e45f:src/app/modules/auth/artist-invite/artist-invite.component.spec.ts:generic-api-key:65

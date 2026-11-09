@@ -49,7 +49,7 @@
             class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
         </label>
         <div class="space-y-2">
-          <label class="block text-sm font-semibold" for="commerce-artist-search">Pesquisar artista (usuário da BraFurries)</label>
+          <label class="block text-sm font-semibold" for="commerce-artist-search">Pesquisar artista (comunidade ou cadastro externo)</label>
           <div class="flex gap-2">
             <input id="commerce-artist-search" type="search" [(ngModel)]="artistSearch"
               (keyup.enter)="searchForArtists()" maxlength="100" placeholder="Nome ou usuário"
@@ -66,7 +66,46 @@
               {{ artist.name }} (ID {{ artist.id }})
             </option>
           </select>
-          <p class="text-xs text-gray-500">A arte será vinculada a uma conta interna existente.</p>
+          <p class="text-xs text-gray-500">
+            O artista pode ser da BraFurries, do Telegram ou de outra rede.
+            A conta comercial não precisa ter login.
+          </p>
+          <button type="button" (click)="showExternalArtistForm = !showExternalArtistForm"
+            class="text-sm font-bold text-braPurple hover:underline">
+            {{ showExternalArtistForm ? 'Fechar cadastro externo' : '+ Cadastrar artista externa' }}
+          </button>
+          <div *ngIf="showExternalArtistForm" class="space-y-3 rounded-xl border border-purple-100 bg-purple-50/40 p-4">
+            <h3 class="font-semibold text-braDark">Nova artista externa</h3>
+            <p class="text-xs text-gray-600">
+              Criará apenas um registro comercial, sem e-mail de login, senha ou associação
+              fictícia ao Discord. A administração poderá enviar um convite de ativação.
+            </p>
+            <label class="block text-sm font-semibold">Nome artístico *
+              <input [(ngModel)]="externalArtistForm.artistName" maxlength="120"
+                class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Nome ou pseudônimo">
+            </label>
+            <label class="block text-sm font-semibold">Telegram (opcional)
+              <input [(ngModel)]="externalArtistForm.telegramHandle" maxlength="100"
+                class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="@usuario">
+            </label>
+            <label class="block text-sm font-semibold">Instagram (opcional)
+              <input [(ngModel)]="externalArtistForm.instagramHandle" maxlength="100"
+                class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="@usuario">
+            </label>
+            <label class="block text-sm font-semibold">E-mail de contato (opcional)
+              <input type="email" [(ngModel)]="externalArtistForm.contactEmail" maxlength="255"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Observações internas (opcional)
+              <textarea rows="2" [(ngModel)]="externalArtistForm.internalNotes" maxlength="5000"
+                class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+            </label>
+            <button type="button" [disabled]="saving || !externalArtistForm.artistName.trim()"
+              (click)="createExternalArtist()"
+              class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+              Salvar artista externa e selecionar
+            </button>
+          </div>
         </div>
         <label class="block text-sm font-semibold">Valor da criação (R$)
           <input type="number" min="0" step=".01" [(ngModel)]="artworkForm.creationCost"
@@ -91,6 +130,67 @@
           <p *ngIf="item.description" class="mt-1 text-sm text-gray-500">{{ item.description }}</p>
         </div>
       </div>
+    </section>
+
+    <section *ngIf="activeTab === 'artworks' && can('ARTWORKS_MANAGE')"
+      class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <h2 class="font-amaranth text-xl font-bold">Artistas externas</h2>
+      <p class="text-sm text-gray-600">
+        Cadastre a artista antes de criar a obra. Quando quiser conceder acesso
+        ao histórico comercial, o proprietário envia um convite individual.
+        A artista não precisa conhecer IDs internos nem estar no Discord.
+      </p>
+      <p *ngIf="!externalArtists.length" class="text-sm text-gray-500">
+        Nenhuma artista externa cadastrada.
+      </p>
+      <div *ngFor="let artist of externalArtists"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm">
+        <div class="space-y-1">
+          <p class="font-semibold">{{ artist.artistName }}</p>
+          <p *ngIf="artist.telegramHandle" class="text-gray-600">Telegram: {{ artist.telegramHandle }}</p>
+          <p *ngIf="artist.instagramHandle" class="text-gray-600">Instagram: {{ artist.instagramHandle }}</p>
+          <p *ngIf="artist.contactEmail" class="text-gray-600">Contato: {{ artist.contactEmail }}</p>
+          <p class="text-xs" [ngClass]="artist.canInvite ? 'text-amber-700' : 'text-green-700'">
+            {{ artist.canInvite ? 'Aguardando ativação da conta' : 'Cadastro comercial já associado a uma conta' }}
+          </p>
+        </div>
+        <button *ngIf="access?.owner && artist.canInvite" type="button"
+          [disabled]="issuingInvitation" (click)="issueInvitation(artist)"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          {{ issuingInvitation ? 'Gerando...' : 'Gerar convite de ativação' }}
+        </button>
+      </div>
+    </section>
+
+    <section *ngIf="activeTab === 'artworks' && access?.owner && issuedInvitation as invite"
+      class="space-y-4 rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
+      <h2 class="font-amaranth text-xl font-bold">Convite criado para {{ issuedArtistName }}</h2>
+      <p class="text-sm text-red-700 font-semibold">
+        Atenção: o link e o código aparecem apenas uma vez. Envie por canais
+        diferentes e confirme o destinatário por um contato já conhecido.
+        O link sozinho não permite ativar a conta nem acessar valores financeiros.
+      </p>
+      <label class="block text-sm font-semibold">Link para enviar
+        <textarea rows="2" readonly [value]="issuedInvitationLink"
+          class="mt-1 block w-full rounded-lg border p-3 text-sm"></textarea>
+      </label>
+      <button type="button" (click)="copyInvitationLink()"
+        class="rounded-lg border border-purple-200 px-4 py-2 text-sm font-bold text-braPurple">
+        Copiar link
+      </button>
+      <label class="block text-sm font-semibold">Código de confirmação (enviar separadamente)
+        <input readonly [value]="invite.confirmationCode"
+          class="mt-1 block w-full max-w-xs rounded-lg border p-3 font-mono text-lg tracking-widest">
+      </label>
+      <button type="button" (click)="copyInvitationCode()"
+        class="rounded-lg border border-purple-200 px-4 py-2 text-sm font-bold text-braPurple">
+        Copiar código
+      </button>
+      <p class="text-sm text-gray-600">O convite vale por 48 horas e só pode ser utilizado uma vez.</p>
+      <button type="button" (click)="clearIssuedInvitation()"
+        class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-bold">
+        Ocultar informações do convite
+      </button>
     </section>
 
     <section *ngIf="activeTab === 'files' && can('ARTWORKS_MANAGE')"

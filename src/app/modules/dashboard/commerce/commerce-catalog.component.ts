@@ -6,6 +6,9 @@ import {
   PlatformPermissionCode
 } from '../../../core/services/platform-access.service';
 import {
+  CommercialArtist, CommerceArtistService, IssuedArtistInvitation
+} from '../../../core/services/commerce-artist.service';
+import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
@@ -48,7 +51,16 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   contracts: CommerceSignedAgreement[] = [];
   links: CommerceProductArtwork[] = [];
   artistCandidates: CommerceArtist[] = [];
-
+  externalArtists: CommercialArtist[] = [];
+  showExternalArtistForm = false;
+  issuedInvitation: IssuedArtistInvitation | null = null;
+  issuedInvitationLink = '';
+  issuedArtistName = '';
+  issuingInvitation = false;
+  externalArtistForm = {
+    artistName: '', telegramHandle: '', instagramHandle: '',
+    contactEmail: '', internalNotes: ''
+  };
   artistSearch = '';
   selectedArtworkId: number | null = null;
   selectedProductId: number | null = null;
@@ -83,7 +95,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly accessService: PlatformAccessService,
-    private readonly catalog: CommerceCatalogService
+    private readonly catalog: CommerceCatalogService,
+    private readonly artistService: CommerceArtistService
   ) {}
 
   ngOnInit(): void {
@@ -133,6 +146,9 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     const tasks: Observable<unknown>[] = [];
     if (this.can('ARTWORKS_MANAGE') || this.can('CONTRACTS_MANAGE')) {
       tasks.push(this.fetch(this.catalog.artworks(), items => this.artworks = items));
+    }
+    if (this.can('ARTWORKS_MANAGE')) {
+      tasks.push(this.fetch(this.artistService.profiles(), items => this.externalArtists = items));
     }
     if (this.can('CONTRACTS_MANAGE')) {
       tasks.push(this.fetch(this.catalog.templates(), items => this.templates = items));
@@ -194,6 +210,92 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
           this.errorMessage = 'Não foi possível pesquisar os artistas.';
         }
       });
+  }
+
+  createExternalArtist(): void {
+    if (!this.can('ARTWORKS_MANAGE') || this.saving ||
+        !this.externalArtistForm.artistName.trim()) {
+      this.errorMessage = 'Informe o nome artístico.';
+      return;
+    }
+    this.saving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    const form = this.externalArtistForm;
+    this.artistService.registerExternal({
+      artistName: form.artistName.trim(),
+      telegramHandle: form.telegramHandle.trim() || null,
+      instagramHandle: form.instagramHandle.trim() || null,
+      contactEmail: form.contactEmail.trim() || null,
+      internalNotes: form.internalNotes.trim() || null
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ id }) => {
+        this.saving = false;
+        this.artistCandidates = [
+          { id, name: form.artistName.trim() },
+          ...this.artistCandidates.filter(artist => artist.id !== id)
+        ];
+        this.artworkForm.artistUserId = id;
+        this.artistSearch = form.artistName.trim();
+        this.externalArtistForm = {
+          artistName: '', telegramHandle: '', instagramHandle: '',
+          contactEmail: '', internalNotes: ''
+        };
+        this.showExternalArtistForm = false;
+        this.successMessage = 'Artista externa cadastrada. Já está selecionada para esta arte.';
+        this.reload();
+      },
+      error: () => {
+        this.saving = false;
+        this.errorMessage = 'Não foi possível cadastrar esta artista externa.';
+      }
+    });
+  }
+
+  issueInvitation(artist: CommercialArtist): void {
+    if (this.access?.owner !== true || !artist.canInvite || this.issuingInvitation) return;
+    this.issuingInvitation = true;
+    this.errorMessage = '';
+    this.issuedInvitation = null;
+    this.issuedInvitationLink = '';
+    this.artistService.issueInvitation(artist.userId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: invitation => {
+          this.issuingInvitation = false;
+          this.issuedArtistName = artist.artistName;
+          this.issuedInvitation = invitation;
+          // Only the URL travels in the initial message. The confirmation
+          // code MUST be transmitted independently through a trusted channel.
+          this.issuedInvitationLink =
+            `${window.location.origin}/artist-invite?token=${encodeURIComponent(invitation.token)}`;
+          this.successMessage =
+            'Convite criado. Compartilhe o link e o código por canais separados; ambos aparecem apenas agora.';
+        },
+        error: () => {
+          this.issuingInvitation = false;
+          this.errorMessage = 'Não foi possível gerar o convite. Confirme que a artista ainda não tem conta.';
+        }
+      });
+  }
+
+  copyInvitationLink(): void {
+    if (!this.issuedInvitationLink) return;
+    navigator.clipboard.writeText(this.issuedInvitationLink).catch(() => {
+      this.errorMessage = 'Copie o link selecionando o texto.';
+    });
+  }
+
+  copyInvitationCode(): void {
+    if (!this.issuedInvitation) return;
+    navigator.clipboard.writeText(this.issuedInvitation.confirmationCode).catch(() => {
+      this.errorMessage = 'Copie o código selecionando o texto.';
+    });
+  }
+
+  clearIssuedInvitation(): void {
+    this.issuedInvitation = null;
+    this.issuedInvitationLink = '';
+    this.issuedArtistName = '';
   }
 
   createArtwork(): void {

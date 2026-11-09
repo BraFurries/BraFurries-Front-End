@@ -10,6 +10,13 @@ const guardedAuthRoutes: Routes = authRoutes.map((route) => ({
 }));
 
 const routes: Routes = [
+  // The same invitation URL must work for signed-in artists and new visitors.
+  // Never put this route behind the publicOnly auth guard.
+  {
+    path: 'artist-invite',
+    loadComponent: () => import('./modules/auth/artist-invite/artist-invite.component')
+      .then(m => m.ArtistInviteComponent)
+  },
   ...guardedAuthRoutes,
   { 
     path: 'painel',
