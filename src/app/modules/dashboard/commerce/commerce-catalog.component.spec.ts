@@ -25,14 +25,15 @@ describe('CommerceCatalogComponent', () => {
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile'
     ]);
     artists = jasmine.createSpyObj<CommerceArtistService>('CommerceArtistService', [
-      'profiles','registerExternal','pendingClaims','approve','reject','revoke'
+      'profiles','registerExternal','issueInvitation','revokeInvitation'
     ]);
     artists.profiles.and.returnValue(of([]));
-    artists.pendingClaims.and.returnValue(of([]));
     artists.registerExternal.and.returnValue(of({ id: 44 }));
-    artists.approve.and.returnValue(of(void 0));
-    artists.reject.and.returnValue(of(void 0));
-    artists.revoke.and.returnValue(of(void 0));
+    artists.issueInvitation.and.returnValue(of({
+      id:62,token:'a'.repeat(64),confirmationCode:'ABCD1234EF56',
+      expiresAt:'2026-11-11T10:00:00'
+    }));
+    artists.revokeInvitation.and.returnValue(of(void 0));
     access.myAccess.and.returnValue(of({ enabled, owner, permissions }));
     catalog.artworks.and.returnValue(of([
       { id: 12, title: 'Arte A', artistUserId: 31, artistName: 'Artista',
@@ -181,22 +182,32 @@ describe('CommerceCatalogComponent', () => {
     expect(component.artistCandidates.some(a => a.id === 44)).toBeTrue();
   });
 
-  it('never fetches pending artist claim private details for non-owner', async () => {
-    await create(['ARTWORKS_MANAGE'], false);
-    expect(artists.pendingClaims).not.toHaveBeenCalled();
+  it('only an owner can issue invitations for unactivated external artists', async () => {
+    await create(['ARTWORKS_MANAGE'],false);
+    const external = {
+      userId:44,artistName:'Artista Telegram',telegramHandle:'@canal',
+      instagramHandle:null,contactEmail:null,internalNotes:null,
+      canInvite:1,createdAt:'2026-11-09'
+    };
+    component.issueInvitation(external);
+    expect(artists.issueInvitation).not.toHaveBeenCalled();
+    component.access={enabled:true,owner:true,permissions:[]};
+    component.issueInvitation(external);
+    expect(artists.issueInvitation).toHaveBeenCalledWith(44);
+    expect(component.issuedInvitationLink).toContain('/artist-invite?token=');
+    expect(component.issuedInvitationLink).not.toContain('artistUserId');
+    expect(component.issuedInvitation?.confirmationCode).toBe('ABCD1234EF56');
+    component.clearIssuedInvitation();
+    expect(component.issuedInvitation).toBeNull();
   });
 
-  it('owner can approve only with verification notes and explicit request selection', async () => {
+  it('never issues a new invite for already activated accounts', async () => {
     await create([],true);
-    component.reviewClaimId = 7;
-    component.reviewMethod = 'TELEGRAM';
-    component.reviewNotes = '';
-    component.approveArtistClaim();
-    expect(artists.approve).not.toHaveBeenCalled();
-    component.reviewNotes = 'Contato previamente cadastrado confirmou pessoalmente';
-    component.approveArtistClaim();
-    expect(artists.approve).toHaveBeenCalledWith(7,'TELEGRAM',
-      'Contato previamente cadastrado confirmou pessoalmente');
+    component.issueInvitation({
+      userId:44,artistName:'Ativada',telegramHandle:null,
+      instagramHandle:null,contactEmail:null,internalNotes:null,
+      canInvite:0,createdAt:'2026-11-09'
+    });
+    expect(artists.issueInvitation).not.toHaveBeenCalled();
   });
-
 });
