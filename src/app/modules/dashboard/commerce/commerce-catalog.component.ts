@@ -6,6 +6,9 @@ import {
   PlatformPermissionCode
 } from '../../../core/services/platform-access.service';
 import {
+  CommercialArtist, CommerceArtistService, PendingArtistClaim
+} from '../../../core/services/commerce-artist.service';
+import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
@@ -48,6 +51,17 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   contracts: CommerceSignedAgreement[] = [];
   links: CommerceProductArtwork[] = [];
   artistCandidates: CommerceArtist[] = [];
+  externalArtists: CommercialArtist[] = [];
+  pendingArtistClaims: PendingArtistClaim[] = [];
+  showExternalArtistForm = false;
+  externalArtistForm = {
+    artistName: '', telegramHandle: '', instagramHandle: '',
+    contactEmail: '', internalNotes: ''
+  };
+  reviewClaimId: number | null = null;
+  reviewMethod = 'TELEGRAM';
+  reviewNotes = '';
+  reviewingClaim = false;
 
   artistSearch = '';
   selectedArtworkId: number | null = null;
@@ -83,7 +97,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly accessService: PlatformAccessService,
-    private readonly catalog: CommerceCatalogService
+    private readonly catalog: CommerceCatalogService,
+    private readonly artistService: CommerceArtistService
   ) {}
 
   ngOnInit(): void {
@@ -96,6 +111,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         }
         this.activeTab = this.visibleTabs()[0]?.key ?? 'artworks';
         this.reload();
+        if (access.owner) this.reloadPendingArtistClaims();
       },
       error: () => {
         this.errorMessage = 'Não foi possível verificar a autorização comercial.';
@@ -133,6 +149,9 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     const tasks: Observable<unknown>[] = [];
     if (this.can('ARTWORKS_MANAGE') || this.can('CONTRACTS_MANAGE')) {
       tasks.push(this.fetch(this.catalog.artworks(), items => this.artworks = items));
+    }
+    if (this.can('ARTWORKS_MANAGE')) {
+      tasks.push(this.fetch(this.artistService.profiles(), items => this.externalArtists = items));
     }
     if (this.can('CONTRACTS_MANAGE')) {
       tasks.push(this.fetch(this.catalog.templates(), items => this.templates = items));
@@ -192,6 +211,124 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         error: () => {
           this.searchingArtists = false;
           this.errorMessage = 'Não foi possível pesquisar os artistas.';
+        }
+      });
+  }
+
+  createExternalArtist(): void {
+    if (!this.can('ARTWORKS_MANAGE') || this.saving ||
+        !this.externalArtistForm.artistName.trim()) {
+      this.errorMessage = 'Informe o nome artístico.';
+      return;
+    }
+    this.saving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    const form = this.externalArtistForm;
+    this.artistService.registerExternal({
+      artistName: form.artistName.trim(),
+      telegramHandle: form.telegramHandle.trim() || null,
+      instagramHandle: form.instagramHandle.trim() || null,
+      contactEmail: form.contactEmail.trim() || null,
+      internalNotes: form.internalNotes.trim() || null
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: ({ id }) => {
+        this.saving = false;
+        this.artistCandidates = [
+          { id, name: form.artistName.trim() },
+          ...this.artistCandidates.filter(artist => artist.id !== id)
+        ];
+        this.artworkForm.artistUserId = id;
+        this.artistSearch = form.artistName.trim();
+        this.externalArtistForm = {
+          artistName: '', telegramHandle: '', instagramHandle: '',
+          contactEmail: '', internalNotes: ''
+        };
+        this.showExternalArtistForm = false;
+        this.successMessage = 'Artista externa cadastrada. Já está selecionada para esta arte.';
+        this.reload();
+      },
+      error: () => {
+        this.saving = false;
+        this.errorMessage = 'Não foi possível cadastrar esta artista externa.';
+      }
+    });
+  }
+
+  reloadPendingArtistClaims(): void {
+    if (this.access?.owner !== true) return;
+    this.artistService.pendingClaims().pipe(takeUntil(this.destroy$)).subscribe({
+      next: claims => this.pendingArtistClaims = claims,
+      error: () => this.errorMessage = 'Não foi possível carregar reivindicações pendentes.'
+    });
+  }
+
+  approveArtistClaim(): void {
+    if (this.access?.owner !== true || this.reviewingClaim ||
+        this.reviewClaimId === null || !this.reviewNotes.trim()) {
+      this.errorMessage = 'Selecione a solicitação e registre como confirmou a identidade.';
+      return;
+    }
+    this.reviewingClaim = true;
+    this.errorMessage = '';
+    this.artistService.approve(this.reviewClaimId,this.reviewMethod,this.reviewNotes.trim())
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          this.reviewingClaim = false;
+          this.reviewClaimId = null;
+          this.reviewNotes = '';
+          this.successMessage = 'Titularidade confirmada. O acesso pessoal já foi liberado.';
+          this.reloadPendingArtistClaims();
+          this.reload();
+        },
+        error: () => {
+          this.reviewingClaim = false;
+          this.errorMessage = 'Não foi possível aprovar a solicitação. Confira as provas e a conta verificada.';
+        }
+      });
+  }
+
+  rejectArtistClaim(): void {
+    if (this.access?.owner !== true || this.reviewingClaim ||
+        this.reviewClaimId === null || !this.reviewNotes.trim()) {
+      this.errorMessage = 'Selecione a solicitação e informe o motivo da recusa.';
+      return;
+    }
+    this.reviewingClaim = true;
+    this.errorMessage = '';
+    this.artistService.reject(this.reviewClaimId,this.reviewNotes.trim())
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          this.reviewingClaim = false;
+          this.reviewClaimId = null;
+          this.reviewNotes = '';
+          this.successMessage = 'Solicitação recusada e registrada.';
+          this.reloadPendingArtistClaims();
+        },
+        error: () => {
+          this.reviewingClaim = false;
+          this.errorMessage = 'Não foi possível recusar a solicitação.';
+        }
+      });
+  }
+
+  revokeArtistClaim(artist: CommercialArtist): void {
+    if (this.access?.owner !== true || artist.claimedByUserId == null) return;
+    const reason = window.prompt(
+      'Motivo para revogar o acesso pessoal a esta artista (obrigatório):');
+    if (!reason?.trim()) return;
+    this.reviewingClaim = true;
+    this.errorMessage = '';
+    this.artistService.revoke(artist.userId,reason.trim())
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          this.reviewingClaim = false;
+          this.successMessage = 'Acesso pessoal revogado imediatamente.';
+          this.reload();
+        },
+        error: () => {
+          this.reviewingClaim = false;
+          this.errorMessage = 'Não foi possível revogar a reivindicação.';
         }
       });
   }
