@@ -168,6 +168,39 @@ describe('CommerceFinanceComponent', () => {
     expect(component.orderRequestKey).toBe('');
   });
 
+  it('retries a receipt reversal with the original request key and date', async () => {
+    await init(['SALES_MANAGE']);
+    spyOn(window,'confirm').and.returnValue(true);
+    component.orders = [{
+      id:25,buyerLabel:'Guto',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN',
+      totalAmount:65,paidAmount:65,notes:null,readyAt:null,
+      deliveredOn:null,cancellationReason:null
+    }];
+    component.selectedOrderId = 25;
+    const receipt = {
+      id:88,eventKind:'RECEIPT' as const,originalEventId:null,amount:65,
+      receivedOn:'2026-11-03',paymentMethod:'PIX',externalReference:null,notes:null
+    };
+    component.orderPayments=[receipt];
+    component.orderReversalReason='Pagamento duplicado';
+    finance.reverseOrderPayment.and.returnValue(throwError(() => new Error('Timeout')));
+    component.reverseOrderPayment(receipt);
+    const first=finance.reverseOrderPayment.calls.mostRecent().args;
+    component.reverseOrderPayment(receipt);
+    const second=finance.reverseOrderPayment.calls.mostRecent().args;
+    expect(second[0]).toBe(25);
+    expect(second[1]).toBe(88);
+    expect(second[2]).toBe(first[2]);
+    expect(second[3]).toBe(first[3]);
+
+    const different={...receipt,id:89};
+    component.orderPayments=[receipt,different];
+    component.reverseOrderPayment(different);
+    const third=finance.reverseOrderPayment.calls.mostRecent().args;
+    expect(third[2]).not.toBe(first[2]);
+  });
+
   it('creates a sale with a stable idempotency key and no locally computed royalty', async () => {
     await init(['SALES_MANAGE']);
     component.addSaleLine();
