@@ -39,6 +39,10 @@
                     class="flex items-center px-4 py-3 hover:bg-gray-800 transition text-sm font-bold text-white">
                     <span class="mr-3">👤</span> Meu Perfil
                 </a>
+                <a routerLink="/painel/minhas-artes" (click)="isUserMenuOpen = false"
+                    class="flex items-center px-4 py-3 hover:bg-gray-800 transition text-sm font-bold text-white">
+                    <span class="mr-3">🎨</span> Minhas artes e royalties
+                </a>
                 <div class="h-px bg-gray-800 w-full"></div>
                 <button (click)="logout()"
                     class="flex items-center px-4 py-3 hover:bg-red-500/10 text-red-400 hover:text-red-300 transition text-sm font-bold w-full text-left">
