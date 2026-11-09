@@ -164,6 +164,16 @@ describe('CommerceFinanceService', () => {
     reversal.flush({id:42});
   });
 
+  it('posts a dedicated owner-only compensation with reason and date', () => {
+    service.reverseArtistPayment(21,99,'2026-11-09','Repasse cadastrado duas vezes').subscribe();
+    const request=http.expectOne(`${base}/statements/21/payments/99/reverse`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      reversedOn:'2026-11-09',reason:'Repasse cadastrado duas vezes'
+    });
+    request.flush({id:100});
+  });
+
   it('cancels an existing sale only through the explicit compensation endpoint', () => {
     service.cancelSale(31,'Cliente desistiu').subscribe();
     const request=http.expectOne(`${base}/sales/31/cancel`);

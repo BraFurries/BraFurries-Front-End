@@ -27,7 +27,7 @@ describe('CommerceFinanceComponent', () => {
     finance=jasmine.createSpyObj<CommerceFinanceService>('CommerceFinanceService',[
       'availableBatches','sales','saleItems','createSale','cancelSale',
       'royalties','statements','createStatement','statementItems',
-      'approveStatement','discardStatement','payments','recordPayment',
+      'approveStatement','discardStatement','payments','recordPayment','reverseArtistPayment',
       'cashMovements','cashSummary','createCashMovement','reverseCashMovement',
       'orders','orderProductChoices','createOrder','orderItems','transitionOrder','orderPayments',
       'receiveOrderPayment','reverseOrderPayment'
@@ -66,6 +66,7 @@ describe('CommerceFinanceComponent', () => {
     finance.reverseCashMovement.and.returnValue(of({id:20}));
     finance.createStatement.and.returnValue(of({id:6}));
     finance.recordPayment.and.returnValue(of({id:7}));
+    finance.reverseArtistPayment.and.returnValue(of({id:100}));
     finance.approveStatement.and.returnValue(of(void 0));
     finance.discardStatement.and.returnValue(of(void 0));
 
@@ -330,5 +331,45 @@ describe('CommerceFinanceComponent', () => {
     component.cashReversalReason='Registro incorreto';
     component.reverseCashMovement();
     expect(finance.reverseCashMovement).not.toHaveBeenCalled();
+  });
+
+  it('restricts artist payment reversal to platform owner and requires a reason', async () => {
+    await init(['FINANCE_VIEW','PAYMENTS_RECORD'],false);
+    component.statements=[statement];
+    component.selectedStatementId=3;
+    component.payments=[{
+      id:99,amount:50,paidOn:'2026-11-02',externalReference:'PIX',
+      notes:null,createdAt:'2026-11-02',eventKind:'PAYMENT',
+      originalPaymentId:null,reversalReason:null,reversedAt:null
+    }];
+    component.beginReverseArtistPayment(component.payments[0]);
+    expect(component.reversingArtistPaymentId).toBeNull();
+    expect(finance.reverseArtistPayment).not.toHaveBeenCalled();
+
+    component.access={enabled:true,owner:true,permissions:[]};
+    component.beginReverseArtistPayment(component.payments[0]);
+    expect(component.reversingArtistPaymentId).toBe(99);
+    component.reversingArtistPaymentReason='Registro duplicado';
+    component.reversingArtistPaymentDate='2026-11-09';
+    spyOn(window,'confirm').and.returnValue(true);
+    component.reverseArtistPayment();
+    expect(finance.reverseArtistPayment).toHaveBeenCalledWith(
+      3,99,'2026-11-09','Registro duplicado');
+  });
+
+  it('does not permit reversal of an already offset payout', async () => {
+    await init([],true);
+    component.payments=[{
+      id:99,amount:50,paidOn:'2026-11-02',externalReference:'PIX',
+      notes:null,createdAt:'2026-11-02',eventKind:'PAYMENT',
+      originalPaymentId:null,reversalReason:null,reversedAt:null
+    },{
+      id:100,amount:-50,paidOn:'2026-11-09',externalReference:'REV',
+      notes:null,createdAt:'2026-11-09',eventKind:'REVERSAL',
+      originalPaymentId:99,reversalReason:'Duplicado',reversedAt:'2026-11-09'
+    }];
+    component.beginReverseArtistPayment(component.payments[0]);
+    expect(component.reversingArtistPaymentId).toBeNull();
+    expect(finance.reverseArtistPayment).not.toHaveBeenCalled();
   });
 });
