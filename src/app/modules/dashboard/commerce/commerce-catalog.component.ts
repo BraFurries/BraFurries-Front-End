@@ -218,6 +218,9 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   startEditArtist(artist: CommercialArtist): void {
+    // The edit form lives inside the Artworks tab; reveal it when launched
+    // from the external artists list rather than leaving the form invisible.
+    this.activeTab='artworks';
     this.editingArtistId=artist.userId;
     this.externalArtistForm={
       artistName:artist.artistName,telegramHandle:artist.telegramHandle || '',
