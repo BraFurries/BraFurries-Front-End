@@ -28,6 +28,8 @@ describe('CommerceFinanceComponent', () => {
       'availableBatches','sales','saleItems','createSale','cancelSale',
       'royalties','statements','createStatement','statementItems',
       'approveStatement','discardStatement','payments','recordPayment','reverseArtistPayment',
+      'correctArtistPaymentMetadata','artistPaymentMetadataHistory',
+      'correctCashMetadata','cashMetadataHistory',
       'cashMovements','cashSummary','createCashMovement','reverseCashMovement',
       'orders','orderProductChoices','createOrder','updateOrder','deleteUnusedOrder','orderItems','transitionOrder','orderPayments',
       'receiveOrderPayment','reverseOrderPayment'
@@ -69,6 +71,10 @@ describe('CommerceFinanceComponent', () => {
     finance.createStatement.and.returnValue(of({id:6}));
     finance.recordPayment.and.returnValue(of({id:7}));
     finance.reverseArtistPayment.and.returnValue(of({id:100}));
+    finance.correctArtistPaymentMetadata.and.returnValue(of(void 0));
+    finance.artistPaymentMetadataHistory.and.returnValue(of([]));
+    finance.correctCashMetadata.and.returnValue(of(void 0));
+    finance.cashMetadataHistory.and.returnValue(of([]));
     finance.approveStatement.and.returnValue(of(void 0));
     finance.discardStatement.and.returnValue(of(void 0));
 
@@ -415,5 +421,60 @@ describe('CommerceFinanceComponent', () => {
     component.editOpenOrder(order);
     expect(component.editingOrderId).toBeNull();
     expect(finance.updateOrder).not.toHaveBeenCalled();
+  });
+
+  it('allows finance staff to correct payment metadata without changing amounts', async () => {
+    await init(['FINANCE_VIEW','PAYMENTS_RECORD']);
+    component.selectedStatementId=3;
+    const payment={
+      id:99,amount:50,paidOn:'2026-11-02',externalReference:'PIX-1',
+      notes:null,createdAt:'2026-11-02',eventKind:'PAYMENT' as const,
+      originalPaymentId:null,reversalReason:null,reversedAt:null
+    };
+    component.startPaymentMetadataEdit(payment);
+    component.paymentMetadataReference='PIX-2';
+    component.paymentMetadataNotes='Referência confirmada';
+    component.paymentMetadataReason='Código do PIX digitado errado';
+    component.submitPaymentMetadataCorrection();
+    expect(finance.correctArtistPaymentMetadata).toHaveBeenCalledWith(
+      3,99,'PIX-2','Referência confirmada','Código do PIX digitado errado');
+    expect(finance.recordPayment).not.toHaveBeenCalled();
+    expect(finance.reverseArtistPayment).not.toHaveBeenCalled();
+  });
+
+  it('does not allow nonfinance staff to correct cash metadata', async () => {
+    await init(['SALES_MANAGE']);
+    component.editingCashMetadataId=25;
+    component.cashMetadataDescription='Despesa';
+    component.cashMetadataReason='Descrição errada';
+    component.submitCashMetadataCorrection();
+    expect(finance.correctCashMetadata).not.toHaveBeenCalled();
+  });
+
+  it('records cash metadata correction using separate append-only route', async () => {
+    await init(['FINANCE_VIEW','CASHFLOW_MANAGE']);
+    component.editingCashMetadataId=25;
+    component.cashMetadataDescription='Impressão de cartazes';
+    component.cashMetadataReference='NF-42';
+    component.cashMetadataNotes='';
+    component.cashMetadataReason='Nota fiscal revisada';
+    component.submitCashMetadataCorrection();
+    expect(finance.correctCashMetadata).toHaveBeenCalledWith(
+      25,'Impressão de cartazes','NF-42',null,'Nota fiscal revisada');
+    expect(finance.createCashMovement).not.toHaveBeenCalled();
+  });
+
+  it('allows finance viewers to inspect past payout corrections', async () => {
+    await init(['FINANCE_VIEW']);
+    component.selectedStatementId=3;
+    finance.artistPaymentMetadataHistory.and.returnValue(of([{
+      id:7,previousReference:'PIX-A',updatedReference:'PIX-B',
+      previousNotes:null,updatedNotes:'Revisado',reason:'Digitação',
+      actorUserId:2,createdAt:'2026-11-09T10:00:00'
+    }]));
+    component.togglePaymentMetadataHistory(99);
+    expect(finance.artistPaymentMetadataHistory).toHaveBeenCalledWith(3,99);
+    expect(component.paymentMetadataHistoryRows[0].updatedReference).toBe('PIX-B');
+    expect(finance.correctArtistPaymentMetadata).not.toHaveBeenCalled();
   });
 });
