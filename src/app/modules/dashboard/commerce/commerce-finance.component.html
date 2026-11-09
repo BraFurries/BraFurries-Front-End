@@ -644,10 +644,68 @@
               {{ movement.contributorType }} ·
               {{ movement.contributionNature === 'REPAYABLE' ? 'Reembolsável' : 'Não reembolsável' }}
             </p>
+            <p *ngIf="movement.externalReference" class="text-xs text-gray-500">
+              Referência: {{ movement.externalReference }}
+            </p>
+            <p *ngIf="movement.notes" class="text-xs text-gray-500">
+              {{ movement.notes }}
+            </p>
+            <p *ngIf="movement.metadataCorrected" class="text-xs text-blue-700">
+              Dados administrativos retificados; valor original preservado.
+            </p>
             <p *ngIf="movement.eventKind === 'REVERSAL'" class="text-xs text-red-700">
               Estorno do lançamento #{{ movement.reversalOfId }}.
               {{ movement.reversalReason }}
             </p>
+            <div *ngIf="movement.eventKind === 'POSTED'" class="flex flex-wrap gap-2">
+              <button *ngIf="can('CASHFLOW_MANAGE')" type="button"
+                [disabled]="saving" (click)="startCashMetadataEdit(movement)"
+                class="rounded-lg border px-3 py-2 text-xs font-semibold">
+                Corrigir descrição/referência
+              </button>
+              <button type="button" (click)="toggleCashMetadataHistory(movement.id)"
+                class="rounded-lg border px-3 py-2 text-xs font-semibold">
+                {{ cashMetadataHistoryId === movement.id ? 'Ocultar revisões' : 'Histórico de revisões' }}
+              </button>
+            </div>
+            <div *ngIf="cashMetadataHistoryId === movement.id" class="space-y-2 rounded-lg bg-gray-50 p-3">
+              <p *ngIf="cashMetadataHistoryLoading" class="text-xs">Carregando revisões...</p>
+              <p *ngIf="!cashMetadataHistoryLoading && !cashMetadataHistoryRows.length" class="text-xs">
+                Sem retificações administrativas.
+              </p>
+              <div *ngFor="let r of cashMetadataHistoryRows" class="rounded-lg border bg-white p-2 text-xs">
+                <p class="font-bold">{{ r.createdAt }} · operador #{{ r.actorUserId }}</p>
+                <p>Motivo: {{ r.reason }}</p>
+                <p>Descrição: {{ r.previousDescription }} → {{ r.updatedDescription }}</p>
+                <p>Referência: {{ r.previousReference || '—' }} → {{ r.updatedReference || '—' }}</p>
+                <p>Observações: {{ r.previousNotes || '—' }} → {{ r.updatedNotes || '—' }}</p>
+              </div>
+            </div>
+            <div *ngIf="editingCashMetadataId === movement.id"
+              class="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p class="text-xs">Somente descrição, referência e observações. Valor, data e origem permanecem intactos.</p>
+              <label class="block text-xs font-semibold">Descrição
+                <input [(ngModel)]="cashMetadataDescription" maxlength="500" class="mt-1 w-full rounded-lg border p-2">
+              </label>
+              <label class="block text-xs font-semibold">Referência
+                <input [(ngModel)]="cashMetadataReference" maxlength="120" class="mt-1 w-full rounded-lg border p-2">
+              </label>
+              <label class="block text-xs font-semibold">Observações
+                <textarea [(ngModel)]="cashMetadataNotes" rows="2" maxlength="5000"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <label class="block text-xs font-semibold">Justificativa obrigatória
+                <textarea [(ngModel)]="cashMetadataReason" rows="2" minlength="3" maxlength="500"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <button type="button" [disabled]="saving || cashMetadataReason.trim().length < 3"
+                (click)="submitCashMetadataCorrection()"
+                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                Salvar retificação
+              </button>
+              <button type="button" (click)="cancelCashMetadataEdit()"
+                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
+            </div>
             <button *ngIf="can('CASHFLOW_MANAGE') && movement.eventKind === 'POSTED'"
               type="button" (click)="startCashReversal(movement)"
               class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">
@@ -825,6 +883,56 @@
               Compensa pagamento #{{ payment.originalPaymentId }} · {{ payment.reversalReason }}
             </p>
             <p *ngIf="payment.notes" class="text-xs text-gray-500">{{ payment.notes }}</p>
+            <p *ngIf="payment.metadataCorrected" class="mt-1 text-xs text-blue-700">
+              Dados administrativos retificados; histórico financeiro original preservado.
+            </p>
+            <div *ngIf="payment.eventKind === 'PAYMENT'" class="mt-2 flex flex-wrap gap-2">
+              <button *ngIf="can('PAYMENTS_RECORD')" type="button" [disabled]="saving"
+                (click)="startPaymentMetadataEdit(payment)"
+                class="rounded-lg border px-3 py-2 text-xs font-semibold">
+                Corrigir referência/observações
+              </button>
+              <button type="button" (click)="togglePaymentMetadataHistory(payment.id)"
+                class="rounded-lg border px-3 py-2 text-xs font-semibold">
+                {{ paymentMetadataHistoryId === payment.id ? 'Ocultar revisões' : 'Histórico de revisões' }}
+              </button>
+            </div>
+            <div *ngIf="paymentMetadataHistoryId === payment.id" class="mt-2 space-y-2 rounded-lg bg-gray-50 p-3">
+              <p *ngIf="paymentMetadataHistoryLoading" class="text-xs">Carregando histórico...</p>
+              <p *ngIf="!paymentMetadataHistoryLoading && !paymentMetadataHistoryRows.length" class="text-xs">
+                Nenhuma retificação administrativa.
+              </p>
+              <div *ngFor="let r of paymentMetadataHistoryRows" class="rounded-lg border bg-white p-2 text-xs">
+                <p class="font-bold">{{ r.createdAt }} · operador #{{ r.actorUserId }}</p>
+                <p>Motivo: {{ r.reason }}</p>
+                <p>Referência: {{ r.previousReference }} → {{ r.updatedReference }}</p>
+                <p>Observações: {{ r.previousNotes || '—' }} → {{ r.updatedNotes || '—' }}</p>
+              </div>
+            </div>
+            <div *ngIf="editingPaymentMetadataId === payment.id"
+              class="mt-2 space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p class="text-xs">Somente referência e observações. Valor e data do pagamento não mudam.</p>
+              <label class="block text-xs font-semibold">Referência bancária
+                <input [(ngModel)]="paymentMetadataReference" maxlength="120"
+                  class="mt-1 w-full rounded-lg border p-2">
+              </label>
+              <label class="block text-xs font-semibold">Observações
+                <textarea [(ngModel)]="paymentMetadataNotes" rows="2" maxlength="5000"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <label class="block text-xs font-semibold">Justificativa obrigatória
+                <textarea [(ngModel)]="paymentMetadataReason" rows="2" minlength="3" maxlength="500"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <button type="button" [disabled]="saving || !paymentMetadataReference.trim()
+                  || paymentMetadataReason.trim().length < 3"
+                (click)="submitPaymentMetadataCorrection()"
+                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                Salvar retificação
+              </button>
+              <button type="button" (click)="cancelPaymentMetadataEdit()"
+                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
+            </div>
             <div *ngIf="access?.owner && payment.eventKind === 'PAYMENT'
                 && !artistPaymentWasReversed(payment.id)" class="mt-2">
               <button type="button" [disabled]="saving" (click)="beginReverseArtistPayment(payment)"

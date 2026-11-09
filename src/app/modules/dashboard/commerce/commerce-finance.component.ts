@@ -6,6 +6,7 @@ import {
   CommerceBatchForSale, CommerceFinanceService, CommercePhysicalSale, CommerceRoyaltyEvent,
   CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
   CommerceCashMovement, CommerceCashSummary, CashMovementType, ContributionNature, ContributionSource,
+  CommercePaymentMetadataRevision, CommerceCashMetadataRevision,
   CommerceOrder, CommerceOrderItem, CommerceOrderLineInput, CommerceOrderPayment, CommerceOrderStatus,
   CommerceOrderProductChoice
 } from '../../../core/services/commerce-finance.service';
@@ -89,6 +90,14 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   cashSummary: CommerceCashSummary | null = null;
   cashReversalId: number | null = null;
   cashReversalReason = '';
+  editingCashMetadataId: number | null = null;
+  cashMetadataDescription = '';
+  cashMetadataReference = '';
+  cashMetadataNotes = '';
+  cashMetadataReason = '';
+  cashMetadataHistoryId: number | null = null;
+  cashMetadataHistoryRows: CommerceCashMetadataRevision[] = [];
+  cashMetadataHistoryLoading = false;
 
   periodYear = Number(brazilToday().slice(0, 4));
   periodMonth = Number(brazilToday().slice(5, 7));
@@ -138,6 +147,13 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   reversingArtistPaymentId: number | null = null;
   reversingArtistPaymentReason = '';
   reversingArtistPaymentDate = brazilToday();
+  editingPaymentMetadataId: number | null = null;
+  paymentMetadataReference = '';
+  paymentMetadataNotes = '';
+  paymentMetadataReason = '';
+  paymentMetadataHistoryId: number | null = null;
+  paymentMetadataHistoryRows: CommercePaymentMetadataRevision[] = [];
+  paymentMetadataHistoryLoading = false;
 
   private readonly destroy$ = new Subject<void>();
 
@@ -654,6 +670,54 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  startPaymentMetadataEdit(payment: CommercePayment): void {
+    if(!this.can('PAYMENTS_RECORD') || !this.can('FINANCE_VIEW')
+      || payment.eventKind!=='PAYMENT') return;
+    this.editingPaymentMetadataId=payment.id;
+    this.paymentMetadataReference=payment.externalReference;
+    this.paymentMetadataNotes=payment.notes || '';
+    this.paymentMetadataReason='';
+  }
+
+  cancelPaymentMetadataEdit(): void {
+    this.editingPaymentMetadataId=null;
+    this.paymentMetadataReason='';
+  }
+
+  submitPaymentMetadataCorrection(): void {
+    const statement=this.selectedStatement;
+    const id=this.editingPaymentMetadataId;
+    if(!this.can('PAYMENTS_RECORD') || !this.can('FINANCE_VIEW') ||
+       !statement || id==null || !this.paymentMetadataReference.trim() ||
+       this.paymentMetadataReason.trim().length<3) {
+      this.errorMessage='Informe a nova referência e o motivo da retificação.';
+      return;
+    }
+    this.mutate(this.finance.correctArtistPaymentMetadata(statement.id,id,
+      this.paymentMetadataReference.trim(),this.paymentMetadataNotes.trim() || null,
+      this.paymentMetadataReason.trim()),
+      'Referência/observação retificada; valor do repasse e histórico preservados.',
+      ()=>this.cancelPaymentMetadataEdit());
+  }
+
+  togglePaymentMetadataHistory(paymentId:number): void {
+    const statement=this.selectedStatement;
+    if(!statement || !this.can('FINANCE_VIEW')) return;
+    if(this.paymentMetadataHistoryId===paymentId) {
+      this.paymentMetadataHistoryId=null;
+      this.paymentMetadataHistoryRows=[];
+      return;
+    }
+    this.paymentMetadataHistoryId=paymentId;
+    this.paymentMetadataHistoryLoading=true;
+    this.finance.artistPaymentMetadataHistory(statement.id,paymentId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next:rows=>{this.paymentMetadataHistoryRows=rows;this.paymentMetadataHistoryLoading=false;},
+        error:()=>{this.paymentMetadataHistoryLoading=false;
+          this.errorMessage='Não foi possível consultar o histórico de retificações do repasse.';}
+      });
+  }
+
   artistPaymentWasReversed(id: number): boolean {
     return this.payments.some(p=>p.eventKind==='REVERSAL' && p.originalPaymentId===id);
   }
@@ -689,6 +753,52 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     ),'Estorno contábil registrado. Verifique o saldo do fechamento.',()=>{
       this.cancelReverseArtistPayment();
       this.selectStatement(statement);
+    });
+  }
+
+  startCashMetadataEdit(movement:CommerceCashMovement): void {
+    if(!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW')
+      || movement.eventKind!=='POSTED') return;
+    this.editingCashMetadataId=movement.id;
+    this.cashMetadataDescription=movement.description;
+    this.cashMetadataReference=movement.externalReference || '';
+    this.cashMetadataNotes=movement.notes || '';
+    this.cashMetadataReason='';
+  }
+
+  cancelCashMetadataEdit(): void {
+    this.editingCashMetadataId=null;
+    this.cashMetadataReason='';
+  }
+
+  submitCashMetadataCorrection(): void {
+    const id=this.editingCashMetadataId;
+    if(!this.can('CASHFLOW_MANAGE') || !this.can('FINANCE_VIEW') ||
+       id==null || !this.cashMetadataDescription.trim() ||
+       this.cashMetadataReason.trim().length<3) {
+      this.errorMessage='Informe a descrição e o motivo da retificação.';
+      return;
+    }
+    this.mutate(this.finance.correctCashMetadata(id,
+      this.cashMetadataDescription.trim(),this.cashMetadataReference.trim() || null,
+      this.cashMetadataNotes.trim() || null,this.cashMetadataReason.trim()),
+      'Dados administrativos retificados; valor financeiro preservado.',
+      ()=>this.cancelCashMetadataEdit());
+  }
+
+  toggleCashMetadataHistory(id:number): void {
+    if(!this.can('FINANCE_VIEW')) return;
+    if(this.cashMetadataHistoryId===id) {
+      this.cashMetadataHistoryId=null;
+      this.cashMetadataHistoryRows=[];
+      return;
+    }
+    this.cashMetadataHistoryId=id;
+    this.cashMetadataHistoryLoading=true;
+    this.finance.cashMetadataHistory(id).pipe(takeUntil(this.destroy$)).subscribe({
+      next:rows=>{this.cashMetadataHistoryRows=rows;this.cashMetadataHistoryLoading=false;},
+      error:()=>{this.cashMetadataHistoryLoading=false;
+        this.errorMessage='Não foi possível consultar o histórico de retificações do caixa.';}
     });
   }
 
