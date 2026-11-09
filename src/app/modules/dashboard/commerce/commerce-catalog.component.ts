@@ -6,12 +6,12 @@ import {
   PlatformPermissionCode
 } from '../../../core/services/platform-access.service';
 import {
-  CommerceArtist, CommerceArtwork, CommerceBatch,
+  CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch,
   CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
 } from '../../../core/services/commerce-catalog.service';
 
-type CatalogTab = 'artworks' | 'templates' | 'contracts' |
+type CatalogTab = 'artworks' | 'files' | 'templates' | 'contracts' |
   'suppliers' | 'products' | 'production' | 'links';
 
 @Component({
@@ -22,6 +22,7 @@ type CatalogTab = 'artworks' | 'templates' | 'contracts' |
 export class CommerceCatalogComponent implements OnInit, OnDestroy {
   readonly tabs: { key: CatalogTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'artworks', label: 'Artes e artistas', permissions: ['ARTWORKS_MANAGE'] },
+    { key: 'files', label: 'Arquivos das artes', permissions: ['ARTWORKS_MANAGE'] },
     { key: 'templates', label: 'Modelos de contratos', permissions: ['CONTRACTS_MANAGE'] },
     { key: 'contracts', label: 'Contratos assinados', permissions: ['CONTRACTS_MANAGE'] },
     { key: 'suppliers', label: 'Fornecedores', permissions: ['SUPPLIERS_MANAGE'] },
@@ -39,6 +40,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
 
   templates: CommerceContractTemplate[] = [];
   artworks: CommerceArtwork[] = [];
+  artworkFiles: CommerceArtworkFile[] = [];
   suppliers: CommerceSupplier[] = [];
   supplierChoices: CommerceSupplierOption[] = [];
   products: CommerceProduct[] = [];
@@ -73,6 +75,9 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     oneTimeAmount: 0
   };
   contractFile: File | null = null;
+  artworkUpload: File | null = null;
+  artworkFileKind: CommerceArtworkFile['kind'] = 'SOURCE';
+  artworkFileDescription = '';
 
   private readonly destroy$ = new Subject<void>();
 
@@ -119,6 +124,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
     if (tab === 'contracts') this.reloadContracts();
+    if (tab === 'files') this.reloadFiles();
     if (tab === 'links') this.reloadLinks();
   }
 
@@ -154,6 +160,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         this.selectedProductId = this.products[0]?.id ?? null;
       }
       if (this.can('CONTRACTS_MANAGE')) this.reloadContracts();
+      if (this.can('ARTWORKS_MANAGE')) this.reloadFiles();
       if (this.can('PRODUCTS_MANAGE')) this.reloadLinks();
     });
   }
@@ -304,6 +311,69 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         },
         error: () => this.errorMessage = 'Não foi possível recuperar o contrato privado.'
       });
+  }
+
+
+  onArtworkFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.item(0) ?? null;
+    if (file && (file.size > 25 * 1024 * 1024 ||
+        !/\.(png|jpe?g|webp|pdf|svg|psd|ai|eps|zip)$/i.test(file.name))) {
+      this.artworkUpload = null;
+      this.errorMessage = 'Use PNG, JPG, WebP, PDF, SVG, PSD, AI, EPS ou ZIP de até 25 MiB.';
+      return;
+    }
+    this.artworkUpload = file;
+  }
+
+  reloadFiles(): void {
+    if (!this.can('ARTWORKS_MANAGE') || this.selectedArtworkId == null) {
+      this.artworkFiles = [];
+      return;
+    }
+    this.artworkFiles = [];
+    this.catalog.artworkFiles(this.selectedArtworkId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: files => this.artworkFiles = files,
+        error: () => this.errorMessage = 'Falha ao carregar arquivos privados desta arte.'
+      });
+  }
+
+  uploadArtworkFile(): void {
+    if (!this.can('ARTWORKS_MANAGE') || this.selectedArtworkId == null ||
+        !this.artworkUpload) {
+      this.errorMessage = 'Selecione a arte e um arquivo válido.';
+      return;
+    }
+    this.mutate(this.catalog.uploadArtworkFile(this.selectedArtworkId,
+      this.artworkFileKind,this.artworkFileDescription.trim() || null,this.artworkUpload),
+      'Arquivo da arte armazenado com segurança.');
+  }
+
+  downloadArtworkFile(file: CommerceArtworkFile): void {
+    if (!this.can('ARTWORKS_MANAGE') || file.artworkId !== this.selectedArtworkId) return;
+    this.catalog.downloadArtworkFile(file.artworkId,file.id)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: blob => {
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = file.originalName;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          setTimeout(() => URL.revokeObjectURL(url),5000);
+        },
+        error: () => this.errorMessage = 'Não foi possível baixar o arquivo privado.'
+      });
+  }
+
+  archiveArtworkFile(file: CommerceArtworkFile): void {
+    if (!this.can('ARTWORKS_MANAGE') || file.artworkId !== this.selectedArtworkId ||
+        file.status !== 'ACTIVE') return;
+    if (!window.confirm('Arquivar esta versão? O histórico e o arquivo privado serão preservados.')) return;
+    this.mutate(this.catalog.archiveArtworkFile(file.artworkId,file.id),
+      'Versão arquivada sem perder o histórico.');
   }
 
   reloadContracts(): void {
