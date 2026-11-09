@@ -84,6 +84,12 @@ export class CommerceArtistService {
     return this.http.post<{ id: number }>(`${this.base}/profiles`, input);
   }
 
+  updateArtist(id: number,input: RegisterCommercialArtist): Observable<void> {
+    return this.http.put<void>(
+      `${environment.apiBaseUrl}/user/me/brafurries-commerce/artist/profiles/${id}`,input
+    );
+  }
+
   portfolio(year: number, month: number): Observable<ArtistPortfolio> {
     return this.http.get<ArtistPortfolio>(`${this.base}/me/portfolio`, {
       params: new HttpParams().set('year', year.toString()).set('month', month.toString())

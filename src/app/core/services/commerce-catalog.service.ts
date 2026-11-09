@@ -96,6 +96,58 @@ export class CommerceCatalogService {
   }
 
 
+  updateArtwork(id: number, input: CreateArtworkInput): Observable<void> {
+    return this.http.put<void>(`${this.base}/artworks/${id}`,input);
+  }
+
+  setArtworkArchived(id: number, archived: boolean): Observable<void> {
+    return this.http.post<void>(`${this.base}/artworks/${id}/archive`,{archived});
+  }
+
+  deleteArtwork(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/artworks/${id}`);
+  }
+
+  updateTemplate(id: number,input: CreateTemplateInput): Observable<void> {
+    return this.http.put<void>(`${this.base}/contract-templates/${id}`,input);
+  }
+
+  setTemplateActive(id: number,active: boolean): Observable<void> {
+    return this.http.post<void>(`${this.base}/contract-templates/${id}/status`,{active});
+  }
+
+  deleteTemplate(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/contract-templates/${id}`);
+  }
+
+  updateSupplier(id: number,input: CreateSupplierInput): Observable<void> {
+    return this.http.put<void>(`${this.base}/suppliers/${id}`,input);
+  }
+
+  setSupplierActive(id: number,active: boolean): Observable<void> {
+    return this.http.post<void>(`${this.base}/suppliers/${id}/status`,{active});
+  }
+
+  deleteSupplier(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/suppliers/${id}`);
+  }
+
+  updateProduct(id: number,input: CreateProductInput): Observable<void> {
+    return this.http.put<void>(`${this.base}/products/${id}`,input);
+  }
+
+  setProductActive(id: number,active: boolean): Observable<void> {
+    return this.http.post<void>(`${this.base}/products/${id}/status`,{active});
+  }
+
+  deleteProduct(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/products/${id}`);
+  }
+
+  unlinkArtwork(productId: number,artworkId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/products/${productId}/artworks/${artworkId}`);
+  }
+
   artworkFiles(artworkId: number): Observable<CommerceArtworkFile[]> {
     return this.http.get<CommerceArtworkFile[]>(`${this.base}/artworks/${artworkId}/files`);
   }
