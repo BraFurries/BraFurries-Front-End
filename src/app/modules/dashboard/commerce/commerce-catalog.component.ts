@@ -6,7 +6,7 @@ import {
   PlatformPermissionCode
 } from '../../../core/services/platform-access.service';
 import {
-  CommercialArtist, CommerceArtistService, PendingArtistClaim
+  CommercialArtist, CommerceArtistService, IssuedArtistInvitation
 } from '../../../core/services/commerce-artist.service';
 import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch,
@@ -52,17 +52,15 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   links: CommerceProductArtwork[] = [];
   artistCandidates: CommerceArtist[] = [];
   externalArtists: CommercialArtist[] = [];
-  pendingArtistClaims: PendingArtistClaim[] = [];
   showExternalArtistForm = false;
+  issuedInvitation: IssuedArtistInvitation | null = null;
+  issuedInvitationLink = '';
+  issuedArtistName = '';
+  issuingInvitation = false;
   externalArtistForm = {
     artistName: '', telegramHandle: '', instagramHandle: '',
     contactEmail: '', internalNotes: ''
   };
-  reviewClaimId: number | null = null;
-  reviewMethod = 'TELEGRAM';
-  reviewNotes = '';
-  reviewingClaim = false;
-
   artistSearch = '';
   selectedArtworkId: number | null = null;
   selectedProductId: number | null = null;
@@ -111,7 +109,6 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         }
         this.activeTab = this.visibleTabs()[0]?.key ?? 'artworks';
         this.reload();
-        if (access.owner) this.reloadPendingArtistClaims();
       },
       error: () => {
         this.errorMessage = 'Não foi possível verificar a autorização comercial.';
@@ -255,82 +252,50 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     });
   }
 
-  reloadPendingArtistClaims(): void {
-    if (this.access?.owner !== true) return;
-    this.artistService.pendingClaims().pipe(takeUntil(this.destroy$)).subscribe({
-      next: claims => this.pendingArtistClaims = claims,
-      error: () => this.errorMessage = 'Não foi possível carregar reivindicações pendentes.'
+  issueInvitation(artist: CommercialArtist): void {
+    if (this.access?.owner !== true || !artist.canInvite || this.issuingInvitation) return;
+    this.issuingInvitation = true;
+    this.errorMessage = '';
+    this.issuedInvitation = null;
+    this.issuedInvitationLink = '';
+    this.artistService.issueInvitation(artist.userId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: invitation => {
+          this.issuingInvitation = false;
+          this.issuedArtistName = artist.artistName;
+          this.issuedInvitation = invitation;
+          // Only the URL travels in the initial message. The confirmation
+          // code MUST be transmitted independently through a trusted channel.
+          this.issuedInvitationLink =
+            `${window.location.origin}/artist-invite?token=${encodeURIComponent(invitation.token)}`;
+          this.successMessage =
+            'Convite criado. Compartilhe o link e o código por canais separados; ambos aparecem apenas agora.';
+        },
+        error: () => {
+          this.issuingInvitation = false;
+          this.errorMessage = 'Não foi possível gerar o convite. Confirme que a artista ainda não tem conta.';
+        }
+      });
+  }
+
+  copyInvitationLink(): void {
+    if (!this.issuedInvitationLink) return;
+    navigator.clipboard.writeText(this.issuedInvitationLink).catch(() => {
+      this.errorMessage = 'Copie o link selecionando o texto.';
     });
   }
 
-  approveArtistClaim(): void {
-    if (this.access?.owner !== true || this.reviewingClaim ||
-        this.reviewClaimId === null || !this.reviewNotes.trim()) {
-      this.errorMessage = 'Selecione a solicitação e registre como confirmou a identidade.';
-      return;
-    }
-    this.reviewingClaim = true;
-    this.errorMessage = '';
-    this.artistService.approve(this.reviewClaimId,this.reviewMethod,this.reviewNotes.trim())
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next: () => {
-          this.reviewingClaim = false;
-          this.reviewClaimId = null;
-          this.reviewNotes = '';
-          this.successMessage = 'Titularidade confirmada. O acesso pessoal já foi liberado.';
-          this.reloadPendingArtistClaims();
-          this.reload();
-        },
-        error: () => {
-          this.reviewingClaim = false;
-          this.errorMessage = 'Não foi possível aprovar a solicitação. Confira as provas e a conta verificada.';
-        }
-      });
+  copyInvitationCode(): void {
+    if (!this.issuedInvitation) return;
+    navigator.clipboard.writeText(this.issuedInvitation.confirmationCode).catch(() => {
+      this.errorMessage = 'Copie o código selecionando o texto.';
+    });
   }
 
-  rejectArtistClaim(): void {
-    if (this.access?.owner !== true || this.reviewingClaim ||
-        this.reviewClaimId === null || !this.reviewNotes.trim()) {
-      this.errorMessage = 'Selecione a solicitação e informe o motivo da recusa.';
-      return;
-    }
-    this.reviewingClaim = true;
-    this.errorMessage = '';
-    this.artistService.reject(this.reviewClaimId,this.reviewNotes.trim())
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next: () => {
-          this.reviewingClaim = false;
-          this.reviewClaimId = null;
-          this.reviewNotes = '';
-          this.successMessage = 'Solicitação recusada e registrada.';
-          this.reloadPendingArtistClaims();
-        },
-        error: () => {
-          this.reviewingClaim = false;
-          this.errorMessage = 'Não foi possível recusar a solicitação.';
-        }
-      });
-  }
-
-  revokeArtistClaim(artist: CommercialArtist): void {
-    if (this.access?.owner !== true || artist.claimedByUserId == null) return;
-    const reason = window.prompt(
-      'Motivo para revogar o acesso pessoal a esta artista (obrigatório):');
-    if (!reason?.trim()) return;
-    this.reviewingClaim = true;
-    this.errorMessage = '';
-    this.artistService.revoke(artist.userId,reason.trim())
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next: () => {
-          this.reviewingClaim = false;
-          this.successMessage = 'Acesso pessoal revogado imediatamente.';
-          this.reload();
-        },
-        error: () => {
-          this.reviewingClaim = false;
-          this.errorMessage = 'Não foi possível revogar a reivindicação.';
-        }
-      });
+  clearIssuedInvitation(): void {
+    this.issuedInvitation = null;
+    this.issuedInvitationLink = '';
+    this.issuedArtistName = '';
   }
 
   createArtwork(): void {
