@@ -3,6 +3,7 @@ import { finalize, switchMap } from 'rxjs';
 import { GuildCategory, GuildChannel, GuildResources } from '../../../core/services/managed-servers.service';
 import {
   PartnerDiscordItem,
+  PartnerDiscordAnnouncementRequest,
   PartnerDiscordOptionRequest,
   PartnerDiscordService,
   PartnerDiscordSettings
@@ -23,6 +24,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
   categoryId = '';
   parentId = '';
   drafts: Record<number, PartnerDiscordOptionRequest> = {};
+  announcementDrafts: Record<number, PartnerDiscordAnnouncementRequest> = {};
   loading = false;
   saving = false;
   error = '';
@@ -70,7 +72,9 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
   }
 
   get dirty(): boolean {
-    return this.hasConfigChanges || !!this.state?.partners.some(item => this.partnerDirty(item));
+    return this.hasConfigChanges || !!this.state?.partners.some(item =>
+      this.partnerDirty(item) || this.announcementDirty(item)
+    );
   }
 
   get enabled(): boolean {
@@ -84,6 +88,51 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
       || draft.existingTextChannelId !== item.existingTextChannelId
       || draft.adoptExistingTextChannel !== item.adoptExistingTextChannel
     );
+  }
+
+  announcementDirty(item: PartnerDiscordItem): boolean {
+    const draft = this.announcementDrafts[item.partnerId];
+    return !!draft && (
+      (draft.markdown || null) !== (item.announcementMarkdown || null)
+      || draft.linksMode !== item.announcementLinksMode
+      || (draft.publicContact || null) !== (item.announcementPublicContact || null)
+    );
+  }
+
+  updateAnnouncementDraft(item: PartnerDiscordItem, changes: Partial<PartnerDiscordAnnouncementRequest>): void {
+    const current = this.announcementDrafts[item.partnerId] ?? this.toAnnouncementDraft(item);
+    this.announcementDrafts[item.partnerId] = { ...current, ...changes };
+    this.error = '';
+    this.success = '';
+    this.dirtyChange.emit(this.dirty);
+  }
+
+  /** Approximate Discord Markdown preview. Always HTML-escape user content
+   * before adding static markup; Angular sanitizes innerHTML again. */
+  previewMarkdown(text: string): string {
+    const escaped = (text || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const inline = (line: string): string => line
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<u>$1</u>')
+      .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="underline">$1</a>');
+    return escaped.split('\n').map(line => {
+      const heading = /^(#{1,3})\s+(.+)$/.exec(line);
+      if (heading) {
+        const cls = heading[1].length === 1 ? 'text-lg' : 'text-base';
+        return `<h3 class="${cls} font-bold mt-3 mb-1">${inline(heading[2])}</h3>`;
+      }
+      if (/^\s*[-*]\s+/.test(line)) {
+        return `<div class="pl-3 my-1">• ${inline(line.replace(/^\s*[-*]\s+/, ''))}</div>`;
+      }
+      return line.trim()
+        ? `<p class="my-1">${inline(line)}</p>`
+        : '<div class="h-2"></div>';
+    }).join('');
   }
 
   updateDraft(item: PartnerDiscordItem, changes: Partial<PartnerDiscordOptionRequest>): void {
@@ -115,6 +164,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     this.success = '';
     this.state = undefined;
     this.drafts = {};
+    this.announcementDrafts = {};
     this.withdrawalConfirmationId = null;
     this.dirtyChange.emit(false);
     this.service.getSettings().subscribe({
@@ -202,6 +252,79 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     });
   }
 
+  saveAnnouncement(item: PartnerDiscordItem): void {
+    const draft = this.announcementDrafts[item.partnerId];
+    if (!this.enabled || !this.state?.configured || !draft
+      || !this.announcementDirty(item) || this.saving || this.busyPartnerId !== null) return;
+    if ((draft.markdown || '').length > 16000 || (draft.publicContact || '').length > 255) {
+      this.error = 'Anúncio limitado a 16.000 caracteres e contato a 255.';
+      return;
+    }
+    const guild = this.guildId;
+    this.busyPartnerId = item.partnerId;
+    this.savingChange.emit(true);
+    this.error = '';
+    this.success = '';
+    this.service.updateAnnouncement(item.partnerId, draft)
+      .pipe(finalize(() => {
+        this.busyPartnerId = null;
+        this.savingChange.emit(false);
+      }))
+      .subscribe({
+        next: updated => {
+          if (guild !== this.guildId || !this.state) return;
+          this.state = {
+            ...this.state,
+            partners: this.state.partners.map(current =>
+              current.partnerId === updated.partnerId ? updated : current
+            )
+          };
+          this.announcementDrafts[updated.partnerId] = this.toAnnouncementDraft(updated);
+          this.success = 'Anúncio salvo. Use Publicar/atualizar no Discord para aplicá-lo à thread.';
+          this.dirtyChange.emit(this.dirty);
+        },
+        error: failure => {
+          if (guild === this.guildId) {
+            this.error = failure?.error?.message || 'Não foi possível salvar o anúncio Markdown.';
+          }
+        }
+      });
+  }
+
+  syncOne(item: PartnerDiscordItem): void {
+    if (!this.enabled || !this.state?.configured || this.saving
+      || this.busyPartnerId !== null || this.dirty) return;
+    const guild = this.guildId;
+    this.busyPartnerId = item.partnerId;
+    this.savingChange.emit(true);
+    this.error = '';
+    this.success = '';
+    this.service.syncPartner(item.partnerId).pipe(
+      finalize(() => {
+        this.busyPartnerId = null;
+        this.savingChange.emit(false);
+      })
+    ).subscribe({
+      next: updated => {
+        if (guild !== this.guildId || !this.state) return;
+        this.state = {
+          ...this.state,
+          partners: this.state.partners.map(current =>
+            current.partnerId === updated.partnerId ? updated : current
+          )
+        };
+        this.announcementDrafts[updated.partnerId] = this.toAnnouncementDraft(updated);
+        this.success = 'Anúncio atualizado na thread do Discord.';
+        this.dirtyChange.emit(this.dirty);
+      },
+      error: failure => {
+        if (guild === this.guildId) {
+          this.error = failure?.error?.message || 'Falha ao sincronizar. Verifique o estado antes de repetir.';
+        }
+      }
+    });
+  }
+
   requestWithdrawal(partnerId: number): void {
     this.withdrawalConfirmationId = partnerId;
     this.error = '';
@@ -268,6 +391,14 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     });
   }
 
+  private toAnnouncementDraft(item: PartnerDiscordItem): PartnerDiscordAnnouncementRequest {
+    return {
+      markdown: item.announcementMarkdown ?? '',
+      linksMode: item.announcementLinksMode ?? 'INLINE_ONLY',
+      publicContact: item.announcementPublicContact ?? ''
+    };
+  }
+
   private toDraft(item: PartnerDiscordItem): PartnerDiscordOptionRequest {
     return {
       exclusiveChannelEnabled: item.exclusiveChannelEnabled,
@@ -281,6 +412,9 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     this.categoryId = settings.categoryId ?? '';
     this.parentId = settings.threadParentChannelId ?? '';
     this.drafts = Object.fromEntries(settings.partners.map(item => [item.partnerId, this.toDraft(item)]));
+    this.announcementDrafts = Object.fromEntries(settings.partners.map(item =>
+      [item.partnerId, this.toAnnouncementDraft(item)]
+    ));
     this.dirtyChange.emit(false);
   }
 
