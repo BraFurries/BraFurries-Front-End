@@ -109,6 +109,82 @@
             }
           }
 
+          <details class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <summary class="cursor-pointer font-semibold text-gray-900">
+              Anúncio em Markdown para o Discord
+              @if (item.announcementMarkdown) {
+                <span class="ml-2 text-xs font-normal text-gray-500">Personalizado</span>
+              } @else {
+                <span class="ml-2 text-xs font-normal text-gray-500">Usando descrição do cadastro</span>
+              }
+            </summary>
+            @if (announcementDrafts[item.partnerId]; as announcement) {
+              <div class="mt-4 space-y-4">
+                <p class="text-xs text-gray-600">
+                  Este texto é independente da descrição do site. Preserve os títulos, links,
+                  emojis, listas e outros recursos Markdown enviados pelo parceiro.
+                  Se ficar vazio, será publicada uma apresentação básica usando o cadastro.
+                </p>
+                <label class="block text-sm font-semibold text-gray-700">
+                  Conteúdo do anúncio (Markdown)
+                  <textarea [ngModel]="announcement.markdown ?? ''"
+                    (ngModelChange)="updateAnnouncementDraft(item, { markdown: $event })"
+                    maxlength="16000" rows="11" spellcheck="true"
+                    [disabled]="saving || busyPartnerId !== null"
+                    placeholder="# 🐑 **República Indie**&#10;&#10;Apresentação e links..."
+                    class="mt-2 block w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-3 font-mono text-sm font-normal"></textarea>
+                </label>
+                <p class="text-right text-xs text-gray-500">
+                  {{ (announcement.markdown || '').length }}/16.000 caracteres · anúncios longos serão divididos em mensagens na mesma thread
+                </p>
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="block text-sm font-semibold text-gray-700">
+                    Links cadastrados na plataforma
+                    <select [ngModel]="announcement.linksMode"
+                      (ngModelChange)="updateAnnouncementDraft(item, { linksMode: $event })"
+                      [disabled]="saving || busyPartnerId !== null"
+                      class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-normal">
+                      <option value="INLINE_ONLY">Usar só os links escritos no anúncio</option>
+                      <option value="APPEND_MISSING">Adicionar links cadastrados que não aparecem no anúncio</option>
+                    </select>
+                  </label>
+                  <label class="block text-sm font-semibold text-gray-700">
+                    Contato público (opcional)
+                    <input type="text" [ngModel]="announcement.publicContact ?? ''"
+                      (ngModelChange)="updateAnnouncementDraft(item, { publicContact: $event })"
+                      maxlength="255" [disabled]="saving || busyPartnerId !== null"
+                      placeholder="Ex.: Discord da equipe ou e-mail público"
+                      class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-normal" />
+                  </label>
+                </div>
+                <p class="text-xs text-gray-500">
+                  O representante da plataforma não será mencionado automaticamente. O ID interno do parceiro não aparecerá na mensagem.
+                </p>
+                <div class="space-y-2">
+                  <h5 class="text-sm font-semibold text-gray-700">Prévia aproximada do Markdown</h5>
+                  <div class="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-800"
+                    [innerHTML]="previewMarkdown(announcement.markdown || '# ' + item.name)">
+                  </div>
+                  <p class="text-xs text-gray-500">
+                    Emojis personalizados e a renderização exata dependem do Discord. A prévia não envia mensagens.
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <button type="button" (click)="saveAnnouncement(item)"
+                    [disabled]="saving || busyPartnerId !== null || !state.configured || !announcementDirty(item)"
+                    class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    Salvar anúncio
+                  </button>
+                  <button type="button" (click)="syncOne(item)"
+                    [disabled]="saving || busyPartnerId !== null || !state.configured || dirty"
+                    class="rounded-lg border border-braPurple px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+                    {{ item.threadId ? 'Atualizar no Discord' : 'Publicar no Discord' }}
+                  </button>
+                </div>
+              </div>
+            }
+          </details>
+
           @if (item.lastSyncError) {
             <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{{ item.lastSyncError }}</p>
           }
