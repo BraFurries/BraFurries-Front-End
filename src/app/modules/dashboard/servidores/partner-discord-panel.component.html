@@ -32,8 +32,8 @@
         <label class="block text-sm font-semibold text-gray-700">
           Canal de threads
           <select [ngModel]="parentId" (ngModelChange)="onParentChanged($event)"
-            [disabled]="saving || busyPartnerId !== null" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-            <option value="">Criar fórum automaticamente</option>
+            [disabled]="saving || busyPartnerId !== null || !categoryId" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+            <option value="">{{ categoryId ? 'Criar fórum automaticamente' : 'Criar categoria e fórum automaticamente' }}</option>
             @for (channel of parentChannels; track channel.id) {
               <option [value]="channel.id">{{ channel.type === 'forum' ? 'Fórum' : 'Texto' }} · {{ channel.name }}</option>
             }
