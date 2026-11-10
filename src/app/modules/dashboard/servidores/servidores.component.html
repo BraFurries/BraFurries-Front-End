@@ -64,7 +64,7 @@
         }
       </section>
       <nav class="section-tabs" role="tablist">
-        @for (section of sections; track section.id) {
+        @for (section of visibleSections; track section.id) {
           <button
             type="button"
             [class.active]="activeSection === section.id"
