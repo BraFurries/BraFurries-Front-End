@@ -62,7 +62,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
 
   get hasConfigChanges(): boolean {
     return !!this.state && (
-      this.categoryId !== (this.state.categoryId ?? '')
+      !this.state.configured || this.categoryId !== (this.state.categoryId ?? '')
       || this.parentId !== (this.state.threadParentChannelId ?? '')
     );
   }
