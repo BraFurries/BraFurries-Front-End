@@ -12,5 +12,10 @@ regexTarget = "secret"
 regexes = ['''^123456789012345678$''']
 paths = [
   '''^src/app/core/services/admin\.service\.spec\.ts$''',
-  '''^src/app/modules/dashboard/admin/pages/usuarios/perfil/perfil-usuario\.component\.spec\.ts$''',
+  '''^src/app/modules/dashboard/admin/pages/usuarios/perfil/perfil-usuario\.component\.spec\.ts
+]
+'',
+  '''^src/app/modules/dashboard/servidores/partner-discord-panel\\.component\\.spec\\.ts
+]
+'',
 ]
