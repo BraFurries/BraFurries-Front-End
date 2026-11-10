@@ -44,7 +44,7 @@
       <div class="flex flex-wrap gap-3">
         <button type="button" (click)="saveConfig()" [disabled]="saving || busyPartnerId !== null || !hasConfigChanges"
           class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Salvar destino</button>
-        <button type="button" (click)="syncAll()" [disabled]="saving || busyPartnerId !== null || dirty"
+        <button type="button" (click)="syncAll()" [disabled]="saving || busyPartnerId !== null || dirty || !state.configured"
           class="rounded-lg border border-braPurple px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">Sincronizar todos os parceiros</button>
       </div>
     </div>
@@ -118,7 +118,7 @@
               {{ item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync ? 'Sincronizado' : 'Publicação ou atualização pendente' }}
             </small>
             <button type="button" (click)="savePartner(item)"
-              [disabled]="saving || busyPartnerId !== null || !drafts[item.partnerId] || !partnerDirty(item)"
+              [disabled]="saving || busyPartnerId !== null || !state.configured || !drafts[item.partnerId] || !partnerDirty(item)"
               class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
               {{ busyPartnerId === item.partnerId ? 'Sincronizando...' : 'Salvar e aplicar no Discord' }}
             </button>
