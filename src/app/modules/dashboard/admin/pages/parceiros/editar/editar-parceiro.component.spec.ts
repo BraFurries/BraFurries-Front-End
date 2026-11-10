@@ -10,6 +10,18 @@ describe('EditarParceiroComponent', () => {
     const route: any = { snapshot: { paramMap: { get: () => '7' } } };
     return { component: new EditarParceiroComponent(route, router, service, dialog), service, router, dialog };
   }
+  it('asks before leaving when the announcement has unsaved edits', () => {
+    const { component } = setup();
+    component.announcementEditor = { dirty: true } as any;
+    const confirm = spyOn(window, 'confirm').and.returnValue(false);
+    expect(component.canDeactivate()).toBeFalse();
+    expect(confirm).toHaveBeenCalled();
+    confirm.and.returnValue(true);
+    expect(component.canDeactivate()).toBeTrue();
+    const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    component.beforeUnload(event);
+    expect(event.defaultPrevented).toBeTrue();
+  });
   it('loads the detail endpoint and exposes read-only metrics', () => {
     const { component, service } = setup(); component.ngOnInit();
     expect(service.getPartner).toHaveBeenCalledWith(7); expect(component.partner?.clicks).toBe(12); expect(component.partner?.invites).toBe(4);

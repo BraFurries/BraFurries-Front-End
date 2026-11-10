@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { finalize } from 'rxjs/operators';
@@ -6,9 +6,11 @@ import { AdminService } from '../../../../../../core/services/admin.service';
 import { DialogComponent } from '../../../../../../shared/components/dialog/dialog.component';
 import { AdminPartnerItem } from '../../../../../../shared/models/api/admin/admin';
 import { PartnerFormSubmission } from '../components/parceiro-form/parceiro-form.component';
+import { PartnerAnnouncementEditorComponent } from './partner-announcement-editor.component';
 
 @Component({ selector: 'app-editar-parceiro', standalone: false, templateUrl: './editar-parceiro.component.html' })
 export class EditarParceiroComponent implements OnInit {
+  @ViewChild(PartnerAnnouncementEditorComponent) announcementEditor?: PartnerAnnouncementEditorComponent;
   partner: AdminPartnerItem | null = null;
   loading = true; notFound = false; submitting = false; statusSubmitting = false; deleting = false;
   errorMessage = ''; successMessage = '';
@@ -62,6 +64,17 @@ export class EditarParceiroComponent implements OnInit {
     }}).afterClosed().subscribe(confirmed => { if (confirmed) this.delete(); });
   }
   back(): void { this.router.navigate(['/painel/admin/parceiros']); }
+  canDeactivate(): boolean {
+    return !this.announcementEditor?.dirty
+      || (typeof window !== 'undefined' && window.confirm('Há alterações não salvas no anúncio. Deseja sair sem salvar?'));
+  }
+  @HostListener('window:beforeunload', ['$event'])
+  beforeUnload(event: BeforeUnloadEvent): void {
+    if (this.announcementEditor?.dirty) {
+      event.preventDefault();
+      event.returnValue = true;
+    }
+  }
   formatDate(value?: string | null): string { return value ? new Intl.DateTimeFormat('pt-BR').format(new Date(value)) : '-'; }
   private updateStatus(status: 'active' | 'suspended'): void {
     this.statusSubmitting = true; this.clearFeedback();

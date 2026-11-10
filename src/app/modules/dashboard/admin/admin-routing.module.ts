@@ -24,7 +24,7 @@ const routes: Routes = [
       { path: 'usuarios', component: AdminUsersComponent },
       { path: 'usuarios/:id', component: AdminUserProfileComponent },
       { path: 'parceiros/novo', component: NovoParceiroComponent },
-      { path: 'parceiros/:id/editar', component: EditarParceiroComponent },
+      { path: 'parceiros/:id/editar', component: EditarParceiroComponent, canDeactivate: [(component: EditarParceiroComponent) => component.canDeactivate()] },
       { path: 'parceiros', component: AdminPartnersComponent, pathMatch: 'full' },
       { path: 'bot-coddy', component: AdminBotComponent },
       { path: 'bot-coddy/detalhes', component: AdminBotDetailsComponent },

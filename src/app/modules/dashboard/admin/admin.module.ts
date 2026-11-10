@@ -12,6 +12,7 @@ import { AdminMetricsComponent } from './pages/metricas/metricas.component';
 import { AdminPartnersComponent } from './pages/parceiros/parceiros.component';
 import { ParceiroFormComponent } from './pages/parceiros/components/parceiro-form/parceiro-form.component';
 import { EditarParceiroComponent } from './pages/parceiros/editar/editar-parceiro.component';
+import { PartnerAnnouncementEditorComponent } from './pages/parceiros/editar/partner-announcement-editor.component';
 import { NovoParceiroComponent } from './pages/parceiros/novo/novo-parceiro.component';
 import { AdminUsersComponent } from './pages/usuarios/usuarios.component';
 import { AdminUserProfileComponent } from './pages/usuarios/perfil/perfil-usuario.component';
@@ -30,6 +31,7 @@ import { AdminOverviewComponent } from './pages/visao-geral/visao-geral.componen
     ParceiroFormComponent,
     NovoParceiroComponent,
     EditarParceiroComponent,
+    PartnerAnnouncementEditorComponent,
     AdminBotComponent,
     AdminBotDetailsComponent,
     AdminMetricsComponent,
