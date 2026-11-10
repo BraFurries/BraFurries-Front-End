@@ -1,0 +1,130 @@
+<section class="space-y-6 rounded-xl border border-gray-200 bg-white p-5 md:p-7">
+  <header>
+    <p class="text-xs font-semibold uppercase tracking-wider text-braPurple">Exclusivo BraFurries</p>
+    <h2 class="mt-1 font-amaranth text-2xl text-gray-900">Vitrine e canais de parceiros</h2>
+    <p class="mt-2 text-sm text-gray-600">Organize cada parceiro em uma thread de divulgação e escolha quais recebem um canal de texto exclusivo. As informações vêm do cadastro de parcerias.</p>
+  </header>
+
+  @if (loading) {
+    <p role="status">Carregando parceiros e configuração do Discord...</p>
+  }
+  @if (error) {
+    <p role="alert" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ error }}</p>
+  }
+  @if (success) {
+    <p role="status" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-green-800">{{ success }}</p>
+  }
+
+  @if (state && enabled) {
+    <div class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <h3 class="font-amaranth text-lg text-gray-900">Destino da vitrine</h3>
+      <div class="grid gap-4 md:grid-cols-2">
+        <label class="block text-sm font-semibold text-gray-700">
+          Categoria Discord
+          <select [ngModel]="categoryId" (ngModelChange)="onCategoryChanged($event)"
+            [disabled]="saving || busyPartnerId !== null" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+            <option value="">Criar automaticamente pelo Coddy</option>
+            @for (category of categories; track category.id) {
+              <option [value]="category.id">{{ category.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="block text-sm font-semibold text-gray-700">
+          Canal de threads
+          <select [ngModel]="parentId" (ngModelChange)="onParentChanged($event)"
+            [disabled]="saving || busyPartnerId !== null" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+            <option value="">Criar fórum automaticamente</option>
+            @for (channel of parentChannels; track channel.id) {
+              <option [value]="channel.id">{{ channel.type === 'forum' ? 'Fórum' : 'Texto' }} · {{ channel.name }}</option>
+            }
+          </select>
+        </label>
+      </div>
+      <p class="text-xs text-gray-600">Um canal existente precisa ser configurado como somente leitura para membros. Threads públicas não suportam permissão de escrita individual; o representante publica nelas pelo site, com o Coddy.</p>
+      <div class="flex flex-wrap gap-3">
+        <button type="button" (click)="saveConfig()" [disabled]="saving || busyPartnerId !== null || !hasConfigChanges"
+          class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Salvar destino</button>
+        <button type="button" (click)="syncAll()" [disabled]="saving || busyPartnerId !== null || dirty"
+          class="rounded-lg border border-braPurple px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">Sincronizar todos os parceiros</button>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <h3 class="font-amaranth text-xl">Parceiros cadastrados</h3>
+      @if (!state.partners.length) {
+        <p class="text-sm text-gray-600">Nenhuma parceria cadastrada. Cadastre um parceiro em Administração → Parceiros para começar.</p>
+      }
+      @for (item of state.partners; track item.partnerId) {
+        <article class="space-y-3 rounded-xl border border-gray-200 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 class="font-semibold text-gray-900">{{ item.name }}</h4>
+              <p class="text-xs text-gray-500">Situação: {{ item.status }} · Representante: {{ item.representativeName || 'Não definido' }}</p>
+            </div>
+            <div class="text-xs text-gray-600">
+              @if (item.threadId) {
+                <a [href]="'https://discord.com/channels/' + state.guildId + '/' + item.threadId"
+                   target="_blank" rel="noopener noreferrer" class="font-semibold text-braPurple underline">Abrir thread</a>
+              } @else { <span>Thread ainda não criada</span> }
+              @if (item.textChannelId) {
+                <span class="mx-2">·</span>
+                <a [href]="'https://discord.com/channels/' + state.guildId + '/' + item.textChannelId"
+                   target="_blank" rel="noopener noreferrer" class="font-semibold text-braPurple underline">Abrir canal</a>
+              }
+            </div>
+          </div>
+
+          @if (drafts[item.partnerId]; as draft) {
+            <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <input type="checkbox" [ngModel]="draft.exclusiveChannelEnabled"
+                (ngModelChange)="updateDraft(item, { exclusiveChannelEnabled: $event, existingTextChannelId: $event ? draft.existingTextChannelId : null, adoptExistingTextChannel: $event ? draft.adoptExistingTextChannel : false })"
+                [disabled]="saving || busyPartnerId !== null" />
+              Permitir canal de texto exclusivo para este parceiro
+            </label>
+            @if (draft.exclusiveChannelEnabled) {
+              @if (!item.representativeDiscordUserId) {
+                <p class="text-xs text-amber-700">Vincule uma conta Discord ao usuário representante antes de conceder escrita direta.</p>
+              }
+              <div class="grid gap-4 md:grid-cols-2">
+                <label class="text-sm font-semibold text-gray-700">
+                  Canal exclusivo
+                  <select [ngModel]="draft.existingTextChannelId ?? ''"
+                    (ngModelChange)="updateDraft(item, { existingTextChannelId: $event || null, adoptExistingTextChannel: false })"
+                    [disabled]="saving || busyPartnerId !== null" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+                    <option value="">Criar canal automaticamente</option>
+                    @for (channel of textChannels; track channel.id) {
+                      <option [value]="channel.id">{{ channel.name }}</option>
+                    }
+                  </select>
+                </label>
+                @if (draft.existingTextChannelId) {
+                  <label class="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" [ngModel]="draft.adoptExistingTextChannel"
+                      (ngModelChange)="updateDraft(item, { adoptExistingTextChannel: $event })"
+                      [disabled]="saving || busyPartnerId !== null" />
+                    Confirmo que este canal será gerenciado pelo Coddy e suas permissões de escrita serão ajustadas
+                  </label>
+                }
+              </div>
+            }
+          }
+
+          @if (item.lastSyncError) {
+            <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{{ item.lastSyncError }}</p>
+          }
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <small class="text-xs" [class.text-green-700]="item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision"
+              [class.text-amber-700]="item.appliedRevision < item.desiredRevision">
+              {{ item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision ? 'Sincronizado' : 'Publicação pendente' }}
+            </small>
+            <button type="button" (click)="savePartner(item)"
+              [disabled]="saving || busyPartnerId !== null || !drafts[item.partnerId] || !partnerDirty(item)"
+              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {{ busyPartnerId === item.partnerId ? 'Sincronizando...' : 'Salvar e aplicar no Discord' }}
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>
