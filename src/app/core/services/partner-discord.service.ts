@@ -17,6 +17,7 @@ export interface PartnerDiscordItem {
   desiredRevision: number;
   appliedRevision: number;
   lastSyncError: string | null;
+  contentOutOfSync: boolean;
 }
 
 export interface PartnerDiscordSettings {
