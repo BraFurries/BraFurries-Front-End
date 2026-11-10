@@ -40,7 +40,7 @@
           </select>
         </label>
       </div>
-      <p class="text-xs text-gray-600">Um canal existente precisa ser configurado como somente leitura para membros. Threads públicas não suportam permissão de escrita individual; o representante publica nelas pelo site, com o Coddy.</p>
+      <p class="text-xs text-gray-600">Ao sincronizar, o Coddy corrige automaticamente as permissões de escrita do canal selecionado, preservando os demais acessos. Administradores do Discord continuam com as permissões administrativas. O representante publica na thread pelo site.</p>
       <div class="flex flex-wrap gap-3">
         <button type="button" (click)="saveConfig()" [disabled]="saving || busyPartnerId !== null || !hasConfigChanges"
           class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Salvar destino</button>
