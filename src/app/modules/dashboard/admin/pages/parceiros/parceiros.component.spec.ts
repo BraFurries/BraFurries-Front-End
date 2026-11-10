@@ -77,7 +77,7 @@ describe('AdminPartnersComponent', () => {
     component.partners = [partner];
     component.togglePartnerStatus(partner);
     expect(service.updatePartnerStatus).toHaveBeenCalledWith(4, 'suspended');
-    expect(component.groupedPartners[0].status).toBe('suspended');
+    expect(component.orderedPartners[0].status).toBe('suspended');
     expect(component.updatingPartnerId).toBeNull();
   });
 
@@ -111,7 +111,7 @@ describe('AdminPartnersComponent', () => {
     response.next({ ...partner, status: 'active' });
     response.complete();
     expect(component.updatingPartnerId).toBeNull();
-    expect(component.groupedPartners[0].status).toBe('active');
+    expect(component.orderedPartners[0].status).toBe('active');
   });
 
   it('preserves the previous state when the API rejects the update', () => {
