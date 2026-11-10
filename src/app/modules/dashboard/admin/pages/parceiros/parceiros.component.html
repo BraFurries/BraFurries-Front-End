@@ -1,17 +1,20 @@
 <div class="space-y-6">
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Parcerias</h2>
-    <div class="flex flex-wrap gap-3">
-      <select [(ngModel)]="status" (change)="loadPartners()"
-              class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
-        <option value="">Todos status</option>
-        <option value="pending">Pendentes</option>
+  <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+    <div>
+      <h2 class="font-amaranth text-2xl font-bold text-gray-800">Parcerias</h2>
+      <p class="mt-1 text-sm text-gray-500">Organizadas por situação e, dentro de cada grupo, por nome.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <select [(ngModel)]="status" (change)="loadPartners()" aria-label="Filtrar por situação"
+              class="block rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-bold text-gray-700 shadow-sm focus:border-braPurple focus:ring-braPurple">
+        <option value="">Todos os estados</option>
         <option value="active">Ativos</option>
+        <option value="pending">Pendentes</option>
         <option value="suspended">Suspensos</option>
       </select>
-      <select [(ngModel)]="category" (change)="loadPartners()"
-              class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
-        <option value="">Todas categorias</option>
+      <select [(ngModel)]="category" (change)="loadPartners()" aria-label="Filtrar por categoria"
+              class="block rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-bold text-gray-700 shadow-sm focus:border-braPurple focus:ring-braPurple">
+        <option value="">Todas as categorias</option>
         <option value="community">Comunidade</option>
         <option value="creator">Criador</option>
         <option value="artist">Artista</option>
@@ -21,63 +24,90 @@
         <option value="brand">Marca</option>
         <option value="other">Outro</option>
       </select>
-      <button type="button" (click)="createPartner()" class="bg-braPurple hover:bg-braDark text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-braPurple/30 transition transform hover:-translate-y-0.5">
+      <button type="button" (click)="createPartner()"
+              class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white shadow-md shadow-braPurple/30 transition hover:bg-braDark">
         + Nova Parceria
       </button>
     </div>
   </div>
 
-  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
+  <p *ngIf="errorMessage" role="alert" class="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{{ errorMessage }}</p>
   <p *ngIf="successMessage" role="status" class="rounded-xl bg-green-50 p-3 text-sm font-bold text-green-700">{{ successMessage }}</p>
 
-  <div *ngIf="loading" class="bg-white rounded-2xl p-6 border border-gray-100 text-sm text-gray-500">
+  <div *ngIf="loading" role="status" class="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-500">
     Carregando parcerias...
   </div>
 
-  <div *ngIf="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div *ngFor="let partner of partners" class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition group relative overflow-hidden">
-      <div class="absolute top-0 right-0 w-24 h-24 bg-braCyan/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+  <div *ngIf="!loading && !groupedPartners.length" class="rounded-2xl border border-gray-100 bg-white p-8 text-center">
+    <p class="font-amaranth text-xl font-bold text-gray-800">Nenhuma parceria encontrada</p>
+    <p class="mt-1 text-sm text-gray-500">Revise os filtros ou cadastre uma nova parceria.</p>
+  </div>
 
-      <div class="flex justify-between items-start mb-4 relative">
-        <img [src]="getPartnerImage(partner)" alt="Logo Parceiro" class="w-16 h-16 rounded-2xl shadow-sm">
-        <div class="flex flex-col items-end gap-1">
-          <span class="text-xs font-bold px-3 py-1 rounded-full"
-                [ngClass]="{
-                  'bg-green-100 text-green-700': partner.status === 'active',
-                  'bg-orange-100 text-orange-700': partner.status === 'pending',
-                  'bg-red-100 text-red-700': partner.status === 'suspended'
-                }">
-            {{ getStatusLabel(partner.status) }}
-          </span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-braPurple/10 text-braPurple">
-            {{ getCategoryLabel(partner.category) }}
-          </span>
-        </div>
+  <div *ngIf="!loading && groupedPartners.length" class="space-y-8">
+    <section *ngFor="let group of groupedPartners" class="space-y-4" [attr.aria-label]="'Parcerias ' + group.label.toLowerCase()">
+      <header class="flex items-center gap-3 border-b border-gray-200 pb-3">
+        <h3 class="font-amaranth text-xl font-bold text-gray-800">{{ group.label }}</h3>
+        <span class="rounded-full px-2.5 py-0.5 text-xs font-bold"
+              [ngClass]="{
+                'bg-green-100 text-green-700': group.status === 'active',
+                'bg-orange-100 text-orange-700': group.status === 'pending',
+                'bg-red-100 text-red-700': group.status === 'suspended'
+              }">{{ group.items.length }}</span>
+      </header>
+      <div class="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <article *ngFor="let partner of group.items"
+                 class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition hover:shadow-md">
+          <div aria-hidden="true" class="pointer-events-none absolute right-0 top-0 -mr-4 -mt-4 h-24 w-24 rounded-bl-full bg-braCyan/5 transition-transform group-hover:scale-110"></div>
+
+          <div class="relative flex min-w-0 flex-1 flex-col">
+            <div class="mb-4 flex items-start justify-between gap-3">
+              <img [src]="getPartnerImage(partner)" [alt]="'Logo de ' + partner.name"
+                   class="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-sm">
+              <div class="flex flex-col items-end gap-1">
+                <span class="rounded-full px-3 py-1 text-xs font-bold"
+                      [ngClass]="{
+                        'bg-green-100 text-green-700': partner.status === 'active',
+                        'bg-orange-100 text-orange-700': partner.status === 'pending',
+                        'bg-red-100 text-red-700': partner.status === 'suspended'
+                      }">{{ getStatusLabel(partner.status) }}</span>
+                <span class="rounded-md bg-braPurple/10 px-2 py-0.5 text-[10px] font-bold text-braPurple">{{ getCategoryLabel(partner.category) }}</span>
+              </div>
+            </div>
+
+            <h4 class="break-words font-amaranth text-lg font-bold text-gray-800">{{ partner.name }}</h4>
+            <p class="mb-2 text-sm text-gray-500">
+              Rep: <span class="break-words font-bold text-gray-700">{{ partner.representativeName || partner.contactName || '-' }}</span>
+            </p>
+            <p *ngIf="partner.description" class="mb-4 line-clamp-2 break-words text-sm text-gray-500">{{ partner.description }}</p>
+          </div>
+
+          <footer class="relative mt-auto border-t border-gray-100 pt-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs text-gray-400">Cliques/Convites</p>
+                <p class="text-lg font-bold text-gray-800">{{ partner.clicks | number:'1.0-0' }}/{{ partner.invites | number:'1.0-0' }}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-gray-400">Desde</p>
+                <p class="text-sm font-bold text-gray-800">{{ formatDate(partner.createdAt) }}</p>
+              </div>
+            </div>
+            <div class="mt-4 flex gap-2">
+              <button type="button" (click)="editPartner(partner)"
+                      class="flex-1 rounded-xl bg-gray-50 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-100">Editar</button>
+              <button type="button" (click)="togglePartnerStatus(partner)"
+                      [disabled]="updatingPartnerId !== null"
+                      [attr.aria-label]="getStatusActionLabel(partner.status) + ' parceria ' + partner.name"
+                      [ngClass]="partner.status === 'active'
+                        ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                        : 'bg-green-50 text-green-700 hover:bg-green-100'"
+                      class="flex-1 rounded-xl py-2 text-sm font-bold transition disabled:cursor-wait disabled:opacity-50">
+                {{ updatingPartnerId === partner.id ? 'Atualizando...' : getStatusActionLabel(partner.status) }}
+              </button>
+            </div>
+          </footer>
+        </article>
       </div>
-
-      <h3 class="text-lg font-bold text-gray-800 font-amaranth">{{ partner.name }}</h3>
-      <p class="text-sm text-gray-500 mb-2">
-        Rep: <span class="font-bold text-gray-700">{{ partner.representativeName || partner.contactName || '-' }}</span>
-      </p>
-      <p *ngIf="partner.description" class="text-sm text-gray-500 mb-4 line-clamp-2">{{ partner.description }}</p>
-
-      <div class="flex items-center justify-between pt-4 border-t border-gray-50">
-        <div>
-          <p class="text-xs text-gray-400">Cliques/Convites</p>
-          <p class="font-bold text-gray-800 text-lg">{{ partner.clicks | number:'1.0-0' }}/{{ partner.invites | number:'1.0-0' }}</p>
-        </div>
-        <div>
-          <p class="text-xs text-gray-400">Desde</p>
-          <p class="font-bold text-gray-800 text-sm">{{ formatDate(partner.createdAt) }}</p>
-        </div>
-      </div>
-
-      <div class="mt-4 flex gap-2">
-        <button type="button" (click)="editPartner(partner)" class="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2 rounded-xl text-sm font-bold transition">Editar</button>
-        <button (click)="togglePartnerStatus(partner)" class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl text-sm font-bold transition">
-          {{ partner.status === 'suspended' ? 'Reativar' : 'Suspender' }}
-        </button>
-      </div>
-    </div>
+    </section>
   </div>
 </div>

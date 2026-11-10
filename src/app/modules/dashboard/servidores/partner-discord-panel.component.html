@@ -1,38 +1,57 @@
-<section class="space-y-6 rounded-xl border border-gray-200 bg-white p-5 md:p-7">
-  <header>
-    <p class="text-xs font-semibold uppercase tracking-wider text-braPurple">Exclusivo BraFurries</p>
-    <h2 class="mt-1 font-amaranth text-2xl text-gray-900">Vitrine e canais de parceiros</h2>
-    <p class="mt-2 text-sm text-gray-600">Organize cada parceiro em uma thread de divulgação e escolha quais recebem um canal de texto exclusivo. As informações vêm do cadastro de parcerias.</p>
+<section class="partner-panel">
+  <header class="card hero-card">
+    <div>
+      <p class="eyebrow">Coddy · Parcerias</p>
+      <h2>Vitrine e canais de parceiros</h2>
+      <p class="help">Organize a divulgação em threads e gerencie canais exclusivos. Os anúncios e as informações de cada parceiro são editados na área administrativa.</p>
+    </div>
+    @if (state && enabled) {
+      <span class="hero-badge">{{ activePartners.length }} {{ activePartners.length === 1 ? 'parceiro ativo' : 'parceiros ativos' }}</span>
+    }
   </header>
 
   @if (loading) {
-    <p role="status">Carregando parceiros e configuração do Discord...</p>
+    <section class="state-card compact" role="status">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Carregando parceiros e configuração do Discord...</p>
+    </section>
   }
+
   @if (error) {
-    <p role="alert" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ error }}</p>
+    <p role="alert" class="error-message">{{ error }}</p>
   }
   @if (success) {
-    <p role="status" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-green-800">{{ success }}</p>
+    <p role="status" class="save-status success">{{ success }}</p>
   }
 
   @if (state && enabled) {
-    <div class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-      <h3 class="font-amaranth text-lg text-gray-900">Destino da vitrine</h3>
-      <div class="grid gap-4 md:grid-cols-2">
-        <label class="block text-sm font-semibold text-gray-700">
-          Categoria Discord
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Publicação</p>
+          <h3>Destino da vitrine</h3>
+          <p class="help">Escolha onde o Coddy cria as threads das parcerias. Os recursos criados automaticamente continuam gerenciados pelo bot.</p>
+        </div>
+        <span class="status-pill" [class.configured]="state.configured">
+          {{ state.configured ? 'Configurado' : 'A configurar' }}
+        </span>
+      </div>
+
+      <div class="settings-grid">
+        <label>
+          <span class="field-label">Categoria Discord</span>
           <select [ngModel]="categoryId" (ngModelChange)="onCategoryChanged($event)"
-            [disabled]="saving || busyPartnerId !== null" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+            [disabled]="saving || busyPartnerId !== null" class="field-control">
             <option value="">Criar automaticamente pelo Coddy</option>
             @for (category of categories; track category.id) {
               <option [value]="category.id">{{ category.name }}</option>
             }
           </select>
         </label>
-        <label class="block text-sm font-semibold text-gray-700">
-          Canal de threads
+        <label>
+          <span class="field-label">Canal de threads</span>
           <select [ngModel]="parentId" (ngModelChange)="onParentChanged($event)"
-            [disabled]="saving || busyPartnerId !== null || !categoryId" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+            [disabled]="saving || busyPartnerId !== null || !categoryId" class="field-control">
             <option value="">{{ categoryId ? 'Criar fórum automaticamente' : 'Criar categoria e fórum automaticamente' }}</option>
             @for (channel of parentChannels; track channel.id) {
               <option [value]="channel.id">{{ channel.type === 'forum' ? 'Fórum' : 'Texto' }} · {{ channel.name }}</option>
@@ -40,121 +59,143 @@
           </select>
         </label>
       </div>
-      <p class="text-xs text-gray-600">Ao sincronizar, o Coddy corrige automaticamente as permissões de escrita do canal selecionado, preservando os demais acessos. Administradores do Discord continuam com as permissões administrativas. O representante publica na thread pelo site.</p>
-      <div class="flex flex-wrap gap-3">
-        <button type="button" (click)="saveConfig()" [disabled]="saving || busyPartnerId !== null || !hasConfigChanges"
-          class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Salvar destino</button>
-        <button type="button" (click)="syncAll()" [disabled]="saving || busyPartnerId !== null || dirty || !state.configured"
-          class="rounded-lg border border-braPurple px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">Sincronizar todos os parceiros</button>
-      </div>
-    </div>
+      <p class="help">Ao sincronizar, o Coddy ajusta as permissões de escrita do destino selecionado, preservando os demais acessos. O representante publica pelo site e não precisa gerenciar a thread manualmente.</p>
 
-    <div class="space-y-4">
-      <h3 class="font-amaranth text-xl">Parceiros ativos</h3>
+      <div class="actions">
+        <button type="button" (click)="saveConfig()" class="primary-button"
+          [disabled]="saving || busyPartnerId !== null || !hasConfigChanges">
+          {{ saving && hasConfigChanges ? 'Salvando…' : 'Salvar destino' }}
+        </button>
+        <button type="button" (click)="syncAll()" class="secondary-button"
+          [disabled]="saving || busyPartnerId !== null || dirty || !state.configured">
+          Sincronizar todos os parceiros
+        </button>
+      </div>
+    </section>
+
+    <section class="partners-section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Operação</p>
+          <h3>Parceiros ativos</h3>
+          <p class="help">Somente parcerias ativas aparecem aqui; pendentes e suspensas continuam administráveis no cadastro.</p>
+        </div>
+      </div>
+
       @if (!activePartners.length) {
-        <p class="text-sm text-gray-600">Nenhuma parceria cadastrada. Cadastre um parceiro em Administração → Parceiros para começar.</p>
+        <div class="card empty-state">
+          <p class="font-semibold text-gray-700">Nenhuma parceria ativa encontrada.</p>
+          <p class="help">Cadastre ou ative um parceiro em Administração → Parcerias para começar.</p>
+        </div>
       }
-      @for (item of activePartners; track item.partnerId) {
-        <article class="space-y-3 rounded-xl border border-gray-200 p-4">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 class="font-semibold text-gray-900">{{ item.name }}</h4>
-              <p class="text-xs text-gray-500">Situação: {{ item.status }} · Representante: {{ item.representativeName || 'Não definido' }}</p>
+
+      <div class="partner-grid">
+        @for (item of activePartners; track item.partnerId) {
+          <article class="card partner-card">
+            <div class="partner-card-header">
+              <div class="min-w-0">
+                <p class="eyebrow">Divulgação</p>
+                <h4 class="partner-title">{{ item.name }}</h4>
+                <p class="help">Representante: {{ item.representativeName || 'Não definido' }}</p>
+              </div>
+              <span class="status-pill" [class.configured]="item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync && !item.lastSyncError">
+                {{ item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync && !item.lastSyncError ? 'Sincronizado' : 'Pendente' }}
+              </span>
             </div>
-            <div class="text-xs text-gray-600">
+
+            <div class="link-row">
               @if (item.threadId) {
                 <a [href]="'https://discord.com/channels/' + state.guildId + '/' + item.threadId"
-                   target="_blank" rel="noopener noreferrer" class="font-semibold text-braPurple underline">Abrir thread</a>
-              } @else { <span>Thread ainda não criada</span> }
+                  target="_blank" rel="noopener noreferrer" class="resource-link">Abrir thread <span aria-hidden="true">↗</span></a>
+              } @else {
+                <span class="help">Thread ainda não criada</span>
+              }
               @if (item.textChannelId) {
-                <span class="mx-2">·</span>
                 <a [href]="'https://discord.com/channels/' + state.guildId + '/' + item.textChannelId"
-                   target="_blank" rel="noopener noreferrer" class="font-semibold text-braPurple underline">Abrir canal</a>
+                  target="_blank" rel="noopener noreferrer" class="resource-link">Abrir canal <span aria-hidden="true">↗</span></a>
               }
             </div>
-          </div>
 
-          @if (drafts[item.partnerId]; as draft) {
-            <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <input type="checkbox" [ngModel]="draft.exclusiveChannelEnabled"
-                (ngModelChange)="updateDraft(item, { exclusiveChannelEnabled: $event, existingTextChannelId: $event ? draft.existingTextChannelId : null, adoptExistingTextChannel: $event ? draft.adoptExistingTextChannel : false })"
-                [disabled]="saving || busyPartnerId !== null" />
-              Permitir canal de texto exclusivo para este parceiro
-            </label>
-            @if (draft.exclusiveChannelEnabled) {
-              @if (!item.representativeDiscordUserId) {
-                <p class="text-xs text-amber-700">Vincule uma conta Discord ao usuário representante antes de conceder escrita direta.</p>
-              }
-              <div class="grid gap-4 md:grid-cols-2">
-                <label class="text-sm font-semibold text-gray-700">
-                  Canal exclusivo
-                  <select [ngModel]="draft.existingTextChannelId ?? ''"
-                    (ngModelChange)="updateDraft(item, { existingTextChannelId: $event || null, adoptExistingTextChannel: false })"
-                    [disabled]="saving || busyPartnerId !== null" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                    <option value="">Criar canal automaticamente</option>
-                    @for (channel of textChannels; track channel.id) {
-                      <option [value]="channel.id">{{ channel.name }}</option>
-                    }
-                  </select>
+            @if (drafts[item.partnerId]; as draft) {
+              <div class="partner-options">
+                <label class="toggle-row">
+                  <input type="checkbox" [ngModel]="draft.exclusiveChannelEnabled"
+                    (ngModelChange)="updateDraft(item, { exclusiveChannelEnabled: $event, existingTextChannelId: $event ? draft.existingTextChannelId : null, adoptExistingTextChannel: $event ? draft.adoptExistingTextChannel : false })"
+                    [disabled]="saving || busyPartnerId !== null" />
+                  <span>Permitir canal de texto exclusivo para este parceiro</span>
                 </label>
-                @if (draft.existingTextChannelId) {
-                  <label class="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" [ngModel]="draft.adoptExistingTextChannel"
-                      (ngModelChange)="updateDraft(item, { adoptExistingTextChannel: $event })"
-                      [disabled]="saving || busyPartnerId !== null" />
-                    Confirmo que este canal será gerenciado pelo Coddy e suas permissões de escrita serão ajustadas
+                @if (draft.exclusiveChannelEnabled) {
+                  @if (!item.representativeDiscordUserId) {
+                    <p class="warning">Vincule uma conta Discord ao representante antes de conceder escrita direta.</p>
+                  }
+                  <label>
+                    <span class="field-label">Canal exclusivo</span>
+                    <select [ngModel]="draft.existingTextChannelId ?? ''"
+                      (ngModelChange)="updateDraft(item, { existingTextChannelId: $event || null, adoptExistingTextChannel: false })"
+                      [disabled]="saving || busyPartnerId !== null" class="field-control">
+                      <option value="">Criar canal automaticamente</option>
+                      @for (channel of textChannels; track channel.id) {
+                        <option [value]="channel.id">{{ channel.name }}</option>
+                      }
+                    </select>
                   </label>
+                  @if (draft.existingTextChannelId) {
+                    <label class="toggle-row">
+                      <input type="checkbox" [ngModel]="draft.adoptExistingTextChannel"
+                        (ngModelChange)="updateDraft(item, { adoptExistingTextChannel: $event })"
+                        [disabled]="saving || busyPartnerId !== null" />
+                      <span>Confirmo que este canal será gerenciado pelo Coddy e que suas permissões serão ajustadas</span>
+                    </label>
+                  }
                 }
               </div>
             }
-          }
 
-          <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            <span>Anúncio: {{ item.announcementMarkdown ? 'Personalizado' : 'Usando descrição do cadastro' }}</span>
-            <a [routerLink]="['/painel/admin/parceiros', item.partnerId, 'editar']"
-              class="font-semibold text-braPurple underline">Editar anúncio na ficha do parceiro</a>
-          </div>
-
-          @if (item.lastSyncError) {
-            <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{{ item.lastSyncError }}</p>
-          }
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <small class="text-xs" [class.text-green-700]="item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync"
-              [class.text-amber-700]="item.appliedRevision < item.desiredRevision || item.contentOutOfSync">
-              {{ item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync ? 'Sincronizado' : 'Publicação ou atualização pendente' }}
-            </small>
-            <button type="button" (click)="savePartner(item)"
-              [disabled]="saving || busyPartnerId !== null || !state.configured || !drafts[item.partnerId] || !partnerDirty(item)"
-              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              {{ busyPartnerId === item.partnerId ? 'Sincronizando...' : 'Salvar e aplicar no Discord' }}
-            </button>
-          </div>
-          @if (item.threadId || item.textChannelId || item.desiredRevision > 0) {
-            @if (withdrawalConfirmationId === item.partnerId) {
-              <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                <strong>Retirar {{ item.name }} do Discord?</strong>
-                <p class="mt-1">A thread será arquivada e o canal criado pelo Coddy será ocultado. O histórico não será apagado. Isso remove as permissões do representante e libera o cadastro para exclusão administrativa.</p>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <button type="button" (click)="confirmWithdrawal(item)"
-                    [disabled]="saving || busyPartnerId !== null || dirty"
-                    class="rounded-lg bg-amber-900 px-3 py-2 font-semibold text-white disabled:opacity-50">
-                    Confirmar retirada
-                  </button>
-                  <button type="button" (click)="cancelWithdrawal()"
-                    [disabled]="busyPartnerId !== null"
-                    class="rounded-lg border border-gray-300 px-3 py-2 font-semibold">Cancelar</button>
-                </div>
+            <div class="announcement-note">
+              <div>
+                <strong>Anúncio {{ item.announcementMarkdown ? 'personalizado' : 'usando a descrição do cadastro' }}</strong>
+                <p class="help">O conteúdo Markdown é editado junto com os dados da parceria.</p>
               </div>
-            } @else {
-              <button type="button" (click)="requestWithdrawal(item.partnerId)"
-                [disabled]="saving || busyPartnerId !== null || dirty"
-                class="text-sm font-semibold text-amber-800 underline disabled:opacity-50">
-                Retirar divulgação do Discord
-              </button>
+              <a [routerLink]="['/painel/admin/parceiros', item.partnerId, 'editar']" class="resource-link">
+                Editar anúncio na ficha do parceiro
+              </a>
+            </div>
+
+            @if (item.lastSyncError) {
+              <p class="warning error" role="alert">{{ item.lastSyncError }}</p>
             }
-          }
-        </article>
-      }
-    </div>
+            <footer class="partner-footer">
+              <div class="actions">
+                <button type="button" (click)="savePartner(item)"
+                  [disabled]="saving || busyPartnerId !== null || !state.configured || !drafts[item.partnerId] || !partnerDirty(item)"
+                  class="primary-button">
+                  {{ busyPartnerId === item.partnerId ? 'Sincronizando…' : 'Salvar e aplicar no Discord' }}
+                </button>
+                @if ((item.threadId || item.textChannelId || item.desiredRevision > 0) && withdrawalConfirmationId !== item.partnerId) {
+                  <button type="button" (click)="requestWithdrawal(item.partnerId)"
+                    [disabled]="saving || busyPartnerId !== null || dirty"
+                    class="danger-button">
+                    Retirar divulgação
+                  </button>
+                }
+              </div>
+
+              @if (withdrawalConfirmationId === item.partnerId) {
+                <div class="withdrawal-confirmation">
+                  <strong>Retirar {{ item.name }} do Discord?</strong>
+                  <p>A thread será arquivada e o canal criado pelo Coddy ficará oculto. O histórico será preservado, mas o representante perderá a permissão de publicação.</p>
+                  <div class="actions">
+                    <button type="button" (click)="confirmWithdrawal(item)"
+                      [disabled]="saving || busyPartnerId !== null || dirty" class="danger-button filled">Confirmar retirada</button>
+                    <button type="button" (click)="cancelWithdrawal()"
+                      [disabled]="busyPartnerId !== null" class="secondary-button">Cancelar</button>
+                  </div>
+                </div>
+              }
+            </footer>
+          </article>
+        }
+      </div>
+    </section>
   }
 </section>

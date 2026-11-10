@@ -14,7 +14,25 @@ export class AdminPartnersComponent implements OnInit {
   status: AdminPartnerStatus | '' = '';
   category: AdminPartnerCategory | '' = '';
   loading = true;
+  updatingPartnerId: number | null = null;
   errorMessage = '';
+
+  readonly statusOrder: readonly { status: AdminPartnerStatus; label: string }[] = [
+    { status: 'active', label: 'Ativos' },
+    { status: 'pending', label: 'Pendentes' },
+    { status: 'suspended', label: 'Suspensos' }
+  ];
+
+  private readonly nameCollator = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true });
+
+  get groupedPartners(): { status: AdminPartnerStatus; label: string; items: AdminPartnerItem[] }[] {
+    return this.statusOrder.map(group => ({
+      ...group,
+      items: this.partners
+        .filter(partner => partner.status === group.status)
+        .sort((a, b) => this.nameCollator.compare(a.name, b.name) || a.id - b.id)
+    })).filter(group => group.items.length > 0);
+  }
   successMessage = '';
 
   constructor(private adminService: AdminService, private router: Router) { }
@@ -43,14 +61,37 @@ export class AdminPartnersComponent implements OnInit {
     });
   }
 
+  getNextStatus(status: AdminPartnerStatus): AdminPartnerStatus {
+    return status === 'active' ? 'suspended' : 'active';
+  }
+
+  getStatusActionLabel(status: AdminPartnerStatus): string {
+    return {
+      active: 'Suspender',
+      pending: 'Ativar',
+      suspended: 'Reativar'
+    }[status];
+  }
+
   togglePartnerStatus(partner: AdminPartnerItem): void {
-    const nextStatus: AdminPartnerStatus = partner.status === 'suspended' ? 'active' : 'suspended';
+    if (this.updatingPartnerId !== null) return;
+
+    const nextStatus = this.getNextStatus(partner.status);
+    this.updatingPartnerId = partner.id;
+    this.errorMessage = '';
+    this.successMessage = '';
 
     this.adminService.updatePartnerStatus(partner.id, nextStatus).subscribe({
       next: (updatedPartner) => {
-        this.partners = this.partners.map((item) => item.id === updatedPartner.id ? updatedPartner : item);
+        // Respect the active server filter when a partner changes state.
+        this.partners = this.partners
+          .map(item => item.id === updatedPartner.id ? updatedPartner : item)
+          .filter(item => !this.status || item.status === this.status);
+        this.updatingPartnerId = null;
+        this.successMessage = `Parceria ${updatedPartner.name} atualizada para ${this.getStatusLabel(updatedPartner.status).toLowerCase()}.`;
       },
       error: () => {
+        this.updatingPartnerId = null;
         this.errorMessage = 'Não foi possível atualizar o status da parceria.';
       }
     });

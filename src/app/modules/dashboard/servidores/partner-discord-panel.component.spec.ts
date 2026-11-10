@@ -78,6 +78,26 @@ describe('PartnerDiscordPanelComponent', () => {
     expect(links).not.toContain('/painel/admin/parceiros/33/editar');
   });
 
+  it('uses the same hero, cards, fields and buttons as the other Coddy tabs', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.querySelector('.partner-panel > .hero-card.card')).not.toBeNull();
+    expect(html.querySelector('.settings-grid .field-control')).not.toBeNull();
+    expect(html.querySelector('.partner-grid .partner-card.card')).not.toBeNull();
+    expect(html.querySelector('.partner-card .announcement-note')).not.toBeNull();
+    expect(html.querySelector('.partner-card .partner-footer .primary-button')).not.toBeNull();
+    expect(html.querySelector('.partner-card .partner-footer .danger-button')).not.toBeNull();
+    expect(html.textContent).toContain('parceiro ativo');
+  });
+
+  it('keeps contextual partner controls inside the styled card', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    const card = html.querySelector('.partner-card') as HTMLElement;
+    expect(card.textContent).toContain('Parceiro exemplo');
+    expect(card.textContent).toContain('Representante');
+    expect(card.querySelector('a[href="/painel/admin/parceiros/31/editar"]')).not.toBeNull();
+    expect((card.querySelector('input[type="checkbox"]') as HTMLInputElement).checked).toBeFalse();
+  });
+
   it('loads the partners solely from the authenticated API', () => {
     expect(service.getSettings).toHaveBeenCalledTimes(1);
     expect(component.state?.partners.map(item => item.partnerId)).toEqual([31]);
