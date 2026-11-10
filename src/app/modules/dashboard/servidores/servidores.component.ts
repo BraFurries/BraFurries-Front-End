@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { concatMap, forkJoin, Observable, of, Subscription } from 'rxjs';
 import { AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
+import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
 
 type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -112,15 +113,23 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   private routeSubscription?: Subscription;
   private contextSubscription?: Subscription;
   private activeCommunityId: number | null = null;
+  private officialPartnerGuildId: string | null = null;
 
   constructor(
     private readonly managedServersService: ManagedServersService,
     private readonly communityContext: CommunityContextService,
+    private readonly partnerDiscord: PartnerDiscordService,
     private readonly route: ActivatedRoute,
     private readonly router: Router
   ) {}
 
   ngOnInit(): void {
+    // Partner management is exclusive to the official BraFurries Discord.
+    // Resolve through the API instead of hardcoding a Community or guild ID.
+    this.partnerDiscord.getSettings().subscribe({
+      next: settings => { this.officialPartnerGuildId = settings.guildId; },
+      error: () => { this.officialPartnerGuildId = null; }
+    });
     this.routeSubscription = this.route.paramMap.subscribe(() => this.resolveRoute());
     this.contextSubscription = this.communityContext.state$.subscribe(state => this.applyCommunityContext(state));
   }
@@ -131,6 +140,12 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   }
   get selectedServer(): ManagedServer | undefined { return this.servers.find(server => server.guildId === this.selectedServerId); }
   get activeSectionDetails(): ServerSectionLink | undefined { return this.sections.find(section => section.id === this.activeSection); }
+  get visibleSections(): ServerSectionLink[] {
+    return this.sections.filter(section =>
+      section.id !== 'partners' || (this.officialPartnerGuildId !== null
+        && this.selectedServerId === this.officialPartnerGuildId)
+    );
+  }
   get selectedFlow(): PortariaFlow | undefined { return this.portaria?.selectedFlow; }
   get orderedLogs(): LogConfiguration[] {
     const order = new Map(LOG_DISPLAY_ORDER.map((type, index) => [type, index]));
