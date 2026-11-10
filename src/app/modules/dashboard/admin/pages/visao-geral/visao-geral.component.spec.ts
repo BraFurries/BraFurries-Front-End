@@ -48,7 +48,7 @@ describe('AdminOverviewComponent', () => {
       'Status do Coddy'
     ]);
     expect(cards[1].textContent).toContain('2 entradas');
-    expect(cards[1].textContent).toContain('1 saídas');
+    expect(cards[1].textContent).toContain('1 saída');
     expect(cards[2].textContent).toContain('3 em análise');
     expect(cards[0].textContent).not.toContain('essa semana');
     fixture.destroy();
