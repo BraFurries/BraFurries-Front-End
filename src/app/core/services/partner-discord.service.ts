@@ -23,6 +23,7 @@ export interface PartnerDiscordSettings {
   guildId: string;
   categoryId: string | null;
   threadParentChannelId: string | null;
+  configured: boolean;
   partners: PartnerDiscordItem[];
 }
 
