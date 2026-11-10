@@ -515,7 +515,14 @@ export interface CreatePartnerRequest {
   links?: PartnerExternalLinkItem[];
 }
 
+export interface PartnerAnnouncementData {
+  markdown: string | null;
+  linksMode: 'INLINE_ONLY' | 'APPEND_MISSING';
+  publicContact: string | null;
+}
+
 export interface UpdatePartnerRequest extends Partial<CreatePartnerRequest> {
+  discordAnnouncement?: PartnerAnnouncementData;
   clearLinkedResource?: boolean;
   clearRepresentativeUser?: boolean;
 }

@@ -176,6 +176,40 @@
 
 
 
+
+  <section *ngIf="partner && announcementReady" class="partner-section">
+    <h2>Anúncio no Discord</h2>
+    <p class="mb-4 text-sm text-gray-500">Salve a apresentação Markdown junto com as demais informações. Após salvar, a API atualiza automaticamente o anúncio no Discord.</p>
+    <label class="block">Conteúdo do anúncio (Markdown)
+      <textarea formControlName="announcementMarkdown" rows="11" maxlength="16000"
+        class="mt-2 block w-full resize-y rounded-xl border border-gray-300 p-3 font-mono text-sm"
+        placeholder="# 🐑 **República Indie**&#10;&#10;Apresentação do parceiro..."></textarea>
+      <span *ngIf="hasError('announcementMarkdown','maxlength')" class="field-error">Máximo de 16.000 caracteres.</span>
+    </label>
+    <p class="mt-1 text-right text-xs text-gray-500">{{ form.controls.announcementMarkdown.value.length }}/16.000 caracteres</p>
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <label>Links cadastrados na plataforma
+        <select formControlName="announcementLinksMode">
+          <option value="INLINE_ONLY">Usar só os links escritos no anúncio</option>
+          <option value="APPEND_MISSING">Adicionar links cadastrados ausentes</option>
+        </select>
+      </label>
+      <label>Contato público (opcional)
+        <input formControlName="announcementPublicContact" maxlength="255" placeholder="Discord da equipe ou e-mail público">
+        <span *ngIf="hasError('announcementPublicContact','maxlength')" class="field-error">Máximo de 255 caracteres.</span>
+      </label>
+    </div>
+    <div class="mt-4 space-y-2">
+      <h3 class="font-semibold text-gray-800">Prévia aproximada do Markdown</h3>
+      <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800"
+        [innerHTML]="previewMarkdown(form.controls.announcementMarkdown.value || '# ' + form.controls.name.value)"></div>
+      <p class="text-xs text-gray-500">Sem texto personalizado, o Coddy utiliza os dados do cadastro. A imagem da parceria é acrescentada à thread em uma mensagem própria. A prévia não publica mensagens.</p>
+    </div>
+  </section>
+  <p *ngIf="partner && !announcementReady" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+    Não foi possível carregar a configuração do anúncio. Os demais dados podem ser editados sem modificar o anúncio existente.
+  </p>
+
   <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
     <button type="button" (click)="cancelled.emit()" [disabled]="submitting" class="secondary-button">Cancelar</button>
     <button type="submit" [disabled]="submitting" class="primary-button">{{ submitting ? 'Salvando...' : submitLabel }}</button>

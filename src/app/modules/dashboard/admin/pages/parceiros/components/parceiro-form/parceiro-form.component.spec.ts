@@ -25,6 +25,44 @@ describe('ParceiroFormComponent', () => {
     fixture.detectChanges();
   });
 
+  it('saves Markdown together with the partner in one update payload', () => {
+    const existing = partner();
+    component.partner = existing;
+    component.publicationDraft = { markdown: '# Indie', linksMode: 'INLINE_ONLY', publicContact: null };
+    component.announcementReady = true;
+    component.ngOnChanges({
+      partner: { currentValue: existing, previousValue: null, firstChange: false, isFirstChange: () => false },
+      publicationDraft: { currentValue: component.publicationDraft, previousValue: null, firstChange: false, isFirstChange: () => false }
+    });
+    component.form.patchValue({ announcementMarkdown: '# 🐑 República Indie', announcementPublicContact: 'Equipe' });
+    const submitted = jasmine.createSpy('submitted');
+    component.submitted.subscribe(submitted);
+    component.submit();
+    expect(submitted).toHaveBeenCalled();
+    expect(submitted.calls.mostRecent().args[0].payload.discordAnnouncement).toEqual({
+      markdown: '# 🐑 República Indie', linksMode: 'INLINE_ONLY', publicContact: 'Equipe'
+    });
+  });
+
+  it('does not send an announcement field when configuration failed to load', () => {
+    component.partner = partner();
+    component.announcementReady = false;
+    component.ngOnChanges({
+      partner: { currentValue: component.partner, previousValue: null, firstChange: false, isFirstChange: () => false }
+    });
+    const submitted = jasmine.createSpy('submitted');
+    component.submitted.subscribe(submitted);
+    component.submit();
+    expect(submitted.calls.mostRecent().args[0].payload.discordAnnouncement).toBeUndefined();
+  });
+
+  it('escapes HTML from the Markdown preview', () => {
+    const html = component.previewMarkdown('# **Anúncio**\n<script>alert(1)</script>');
+    expect(html).toContain('<strong>Anúncio</strong>');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
   it('starts pending and exposes exactly the official categories including artist', () => {
     expect(component.form.controls.status.value).toBe('pending');
     expect(PARTNER_CATEGORIES.map(item => `${item.value}:${item.label}`)).toEqual([

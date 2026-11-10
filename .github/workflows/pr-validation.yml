@@ -127,5 +127,12 @@ jobs:
           --include=**/editar-parceiro.component.spec.ts
           --include=**/partner-discord-panel.component.spec.ts
 
+      - name: Partner announcement regression tests
+        run: >
+          npm test -- --watch=false --browsers=ChromeHeadless
+          --include=**/parceiro-form.component.spec.ts
+          --include=**/editar-parceiro.component.spec.ts
+          --include=**/partner-discord-panel.component.spec.ts
+
       - name: Build
         run: npm run build

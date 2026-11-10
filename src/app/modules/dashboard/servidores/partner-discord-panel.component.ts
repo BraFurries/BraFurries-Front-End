@@ -75,6 +75,10 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     );
   }
 
+  get activePartners(): PartnerDiscordItem[] {
+    return this.state?.partners.filter(item => item.status === 'active') ?? [];
+  }
+
   get enabled(): boolean {
     return !!this.state && this.guildId === this.state.guildId;
   }

@@ -13,7 +13,8 @@ import {
   PartnerLinkedResource,
   PartnerPrefill,
   PartnerRepresentative,
-  UpdatePartnerRequest
+  UpdatePartnerRequest,
+  PartnerAnnouncementData
 } from '../../../../../../../shared/models/api/admin/admin';
 
 export interface PartnerFormSubmission {
@@ -53,6 +54,8 @@ const httpUrlValidator = (control: AbstractControl): ValidationErrors | null => 
 })
 export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
   @Input() partner: AdminPartnerItem | null = null;
+  @Input() publicationDraft: PartnerAnnouncementData | null = null;
+  @Input() announcementReady = false;
   @Input() submitting = false;
   @Input() submitLabel = 'Salvar parceria';
   @Output() submitted = new EventEmitter<PartnerFormSubmission>();
@@ -122,7 +125,10 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
     websiteUrl: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(1024), httpUrlValidator] }),
     contactName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(128)] }),
     contactEmail: new FormControl('', { nonNullable: true, validators: [Validators.email, Validators.maxLength(255)] }),
-    links: new FormArray<FormGroup>([])
+    links: new FormArray<FormGroup>([]),
+    announcementMarkdown: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(16000)] }),
+    announcementLinksMode: new FormControl<'INLINE_ONLY' | 'APPEND_MISSING'>('INLINE_ONLY', { nonNullable: true }),
+    announcementPublicContact: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(255)] })
   });
 
   private readonly subscriptions = new Subscription();
@@ -142,12 +148,14 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
     this.bindRepresentativeSearch();
     this.bindLinkControls();
     this.applyPartner();
+    this.applyAnnouncement();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['partner'] && !changes['partner'].firstChange) {
       this.applyPartner();
     }
+    if (changes['publicationDraft'] || changes['announcementReady']) this.applyAnnouncement();
   }
 
   ngOnDestroy(): void {
@@ -276,6 +284,13 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
       contactName: editableValue(value.contactName), contactEmail: editableValue(value.contactEmail), links
     };
     if (!this.partner) payload.status = value.status;
+    if (this.partner && this.announcementReady) {
+      (payload as UpdatePartnerRequest).publicationDraft = {
+        markdown: value.announcementMarkdown.trim() || null,
+        linksMode: value.announcementLinksMode,
+        publicContact: value.announcementPublicContact.trim() || null
+      };
+    }
 
     const desiredResource = this.buildDesiredResource(value.name.trim(), category);
     if (desiredResource) {
@@ -395,6 +410,35 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
     this.candidateSearch.next({ category, search: search.trim() });
   }
 
+  private applyAnnouncement(): void {
+    this.form.patchValue({
+      announcementMarkdown: this.publicationDraft?.markdown ?? '',
+      announcementLinksMode: this.publicationDraft?.linksMode ?? 'INLINE_ONLY',
+      announcementPublicContact: this.publicationDraft?.publicContact ?? ''
+    }, { emitEvent: false });
+    this.form.controls.announcementMarkdown.markAsPristine();
+    this.form.controls.announcementLinksMode.markAsPristine();
+    this.form.controls.announcementPublicContact.markAsPristine();
+  }
+
+  /** Approximate Discord Markdown preview; HTML is always escaped first. */
+  previewMarkdown(text: string): string {
+    const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const inline = (line: string): string => line
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<u>$1</u>')
+      .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="underline">$1</a>');
+    return escaped.split('\n').map(line => {
+      const heading = /^(#{1,3})\s+(.+)$/.exec(line);
+      if (heading) return '<h3 class="font-bold mt-3 mb-1">' + inline(heading[2]) + '</h3>';
+      if (/^\s*[-*]\s+/.test(line)) return '<div class="pl-3 my-1">• ' + inline(line.replace(/^\s*[-*]\s+/, '')) + '</div>';
+      return line.trim() ? '<p class="my-1">' + inline(line) + '</p>' : '<div class="h-2"></div>';
+    }).join('');
+  }
+
   private applyPartner(): void {
     this.resetAutofillTracking();
     this.links.clear();
@@ -422,6 +466,7 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
     this.selectedRepresentative = partner?.representative ?? (partner?.representativeUserId ? { id: partner.representativeUserId, name: partner.representativeName ?? `Usuário ${partner.representativeUserId}` } : null);
     this.representativeSearchCompleted = false;
     this.representativeSearchControl.setValue(this.selectedRepresentative?.name ?? '', { emitEvent: false });
+    this.form.markAsPristine();
 
     if (partner && this.isInternalResourceForCategory(this.originalLinkedResource, partner.category)) {
       this.originMode = 'existing';

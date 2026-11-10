@@ -5,17 +5,21 @@ import { finalize } from 'rxjs/operators';
 import { AdminService } from '../../../../../../core/services/admin.service';
 import { DialogComponent } from '../../../../../../shared/components/dialog/dialog.component';
 import { AdminPartnerItem } from '../../../../../../shared/models/api/admin/admin';
-import { PartnerFormSubmission } from '../components/parceiro-form/parceiro-form.component';
-import { PartnerAnnouncementEditorComponent } from './partner-announcement-editor.component';
+import { ParceiroFormComponent, PartnerFormSubmission } from '../components/parceiro-form/parceiro-form.component';
+import { PartnerDiscordAnnouncementRequest, PartnerDiscordService } from '../../../../../../core/services/partner-discord.service';
+import { UpdatePartnerRequest } from '../../../../../../shared/models/api/admin/admin';
 
 @Component({ selector: 'app-editar-parceiro', standalone: false, templateUrl: './editar-parceiro.component.html' })
 export class EditarParceiroComponent implements OnInit {
-  @ViewChild(PartnerAnnouncementEditorComponent) announcementEditor?: PartnerAnnouncementEditorComponent;
+  @ViewChild(ParceiroFormComponent) partnerForm?: ParceiroFormComponent;
+  discordAnnouncement: PartnerDiscordAnnouncementRequest | null = null;
+  discordAnnouncementReady = false;
   partner: AdminPartnerItem | null = null;
   loading = true; notFound = false; submitting = false; statusSubmitting = false; deleting = false;
   errorMessage = ''; successMessage = '';
   private id = 0;
-  constructor(private route: ActivatedRoute, private router: Router, private adminService: AdminService, private dialog: MatDialog) { }
+  constructor(private route: ActivatedRoute, private router: Router, private adminService: AdminService,
+    private dialog: MatDialog, private partnerDiscordService: PartnerDiscordService) { }
 
   ngOnInit(): void {
     const navigationError = (this.router as any).getCurrentNavigation?.()?.extras.state?.['errorMessage'] ?? history.state?.['errorMessage'];
@@ -27,7 +31,27 @@ export class EditarParceiroComponent implements OnInit {
     this.id = Number(this.route.snapshot.paramMap.get('id'));
     if (!Number.isInteger(this.id) || this.id <= 0) { this.notFound = true; this.loading = false; return; }
     this.adminService.getPartner(this.id).subscribe({
-      next: partner => { this.partner = partner; this.loading = false; },
+      next: partner => {
+        this.partner = partner;
+        this.partnerDiscordService.getSettings().subscribe({
+          next: settings => {
+            const item = settings.partners.find(current => current.partnerId === this.id);
+            if (item) {
+              this.discordAnnouncement = {
+                markdown: item.announcementMarkdown,
+                linksMode: item.announcementLinksMode,
+                publicContact: item.announcementPublicContact
+              };
+              this.discordAnnouncementReady = true;
+            } else this.errorMessage = 'Não foi possível localizar a configuração do anúncio desta parceria.';
+            this.loading = false;
+          },
+          error: () => {
+            this.errorMessage = 'Não foi possível carregar o anúncio do Discord; ele será preservado.';
+            this.loading = false;
+          }
+        });
+      },
       error: error => { this.notFound = error?.status === 404; this.errorMessage = this.notFound ? '' : 'Não foi possível concluir a operação. Tente novamente.'; this.loading = false; }
     });
   }
@@ -37,11 +61,13 @@ export class EditarParceiroComponent implements OnInit {
     this.adminService.updatePartner(this.id, submission.payload).subscribe({
       next: partner => {
         this.partner = partner;
+        const submittedAnnouncement = (submission.payload as UpdatePartnerRequest).discordAnnouncement;
+        if (submittedAnnouncement) this.discordAnnouncement = { ...submittedAnnouncement };
         if (submission.imageFile) {
-          this.adminService.uploadPartnerImage(this.id, submission.imageFile).pipe(finalize(() => this.submitting = false)).subscribe({ next: image => { this.partner = { ...partner, imageUrl: image.imageUrl }; this.successMessage = 'Parceria atualizada com sucesso.'; }, error: () => this.errorMessage = 'Os dados da parceria foram salvos, mas não foi possível atualizar a imagem.' });
+          this.adminService.uploadPartnerImage(this.id, submission.imageFile).pipe(finalize(() => this.submitting = false)).subscribe({ next: image => { this.partner = { ...partner, imageUrl: image.imageUrl }; this.successMessage = 'Parceria atualizada com sucesso.'; this.refreshDiscordStatus(); }, error: () => this.errorMessage = 'Os dados da parceria foram salvos, mas não foi possível atualizar a imagem.' });
         } else if (submission.removeImage) {
-          this.adminService.deletePartnerImage(this.id).pipe(finalize(() => this.submitting = false)).subscribe({ next: image => { this.partner = { ...partner, imageUrl: image.imageUrl }; this.successMessage = 'Parceria atualizada com sucesso.'; }, error: () => this.errorMessage = 'Os dados da parceria foram salvos, mas não foi possível atualizar a imagem.' });
-        } else { this.submitting = false; this.successMessage = 'Parceria atualizada com sucesso.'; }
+          this.adminService.deletePartnerImage(this.id).pipe(finalize(() => this.submitting = false)).subscribe({ next: image => { this.partner = { ...partner, imageUrl: image.imageUrl }; this.successMessage = 'Parceria atualizada com sucesso.'; this.refreshDiscordStatus(); }, error: () => this.errorMessage = 'Os dados da parceria foram salvos, mas não foi possível atualizar a imagem.' });
+        } else { this.submitting = false; this.successMessage = 'Parceria atualizada com sucesso.'; this.refreshDiscordStatus(); }
       },
       error: error => { this.submitting = false; this.errorMessage = this.mapError(error?.status, error?.error?.message); }
     });
@@ -65,15 +91,27 @@ export class EditarParceiroComponent implements OnInit {
   }
   back(): void { this.router.navigate(['/painel/admin/parceiros']); }
   canDeactivate(): boolean {
-    return !this.announcementEditor?.dirty
+    return !this.partnerForm?.form.dirty
       || (typeof window !== 'undefined' && window.confirm('Há alterações não salvas no anúncio. Deseja sair sem salvar?'));
   }
   @HostListener('window:beforeunload', ['$event'])
   beforeUnload(event: BeforeUnloadEvent): void {
-    if (this.announcementEditor?.dirty) {
+    if (this.partnerForm?.form.dirty) {
       event.preventDefault();
       event.returnValue = true;
     }
+  }
+  private refreshDiscordStatus(): void {
+    this.partnerDiscordService.getSettings().subscribe({
+      next: settings => {
+        const current = settings.partners.find(item => item.partnerId === this.id);
+        if (current?.lastSyncError) this.errorMessage = 'Parceria salva, mas a atualização no Discord falhou. Verifique a configuração da vitrine.';
+        else if (current && (current.contentOutOfSync || current.appliedRevision < current.desiredRevision)) {
+          this.errorMessage = 'Parceria salva, mas o Discord ainda não está sincronizado.';
+        }
+      },
+      error: () => this.errorMessage = 'Parceria salva; não foi possível confirmar o estado do anúncio no Discord.'
+    });
   }
   formatDate(value?: string | null): string { return value ? new Intl.DateTimeFormat('pt-BR').format(new Date(value)) : '-'; }
   private updateStatus(status: 'active' | 'suspended'): void {

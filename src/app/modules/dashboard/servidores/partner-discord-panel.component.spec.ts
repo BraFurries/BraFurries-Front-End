@@ -64,6 +64,20 @@ describe('PartnerDiscordPanelComponent', () => {
     fixture.detectChanges();
   });
 
+  it('shows only active partners in the Discord operations list', () => {
+    component.state = settings({ partners: [
+      { ...partner, status: 'active' },
+      { ...partner, partnerId: 32, status: 'pending' },
+      { ...partner, partnerId: 33, status: 'suspended' }
+    ] });
+    fixture.detectChanges();
+    expect(component.activePartners.map(item => item.partnerId)).toEqual([31]);
+    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a'))
+      .map(link => link.getAttribute('href'));
+    expect(links).not.toContain('/painel/admin/parceiros/32/editar');
+    expect(links).not.toContain('/painel/admin/parceiros/33/editar');
+  });
+
   it('loads the partners solely from the authenticated API', () => {
     expect(service.getSettings).toHaveBeenCalledTimes(1);
     expect(component.state?.partners.map(item => item.partnerId)).toEqual([31]);
