@@ -114,6 +114,7 @@ jobs:
           --include=**/dashboard.guard.spec.ts
           --include=**/auth-token.interceptor.spec.ts
           --include=**/user.service.spec.ts
+          --include=**/visao-geral.component.spec.ts
           --include=**/inicio.component.spec.ts
           --include=**/perfil.component.spec.ts
           --include=**/social-auth-error-message.spec.ts
