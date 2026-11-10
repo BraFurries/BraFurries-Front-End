@@ -42,8 +42,8 @@
           <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.metrics.botReachedUsers | number:'1.0-0' }}</h3>
           <p class="text-gray-400 text-[11px] mt-2 font-bold leading-tight">
             em <span class="text-braCyan">{{ data.metrics.botServers | number:'1.0-0' }} servidores</span><br>
-            <span class="text-green-500">+{{ data.metrics.serverGrowthWeek | number:'1.0-0' }} entradas</span>
-            <span *ngIf="data.metrics.serverLeavesWeek > 0" class="text-red-500"> · -{{ data.metrics.serverLeavesWeek | number:'1.0-0' }} saídas</span>
+            <span class="text-green-500">+{{ data.metrics.serverGrowthWeek | number:'1.0-0' }} {{ data.metrics.serverGrowthWeek === 1 ? 'entrada' : 'entradas' }}</span>
+            <span *ngIf="data.metrics.serverLeavesWeek > 0" class="text-red-500"> · -{{ data.metrics.serverLeavesWeek | number:'1.0-0' }} {{ data.metrics.serverLeavesWeek === 1 ? 'saída' : 'saídas' }}</span>
             <span class="text-gray-400"> (7 dias)</span>
           </p>
         </div>
