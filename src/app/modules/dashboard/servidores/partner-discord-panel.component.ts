@@ -163,7 +163,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
 
   savePartner(item: PartnerDiscordItem): void {
     const draft = this.drafts[item.partnerId];
-    if (!this.enabled || !draft || this.saving || this.busyPartnerId != null) return;
+    if (!this.enabled || !this.state?.configured || !draft || this.saving || this.busyPartnerId != null) return;
     if (draft.exclusiveChannelEnabled && !item.representativeDiscordUserId) {
       this.error = 'Defina um representante com Discord vinculado ao cadastro antes de habilitar o canal.';
       return;
@@ -242,7 +242,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
   }
 
   syncAll(): void {
-    if (!this.enabled || this.saving || this.busyPartnerId != null || this.dirty) return;
+    if (!this.enabled || !this.state?.configured || this.saving || this.busyPartnerId != null || this.dirty) return;
     const guild = this.guildId;
     this.saving = true;
     this.savingChange.emit(true);
