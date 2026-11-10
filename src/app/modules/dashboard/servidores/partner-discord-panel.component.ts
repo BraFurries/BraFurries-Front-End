@@ -11,7 +11,8 @@ import {
 @Component({
   selector: 'app-partner-discord-panel',
   standalone: false,
-  templateUrl: './partner-discord-panel.component.html'
+  templateUrl: './partner-discord-panel.component.html',
+  styleUrls: ['./partner-discord-panel.component.scss']
 })
 export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
   @Input() guildId = '';
