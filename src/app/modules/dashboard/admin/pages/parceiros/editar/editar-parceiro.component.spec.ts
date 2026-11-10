@@ -8,11 +8,12 @@ describe('EditarParceiroComponent', () => {
     const router: any = { navigate: jasmine.createSpy() };
     const dialog: any = { open: jasmine.createSpy().and.returnValue({ afterClosed: () => of(true) }) };
     const route: any = { snapshot: { paramMap: { get: () => '7' } } };
-    return { component: new EditarParceiroComponent(route, router, service, dialog), service, router, dialog };
+    const discord: any = { getSettings: jasmine.createSpy().and.returnValue(of({ configured: true, guildId: '753321055682035712', partners: [{ partnerId: 7, announcementMarkdown: null, announcementLinksMode: 'INLINE_ONLY', announcementPublicContact: null }] })) };
+    return { component: new EditarParceiroComponent(route, router, service, dialog, discord), service, router, dialog, discord };
   }
   it('asks before leaving when the announcement has unsaved edits', () => {
     const { component } = setup();
-    component.announcementEditor = { dirty: true } as any;
+    component.partnerForm = { form: { dirty: true } } as any;
     const confirm = spyOn(window, 'confirm').and.returnValue(false);
     expect(component.canDeactivate()).toBeFalse();
     expect(confirm).toHaveBeenCalled();

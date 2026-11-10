@@ -50,11 +50,11 @@
     </div>
 
     <div class="space-y-4">
-      <h3 class="font-amaranth text-xl">Parceiros cadastrados</h3>
-      @if (!state.partners.length) {
+      <h3 class="font-amaranth text-xl">Parceiros ativos</h3>
+      @if (!activePartners.length) {
         <p class="text-sm text-gray-600">Nenhuma parceria cadastrada. Cadastre um parceiro em Administração → Parceiros para começar.</p>
       }
-      @for (item of state.partners; track item.partnerId) {
+      @for (item of activePartners; track item.partnerId) {
         <article class="space-y-3 rounded-xl border border-gray-200 p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
