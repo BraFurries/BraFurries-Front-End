@@ -113,9 +113,9 @@
             <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{{ item.lastSyncError }}</p>
           }
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <small class="text-xs" [class.text-green-700]="item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision"
-              [class.text-amber-700]="item.appliedRevision < item.desiredRevision">
-              {{ item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision ? 'Sincronizado' : 'Publicação pendente' }}
+            <small class="text-xs" [class.text-green-700]="item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync"
+              [class.text-amber-700]="item.appliedRevision < item.desiredRevision || item.contentOutOfSync">
+              {{ item.appliedRevision > 0 && item.appliedRevision >= item.desiredRevision && !item.contentOutOfSync ? 'Sincronizado' : 'Publicação ou atualização pendente' }}
             </small>
             <button type="button" (click)="savePartner(item)"
               [disabled]="saving || busyPartnerId !== null || !drafts[item.partnerId] || !partnerDirty(item)"
