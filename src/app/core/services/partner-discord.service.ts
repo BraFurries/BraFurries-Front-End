@@ -26,6 +26,13 @@ export interface PartnerDiscordSettings {
   partners: PartnerDiscordItem[];
 }
 
+export interface OwnPartnerPublication {
+  partnerId: number;
+  partnerName: string;
+  guildId: string;
+  threadId: string;
+}
+
 export interface PartnerDiscordConfigRequest {
   categoryId: string | null;
   threadParentChannelId: string | null;
@@ -61,6 +68,10 @@ export class PartnerDiscordService {
 
   syncAll(): Observable<PartnerDiscordItem[]> {
     return this.http.post<PartnerDiscordItem[]>(`${this.baseUrl}/discord/sync`, {});
+  }
+
+  getMyPublications(): Observable<OwnPartnerPublication[]> {
+    return this.http.get<OwnPartnerPublication[]>(`${environment.apiBaseUrl}/user/me/partners/discord`);
   }
 
   /** A representative posts via the API, never via a Coddy internal URL. */
