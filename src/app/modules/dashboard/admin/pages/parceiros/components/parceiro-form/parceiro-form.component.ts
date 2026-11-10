@@ -285,7 +285,7 @@ export class ParceiroFormComponent implements OnInit, OnChanges, OnDestroy {
     };
     if (!this.partner) payload.status = value.status;
     if (this.partner && this.announcementReady) {
-      (payload as UpdatePartnerRequest).publicationDraft = {
+      (payload as UpdatePartnerRequest).discordAnnouncement = {
         markdown: value.announcementMarkdown.trim() || null,
         linksMode: value.announcementLinksMode,
         publicContact: value.announcementPublicContact.trim() || null
