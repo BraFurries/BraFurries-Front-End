@@ -67,6 +67,10 @@ export class PartnerDiscordService {
     return this.http.post<PartnerDiscordItem>(`${this.baseUrl}/${partnerId}/discord/sync`, {});
   }
 
+  unpublishPartner(partnerId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${partnerId}/discord`);
+  }
+
   syncAll(): Observable<PartnerDiscordItem[]> {
     return this.http.post<PartnerDiscordItem[]>(`${this.baseUrl}/discord/sync`, {});
   }
