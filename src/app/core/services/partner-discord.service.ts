@@ -18,6 +18,9 @@ export interface PartnerDiscordItem {
   appliedRevision: number;
   lastSyncError: string | null;
   contentOutOfSync: boolean;
+  announcementMarkdown: string | null;
+  announcementLinksMode: 'INLINE_ONLY' | 'APPEND_MISSING';
+  announcementPublicContact: string | null;
 }
 
 export interface PartnerDiscordSettings {
@@ -46,6 +49,12 @@ export interface PartnerDiscordOptionRequest {
   adoptExistingTextChannel: boolean;
 }
 
+export interface PartnerDiscordAnnouncementRequest {
+  markdown: string | null;
+  linksMode: 'INLINE_ONLY' | 'APPEND_MISSING';
+  publicContact: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PartnerDiscordService {
   private readonly baseUrl = `${environment.apiBaseUrl}/admin/partners`;
@@ -62,6 +71,12 @@ export class PartnerDiscordService {
 
   updatePartner(partnerId: number, payload: PartnerDiscordOptionRequest): Observable<PartnerDiscordItem> {
     return this.http.put<PartnerDiscordItem>(`${this.baseUrl}/${partnerId}/discord`, payload);
+  }
+
+  updateAnnouncement(partnerId: number, payload: PartnerDiscordAnnouncementRequest): Observable<PartnerDiscordItem> {
+    return this.http.put<PartnerDiscordItem>(
+      `${this.baseUrl}/${partnerId}/discord/announcement`, payload
+    );
   }
 
   syncPartner(partnerId: number): Observable<PartnerDiscordItem> {
