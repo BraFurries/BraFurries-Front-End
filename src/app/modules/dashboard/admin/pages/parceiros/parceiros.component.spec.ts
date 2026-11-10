@@ -22,10 +22,39 @@ describe('AdminPartnersComponent', () => {
       { id: 4, name: 'Bicho', status: 'suspended' },
       { id: 5, name: 'Alfa', status: 'pending' }
     ] as any;
+    component.groupByStatus = true;
     expect(component.groupedPartners.map(group => group.status)).toEqual(['active', 'pending', 'suspended']);
     expect(component.groupedPartners.map(group => group.items.map(item => item.name)))
       .toEqual([['Águia', 'Úrsula'], ['Alfa', 'Zebra'], ['Bicho']]);
     expect(component.partners.map(item => item.id)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('starts ungrouped and keeps the status-then-name order in a single grid', () => {
+    const component = new AdminPartnersComponent({} as any, router);
+    component.partners = [
+      { id: 1, name: 'Zebra', status: 'pending' },
+      { id: 2, name: 'Úrsula', status: 'active' },
+      { id: 3, name: 'Águia', status: 'active' },
+      { id: 4, name: 'Bicho', status: 'suspended' },
+      { id: 5, name: 'Alfa', status: 'pending' }
+    ] as any;
+
+    expect(component.groupByStatus).toBeFalse();
+    expect(component.groupedPartners.length).toBe(1);
+    expect(component.groupedPartners[0].status).toBeNull();
+    expect(component.groupedPartners[0].items.map(item => item.id)).toEqual([3, 2, 5, 1, 4]);
+    component.groupByStatus = true;
+    expect(component.groupedPartners.map(group => group.status)).toEqual(['active', 'pending', 'suspended']);
+    expect(component.groupedPartners.flatMap(group => group.items).map(item => item.id)).toEqual([3, 2, 5, 1, 4]);
+    component.groupByStatus = false;
+    expect(component.groupedPartners[0].items.map(item => item.id)).toEqual([3, 2, 5, 1, 4]);
+  });
+
+  it('does not display empty sections in either mode', () => {
+    const component = new AdminPartnersComponent({} as any, router);
+    expect(component.groupedPartners).toEqual([]);
+    component.groupByStatus = true;
+    expect(component.groupedPartners).toEqual([]);
   });
 
   it('offers an appropriate action for each status', () => {
@@ -48,7 +77,7 @@ describe('AdminPartnersComponent', () => {
     component.partners = [partner];
     component.togglePartnerStatus(partner);
     expect(service.updatePartnerStatus).toHaveBeenCalledWith(4, 'suspended');
-    expect(component.groupedPartners[0].status).toBe('suspended');
+    expect(component.orderedPartners[0].status).toBe('suspended');
     expect(component.updatingPartnerId).toBeNull();
   });
 
@@ -82,7 +111,7 @@ describe('AdminPartnersComponent', () => {
     response.next({ ...partner, status: 'active' });
     response.complete();
     expect(component.updatingPartnerId).toBeNull();
-    expect(component.groupedPartners[0].status).toBe('active');
+    expect(component.orderedPartners[0].status).toBe('active');
   });
 
   it('preserves the previous state when the API rejects the update', () => {

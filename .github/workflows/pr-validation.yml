@@ -131,6 +131,7 @@ jobs:
         run: >
           npm test -- --watch=false --browsers=ChromeHeadless
           --include=**/parceiro-form.component.spec.ts
+          --include=**/parceiros.component.spec.ts
           --include=**/editar-parceiro.component.spec.ts
           --include=**/partner-discord-panel.component.spec.ts
 

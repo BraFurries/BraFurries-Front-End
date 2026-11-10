@@ -13,6 +13,7 @@ export class AdminPartnersComponent implements OnInit {
   partners: AdminPartnerItem[] = [];
   status: AdminPartnerStatus | '' = '';
   category: AdminPartnerCategory | '' = '';
+  groupByStatus = false;
   loading = true;
   updatingPartnerId: number | null = null;
   errorMessage = '';
@@ -24,13 +25,28 @@ export class AdminPartnersComponent implements OnInit {
   ];
 
   private readonly nameCollator = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true });
+  private readonly statusRank: Record<AdminPartnerStatus, number> = {
+    active: 0,
+    pending: 1,
+    suspended: 2
+  };
 
-  get groupedPartners(): { status: AdminPartnerStatus; label: string; items: AdminPartnerItem[] }[] {
+  get orderedPartners(): AdminPartnerItem[] {
+    return [...this.partners].sort((a, b) =>
+      this.statusRank[a.status] - this.statusRank[b.status]
+      || this.nameCollator.compare(a.name, b.name)
+      || a.id - b.id
+    );
+  }
+
+  get groupedPartners(): { status: AdminPartnerStatus | null; label: string; items: AdminPartnerItem[] }[] {
+    const items = this.orderedPartners;
+    if (!items.length) return [];
+    if (!this.groupByStatus) return [{ status: null, label: 'Todos', items }];
+
     return this.statusOrder.map(group => ({
       ...group,
-      items: this.partners
-        .filter(partner => partner.status === group.status)
-        .sort((a, b) => this.nameCollator.compare(a.name, b.name) || a.id - b.id)
+      items: items.filter(partner => partner.status === group.status)
     })).filter(group => group.items.length > 0);
   }
   successMessage = '';
