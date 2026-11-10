@@ -28,6 +28,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
   error = '';
   success = '';
   busyPartnerId: number | null = null;
+  withdrawalConfirmationId: number | null = null;
   private generation = 0;
 
   constructor(private readonly service: PartnerDiscordService) {}
@@ -114,6 +115,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     this.success = '';
     this.state = undefined;
     this.drafts = {};
+    this.withdrawalConfirmationId = null;
     this.dirtyChange.emit(false);
     this.service.getSettings().subscribe({
       next: settings => {
@@ -195,6 +197,45 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
         if (guild === this.guildId) {
           this.error = failure?.error?.message
             || 'Configuração possivelmente salva, mas não foi possível sincronizar. Recarregue o estado.';
+        }
+      }
+    });
+  }
+
+  requestWithdrawal(partnerId: number): void {
+    this.withdrawalConfirmationId = partnerId;
+    this.error = '';
+    this.success = '';
+  }
+
+  cancelWithdrawal(): void {
+    this.withdrawalConfirmationId = null;
+  }
+
+  confirmWithdrawal(item: PartnerDiscordItem): void {
+    if (!this.enabled || this.saving || this.busyPartnerId !== null
+      || this.withdrawalConfirmationId !== item.partnerId || this.dirty) return;
+    const guild = this.guildId;
+    this.busyPartnerId = item.partnerId;
+    this.savingChange.emit(true);
+    this.error = '';
+    this.success = '';
+    this.service.unpublishPartner(item.partnerId).pipe(
+      switchMap(() => this.service.getSettings()),
+      finalize(() => {
+        this.busyPartnerId = null;
+        this.savingChange.emit(false);
+      })
+    ).subscribe({
+      next: settings => {
+        if (guild !== this.guildId) return;
+        this.apply(settings);
+        this.withdrawalConfirmationId = null;
+        this.success = 'Publicação retirada do Discord. O histórico foi preservado, e o cadastro poderá ser excluído separadamente.';
+      },
+      error: failure => {
+        if (guild === this.guildId) {
+          this.error = failure?.error?.message || 'Não foi possível retirar a divulgação do parceiro.';
         }
       }
     });
