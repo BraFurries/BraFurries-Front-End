@@ -203,7 +203,7 @@
       <h3 class="font-semibold text-gray-800">Prévia aproximada do Markdown</h3>
       <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800"
         [innerHTML]="previewMarkdown(form.controls.announcementMarkdown.value || '# ' + form.controls.name.value)"></div>
-      <p class="text-xs text-gray-500">Sem texto personalizado, o Coddy utiliza os dados do cadastro. A imagem da parceria é acrescentada à thread em uma mensagem própria. A prévia não publica mensagens.</p>
+      <p class="text-xs text-gray-500">Sem texto personalizado, o Coddy utiliza os dados do cadastro. A imagem enviada pelo painel será atualizada como anexo da mensagem inicial do Fórum, preservando a thread. A prévia não publica mensagens.</p>
     </div>
   </section>
   <p *ngIf="partner && !announcementReady" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
