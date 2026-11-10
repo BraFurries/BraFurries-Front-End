@@ -6,6 +6,7 @@ import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } fr
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { AutoJoinRolesState, BumpConfigResponse, GuildResources, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PortariaBypass, PortariaBypassesState, PortariaState, ServerChannelsConfig, StaffRoles } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
+import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
 import { RoleSelectionComponent } from './role-selection.component';
 import { ServidoresComponent } from './servidores.component';
 
@@ -193,7 +194,7 @@ describe('ServidoresComponent', () => {
     service.updatePortariaEnabled.and.returnValue(of(portaria));
     service.publishPortariaFlow.and.returnValue(of({ flowId: 1, channelId: '888888888888888888', messageId: '123456789012345678', created: true, reused: false, updated: false }));
     service.getLogs.and.returnValue(of(logs)); service.updateLog.and.returnValue(of(logs)); service.testLog.and.returnValue(of(void 0));
-    await TestBed.configureTestingModule({ declarations: [ServidoresComponent, RoleSelectionComponent, MockPortariaClarificationSettingsComponent, MockXpLevelingPanelComponent, MockAiConfigurationPanelComponent, MockVipConfigurationPanelComponent, MockBackupManagementPanelComponent, MockThemeManagementPanelComponent], imports: [FormsModule], providers: [provideRouter([]), { provide: ActivatedRoute, useValue: route }, { provide: ManagedServersService, useValue: service }, { provide: CommunityContextService, useValue: communityContext }] }).compileComponents();
+    await TestBed.configureTestingModule({ declarations: [ServidoresComponent, RoleSelectionComponent, MockPortariaClarificationSettingsComponent, MockXpLevelingPanelComponent, MockAiConfigurationPanelComponent, MockVipConfigurationPanelComponent, MockBackupManagementPanelComponent, MockThemeManagementPanelComponent], imports: [FormsModule], providers: [provideRouter([]), { provide: ActivatedRoute, useValue: route }, { provide: ManagedServersService, useValue: service }, { provide: CommunityContextService, useValue: communityContext }, { provide: PartnerDiscordService, useValue: { getSettings: () => throwError(() => new Error('not a partner manager')) } }] }).compileComponents();
     router = TestBed.inject(Router);
   });
   function create(): void { fixture = TestBed.createComponent(ServidoresComponent); component = fixture.componentInstance; fixture.detectChanges(); }

@@ -4,6 +4,7 @@ import { BaseLayoutDashboardComponent } from '../../core/components/dashboard/ba
 import { InicioComponent } from './inicio/inicio.component';
 import { PerfilComponent } from './perfil/perfil.component';
 import { ServidoresComponent } from './servidores/servidores.component';
+import { PartnerPostingComponent } from './servidores/partner-posting.component';
 import { EquipesComponent } from './equipes/equipes.component';
 import { MembrosComponent } from './membros/membros.component';
 import { CommunityAccessComponent } from './community-access/community-access.component';
@@ -26,6 +27,7 @@ const routes: Routes = [
       { path: '', component: InicioComponent },
       { path: 'perfil', component: PerfilComponent },
       { path: 'minhas-artes', component: CommerceArtistPortalComponent },
+      { path: 'minhas-parcerias', component: PartnerPostingComponent },
       { path: 'gestao-comercial/financeiro', component: CommerceFinanceComponent },
       { path: 'gestao-comercial/catalogo', component: CommerceCatalogComponent },
       { path: 'gestao-comercial', component: CommerceAccessComponent },

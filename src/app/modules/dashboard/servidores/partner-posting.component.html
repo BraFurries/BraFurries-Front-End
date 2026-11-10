@@ -1,0 +1,51 @@
+<main class="min-h-full bg-gray-50 px-4 py-7 font-archivo text-gray-800 md:px-10 md:py-10">
+  <div class="mx-auto max-w-4xl space-y-6">
+    <header>
+      <p class="text-xs font-semibold uppercase tracking-wider text-braPurple">BraFurries • Discord</p>
+      <h1 class="font-amaranth text-3xl font-bold text-gray-900">Publicações de parceiros</h1>
+      <p class="mt-2 text-sm text-gray-600">Publique novidades exclusivamente nas threads das parcerias que você representa. A publicação é autorizada pela sua conta e enviada ao Discord pelo Coddy.</p>
+    </header>
+    @if (loading) {
+      <p role="status">Carregando suas parcerias...</p>
+    }
+    @if (error) {
+      <p role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ error }}</p>
+    }
+    @if (success) {
+      <p role="status" class="rounded-lg border border-gray-200 bg-white p-4 text-sm text-green-800">{{ success }}</p>
+    }
+    @if (!loading && !partners.length && !error) {
+      <section class="rounded-xl border border-gray-200 bg-white p-6">
+        <h2 class="font-amaranth text-lg">Nenhuma thread disponível</h2>
+        <p class="mt-2 text-sm text-gray-600">Você precisa ser o representante cadastrado de uma parceria ativa cuja vitrine já tenha sido publicada pela equipe BraFurries.</p>
+      </section>
+    }
+    @for (partner of partners; track partner.partnerId) {
+      <article class="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="font-amaranth text-xl text-gray-900">{{ partner.partnerName }}</h2>
+          <a [href]="'https://discord.com/channels/' + partner.guildId + '/' + partner.threadId"
+            target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-braPurple underline">Ver thread no Discord</a>
+        </div>
+        <label class="block space-y-2 text-sm font-semibold text-gray-700">
+          Mensagem de divulgação
+          <textarea [ngModel]="draft[partner.partnerId] || ''" (ngModelChange)="draft[partner.partnerId] = $event"
+            rows="5" maxlength="1900" placeholder="Compartilhe uma atualização, evento ou novidade..."
+            class="block w-full resize-y rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 font-normal"></textarea>
+        </label>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <small class="text-xs text-gray-500">{{ (draft[partner.partnerId] || '').length }}/1900 caracteres · sem menções em massa</small>
+          <button type="button" (click)="publish(partner)"
+            [disabled]="postingPartnerId !== null || !(draft[partner.partnerId] || '').trim()"
+            class="rounded-lg bg-braPurple px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {{ postingPartnerId === partner.partnerId ? 'Publicando...' : 'Publicar no Discord' }}
+          </button>
+        </div>
+        @if (lastSentId[partner.partnerId]) {
+          <a [href]="'https://discord.com/channels/' + partner.guildId + '/' + partner.threadId + '/' + lastSentId[partner.partnerId]"
+            target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-braPurple underline">Ver última mensagem enviada</a>
+        }
+      </article>
+    }
+  </div>
+</main>

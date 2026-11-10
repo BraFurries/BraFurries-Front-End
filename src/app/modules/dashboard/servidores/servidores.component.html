@@ -64,7 +64,7 @@
         }
       </section>
       <nav class="section-tabs" role="tablist">
-        @for (section of sections; track section.id) {
+        @for (section of visibleSections; track section.id) {
           <button
             type="button"
             [class.active]="activeSection === section.id"
@@ -87,6 +87,13 @@
           (dirtyChange)="themeDirty = $event"
           (savingChange)="themeSaving = $event"
         ></app-theme-management-panel>
+      } @else if (activeSection === 'partners') {
+        <app-partner-discord-panel
+          [guildId]="selectedServerId"
+          [resources]="resources"
+          (dirtyChange)="partnerDiscordDirty = $event"
+          (savingChange)="partnerDiscordSaving = $event"
+        ></app-partner-discord-panel>
       } @else if (configurationLoading) {
         <section class="state-card compact">
           <div class="spinner"></div>

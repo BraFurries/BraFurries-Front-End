@@ -1,6 +1,5 @@
-# Keep the default Gitleaks rules intact.
-# This narrow exception covers only a demonstrably synthetic Discord snowflake
-# in two test fixtures; it does not suppress other Discord IDs or secret types.
+# Keep default Gitleaks rules intact.
+# Scoped exception for a known synthetic Discord snowflake in test fixtures.
 [extend]
 useDefault = true
 
@@ -13,4 +12,5 @@ regexes = ['''^123456789012345678$''']
 paths = [
   '''^src/app/core/services/admin\.service\.spec\.ts$''',
   '''^src/app/modules/dashboard/admin/pages/usuarios/perfil/perfil-usuario\.component\.spec\.ts$''',
+  '''^src/app/modules/dashboard/servidores/partner-discord-panel\.component\.spec\.ts$''',
 ]

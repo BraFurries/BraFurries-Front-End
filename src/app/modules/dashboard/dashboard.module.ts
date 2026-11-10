@@ -14,6 +14,8 @@ import { AiConfigurationPanelComponent } from './servidores/ai-configuration-pan
 import { VipConfigurationPanelComponent } from './servidores/vip-configuration-panel.component';
 import { BackupManagementPanelComponent } from './servidores/backup-management-panel.component';
 import { ThemeManagementPanelComponent } from './servidores/theme-management-panel.component';
+import { PartnerDiscordPanelComponent } from './servidores/partner-discord-panel.component';
+import { PartnerPostingComponent } from './servidores/partner-posting.component';
 import { RoleSelectionComponent } from './servidores/role-selection.component';
 import { OperationModalComponent } from './servidores/operation-modal.component';
 import { EquipesComponent } from './equipes/equipes.component';
@@ -52,6 +54,8 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     VipConfigurationPanelComponent,
     BackupManagementPanelComponent,
     ThemeManagementPanelComponent,
+    PartnerDiscordPanelComponent,
+    PartnerPostingComponent,
     RoleSelectionComponent,
     OperationModalComponent,
     EquipesComponent,
