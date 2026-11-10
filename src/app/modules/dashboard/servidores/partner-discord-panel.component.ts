@@ -47,6 +47,7 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
   }
 
   get parentChannels(): GuildChannel[] {
+    if (!this.categoryId) return [];
     return (this.resources?.channels ?? []).filter(channel =>
       ['text', 'forum'].includes(channel.type)
       && (!this.categoryId || channel.categoryId === this.categoryId)
