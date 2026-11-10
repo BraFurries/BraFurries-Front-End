@@ -120,5 +120,12 @@ jobs:
           --include=**/login.component.spec.ts
           --include=**/social-register.component.spec.ts
 
+      - name: Partner Markdown editor regression tests
+        run: >
+          npm test -- --watch=false --browsers=ChromeHeadless
+          --include=**/partner-announcement-editor.component.spec.ts
+          --include=**/editar-parceiro.component.spec.ts
+          --include=**/partner-discord-panel.component.spec.ts
+
       - name: Build
         run: npm run build

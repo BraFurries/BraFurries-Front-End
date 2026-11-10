@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 
 import {
@@ -48,13 +49,13 @@ describe('PartnerDiscordPanelComponent', () => {
 
   beforeEach(async () => {
     service = jasmine.createSpyObj<PartnerDiscordService>('PartnerDiscordService', [
-      'getSettings', 'updateConfig', 'updatePartner', 'updateAnnouncement',
+      'getSettings', 'updateConfig', 'updatePartner',
       'syncPartner', 'syncAll', 'unpublishPartner'
     ]);
     service.getSettings.and.returnValue(of(settings()));
     await TestBed.configureTestingModule({
       declarations: [PartnerDiscordPanelComponent],
-      imports: [FormsModule],
+      imports: [FormsModule, RouterTestingModule],
       providers: [{ provide: PartnerDiscordService, useValue: service }]
     }).compileComponents();
     fixture = TestBed.createComponent(PartnerDiscordPanelComponent);
@@ -101,37 +102,11 @@ describe('PartnerDiscordPanelComponent', () => {
     expect(service.syncAll).not.toHaveBeenCalled();
   });
 
-  it('keeps Markdown changes pending until explicitly saved and published', () => {
-    component.updateAnnouncementDraft(partner, {
-      markdown: '# 🐑 República Indie',
-      linksMode: 'INLINE_ONLY',
-      publicContact: null
-    });
-    expect(component.announcementDirty(partner)).toBeTrue();
-    component.syncOne(partner);
-    expect(service.syncPartner).not.toHaveBeenCalled();
-
-    const saved = {
-      ...partner, announcementMarkdown: '# 🐑 República Indie',
-      desiredRevision: 2
-    };
-    service.updateAnnouncement.and.returnValue(of(saved));
-    component.saveAnnouncement(partner);
-    expect(service.updateAnnouncement).toHaveBeenCalledOnceWith(31,
-      jasmine.objectContaining({ markdown: '# 🐑 República Indie' }));
-    expect(component.announcementDirty(saved)).toBeFalse();
-    expect(service.syncPartner).not.toHaveBeenCalled();
-
-    service.syncPartner.and.returnValue(of({ ...saved, appliedRevision: 2 }));
-    component.syncOne(saved);
-    expect(service.syncPartner).toHaveBeenCalledOnceWith(31);
-  });
-
-  it('escapes HTML in Markdown preview before formatting headings', () => {
-    const rendered = component.previewMarkdown('# **Anúncio**\\n<script>alert(1)</script>');
-    expect(rendered).toContain('<strong>Anúncio</strong>');
-    expect(rendered).not.toContain('<script>');
-    expect(rendered).toContain('&lt;script&gt;');
+  it('links to the partner record instead of duplicating the Markdown editor', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Editar anúncio na ficha do parceiro');
+    expect(html.querySelector('textarea[maxlength="16000"]')).toBeNull();
+    expect(html.querySelector('a[href="/painel/admin/parceiros/31/editar"]')).not.toBeNull();
   });
 
   it('shows an authorization error if administrative access is denied', () => {
