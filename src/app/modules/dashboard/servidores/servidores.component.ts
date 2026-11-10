@@ -4,7 +4,7 @@ import { concatMap, forkJoin, Observable, of, Subscription } from 'rxjs';
 import { AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 
-type ServerSection = 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
+type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
 interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
@@ -21,6 +21,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   readonly sections: ServerSectionLink[] = [
     { id: 'overview', label: 'Visão geral', icon: '✨' }, { id: 'vip', label: 'VIP', icon: '💎' }, { id: 'channels', label: 'Canais', icon: '#️⃣' }, { id: 'ai', label: 'IA', icon: '🤖' }, { id: 'bump', label: 'Bump', icon: '🚀' },
     { id: 'portaria', label: 'Portaria', icon: '🚪' }, { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️' }, { id: 'backups', label: 'Backups', icon: '💾' }, { id: 'themes', label: 'Temas', icon: '🎨' }, { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️' }, { id: 'cargos-temporarios', label: 'Cargos temporários', icon: '⏳' }, { id: 'private-area', label: 'Área privada', icon: '🔐' },
+    { id: 'partners', label: 'Parceiros', icon: '🤝' },
     { id: 'logs', label: 'Logs', icon: '📜' }, { id: 'leveling', label: 'XP & Leveling', icon: '🏆' },
     { id: 'economy', label: 'Economia', icon: '💰', status: 'coming-soon' }, { id: 'tickets', label: 'Tickets', icon: '🎫', status: 'coming-soon' }
   ];
@@ -59,6 +60,8 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   backupDirty = false;
   backupSaving = false;
   themeDirty = false;
+  partnerDiscordDirty = false;
+  partnerDiscordSaving = false;
   themeSaving = false;
   private logsRequestGeneration = 0;
   autoJoinRoleId = '';
@@ -643,7 +646,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   get channelsDirty(): boolean { return this.channelsBaseline !== undefined && this.channelsSnapshot() !== this.channelsBaseline; }
   get collaborativeDirty(): boolean { return !!this.collaborativeDraft && this.collaborativeBaseline !== undefined && JSON.stringify(this.collaborativeDraft) !== this.collaborativeBaseline; }
   get bypassDraftDirty(): boolean { return JSON.stringify(this.bypassDraft) !== this.bypassDraftBaseline; }
-  hasUnsavedChanges(): boolean { return this.xpDirty || this.aiDirty || this.vipDirty || this.backupDirty || this.themeDirty || this.channelsDirty || this.staffRolesDirty || this.collaborativeDirty || this.bypassDraftDirty || this.portariaRolesDirty || this.portariaDirty || this.portariaWizardDirty || this.privateAreaDirty || this.publicationDraftDirty || (['processing', 'warning', 'individual', 'monthly'] as BumpCard[]).some(card => this.isBumpCardDirty(card)) || this.orderedLogs.some(log => this.isLogDirty(log)); }
+  hasUnsavedChanges(): boolean { return this.xpDirty || this.aiDirty || this.vipDirty || this.backupDirty || this.themeDirty || this.partnerDiscordDirty || this.channelsDirty || this.staffRolesDirty || this.collaborativeDirty || this.bypassDraftDirty || this.portariaRolesDirty || this.portariaDirty || this.portariaWizardDirty || this.privateAreaDirty || this.publicationDraftDirty || (['processing', 'warning', 'individual', 'monthly'] as BumpCard[]).some(card => this.isBumpCardDirty(card)) || this.orderedLogs.some(log => this.isLogDirty(log)); }
   get activeLogsCount(): number { return (this.logs?.logs ?? []).filter(log => log.enabled).length; }
   get logsHaveProblems(): boolean { return (this.logs?.logs ?? []).some(log => !!log.target && (log.target.missing || log.target.writable === false)); }
   get protectionStatus(): 'complete' | 'partial' | 'limited' | 'unknown' {
@@ -654,7 +657,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   requestOverviewSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
   continueEditing(): void { this.pendingNavigation = undefined; }
   discardAndNavigate(): void {
-    if (this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving) return;
+    if (this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || this.partnerDiscordSaving) return;
     const target = this.pendingNavigation;
     this.pendingNavigation = undefined;
     if (!target) return;
@@ -735,7 +738,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     this.resources = undefined; this.staff = undefined; this.moderationAccess = undefined; this.collaborativeDraft = undefined; this.collaborativeBaseline = undefined; this.portariaBypasses = []; this.bypassPortariaEnabled = true; this.bypassesLoading = false; this.bypassesError = ''; this.resetBypassDraft(); this.portaria = undefined; this.portariaBaseline = undefined; this.portariaWizardBaseline = undefined; this.privateAreaBaseline = undefined; this.autoJoinRoles = undefined; this.serverChannels = undefined; this.channelsBaseline = undefined; this.bumpPersisted = undefined; this.bumpDraft = undefined; this.bumpSaveState = { processing: 'idle', warning: 'idle', individual: 'idle', monthly: 'idle' }; this.bumpSaveError = {}; this.logs = undefined; this.logDrafts = {}; this.logsError = ''; this.autoJoinRoleId = ''; this.staffRoleDraft = []; this.portariaRoleDraft = { visitanteRoleId: null, acessoProvisorioRoleId: null, maior18RoleId: null, menor18RoleId: null }; this.resetPublicationDraft(); this.visitorAutoJoinCleanupRoleId = undefined;
     this.configurationLoading = false;
     this.configurationError = '';
-    this.xpDirty = false; this.xpSaving = false; this.aiDirty = false; this.aiSaving = false; this.vipDirty = false; this.vipSaving = false; this.backupDirty = false; this.backupSaving = false; this.themeDirty = false; this.themeSaving = false;
+    this.xpDirty = false; this.xpSaving = false; this.aiDirty = false; this.aiSaving = false; this.vipDirty = false; this.vipSaving = false; this.backupDirty = false; this.backupSaving = false; this.themeDirty = false; this.themeSaving = false; this.partnerDiscordDirty = false; this.partnerDiscordSaving = false;
     this.mutationInFlight = false; this.saveState = 'idle'; this.saveError = ''; this.lastSave = undefined;
   }
   private resolveRoute(): void {
