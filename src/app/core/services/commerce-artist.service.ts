@@ -34,6 +34,10 @@ export interface InvitationResult {
   message: string;
 }
 
+export interface PersonalArtistAccess {
+  eligible: boolean;
+}
+
 export interface ArtistPortfolioArtwork {
   id: number;
   title: string;
@@ -88,6 +92,11 @@ export class CommerceArtistService {
     return this.http.put<void>(
       `${environment.apiBaseUrl}/user/me/brafurries-commerce/artist/profiles/${id}`,input
     );
+  }
+
+  /** The API derives eligibility solely from the authenticated canonical user. */
+  myAccess(): Observable<PersonalArtistAccess> {
+    return this.http.get<PersonalArtistAccess>(`${this.base}/me/access`);
   }
 
   portfolio(year: number, month: number): Observable<ArtistPortfolio> {
