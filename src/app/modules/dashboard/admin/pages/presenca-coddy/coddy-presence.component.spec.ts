@@ -34,7 +34,8 @@ describe('AdminCoddyPresenceComponent', () => {
     const content = fixture.nativeElement.textContent as string;
     expect(content).toContain('Presença do Coddy');
     expect(content).toContain('Servidores ativos');
-    expect(content).toContain('1.234');
+    // Angular's default test locale may differ from the user's selected locale.
+    expect(content).toMatch(/1[,.]234/);
     expect(content).toContain('Servidor Demo');
     expect(content).toContain('Comunidade Demo');
     expect(content).toContain('123456789012345678');
