@@ -103,6 +103,139 @@
     </div>
   </div>
 
+  <!-- Presence is the public Discord appearance, not process health. -->
+  <section class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-5">
+    <div>
+      <h3 class="text-xl font-amaranth font-bold text-gray-800">Presença do Coddy no Discord</h3>
+      <p class="text-sm text-gray-500 mt-1">
+        Altere a atividade que aparece no perfil do bot. Não altera o status operacional, uptime ou saúde do processo.
+      </p>
+    </div>
+    <div *ngIf="presenceLoading" class="text-sm text-gray-500">Consultando presença...</div>
+    <div *ngIf="!presenceLoading" class="grid gap-3 sm:grid-cols-2 text-sm">
+      <div class="rounded-2xl bg-gray-50 p-4">
+        <p class="font-bold text-gray-600 mb-2">Presença configurada</p>
+        <p class="break-words" *ngIf="presence?.desired as desired">{{ desired.activityType }} · {{ desired.activityText }} · {{ desired.availability }}</p>
+        <p *ngIf="!presence?.desired" class="text-gray-400">Nenhuma configuração salva</p>
+      </div>
+      <div class="rounded-2xl bg-gray-50 p-4">
+        <p class="font-bold text-gray-600 mb-2">Presença no runtime</p>
+        <p class="break-words" *ngIf="presence?.current as current">{{ current.activityType || 'Padrão' }} · {{ current.activityText || 'Sem atividade' }} · {{ current.availability }}</p>
+        <p *ngIf="!presence?.current" class="text-gray-400">Coddy indisponível para leitura</p>
+      </div>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <label class="block">
+        <span class="text-sm font-bold text-gray-700">Tipo de atividade</span>
+        <select [(ngModel)]="activityType" (ngModelChange)="presenceConfirming = false"
+                class="mt-2 block w-full rounded-xl border border-gray-200 p-3 bg-white text-gray-800">
+          <option value="PLAYING">Jogando</option>
+          <option value="LISTENING">Ouvindo</option>
+          <option value="WATCHING">Assistindo</option>
+          <option value="CUSTOM">Mensagem personalizada</option>
+        </select>
+      </label>
+      <label class="block sm:col-span-2">
+        <span class="text-sm font-bold text-gray-700">Texto da atividade</span>
+        <input [(ngModel)]="activityText" (ngModelChange)="presenceConfirming = false" maxlength="128"
+               placeholder="O que o Coddy está fazendo?" type="text"
+               class="mt-2 block w-full rounded-xl border border-gray-200 p-3 bg-white text-gray-800"/>
+      </label>
+      <label class="block">
+        <span class="text-sm font-bold text-gray-700">Disponibilidade</span>
+        <select [(ngModel)]="availability" (ngModelChange)="presenceConfirming = false"
+                class="mt-2 block w-full rounded-xl border border-gray-200 p-3 bg-white text-gray-800">
+          <option value="online">Online</option>
+          <option value="idle">Ausente</option>
+          <option value="dnd">Não perturbe</option>
+          <option value="invisible">Invisível</option>
+        </select>
+      </label>
+    </div>
+    <p *ngIf="presenceError" role="alert" class="text-sm font-semibold text-red-600">{{ presenceError }}</p>
+    <p *ngIf="presenceMessage" role="status" class="text-sm font-semibold text-green-700">{{ presenceMessage }}</p>
+    <div *ngIf="presenceConfirming" class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm space-y-3">
+      <p class="font-bold text-orange-900">Confirmar alteração global</p>
+      <p>Alterar a presença do Coddy para <strong>{{ activityType }}</strong>: {{ activityText }} ({{ availability }})?</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" (click)="applyPresence()" [disabled]="presenceSaving"
+                class="rounded-xl bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">Confirmar e aplicar</button>
+        <button type="button" (click)="presenceConfirming = false"
+                class="rounded-xl bg-white border border-gray-200 px-4 py-2 font-bold text-gray-700">Cancelar</button>
+      </div>
+    </div>
+    <button *ngIf="!presenceConfirming" type="button" (click)="reviewPresence()"
+            [disabled]="presenceLoading || presenceSaving"
+            class="rounded-xl bg-braDark px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
+      {{ presenceSaving ? 'Aplicando...' : 'Revisar alteração de presença' }}
+    </button>
+  </section>
+
+  <section class="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-5">
+    <div>
+      <h3 class="text-xl font-amaranth font-bold text-gray-800">Enviar mensagem como Coddy</h3>
+      <p class="text-sm text-gray-500 mt-1">
+        Disponível apenas para administradores globais. Escolha uma Community ativa e um canal onde o bot possa escrever.
+        Menções a usuários, cargos ou todos são enviadas sem notificações.
+      </p>
+    </div>
+    <div *ngIf="destinationsLoading" class="text-sm text-gray-500">Consultando canais disponíveis...</div>
+    <p *ngIf="destinationsError" role="alert" class="text-sm font-semibold text-red-600">{{ destinationsError }}</p>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="block">
+        <span class="text-sm font-bold text-gray-700">Servidor / Community</span>
+        <select [ngModel]="selectedGuildId" (ngModelChange)="selectGuild($event)" [disabled]="sending || destinationsLoading"
+                class="mt-2 block w-full rounded-xl border border-gray-200 p-3 bg-white text-gray-800">
+          <option value="">Selecione um servidor</option>
+          <option *ngFor="let guild of destinations" [value]="guild.guildId">{{ guild.communityName }} · {{ guild.guildName }}</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-sm font-bold text-gray-700">Canal</span>
+        <select [ngModel]="selectedChannelId" (ngModelChange)="selectChannel($event)"
+                [disabled]="!selectedGuild || sending"
+                class="mt-2 block w-full rounded-xl border border-gray-200 p-3 bg-white text-gray-800">
+          <option value="">Selecione um canal</option>
+          <option *ngFor="let channel of selectedGuild?.channels" [value]="channel.channelId">
+            #{{ channel.name }} {{ channel.kind === 'thread' ? '(thread)' : '' }}
+          </option>
+        </select>
+      </label>
+    </div>
+    <label class="block">
+      <span class="text-sm font-bold text-gray-700">Mensagem em Markdown</span>
+      <textarea [ngModel]="messageText" (ngModelChange)="messageText = $event; onMessageChanged()"
+                [disabled]="sending" rows="5" maxlength="1800" placeholder="Escreva a mensagem..."
+                class="mt-2 block w-full rounded-xl border border-gray-200 p-3 text-gray-800"></textarea>
+      <span class="block mt-1 text-xs text-gray-500">{{ messageText.length }}/1800 caracteres</span>
+    </label>
+    <p *ngIf="sendError" role="alert" class="text-sm font-semibold text-red-600">{{ sendError }}</p>
+    <p *ngIf="sentMessageId" role="status" class="text-sm font-semibold text-green-700">
+      Mensagem enviada. ID Discord: {{ sentMessageId }}
+    </p>
+    <div *ngIf="messagePreview" class="rounded-2xl bg-gray-50 border border-gray-200 p-4 space-y-3">
+      <p class="text-sm font-bold text-gray-700">Prévia de envio</p>
+      <p class="text-sm text-gray-600">Destino: <strong>{{ selectedGuild?.guildName }} / {{ selectedChannelName }}</strong></p>
+      <div class="whitespace-pre-wrap break-words text-sm text-gray-800 rounded-xl bg-white p-4 border border-gray-100">{{ messageText }}</div>
+      <p class="text-xs text-orange-700">Esta ação publica uma mensagem real no Discord e não pode ser desfeita automaticamente.</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" (click)="sendMessage()" [disabled]="sending"
+                class="rounded-xl bg-braPurple px-4 py-2 text-white text-sm font-bold disabled:opacity-50">
+          Confirmar envio
+        </button>
+        <button type="button" (click)="messagePreview = false"
+                class="rounded-xl bg-white border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700">Voltar</button>
+      </div>
+    </div>
+    <button *ngIf="!messagePreview" type="button" (click)="reviewMessage()" [disabled]="sending || sendBlocked"
+            class="rounded-xl bg-braDark px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
+      {{ sending ? 'Enviando...' : 'Pré-visualizar mensagem' }}
+    </button>
+    <p *ngIf="sendBlocked && !sentMessageId" class="text-xs text-amber-700">
+      A solicitação não será repetida automaticamente. Confira o canal antes de iniciar outra.
+    </p>
+  </section>
+
   <!-- TODO: Para implementação futura de gerenciamento de módulos real
   <div>
     <h3 class="text-lg font-amaranth font-bold text-gray-800 mb-4">Gerenciamento de Módulos</h3>
