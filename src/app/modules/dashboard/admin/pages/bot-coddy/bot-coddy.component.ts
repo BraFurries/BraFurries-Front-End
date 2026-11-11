@@ -135,9 +135,8 @@ export class AdminBotComponent implements OnInit, OnDestroy {
         this.presenceSaving = false;
       },
       error: () => {
-        this.presenceError = 'Não foi possível aplicar agora. A presença desejada pode ter sido salva; consulte o estado atual antes de repetir.';
+        this.presenceError = 'Não foi possível confirmar a aplicação. A presença desejada pode ter sido salva; atualize a página e confira antes de repetir.';
         this.presenceSaving = false;
-        this.loadPresence();
       }
     });
   }
