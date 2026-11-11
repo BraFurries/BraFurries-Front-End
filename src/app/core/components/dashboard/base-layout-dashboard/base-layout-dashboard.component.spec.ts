@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, RouterModule } from '@angular/router';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import {
   CommunityContextService,
@@ -10,6 +10,7 @@ import {
 } from '../../../services/community-context.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { PlatformAccessService } from '../../../services/platform-access.service';
+import { PartnerDiscordService, OwnPartnerPublication } from '../../../services/partner-discord.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
 import { BaseLayoutDashboardComponent } from './base-layout-dashboard.component';
@@ -24,6 +25,7 @@ describe('BaseLayoutDashboardComponent', () => {
   let context$: BehaviorSubject<CommunityContextState>;
   let context: jasmine.SpyObj<CommunityContextService>;
   let commerce: jasmine.SpyObj<PlatformAccessService>;
+  let partners: jasmine.SpyObj<PartnerDiscordService>;
   let router: Router;
 
   const user: User = {
@@ -63,6 +65,13 @@ describe('BaseLayoutDashboardComponent', () => {
     errorMessage: ''
   };
 
+  const ownPublication: OwnPartnerPublication = {
+    partnerId: 17,
+    partnerName: 'República Indie',
+    guildId: '123456789012345678',
+    threadId: '234567890123456789'
+  };
+
   beforeEach(async () => {
     sessionStorage.removeItem('brafurries.dashboard.community-section-expanded');
     user$ = new BehaviorSubject<User | null>(user);
@@ -73,6 +82,8 @@ describe('BaseLayoutDashboardComponent', () => {
       { state$: context$.asObservable() }
     );
     commerce = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
+    partners = jasmine.createSpyObj<PartnerDiscordService>('PartnerDiscordService', ['getMyPublications']);
+    partners.getMyPublications.and.returnValue(of([]));
     commerce.myAccess.and.returnValue(of({ enabled: false, owner: false, permissions: [] }));
     context.initialize.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.selectCommunity.and.returnValue(of({ kind: 'ready', state: baseState }));
@@ -87,7 +98,8 @@ describe('BaseLayoutDashboardComponent', () => {
         { provide: UserPermissionsService, useValue: { isAdmin: () => false } },
         { provide: UserService, useValue: { user$: user$.asObservable(), logout: () => of(true) } },
         { provide: CommunityContextService, useValue: context },
-        { provide: PlatformAccessService, useValue: commerce }
+        { provide: PlatformAccessService, useValue: commerce },
+        { provide: PartnerDiscordService, useValue: partners }
       ]
     }).compileComponents();
 
@@ -95,6 +107,67 @@ describe('BaseLayoutDashboardComponent', () => {
     fixture = TestBed.createComponent(BaseLayoutDashboardComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  it('hides Minhas Parcerias for users with no eligible published partnerships', () => {
+    expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    expect(partners.getMyPublications).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/perfil"]')).toBeTruthy();
+  });
+
+  it('shows Minhas Parcerias only when the authenticated representative has a publication', () => {
+    partners.getMyPublications.and.returnValue(of([ownPublication]));
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    const link = fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]') as HTMLAnchorElement | null;
+    expect(link?.textContent).toContain('Minhas publicações de parceiros');
+  });
+
+  it('rechecks eligibility each time the profile menu opens', () => {
+    partners.getMyPublications.and.returnValues(of([]), of([ownPublication]), of([]));
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    expect(component.showMyPartnerPublications).toBeFalse();
+
+    component.toggleUserMenu();
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    expect(component.showMyPartnerPublications).toBeTrue();
+
+    component.toggleUserMenu();
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    expect(component.showMyPartnerPublications).toBeFalse();
+    expect(partners.getMyPublications).toHaveBeenCalledTimes(3);
+  });
+
+  it('clears eligibility on logout and ignores responses from a previous account', () => {
+    const previousAccount = new Subject<OwnPartnerPublication[]>();
+    partners.getMyPublications.and.returnValues(previousAccount.asObservable(), of([]));
+    component.toggleUserMenu();
+    user$.next(null);
+    user$.next({ ...user, id: 2, name: 'Nova conta' });
+    previousAccount.next([ownPublication]);
+    fixture.detectChanges();
+    expect(component.showMyPartnerPublications).toBeFalse();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
+
+    component.toggleUserMenu();
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    expect(partners.getMyPublications).toHaveBeenCalledTimes(2);
+    expect(component.showMyPartnerPublications).toBeFalse();
+  });
+
+  it('does not expose the link when the eligibility request fails', () => {
+    partners.getMyPublications.and.returnValue(throwError(() => new Error('Network unavailable')));
+    component.toggleUserMenu();
+    fixture.detectChanges();
+    expect(component.showMyPartnerPublications).toBeFalse();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
   });
 
   it('initializes the persisted Community context once for global navigation', () => {

@@ -39,7 +39,7 @@
                     class="flex items-center px-4 py-3 hover:bg-gray-800 transition text-sm font-bold text-white">
                     <span class="mr-3">👤</span> Meu Perfil
                 </a>
-                <a routerLink="/painel/minhas-parcerias" (click)="isUserMenuOpen = false"
+                <a *ngIf="showMyPartnerPublications" routerLink="/painel/minhas-parcerias" (click)="isUserMenuOpen = false"
                     class="flex items-center px-4 py-3 hover:bg-gray-800 transition text-sm font-bold text-white">
                     <span class="mr-3">🤝</span> Minhas publicações de parceiros
                 </a>

@@ -9,6 +9,7 @@ import {
 } from '../../../services/community-context.service';
 import { CommunitySummary } from '../../../services/community-access.service';
 import { PlatformAccessService } from '../../../services/platform-access.service';
+import { PartnerDiscordService } from '../../../services/partner-discord.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
@@ -25,6 +26,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   showCommerceMenu = false;
   showPermissionsMenu = false;
   showPartnersMenu = false;
+  showMyPartnerPublications = false;
   currentUser: User | null = null;
   isUserMenuOpen = false;
   isCommunityMenuOpen = false;
@@ -48,6 +50,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
 
   private readonly communitySectionStorageKey = 'brafurries.dashboard.community-section-expanded';
   private lastCommerceUserId: number | null = null;
+  private partnerPublicationsRequestId = 0;
   private readonly destroy$ = new Subject<void>();
   private readonly failedCommunityImageUrls = new Set<string>();
 
@@ -59,6 +62,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     private readonly userService: UserService,
     private readonly communityContext: CommunityContextService,
     private readonly commerceAccess: PlatformAccessService,
+    private readonly partnerDiscord: PartnerDiscordService,
     private readonly router: Router
   ) {
     this.activePath = window.location.pathname;
@@ -83,6 +87,9 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
         const userId = user?.id ?? null;
         if (userId === this.lastCommerceUserId) return;
         this.lastCommerceUserId = userId;
+        // Never retain an eligibility result across account switches or logout.
+        this.partnerPublicationsRequestId++;
+        this.showMyPartnerPublications = false;
         this.showCommerceMenu = false;
         this.showPermissionsMenu = false;
         if (userId == null) return;
@@ -195,7 +202,36 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
 
   toggleUserMenu(): void {
     this.isUserMenuOpen = !this.isUserMenuOpen;
-    if (this.isUserMenuOpen) this.isCommunityMenuOpen = false;
+    if (this.isUserMenuOpen) {
+      this.isCommunityMenuOpen = false;
+      // Re-check when opening so newly activated/withdrawn partnerships are reflected
+      // without requiring the user to sign out and back in.
+      this.refreshMyPartnerPublications();
+    } else {
+      this.partnerPublicationsRequestId++;
+      this.showMyPartnerPublications = false;
+    }
+  }
+
+  private refreshMyPartnerPublications(): void {
+    const userId = this.currentUser?.id;
+    const requestId = ++this.partnerPublicationsRequestId;
+    // Fail closed in the navigation: the backend still authorizes all requests.
+    this.showMyPartnerPublications = false;
+    if (userId == null) return;
+
+    this.partnerDiscord.getMyPublications()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: publications => {
+          if (requestId !== this.partnerPublicationsRequestId || this.currentUser?.id !== userId) return;
+          this.showMyPartnerPublications = publications.length > 0;
+        },
+        error: () => {
+          if (requestId !== this.partnerPublicationsRequestId || this.currentUser?.id !== userId) return;
+          this.showMyPartnerPublications = false;
+        }
+      });
   }
 
   toggleCommunityMenu(): void {
