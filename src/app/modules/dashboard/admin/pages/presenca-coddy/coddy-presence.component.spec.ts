@@ -28,7 +28,7 @@ describe('AdminCoddyPresenceComponent', () => {
     }).compileComponents();
   });
 
-  it('renders the reach, server identity and expanded sync details', () => {
+  it('renders distinct reach and server identity without internal reconciliation details', () => {
     const fixture = TestBed.createComponent(AdminCoddyPresenceComponent);
     fixture.detectChanges();
     const content = fixture.nativeElement.textContent as string;
@@ -40,12 +40,11 @@ describe('AdminCoddyPresenceComponent', () => {
     expect(content).toContain('Comunidade Demo');
     expect(content).toContain('123456789012345678');
     expect(content).toContain('Não registrado');
-    expect(content).toContain('cada identidade da plataforma uma vez');
-    expect(content).toContain('1 de 1 servidores ativos reconciliados');
-    fixture.componentInstance.toggleDetails('123456789012345678');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Última reconciliação de membros');
-    expect(fixture.nativeElement.textContent).toContain('Sincronizado');
+    expect(content).toContain('identidades distintas com presença registrada');
+    expect(content).toContain('servidores com dados disponíveis');
+    expect(content).not.toContain('reconciliação');
+    expect(content).not.toContain('Sincronizado');
+    expect(content).not.toContain('Ver detalhes');
     fixture.destroy();
   });
 

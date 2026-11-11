@@ -48,8 +48,8 @@ describe('AdminOverviewComponent', () => {
       'Parceiros Ativos',
       'Status do Coddy'
     ]);
-    expect(cards[1].textContent).toContain('6 de 8 servidores reconciliados');
-    expect(cards[1].textContent).toContain('Membros únicos rastreados');
+    expect(cards[1].textContent).toContain('Identidades distintas com presença registrada');
+    expect(cards[1].textContent).not.toContain('reconciliados');
     expect(cards[1].textContent).toContain('2 entradas');
     expect(cards[1].textContent).toContain('1 saída');
     expect(cards[2].textContent).toContain('3 em análise');

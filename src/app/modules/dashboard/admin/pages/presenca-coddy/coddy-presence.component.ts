@@ -16,7 +16,6 @@ export class AdminCoddyPresenceComponent implements OnInit, OnDestroy {
   search = '';
   status: '' | 'active' | 'inactive' = '';
   communityIdInput: number | null = null;
-  expandedGuildId: string | null = null;
   private readonly destroyed$ = new Subject<void>();
   private requestSequence = 0;
 
@@ -39,7 +38,6 @@ export class AdminCoddyPresenceComponent implements OnInit, OnDestroy {
     const sequence = ++this.requestSequence;
     this.loading = true;
     this.errorMessage = '';
-    this.expandedGuildId = null;
     this.admin.getCoddyPresence({
       page, pageSize: 20, search: this.search.trim(), status: this.status,
       communityId: communityId ?? undefined
@@ -71,20 +69,8 @@ export class AdminCoddyPresenceComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleDetails(guildId: string): void {
-    this.expandedGuildId = this.expandedGuildId === guildId ? null : guildId;
-  }
-
   statusLabel(server: AdminCoddyPresenceServer): string {
     return server.active ? 'Ativo' : 'Inativo';
-  }
-
-  syncLabel(value: string | null): string {
-    switch (value) {
-      case 'HEALTHY': return 'Sincronizado';
-      case 'RECONCILIATION_REQUIRED': return 'Reconciliação necessária';
-      default: return value ? value.replace(/_/g, ' ') : 'Desconhecido';
-    }
   }
 
   formatUtc(value: string | null): string {
@@ -94,12 +80,4 @@ export class AdminCoddyPresenceComponent implements OnInit, OnDestroy {
     return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(parsed);
   }
 
-  formatStoredDate(value: string | null): string {
-    if (!value) return 'Não registrado';
-    // These legacy LocalDateTime values have no declared timezone.
-    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    return match
-      ? match[3] + '/' + match[2] + '/' + match[1] + ' ' + match[4] + ':' + match[5]
-      : 'Não registrado';
-  }
 }

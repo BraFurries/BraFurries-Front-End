@@ -7,7 +7,7 @@
     <button type="button" (click)="load()" [disabled]="loading"
             class="self-start rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50">↻ Atualizar</button>
   </header>
-  <p class="text-xs text-gray-500">O alcance conta cada identidade da plataforma uma vez, entre servidores ativos com reconciliação completa e saudável. Não são necessariamente pessoas humanas únicas: contas de bots também podem aparecer. Servidores sem reconciliação válida ficam fora da medição. Entradas e saídas contam somente a última ocorrência por servidor no período.</p>
+  <p class="text-xs text-gray-500">O alcance conhecido conta identidades distintas com presença registrada na plataforma. Pode não abranger todos os servidores, e contas de bots também podem estar incluídas. Entradas e saídas contam somente a última ocorrência por servidor no período.</p>
 
   <div *ngIf="presence as data" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -18,7 +18,7 @@
     <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <p class="text-sm font-bold text-gray-500">Membros únicos rastreados</p>
       <h3 class="mt-2 text-3xl font-amaranth font-bold text-braPurple">{{ data.summary.estimatedReach | number:'1.0-0' }}</h3>
-      <p class="mt-2 text-xs text-gray-500">{{ data.summary.reconciledServers | number:'1.0-0' }} de {{ data.summary.activeServers | number:'1.0-0' }} servidores ativos reconciliados</p>
+      <p class="mt-2 text-xs text-gray-500">Identidades distintas registradas nos servidores com dados disponíveis</p>
     </div>
     <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <p class="text-sm font-bold text-gray-500">Entradas</p>
@@ -77,7 +77,6 @@
             <th scope="col" class="px-5 py-4">Presença</th>
             <th scope="col" class="px-5 py-4">Última entrada</th>
             <th scope="col" class="px-5 py-4">Última saída</th>
-            <th scope="col" class="px-5 py-4 text-right">Detalhes</th>
           </tr>
         </thead>
         <tbody>
@@ -95,29 +94,10 @@
               </td>
               <td class="px-5 py-4 text-gray-600">{{ formatUtc(server.lastBotJoinedAt) }}</td>
               <td class="px-5 py-4 text-gray-600">{{ formatUtc(server.lastBotLeftAt) }}</td>
-              <td class="px-5 py-4 text-right">
-                <button type="button" (click)="toggleDetails(server.guildId)"
-                        [attr.aria-expanded]="expandedGuildId === server.guildId"
-                        [attr.aria-label]="'Detalhes de ' + server.name"
-                        class="rounded-lg px-3 py-2 font-bold text-braPurple hover:bg-braPurple/10">
-                  {{ expandedGuildId === server.guildId ? 'Recolher' : 'Ver detalhes' }}
-                </button>
-              </td>
-            </tr>
-            <tr *ngIf="expandedGuildId === server.guildId" class="border-b border-gray-100 bg-gray-50/70">
-              <td colspan="6" class="px-5 py-5">
-                <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                  <div><p class="text-xs font-bold text-gray-500">Estado da sincronização</p><p class="mt-1 font-bold text-gray-800">{{ syncLabel(server.membershipSyncState) }}</p></div>
-                  <div><p class="text-xs font-bold text-gray-500">Última reconciliação de membros</p><p class="mt-1 text-gray-800">{{ formatStoredDate(server.lastFullReconciliationAt) }}</p></div>
-                  <div><p class="text-xs font-bold text-gray-500">Último evento de membro</p><p class="mt-1 text-gray-800">{{ formatStoredDate(server.lastMembershipEventAt) }}</p></div>
-                  <div><p class="text-xs font-bold text-gray-500">Guild ID</p><p class="mt-1 break-all font-mono text-gray-800">{{ server.guildId }}</p></div>
-                </div>
-                <p class="mt-3 text-xs text-gray-500">Os horários de reconciliação e eventos de membros são registros internos legados, sem fuso horário declarado; não representam uma confirmação ao vivo da conexão do bot.</p>
-              </td>
             </tr>
           </ng-container>
           <tr *ngIf="data.items.length === 0">
-            <td colspan="6" class="px-5 py-10 text-center text-gray-500">Nenhum servidor encontrado com os filtros selecionados.</td>
+            <td colspan="5" class="px-5 py-10 text-center text-gray-500">Nenhum servidor encontrado com os filtros selecionados.</td>
           </tr>
         </tbody>
       </table>
