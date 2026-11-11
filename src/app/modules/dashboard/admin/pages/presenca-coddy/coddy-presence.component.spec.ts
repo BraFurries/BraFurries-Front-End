@@ -8,7 +8,7 @@ import { AdminCoddyPresenceComponent } from './coddy-presence.component';
 
 describe('AdminCoddyPresenceComponent', () => {
   const response: AdminCoddyPresenceResponse = {
-    summary: { knownServers: 2, activeServers: 1, inactiveServers: 1, estimatedReach: 1234,
+    summary: { knownServers: 2, activeServers: 1, reconciledServers: 1, inactiveServers: 1, estimatedReach: 1234,
       entries7d: 1, exits7d: 1, entries30d: 2, exits30d: 1 },
     pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
     items: [{ communityId: 7, communityName: 'Comunidade Demo', guildId: '123456789012345678',
@@ -40,7 +40,8 @@ describe('AdminCoddyPresenceComponent', () => {
     expect(content).toContain('Comunidade Demo');
     expect(content).toContain('123456789012345678');
     expect(content).toContain('Não registrado');
-    expect(content).toContain('não o total de pessoas únicas');
+    expect(content).toContain('cada identidade da plataforma uma vez');
+    expect(content).toContain('1 de 1 servidores ativos reconciliados');
     fixture.componentInstance.toggleDetails('123456789012345678');
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Última reconciliação de membros');

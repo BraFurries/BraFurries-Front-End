@@ -2,12 +2,12 @@
   <header class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
     <div>
       <h2 class="text-2xl font-amaranth font-bold text-gray-800">Presença do Coddy</h2>
-      <p class="text-sm text-gray-500 mt-1">Servidores conhecidos, alcance estimado e últimas mudanças de presença.</p>
+      <p class="text-sm text-gray-500 mt-1">Servidores conhecidos, membros únicos rastreados e últimas mudanças de presença.</p>
     </div>
     <button type="button" (click)="load()" [disabled]="loading"
             class="self-start rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50">↻ Atualizar</button>
   </header>
-  <p class="text-xs text-gray-500">O alcance é a soma de membros dos servidores ativos, não o total de pessoas únicas. Entradas e saídas contam servidores pela última ocorrência registrada no período; não são um histórico completo de eventos.</p>
+  <p class="text-xs text-gray-500">O alcance conta cada identidade da plataforma uma vez, entre servidores ativos com reconciliação completa e saudável. Não são necessariamente pessoas humanas únicas: contas de bots também podem aparecer. Servidores sem reconciliação válida ficam fora da medição. Entradas e saídas contam somente a última ocorrência por servidor no período.</p>
 
   <div *ngIf="presence as data" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -16,9 +16,9 @@
       <p class="mt-2 text-xs text-gray-500">{{ data.summary.inactiveServers | number:'1.0-0' }} inativos · {{ data.summary.knownServers | number:'1.0-0' }} conhecidos</p>
     </div>
     <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <p class="text-sm font-bold text-gray-500">Alcance estimado</p>
+      <p class="text-sm font-bold text-gray-500">Membros únicos rastreados</p>
       <h3 class="mt-2 text-3xl font-amaranth font-bold text-braPurple">{{ data.summary.estimatedReach | number:'1.0-0' }}</h3>
-      <p class="mt-2 text-xs text-gray-500">Soma de membros observados nos servidores ativos</p>
+      <p class="mt-2 text-xs text-gray-500">{{ data.summary.reconciledServers | number:'1.0-0' }} de {{ data.summary.activeServers | number:'1.0-0' }} servidores ativos reconciliados</p>
     </div>
     <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <p class="text-sm font-bold text-gray-500">Entradas</p>
@@ -73,7 +73,7 @@
         <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-500">
           <tr>
             <th scope="col" class="px-5 py-4">Servidor / comunidade</th>
-            <th scope="col" class="px-5 py-4">Membros observados</th>
+            <th scope="col" class="px-5 py-4">Membros observados (Discord)</th>
             <th scope="col" class="px-5 py-4">Presença</th>
             <th scope="col" class="px-5 py-4">Última entrada</th>
             <th scope="col" class="px-5 py-4">Última saída</th>
