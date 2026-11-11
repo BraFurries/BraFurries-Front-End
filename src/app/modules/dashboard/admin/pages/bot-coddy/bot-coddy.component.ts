@@ -10,7 +10,9 @@ import { AdminBotStatus } from '../../../../../shared/models/api/admin/admin';
 })
 export class AdminBotComponent implements OnInit {
   botStatus: AdminBotStatus | null = null;
+  reachedUsers: number | null = null;
   loading = true;
+  reachLoading = true;
   errorMessage = '';
 
   constructor(private adminService: AdminService) { }
@@ -22,6 +24,20 @@ export class AdminBotComponent implements OnInit {
   loadBotStatus(): void {
     this.loading = true;
     this.errorMessage = '';
+    this.reachedUsers = null;
+    this.reachLoading = true;
+
+    // Use the same persisted distinct reach as the administrative overview.
+    // Runtime status.users is the sum of guild member counts and can duplicate people.
+    this.adminService.getOverview().subscribe({
+      next: overview => {
+        this.reachedUsers = overview.metrics.botReachedUsers;
+        this.reachLoading = false;
+      },
+      error: () => {
+        this.reachLoading = false;
+      }
+    });
 
     this.adminService.getBotStatus().subscribe({
       next: (status) => {
