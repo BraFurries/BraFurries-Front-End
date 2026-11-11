@@ -115,6 +115,7 @@ jobs:
           --include=**/auth-token.interceptor.spec.ts
           --include=**/user.service.spec.ts
           --include=**/visao-geral.component.spec.ts
+          --include=**/bot-coddy.component.spec.ts
           --include=**/coddy-presence.component.spec.ts
           --include=**/admin.component.spec.ts
           --include=**/admin.service.spec.ts
