@@ -180,4 +180,17 @@ describe('AdminService log contract', () => {
     expect(revoke.request.body).toEqual({ reason: 'incorreto' });
     revoke.flush({});
   });
+  it('sends presence search, pagination and exact Discord ID without rounding', () => {
+    service.getCoddyPresence({ page: 2, pageSize: 20, search: '123456789012345678', status: 'active', communityId: 7 })
+      .subscribe(value => expect(value.items[0].guildId).toBe('123456789012345678'));
+    const req = http.expectOne(request => request.url.endsWith('/admin/coddy-presence'));
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('pageSize')).toBe('20');
+    expect(req.request.params.get('status')).toBe('active');
+    expect(req.request.params.get('communityId')).toBe('7');
+    expect(req.request.params.get('search')).toBe('123456789012345678');
+    req.flush({ summary: {}, items: [{ guildId: '123456789012345678' }], pagination: {} });
+  });
+
 });

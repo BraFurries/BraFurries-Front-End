@@ -1,0 +1,135 @@
+<div class="space-y-6">
+  <header class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h2 class="text-2xl font-amaranth font-bold text-gray-800">Presença do Coddy</h2>
+      <p class="text-sm text-gray-500 mt-1">Servidores conhecidos, alcance estimado e últimas mudanças de presença.</p>
+    </div>
+    <button type="button" (click)="load()" [disabled]="loading"
+            class="self-start rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50">↻ Atualizar</button>
+  </header>
+  <p class="text-xs text-gray-500">O alcance é a soma de membros dos servidores ativos, não o total de pessoas únicas. Entradas e saídas contam servidores pela última ocorrência registrada no período; não são um histórico completo de eventos.</p>
+
+  <div *ngIf="presence as data" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <p class="text-sm font-bold text-gray-500">Servidores ativos</p>
+      <h3 class="mt-2 text-3xl font-amaranth font-bold text-braPurple">{{ data.summary.activeServers | number:'1.0-0' }}</h3>
+      <p class="mt-2 text-xs text-gray-500">{{ data.summary.inactiveServers | number:'1.0-0' }} inativos · {{ data.summary.knownServers | number:'1.0-0' }} conhecidos</p>
+    </div>
+    <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <p class="text-sm font-bold text-gray-500">Alcance estimado</p>
+      <h3 class="mt-2 text-3xl font-amaranth font-bold text-braPurple">{{ data.summary.estimatedReach | number:'1.0-0' }}</h3>
+      <p class="mt-2 text-xs text-gray-500">Soma de membros observados nos servidores ativos</p>
+    </div>
+    <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <p class="text-sm font-bold text-gray-500">Entradas</p>
+      <h3 class="mt-2 text-3xl font-amaranth font-bold text-green-600">{{ data.summary.entries7d | number:'1.0-0' }}</h3>
+      <p class="mt-2 text-xs text-gray-500">7 dias · {{ data.summary.entries30d | number:'1.0-0' }} nos últimos 30 dias</p>
+    </div>
+    <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <p class="text-sm font-bold text-gray-500">Saídas</p>
+      <h3 class="mt-2 text-3xl font-amaranth font-bold text-red-600">{{ data.summary.exits7d | number:'1.0-0' }}</h3>
+      <p class="mt-2 text-xs text-gray-500">7 dias · {{ data.summary.exits30d | number:'1.0-0' }} nos últimos 30 dias</p>
+    </div>
+  </div>
+  <div *ngIf="loading && !presence" class="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-500">Carregando indicadores de presença...</div>
+
+  <section class="rounded-3xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div class="border-b border-gray-100 p-5 space-y-3">
+      <div>
+        <h3 class="font-amaranth text-lg font-bold text-gray-800">Servidores conhecidos</h3>
+        <p class="text-xs text-gray-500">Busque por nome do servidor, comunidade vinculada ou Guild ID completo.</p>
+      </div>
+      <form (ngSubmit)="applyFilters()" class="flex flex-col gap-2 lg:flex-row">
+        <label class="flex-1">
+          <span class="sr-only">Buscar servidor</span>
+          <input type="search" name="search" [(ngModel)]="search" maxlength="100"
+                 placeholder="Servidor, comunidade ou Guild ID..."
+                 class="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm text-gray-800 focus:border-braPurple focus:ring-braPurple">
+        </label>
+        <label>
+          <span class="sr-only">Estado da presença</span>
+          <select name="status" [(ngModel)]="status" (change)="applyFilters()"
+                  class="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm text-gray-700 focus:border-braPurple focus:ring-braPurple lg:w-40">
+            <option value="">Todos os estados</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+          </select>
+        </label>
+        <label>
+          <span class="sr-only">ID da comunidade</span>
+          <input type="number" name="communityId" min="1" step="1" [(ngModel)]="communityIdInput"
+                 placeholder="ID da comunidade"
+                 class="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm text-gray-700 focus:border-braPurple focus:ring-braPurple lg:w-44">
+        </label>
+        <button type="submit" [disabled]="loading"
+                class="rounded-xl bg-braPurple px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">Filtrar</button>
+      </form>
+    </div>
+    <p *ngIf="errorMessage" role="alert" class="px-5 pt-4 text-sm font-bold text-red-600">{{ errorMessage }}</p>
+    <p *ngIf="loading" aria-live="polite" class="px-5 py-3 text-sm text-gray-500">Atualizando servidores...</p>
+
+    <div *ngIf="!loading && presence as data" class="overflow-x-auto">
+      <table class="w-full min-w-[900px] text-left text-sm">
+        <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-500">
+          <tr>
+            <th scope="col" class="px-5 py-4">Servidor / comunidade</th>
+            <th scope="col" class="px-5 py-4">Membros observados</th>
+            <th scope="col" class="px-5 py-4">Presença</th>
+            <th scope="col" class="px-5 py-4">Última entrada</th>
+            <th scope="col" class="px-5 py-4">Última saída</th>
+            <th scope="col" class="px-5 py-4 text-right">Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let server of data.items">
+            <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+              <td class="px-5 py-4">
+                <p class="font-bold text-gray-800">{{ server.name }}</p>
+                <p class="text-xs text-gray-500">{{ server.communityName }} · comunidade #{{ server.communityId }}</p>
+                <p class="font-mono text-xs text-gray-400">{{ server.guildId }}</p>
+              </td>
+              <td class="px-5 py-4 font-bold text-gray-700">{{ server.observedMembers | number:'1.0-0' }}</td>
+              <td class="px-5 py-4">
+                <span class="rounded-full px-2.5 py-1 text-xs font-bold"
+                      [ngClass]="server.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">{{ statusLabel(server) }}</span>
+              </td>
+              <td class="px-5 py-4 text-gray-600">{{ formatUtc(server.lastBotJoinedAt) }}</td>
+              <td class="px-5 py-4 text-gray-600">{{ formatUtc(server.lastBotLeftAt) }}</td>
+              <td class="px-5 py-4 text-right">
+                <button type="button" (click)="toggleDetails(server.guildId)"
+                        [attr.aria-expanded]="expandedGuildId === server.guildId"
+                        [attr.aria-label]="'Detalhes de ' + server.name"
+                        class="rounded-lg px-3 py-2 font-bold text-braPurple hover:bg-braPurple/10">
+                  {{ expandedGuildId === server.guildId ? 'Recolher' : 'Ver detalhes' }}
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="expandedGuildId === server.guildId" class="border-b border-gray-100 bg-gray-50/70">
+              <td colspan="6" class="px-5 py-5">
+                <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                  <div><p class="text-xs font-bold text-gray-500">Estado da sincronização</p><p class="mt-1 font-bold text-gray-800">{{ syncLabel(server.membershipSyncState) }}</p></div>
+                  <div><p class="text-xs font-bold text-gray-500">Última reconciliação de membros</p><p class="mt-1 text-gray-800">{{ formatStoredDate(server.lastFullReconciliationAt) }}</p></div>
+                  <div><p class="text-xs font-bold text-gray-500">Último evento de membro</p><p class="mt-1 text-gray-800">{{ formatStoredDate(server.lastMembershipEventAt) }}</p></div>
+                  <div><p class="text-xs font-bold text-gray-500">Guild ID</p><p class="mt-1 break-all font-mono text-gray-800">{{ server.guildId }}</p></div>
+                </div>
+                <p class="mt-3 text-xs text-gray-500">Os horários de reconciliação e eventos de membros são registros internos legados, sem fuso horário declarado; não representam uma confirmação ao vivo da conexão do bot.</p>
+              </td>
+            </tr>
+          </ng-container>
+          <tr *ngIf="data.items.length === 0">
+            <td colspan="6" class="px-5 py-10 text-center text-gray-500">Nenhum servidor encontrado com os filtros selecionados.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div *ngIf="presence as data" class="flex flex-col items-start justify-between gap-3 border-t border-gray-100 px-5 py-4 text-sm text-gray-500 sm:flex-row sm:items-center">
+      <span>Página {{ data.pagination.page }} de {{ data.pagination.totalPages || 1 }} · {{ data.pagination.totalItems | number:'1.0-0' }} servidores encontrados</span>
+      <div class="flex gap-2">
+        <button type="button" (click)="previousPage()" [disabled]="loading || data.pagination.page <= 1"
+                class="rounded-lg border border-gray-200 px-3 py-2 font-bold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">‹ Anterior</button>
+        <button type="button" (click)="nextPage()" [disabled]="loading || data.pagination.page >= data.pagination.totalPages"
+                class="rounded-lg border border-gray-200 px-3 py-2 font-bold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Próxima ›</button>
+      </div>
+    </div>
+  </section>
+</div>
