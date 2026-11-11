@@ -34,6 +34,7 @@ export interface AdminOverview {
     botServers: number;
     serverGrowthWeek: number;
     botReachedUsers: number;
+    serverLeavesWeek: number;
   };
   recentActivities: {
     id: number;

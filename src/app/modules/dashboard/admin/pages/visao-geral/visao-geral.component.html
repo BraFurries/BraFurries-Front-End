@@ -31,11 +31,24 @@
         <div>
           <p class="text-gray-500 text-sm font-bold">Total de Usuários</p>
           <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.metrics.totalUsers | number:'1.0-0' }}</h3>
-          <p class="text-green-500 text-xs mt-2 font-bold">+{{ data.metrics.newUsersWeek | number:'1.0-0' }} essa semana</p>
+          <p *ngIf="data.metrics.newUsersWeek > 0" class="text-green-500 text-xs mt-2 font-bold">+{{ data.metrics.newUsersWeek | number:'1.0-0' }} essa semana</p>
         </div>
         <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">👥</div>
       </div>
 
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm font-bold">Alcance do Coddy</p>
+          <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.metrics.botReachedUsers | number:'1.0-0' }}</h3>
+          <p class="text-gray-400 text-[11px] mt-2 font-bold leading-tight">
+            em <span class="text-braCyan">{{ data.metrics.botServers | number:'1.0-0' }} servidores</span><br>
+            <span class="text-green-500">+{{ data.metrics.serverGrowthWeek | number:'1.0-0' }} {{ data.metrics.serverGrowthWeek === 1 ? 'entrada' : 'entradas' }}</span>
+            <span *ngIf="data.metrics.serverLeavesWeek > 0" class="text-red-500"> · -{{ data.metrics.serverLeavesWeek | number:'1.0-0' }} {{ data.metrics.serverLeavesWeek === 1 ? 'saída' : 'saídas' }}</span>
+            <span class="text-gray-400"> (7 dias)</span>
+          </p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">🌍</div>
+      </div>
       <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
         <div>
           <p class="text-gray-500 text-sm font-bold">Parceiros Ativos</p>
@@ -54,17 +67,6 @@
         <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 text-xl">🤖</div>
       </div>
 
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <p class="text-gray-500 text-sm font-bold">Alcance do Coddy</p>
-          <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.metrics.botReachedUsers | number:'1.0-0' }}</h3>
-          <p class="text-gray-400 text-[11px] mt-2 font-bold leading-tight">
-            em <span class="text-braCyan">{{ data.metrics.botServers | number:'1.0-0' }} servidores</span><br>
-            <span class="text-green-500">+{{ data.metrics.serverGrowthWeek | number:'1.0-0' }} nessa semana</span>
-          </p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">🌍</div>
-      </div>
     </div>
 
     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
