@@ -32,6 +32,8 @@ export interface AdminOverview {
     botStatus: AdminBotStatusValue;
     botPingMs: number;
     botServers: number;
+    /** Servidores ativos com uma reconciliação completa e saudável. */
+    botReconciledServers: number;
     serverGrowthWeek: number;
     botReachedUsers: number;
     serverLeavesWeek: number;
@@ -51,8 +53,10 @@ export interface AdminOverview {
 export interface AdminCoddyPresenceSummary {
   knownServers: number;
   activeServers: number;
+  /** Servidores ativos com reconciliação completa e saudável. */
+  reconciledServers: number;
   inactiveServers: number;
-  /** Membros somados entre servidores ativos, não pessoas únicas. */
+  /** Identidades distintas com presença registrada nos servidores reconciliados. */
   estimatedReach: number;
   entries7d: number;
   exits7d: number;

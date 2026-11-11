@@ -16,6 +16,7 @@ describe('AdminOverviewComponent', () => {
       botStatus: 'online',
       botPingMs: 21,
       botServers: 8,
+      botReconciledServers: 6,
       serverGrowthWeek: 2,
       serverLeavesWeek: 1,
       botReachedUsers: 2580
@@ -47,6 +48,8 @@ describe('AdminOverviewComponent', () => {
       'Parceiros Ativos',
       'Status do Coddy'
     ]);
+    expect(cards[1].textContent).toContain('Identidades distintas com presença registrada');
+    expect(cards[1].textContent).not.toContain('reconciliados');
     expect(cards[1].textContent).toContain('2 entradas');
     expect(cards[1].textContent).toContain('1 saída');
     expect(cards[2].textContent).toContain('3 em análise');

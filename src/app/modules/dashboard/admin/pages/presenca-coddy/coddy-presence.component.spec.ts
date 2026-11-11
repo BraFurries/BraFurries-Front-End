@@ -8,7 +8,7 @@ import { AdminCoddyPresenceComponent } from './coddy-presence.component';
 
 describe('AdminCoddyPresenceComponent', () => {
   const response: AdminCoddyPresenceResponse = {
-    summary: { knownServers: 2, activeServers: 1, inactiveServers: 1, estimatedReach: 1234,
+    summary: { knownServers: 2, activeServers: 1, reconciledServers: 1, inactiveServers: 1, estimatedReach: 1234,
       entries7d: 1, exits7d: 1, entries30d: 2, exits30d: 1 },
     pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
     items: [{ communityId: 7, communityName: 'Comunidade Demo', guildId: '123456789012345678',
@@ -28,7 +28,7 @@ describe('AdminCoddyPresenceComponent', () => {
     }).compileComponents();
   });
 
-  it('renders the reach, server identity and expanded sync details', () => {
+  it('renders distinct reach and server identity without internal reconciliation details', () => {
     const fixture = TestBed.createComponent(AdminCoddyPresenceComponent);
     fixture.detectChanges();
     const content = fixture.nativeElement.textContent as string;
@@ -40,11 +40,11 @@ describe('AdminCoddyPresenceComponent', () => {
     expect(content).toContain('Comunidade Demo');
     expect(content).toContain('123456789012345678');
     expect(content).toContain('Não registrado');
-    expect(content).toContain('não o total de pessoas únicas');
-    fixture.componentInstance.toggleDetails('123456789012345678');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Última reconciliação de membros');
-    expect(fixture.nativeElement.textContent).toContain('Sincronizado');
+    expect(content).toContain('identidades distintas com presença registrada');
+    expect(content).toContain('servidores com dados disponíveis');
+    expect(content).not.toContain('reconciliação');
+    expect(content).not.toContain('Sincronizado');
+    expect(content).not.toContain('Ver detalhes');
     fixture.destroy();
   });
 
