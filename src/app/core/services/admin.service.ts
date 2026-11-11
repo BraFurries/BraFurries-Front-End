@@ -9,6 +9,7 @@ import {
   AdminMetrics,
   AdminMetricsPeriod,
   AdminOverview,
+  AdminCoddyPresenceResponse,
   AdminPartnerCategory,
   AdminPartnerItem,
   AdminPartnersResponse,
@@ -38,6 +39,14 @@ import {
   UserIdentityLinkView
 } from '../../shared/models/api/admin/admin';
 
+export interface AdminCoddyPresenceFilters {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: 'active' | 'inactive' | '';
+  communityId?: number;
+}
+
 export interface AdminUsersFilters {
   page?: number;
   pageSize?: number;
@@ -65,6 +74,12 @@ export class AdminService {
 
   getOverview(): Observable<AdminOverview> {
     return this.http.get<AdminOverview>(`${this.baseUrl}/overview`);
+  }
+
+  getCoddyPresence(filters: AdminCoddyPresenceFilters = {}): Observable<AdminCoddyPresenceResponse> {
+    return this.http.get<AdminCoddyPresenceResponse>(this.baseUrl + '/coddy-presence', {
+      params: this.buildParams(filters)
+    });
   }
 
   getMetrics(period: AdminMetricsPeriod): Observable<AdminMetrics> {

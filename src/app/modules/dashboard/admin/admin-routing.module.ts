@@ -12,6 +12,7 @@ import { NovoParceiroComponent } from './pages/parceiros/novo/novo-parceiro.comp
 import { AdminUsersComponent } from './pages/usuarios/usuarios.component';
 import { AdminUserProfileComponent } from './pages/usuarios/perfil/perfil-usuario.component';
 import { AdminOverviewComponent } from './pages/visao-geral/visao-geral.component';
+import { AdminCoddyPresenceComponent } from './pages/presenca-coddy/coddy-presence.component';
 
 const routes: Routes = [
   {
@@ -27,6 +28,7 @@ const routes: Routes = [
       { path: 'parceiros/:id/editar', component: EditarParceiroComponent, canDeactivate: [(component: EditarParceiroComponent) => component.canDeactivate()] },
       { path: 'parceiros', component: AdminPartnersComponent, pathMatch: 'full' },
       { path: 'bot-coddy', component: AdminBotComponent },
+      { path: 'presenca-coddy', component: AdminCoddyPresenceComponent },
       { path: 'bot-coddy/detalhes', component: AdminBotDetailsComponent },
       { path: 'metricas', component: AdminMetricsComponent },
       { path: 'avisos', component: AdminAnnouncementsComponent }

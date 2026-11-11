@@ -17,12 +17,14 @@ import { AdminUsersComponent } from './pages/usuarios/usuarios.component';
 import { AdminUserProfileComponent } from './pages/usuarios/perfil/perfil-usuario.component';
 import { AdminUserCommunityContextComponent } from './pages/usuarios/perfil/perfil-usuario-contexto.component';
 import { AdminOverviewComponent } from './pages/visao-geral/visao-geral.component';
+import { AdminCoddyPresenceComponent } from './pages/presenca-coddy/coddy-presence.component';
 
 @NgModule({
   declarations: [
     AdminComponent,
     AdminPermissionsComponent,
     AdminOverviewComponent,
+    AdminCoddyPresenceComponent,
     AdminUsersComponent,
     AdminUserProfileComponent,
     AdminUserCommunityContextComponent,

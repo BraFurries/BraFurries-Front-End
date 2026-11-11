@@ -46,6 +46,43 @@ export interface AdminOverview {
   }[];
 }
 
+
+/** Diretório global, somente para administradores da plataforma. */
+export interface AdminCoddyPresenceSummary {
+  knownServers: number;
+  activeServers: number;
+  inactiveServers: number;
+  /** Membros somados entre servidores ativos, não pessoas únicas. */
+  estimatedReach: number;
+  entries7d: number;
+  exits7d: number;
+  entries30d: number;
+  exits30d: number;
+}
+
+export interface AdminCoddyPresenceServer {
+  communityId: number;
+  communityName: string;
+  /** Discord snowflake; deve permanecer string para manter precisão. */
+  guildId: string;
+  name: string;
+  active: boolean;
+  observedMembers: number;
+  membershipSyncState: string;
+  /** Instantes UTC (Z), ou null se não existe histórico confiável. */
+  lastBotJoinedAt: string | null;
+  lastBotLeftAt: string | null;
+  /** Campos legados LocalDateTime: sem fuso horário garantido. */
+  lastFullReconciliationAt: string | null;
+  lastMembershipEventAt: string | null;
+}
+
+export interface AdminCoddyPresenceResponse {
+  summary: AdminCoddyPresenceSummary;
+  items: AdminCoddyPresenceServer[];
+  pagination: Pagination;
+}
+
 export interface AdminMetrics {
   summary: {
     commandsExecuted: number;

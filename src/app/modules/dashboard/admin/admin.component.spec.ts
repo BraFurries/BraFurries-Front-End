@@ -43,6 +43,7 @@ describe('AdminComponent area tabs', () => {
     expect(component.isGlobalAdmin).toBeFalse();
     expect(fixture.nativeElement.querySelector('a[href="/parceiros"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/usuarios"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/presenca-coddy"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/permissoes"]')).toBeNull();
   });
 
@@ -52,6 +53,7 @@ describe('AdminComponent area tabs', () => {
     expect(component.isPermissionsOwner).toBeTrue();
     expect(fixture.nativeElement.querySelector('a[href="/permissoes"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/metricas"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/presenca-coddy"]')).toBeNull();
   });
 
   it('preserves global administrator navigation when commercial access is absent', () => {
@@ -62,6 +64,7 @@ describe('AdminComponent area tabs', () => {
     expect(component.canManagePartners).toBeTrue();
     expect(fixture.nativeElement.querySelector('a[href="/usuarios"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/parceiros"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/presenca-coddy"]')).toBeTruthy();
   });
 
   it('does not reveal restricted tabs when access lookup fails', () => {
