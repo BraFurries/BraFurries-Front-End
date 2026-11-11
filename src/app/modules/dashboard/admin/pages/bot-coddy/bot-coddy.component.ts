@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { AdminService } from '../../../../../core/services/admin.service';
 import {
@@ -216,8 +217,16 @@ export class AdminBotComponent implements OnInit, OnDestroy {
         this.sendError = '';
         this.sending = false;
       },
-      error: () => {
-        this.sendError = 'Envio sem confirmação. Confira o canal no Discord antes de criar uma nova solicitação, para evitar mensagens duplicadas.';
+      error: (error: HttpErrorResponse) => {
+        if (error.status === 403) {
+          this.sendError = 'Acesso negado ou Coddy sem permissão para publicar nesse canal. Confira as permissões.';
+        } else if (error.status === 400 || error.status === 404) {
+          this.sendError = 'Servidor, canal ou conteúdo rejeitado. Confira o destino antes de tentar novamente.';
+        } else if (error.status === 409) {
+          this.sendError = 'Este envio já foi solicitado. Confira a mensagem no Discord antes de iniciar outro.';
+        } else {
+          this.sendError = 'Envio sem confirmação. Confira o canal no Discord antes de criar uma nova solicitação, para evitar mensagens duplicadas.';
+        }
         this.sending = false;
       }
     });
