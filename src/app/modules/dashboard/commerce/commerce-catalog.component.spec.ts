@@ -24,6 +24,7 @@ describe('CommerceCatalogComponent', () => {
       'templates','artworks','suppliers','supplierChoices','products','productionBatches',
       'productArtworks','contracts','contractPreparations','prepareContract',
       'downloadPreparation','uploadSignedPreparation','cancelPreparation',
+      'deleteUnsignedPreparation',
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
@@ -72,6 +73,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.prepareContract.and.returnValue(of({id:91}));
     catalog.uploadSignedPreparation.and.returnValue(of({id:92}));
     catalog.cancelPreparation.and.returnValue(of(void 0));
+    catalog.deleteUnsignedPreparation.and.returnValue(of(void 0));
     catalog.artworkFiles.and.returnValue(of([]));
     catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
@@ -550,5 +552,40 @@ describe('CommerceCatalogComponent', () => {
     expect(text).toContain('Sem royalties previstos');
     expect(text).toContain('Pagamento único acordado:');
     expect(text).not.toContain('ONE_TIME_FEE');
+  });
+
+  it('allows the owner to delete an unsigned draft and private PDF without signing it', async () => {
+    await create(['CONTRACTS_MANAGE'],true);
+    const draft = {
+      id:91,artworkId:12,templateId:13,artistUserId:31,templateName:'Teste',
+      status:'PENDING' as const,signedContractId:null,effectiveFrom:'2026-11-12',
+      effectiveUntil:null,createdAt:'2026-11-12T02:00:00',completedAt:null
+    };
+    catalog.contractPreparations.and.returnValue(of([draft]));
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Excluir minuta e PDF definitivamente');
+    spyOn(window,'confirm').and.returnValue(true);
+    component.deleteUnsignedPreparation(draft);
+    expect(catalog.deleteUnsignedPreparation).toHaveBeenCalledOnceWith(12,91);
+    expect(component.successMessage).toContain('excluídos definitivamente');
+  });
+
+  it('never offers irreversible deletion to non-owners or for signed contracts', async () => {
+    await create(['CONTRACTS_MANAGE'],false);
+    const draft = {
+      id:91,artworkId:12,templateId:13,artistUserId:31,templateName:'Teste',
+      status:'CANCELLED' as const,signedContractId:null,effectiveFrom:'2026-11-12',
+      effectiveUntil:null,createdAt:'2026-11-12T02:00:00',completedAt:'2026-11-12T02:30:00'
+    };
+    catalog.contractPreparations.and.returnValue(of([draft]));
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Excluir minuta e PDF definitivamente');
+    component.deleteUnsignedPreparation(draft);
+    expect(catalog.deleteUnsignedPreparation).not.toHaveBeenCalled();
+    component.access={enabled:true,owner:true,permissions:['CONTRACTS_MANAGE']};
+    component.deleteUnsignedPreparation({...draft,status:'SIGNED',signedContractId:21});
+    expect(catalog.deleteUnsignedPreparation).not.toHaveBeenCalled();
   });
 });

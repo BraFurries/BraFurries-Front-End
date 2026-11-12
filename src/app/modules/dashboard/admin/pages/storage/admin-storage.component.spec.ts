@@ -24,10 +24,11 @@ describe('AdminStorageComponent', () => {
 
   beforeEach(async () => {
     access=jasmine.createSpyObj('PlatformAccessService',['myAccess']);
-    service=jasmine.createSpyObj('AdminStorageService',['list','inspect','deleteOrphan']);
+    service=jasmine.createSpyObj('AdminStorageService',['list','inspect','deleteOrphan','deleteUnsignedPreparation']);
     service.list.and.returnValue(of(page));
     service.inspect.and.returnValue(of(orphan));
     service.deleteOrphan.and.returnValue(of(void 0));
+    service.deleteUnsignedPreparation.and.returnValue(of(void 0));
     access.myAccess.and.returnValue(of({enabled:true,owner:true,permissions:[]}));
     await TestBed.configureTestingModule({
       imports:[CommonModule,FormsModule,RouterTestingModule],
@@ -147,6 +148,47 @@ describe('AdminStorageComponent', () => {
     fixture.detectChanges();
     expect(service.list).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Não foi possível validar');
+    fixture.destroy();
+  });
+
+  it('deletes only an unsigned linked preparation and R2 PDF through the business endpoint', () => {
+    const linked: StoredObject = {
+      ...orphan,referenceStatus:'LINKED',deletable:false,
+      references:[{source:'PREPARATION',recordId:21,artworkId:12,status:'PENDING'}]
+    };
+    service.inspect.and.returnValue(of(linked));
+    const fixture=TestBed.createComponent(AdminStorageComponent);
+    fixture.detectChanges();
+    const component=fixture.componentInstance;
+    component.exactKey=key;
+    component.inspectExact();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Excluir minuta #21 e PDF definitivamente');
+    spyOn(window,'confirm').and.returnValue(true);
+    component.removeUnsignedPreparation();
+    expect(service.deleteUnsignedPreparation)
+      .toHaveBeenCalledOnceWith('PRIVATE',key,'"etag"',12,21);
+    expect(service.deleteOrphan).not.toHaveBeenCalled();
+    expect(component.successMessage).toContain('Minuta e PDF privado removidos');
+    fixture.destroy();
+  });
+
+  it('does not allow permanent deletion of signed preparations or other linked files', () => {
+    const linked: StoredObject = {
+      ...orphan,referenceStatus:'LINKED',deletable:false,
+      references:[{source:'PREPARATION',recordId:21,artworkId:12,status:'SIGNED'}]
+    };
+    service.inspect.and.returnValue(of(linked));
+    const fixture=TestBed.createComponent(AdminStorageComponent);
+    fixture.detectChanges();
+    const component=fixture.componentInstance;
+    component.exactKey=key;
+    component.inspectExact();
+    fixture.detectChanges();
+    expect(component.deletablePreparation).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Excluir minuta #21 e PDF definitivamente');
+    component.removeUnsignedPreparation();
+    expect(service.deleteUnsignedPreparation).not.toHaveBeenCalled();
     fixture.destroy();
   });
 });

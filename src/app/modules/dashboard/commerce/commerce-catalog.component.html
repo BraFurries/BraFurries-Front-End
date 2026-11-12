@@ -579,6 +579,11 @@
                 class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
                 Cancelar minuta
               </button>
+              <button *ngIf="access?.owner && item.status !== 'SIGNED'" type="button" [disabled]="saving"
+                (click)="deleteUnsignedPreparation(item)"
+                class="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 disabled:opacity-50">
+                Excluir minuta e PDF definitivamente
+              </button>
             </div>
           </article>
         </div>

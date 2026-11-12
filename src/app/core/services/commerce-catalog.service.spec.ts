@@ -99,6 +99,15 @@ describe('CommerceCatalogService', () => {
     req.flush({id:51});
   });
 
+
+  it('issues an authenticated DELETE for an unsigned draft using only identifiers', () => {
+    catalog.deleteUnsignedPreparation(20,51).subscribe();
+    const req=http.expectOne(`${base}/artworks/20/contract-preparations/51`);
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.body).toBeNull();
+    req.flush(null);
+  });
+
   it('gets prepared PDF privately and uploads a human-reviewed signed copy', () => {
     catalog.contractPreparations(20).subscribe();
     const list=http.expectOne(`${base}/artworks/20/contract-preparations`);

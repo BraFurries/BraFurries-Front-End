@@ -2,15 +2,19 @@
   <div>
     <h2 class="font-amaranth text-2xl font-bold text-gray-800">Gestão de Armazenamento</h2>
     <p class="mt-1 text-sm text-gray-600">
-      Explore objetos dos buckets R2 sem expor credenciais. A exclusão só é liberada quando
-      a API comprova ausência de vínculos nos tipos privados suportados.
+      Explore objetos dos buckets R2 sem expor credenciais. Objetos órfãos podem ser removidos
+      após verificação; minutas não assinadas têm exclusão específica do cadastro e do PDF.
     </p>
   </div>
 
   <p *ngIf="checkingAccess" role="status" class="rounded-xl bg-white p-4 text-sm text-gray-600">
     Verificando acesso administrativo...
   </p>
-  <div *ngIf="!checkingAccess && !owner"
+  <p *ngIf="!checkingAccess && !owner && errorMessage" role="alert"
+     class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    {{ errorMessage }}
+  </p>
+  <div *ngIf="!checkingAccess && !owner && !errorMessage"
        class="rounded-xl border bg-white p-5 text-sm text-gray-600">
     Esta área é exclusiva do responsável pela BraFurries.
   </div>
@@ -184,9 +188,22 @@
            class="inline-block text-sm font-semibold text-braPurple underline">
           Abrir Gestão Comercial para verificar o registro
         </a>
+        <div *ngIf="deletablePreparation as reference"
+             class="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
+          <p class="text-sm text-red-900">
+            Esta minuta não possui assinatura registrada. O owner pode excluir o cadastro
+            e o PDF privado juntos; contratos assinados e outros vínculos continuam protegidos.
+          </p>
+          <button type="button" (click)="removeUnsignedPreparation()"
+                  [disabled]="deleting || inspecting"
+                  class="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-bold text-red-800 disabled:opacity-50">
+            Excluir minuta #{{ reference.recordId }} e PDF definitivamente
+          </button>
+        </div>
       </div>
       <p *ngIf="!selected.deletable" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-        Exclusão bloqueada: objeto vinculado, recente ou com referências ainda não verificáveis.
+        Exclusão direta do arquivo bloqueada: objeto vinculado, recente ou com referências
+        não verificáveis. Para minutas não assinadas, utilize a ação específica acima.
         Arquivos públicos e prefixos não mapeados permanecem protegidos.
       </p>
       <div *ngIf="selected.deletable" class="space-y-2">

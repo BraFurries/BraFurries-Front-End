@@ -3,7 +3,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { PlatformAccessService } from '../../../../../core/services/platform-access.service';
 import {
   AdminStorageService, StorageBucket, StorageObjectPage, StoredObject,
-  StorageReferenceStatus
+  StorageReferenceStatus, StorageObjectReference
 } from '../../../../../core/services/admin-storage.service';
 
 @Component({
@@ -155,7 +155,7 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
   }
 
   private inspectKey(key: string): void {
-    if (!this.owner || this.inspecting || !key) return;
+    if (!this.owner || this.inspecting || this.deleting || !key) return;
     const sequence = ++this.inspectSequence;
     const scope = this.bucket;
     this.inspecting = true;
@@ -175,6 +175,48 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
         this.errorMessage = 'Objeto não encontrado ou impossível de consultar no R2.';
       }
     });
+  }
+
+  /** Only a single unsigned preparation may be removed via this business action. */
+  get deletablePreparation(): StorageObjectReference | null {
+    const object = this.selected;
+    if (!this.owner || this.bucket !== 'PRIVATE' || !object?.etag ||
+        object.category !== 'CONTRACT_DOCUMENT' ||
+        object.referenceStatus !== 'LINKED' || object.references.length !== 1) return null;
+    const reference = object.references[0];
+    return reference.source === 'PREPARATION' &&
+      (reference.status === 'PENDING' || reference.status === 'CANCELLED')
+      ? reference : null;
+  }
+
+  removeUnsignedPreparation(): void {
+    const object = this.selected;
+    const reference = this.deletablePreparation;
+    if (!this.owner || this.deleting || !object?.etag || !reference) return;
+    if (!window.confirm('Excluir DEFINITIVAMENTE a minuta #' + reference.recordId +
+      ' (arte #' + reference.artworkId + ') e o PDF ' + object.key +
+      '? A exclusão é irreversível, mas a auditoria será preservada.')) return;
+    this.deleting = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.storage.deleteUnsignedPreparation('PRIVATE',object.key,object.etag,
+      reference.artworkId,reference.recordId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          this.deleting = false;
+          this.selected = null;
+          this.exactKey = '';
+          this.loadPage();
+          this.successMessage = 'Minuta e PDF privado removidos. Evento de auditoria preservado.';
+        },
+        error: () => {
+          this.deleting = false;
+          this.selected = null;
+          this.loadPage();
+          this.errorMessage = 'Exclusão não confirmada integralmente. A minuta pode ter sido ' +
+            'excluída enquanto o arquivo permaneceu no R2. Inspecione a chave novamente.';
+        }
+      });
   }
 
   removeOrphan(): void {

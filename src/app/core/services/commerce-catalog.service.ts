@@ -270,6 +270,13 @@ export class CommerceCatalogService {
     );
   }
 
+  /** Owner-only permanent deletion. API rejects signed and cross-linked documents. */
+  deleteUnsignedPreparation(artworkId: number,preparationId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/artworks/${artworkId}/contract-preparations/${preparationId}`
+    );
+  }
+
   cancelPreparation(artworkId: number,preparationId: number): Observable<void> {
     return this.http.post<void>(
       `${this.base}/artworks/${artworkId}/contract-preparations/${preparationId}/cancel`,{}

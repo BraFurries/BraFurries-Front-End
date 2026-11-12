@@ -109,6 +109,8 @@ jobs:
           --include=**/commerce-finance.component.spec.ts
           --include=**/commerce-finance.service.spec.ts
           --include=**/commerce-catalog.service.spec.ts
+          --include=**/admin-storage.component.spec.ts
+          --include=**/admin-storage.service.spec.ts
           --include=**/commerce-access.service.spec.ts
           --include=**/base-layout-dashboard.component.spec.ts
           --include=**/stale-chunk-recovery.service.spec.ts

@@ -980,6 +980,30 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       'Minuta cancelada, com histórico preservado.');
   }
 
+  deleteUnsignedPreparation(item: CommerceContractPreparation): void {
+    if (!this.access?.enabled || !this.access.owner || this.saving ||
+        item.artworkId !== this.selectedArtworkId || item.status === 'SIGNED') return;
+    if (!window.confirm('Excluir DEFINITIVAMENTE a minuta #' + item.id +
+      ' e seu PDF privado do R2? Esta ação não poderá ser desfeita.')) return;
+    this.saving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.catalog.deleteUnsignedPreparation(item.artworkId,item.id)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          this.saving = false;
+          this.reload();
+          this.successMessage = 'Minuta e PDF privado excluídos definitivamente. Auditoria preservada.';
+        },
+        error: () => {
+          this.saving = false;
+          this.reload();
+          this.errorMessage = 'Exclusão não confirmada por completo. A minuta pode ter sido removida ' +
+            'do cadastro mesmo que a limpeza do R2 tenha falhado. Confira Administração → Armazenamento.';
+        }
+      });
+  }
+
   get hasPendingPreparation(): boolean {
     return this.preparations.some(item => item.status === 'PENDING');
   }
