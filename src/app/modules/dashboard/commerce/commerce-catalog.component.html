@@ -622,6 +622,25 @@
         </div>
       </article>
 
+        <div *ngIf="access?.owner && screen === 'browse'"
+          class="mt-6 max-w-3xl space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <h3 class="font-semibold text-amber-950">Limpar PDF órfão de um teste antigo</h3>
+          <p class="text-sm text-amber-900">
+            Use apenas se o contrato já foi apagado do banco. Cole a chave exata do objeto
+            privado no R2. A API não excluirá arquivos ainda vinculados a contratos ou minutas.
+          </p>
+          <label class="block text-sm font-semibold text-amber-950">
+            Chave do objeto privado
+            <input type="text" [(ngModel)]="orphanedPdfKey" autocomplete="off"
+              placeholder="commerce/contracts/123/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.pdf"
+              class="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-xs">
+          </label>
+          <button type="button" [disabled]="saving || !orphanedPdfKey.trim()"
+            (click)="deleteOrphanedContractPdf()"
+            class="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-800 disabled:opacity-50">
+            Excluir somente este PDF do R2
+          </button>
+        </div>
       </ng-container>
     </section>
 
