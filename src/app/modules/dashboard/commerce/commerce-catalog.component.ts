@@ -737,22 +737,6 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.contractFile = file;
   }
 
-  signContract(): void {
-    if (!this.can('CONTRACTS_MANAGE') || this.selectedArtworkId == null
-      || this.contractForm.templateId == null || !this.contractFile) {
-      this.errorMessage = 'Escolha a arte, o modelo e o PDF assinado.';
-      return;
-    }
-    if (!window.confirm('Confirma que este PDF está assinado e contém os termos válidos do contrato?')) return;
-    this.mutate(this.catalog.signContract(this.selectedArtworkId,{
-      templateId: this.contractForm.templateId,
-      effectiveFrom: this.contractForm.effectiveFrom,
-      effectiveUntil: this.contractForm.effectiveUntil || null,
-      oneTimeAmount: this.contractForm.oneTimeAmount,
-      file: this.contractFile
-    }), 'Contrato assinado registrado e vinculado à arte.');
-  }
-
   terminateContract(contract: CommerceSignedAgreement): void {
     if (!this.can('CONTRACTS_MANAGE') || contract.status !== 'ACTIVE') return;
     if (!window.confirm(
