@@ -1,0 +1,167 @@
+<section class="space-y-6">
+  <div>
+    <h2 class="font-amaranth text-2xl font-bold text-gray-800">Gestão de Armazenamento</h2>
+    <p class="mt-1 text-sm text-gray-600">
+      Explore objetos dos buckets R2 sem expor credenciais. A exclusão só é liberada quando
+      a API comprova ausência de vínculos nos tipos privados suportados.
+    </p>
+  </div>
+
+  <p *ngIf="checkingAccess" role="status" class="rounded-xl bg-white p-4 text-sm text-gray-600">
+    Verificando acesso administrativo...
+  </p>
+  <div *ngIf="!checkingAccess && !owner"
+       class="rounded-xl border bg-white p-5 text-sm text-gray-600">
+    Esta área é exclusiva do responsável pela BraFurries.
+  </div>
+
+  <ng-container *ngIf="!checkingAccess && owner">
+    <div class="rounded-xl border border-purple-100 bg-white p-5 space-y-4">
+      <div class="grid gap-4 md:grid-cols-4">
+        <label class="block text-sm font-semibold text-gray-700">
+          Bucket
+          <select [ngModel]="bucket" (ngModelChange)="changeBucket($event)"
+                  [disabled]="loading || deleting"
+                  class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="PRIVATE">Privado</option>
+            <option value="PUBLIC">Público</option>
+          </select>
+        </label>
+        <label class="block text-sm font-semibold text-gray-700 md:col-span-3">
+          Prefixo para explorar
+          <input type="text" [(ngModel)]="prefix" (keyup.enter)="applyFilters()"
+                 maxlength="256" placeholder="Ex.: commerce/contracts/"
+                 class="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm">
+        </label>
+      </div>
+      <button type="button" [disabled]="loading || deleting" (click)="applyFilters()"
+              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+        Listar objetos
+      </button>
+
+      <div class="border-t pt-4 space-y-2">
+        <label class="block text-sm font-semibold text-gray-700">
+          Inspecionar chave exata (inclusive objetos não exibidos na página atual)
+          <input type="text" [(ngModel)]="exactKey" (keyup.enter)="inspectExact()"
+                 maxlength="512" autocomplete="off"
+                 placeholder="commerce/contracts/123/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.pdf"
+                 class="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-xs">
+        </label>
+        <button type="button" [disabled]="inspecting || !exactKey.trim()"
+                (click)="inspectExact()"
+                class="rounded-lg border border-purple-200 px-4 py-2 text-sm font-bold text-braPurple disabled:opacity-50">
+          Inspecionar objeto
+        </button>
+      </div>
+    </div>
+
+    <p *ngIf="errorMessage" role="alert"
+       class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ errorMessage }}</p>
+    <p *ngIf="successMessage" role="status"
+       class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">{{ successMessage }}</p>
+
+    <div class="rounded-xl border bg-white p-4 md:p-5 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="font-bold text-gray-800">Objetos encontrados</h3>
+          <p class="text-xs text-gray-500">
+            Página {{ pageIndex + 1 }} · até 50 por página · sem varredura automática do bucket
+          </p>
+        </div>
+        <span *ngIf="page" class="text-sm font-semibold text-gray-600">
+          {{ page.objects.length }} arquivos · {{ page.pageBytes | number }} bytes nesta página
+        </span>
+      </div>
+
+      <p *ngIf="loading" role="status" class="py-5 text-sm text-gray-500">
+        Consultando o R2...
+      </p>
+      <p *ngIf="!loading && page && !page.objects.length"
+         class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+        Nenhum objeto encontrado neste prefixo.
+      </p>
+
+      <div *ngIf="!loading && page?.objects?.length" class="overflow-x-auto">
+        <table class="w-full min-w-[680px] border-collapse text-sm">
+          <thead>
+            <tr class="border-b text-left text-xs font-bold uppercase text-gray-500">
+              <th class="p-3">Chave</th>
+              <th class="p-3">Categoria</th>
+              <th class="p-3">Vínculo</th>
+              <th class="p-3 text-right">Tamanho</th>
+              <th class="p-3">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of page?.objects" class="border-b last:border-0">
+              <td class="max-w-[360px] break-all p-3 font-mono text-xs text-gray-700">{{ item.key }}</td>
+              <td class="p-3 text-gray-700">{{ categoryLabel(item.category) }}</td>
+              <td class="p-3">
+                <span class="rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+                  {{ statusLabel(item.referenceStatus) }}
+                </span>
+              </td>
+              <td class="p-3 text-right text-gray-600">{{ item.sizeBytes | number }}</td>
+              <td class="p-3">
+                <button type="button" (click)="inspect(item)" [disabled]="inspecting || deleting"
+                        class="rounded-lg border px-3 py-2 font-semibold text-braPurple disabled:opacity-50">
+                  Detalhes
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div *ngIf="page" class="flex flex-wrap gap-3">
+        <button type="button" (click)="previousPage()" [disabled]="loading || pageIndex === 0"
+                class="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          Página anterior
+        </button>
+        <button type="button" (click)="nextPage()" [disabled]="loading || !page.nextCursor"
+                class="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          Próxima página
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="selected" class="rounded-xl border border-purple-100 bg-white p-5 space-y-3">
+      <h3 class="font-amaranth text-xl font-bold text-gray-800">Inspeção de objeto</h3>
+      <p class="break-all rounded-lg bg-gray-50 p-3 font-mono text-xs text-gray-700">
+        {{ selected.key }}
+      </p>
+      <dl class="grid gap-3 text-sm md:grid-cols-2">
+        <div><dt class="font-semibold text-gray-500">Bucket</dt><dd>{{ bucket === 'PRIVATE' ? 'Privado' : 'Público' }}</dd></div>
+        <div><dt class="font-semibold text-gray-500">Categoria</dt><dd>{{ categoryLabel(selected.category) }}</dd></div>
+        <div><dt class="font-semibold text-gray-500">Vínculos</dt><dd>{{ statusLabel(selected.referenceStatus) }}</dd></div>
+        <div><dt class="font-semibold text-gray-500">Domínio</dt><dd>{{ selected.referenceLabel }}</dd></div>
+        <div><dt class="font-semibold text-gray-500">Tamanho</dt><dd>{{ selected.sizeBytes | number }} bytes</dd></div>
+        <div><dt class="font-semibold text-gray-500">Última alteração</dt>
+          <dd>{{ selected.lastModified ? (selected.lastModified | date:'dd/MM/yyyy HH:mm') : 'Indisponível' }}</dd></div>
+        <div><dt class="font-semibold text-gray-500">Tipo MIME</dt><dd>{{ selected.contentType || 'Não informado' }}</dd></div>
+        <div class="min-w-0"><dt class="font-semibold text-gray-500">ETag</dt>
+          <dd class="break-all font-mono text-xs">{{ selected.etag || 'Não informado' }}</dd></div>
+      </dl>
+      <p *ngIf="!selected.deletable" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+        Exclusão bloqueada: objeto vinculado, recente ou com referências ainda não verificáveis.
+        Arquivos públicos e prefixos não mapeados permanecem protegidos.
+      </p>
+      <div *ngIf="selected.deletable" class="space-y-2">
+        <p class="text-sm text-amber-800">
+          Este objeto privado pertence a um tipo mapeado e não possui vínculos conhecidos.
+          A API verificará os vínculos e o ETag novamente no momento da exclusão.
+        </p>
+        <button type="button" (click)="removeOrphan()" [disabled]="deleting"
+                class="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-bold text-red-800 disabled:opacity-50">
+          Excluir órfão definitivamente do R2
+        </button>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-500">
+      V1: exploração paginada e inspeção de metadados, sem acesso direto ao conteúdo privado.
+      Apenas contratos e arquivos privados de artes têm verificação completa de referências;
+      outros objetos são exibidos em modo de consulta.
+    </p>
+  </ng-container>
+</section>
