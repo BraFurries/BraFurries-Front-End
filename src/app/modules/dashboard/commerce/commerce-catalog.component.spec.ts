@@ -27,7 +27,7 @@ describe('CommerceCatalogComponent', () => {
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
-      'searchArtists','downloadContract','terminateContract','deleteOrphanedContractPdf',
+      'searchArtists','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
       'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
@@ -177,20 +177,6 @@ describe('CommerceCatalogComponent', () => {
     expect(component.visibleTabs().some(t => t.key === 'contracts')).toBeFalse();
     expect(catalog.contracts).not.toHaveBeenCalled();
     expect(catalog.downloadContract).not.toHaveBeenCalled();
-  });
-
-  it('allows owner to clean orphan PDF only after confirmation', async () => {
-    await create(['CONTRACTS_MANAGE'],true);
-    const key='commerce/contracts/20/12345678-1234-1234-1234-123456789abc.pdf';
-    catalog.deleteOrphanedContractPdf.and.returnValue(of(void 0));
-    component.selectTab('contracts');
-    component.orphanedPdfKey=key;
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Excluir somente este PDF do R2');
-    spyOn(window,'confirm').and.returnValue(true);
-    component.deleteOrphanedContractPdf();
-    expect(catalog.deleteOrphanedContractPdf).toHaveBeenCalledOnceWith(key);
-    expect(component.orphanedPdfKey).toBe('');
   });
 
   it('keeps only operational catalog and finance navigation, without Teams or Access', async () => {
