@@ -203,9 +203,9 @@ describe('CommerceCatalogComponent', () => {
       royaltyFixedAmount:null,oneTimeAmount:0,effectiveFrom:'2026-11-12',
       effectiveUntil:null,sha256:'abc',sizeBytes:512,artistUserId:31
     } as unknown as import('../../../core/services/commerce-catalog.service').CommerceSignedAgreement;
-    component.contracts = [agreement];
     catalog.discardUnusedTestContract.and.returnValue(of(void 0));
     component.selectTab('contracts');
+    component.contracts = [agreement];
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Excluir contrato de teste e PDF');
     spyOn(window,'confirm').and.returnValue(true);
