@@ -172,6 +172,21 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     if (tab === 'suppliers') this.cancelEditSupplier();
     if (tab === 'products') this.cancelEditProduct();
     if (tab === 'production') this.cancelEditBatch();
+    if (tab === 'files') {
+      this.artworkUpload = null;
+      this.artworkFileKind = 'SOURCE';
+      this.artworkFileDescription = '';
+    }
+    if (tab === 'links') {
+      this.linkedArtworkId = null;
+      this.allocation = null;
+    }
+    if (tab === 'contracts') {
+      this.contractFile = null;
+      this.contractForm.templateId = null;
+      this.contractForm.effectiveUntil = '';
+      this.contractForm.oneTimeAmount = 0;
+    }
     this.returnToArtworkForm = returningFromArtwork;
     if (tab === 'files' || tab === 'contracts') {
       if (parentId != null) this.selectedArtworkId = parentId;
