@@ -67,6 +67,40 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
+  get breadcrumbs(): { name: string; path: string }[] {
+    const result = [{ name: 'Raiz', path: '' }];
+    let current = '';
+    for (const segment of this.prefix.split('/').filter(Boolean)) {
+      current += segment + '/';
+      result.push({ name: segment, path: current });
+    }
+    return result;
+  }
+
+  folderName(path: string): string {
+    const normalized = path.endsWith('/') ? path.slice(0, -1) : path;
+    return normalized.split('/').pop() || path;
+  }
+
+  objectName(key: string): string {
+    return key.slice(this.prefix.length) || key;
+  }
+
+  openFolder(path: string): void {
+    if (!this.owner || this.loading || this.deleting) return;
+    this.prefix = path;
+    this.applyFilters();
+  }
+
+  referenceType(source: string): string {
+    switch (source) {
+      case 'CONTRACT': return 'Contrato assinado';
+      case 'PREPARATION': return 'Minuta de contrato';
+      case 'ARTWORK_FILE': return 'Arquivo de arte';
+      default: return 'Registro de origem desconhecida';
+    }
+  }
+
   applyFilters(): void {
     if (!this.owner) return;
     this.cursors = [null];

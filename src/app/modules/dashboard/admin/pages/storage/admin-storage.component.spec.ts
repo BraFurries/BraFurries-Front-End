@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 import { PlatformAccessService } from '../../../../../core/services/platform-access.service';
 import { AdminStorageService, StorageObjectPage, StoredObject } from '../../../../../core/services/admin-storage.service';
@@ -11,10 +12,11 @@ describe('AdminStorageComponent', () => {
   const orphan: StoredObject = {
     key, sizeBytes:100, lastModified:'2025-01-01T00:00:00Z',
     contentType:'application/pdf', etag:'"etag"', category:'CONTRACT_DOCUMENT',
-    referenceStatus:'ORPHAN', referenceLabel:'Contrato assinado ou minuta', deletable:true
+    referenceStatus:'ORPHAN', referenceLabel:'Contrato assinado ou minuta', deletable:true,
+    references:[]
   };
   const page: StorageObjectPage = {
-    bucket:'PRIVATE', prefix:'commerce/', objects:[orphan],
+    bucket:'PRIVATE', prefix:'commerce/', folders:['commerce/contracts/'], objects:[orphan],
     nextCursor:'next-token', truncated:true, pageBytes:100
   };
   let access: jasmine.SpyObj<PlatformAccessService>;
@@ -28,7 +30,7 @@ describe('AdminStorageComponent', () => {
     service.deleteOrphan.and.returnValue(of(void 0));
     access.myAccess.and.returnValue(of({enabled:true,owner:true,permissions:[]}));
     await TestBed.configureTestingModule({
-      imports:[CommonModule,FormsModule],
+      imports:[CommonModule,FormsModule,RouterTestingModule],
       declarations:[AdminStorageComponent],
       providers:[
         {provide:PlatformAccessService,useValue:access},
@@ -55,6 +57,40 @@ describe('AdminStorageComponent', () => {
     expect(fixture.nativeElement.textContent).toContain(key);
     component.nextPage();
     expect(service.list).toHaveBeenCalledWith('PRIVATE','commerce/','next-token',50);
+    fixture.destroy();
+  });
+
+  it('renders virtual folders and navigates into them without touching R2 keys', () => {
+    const fixture=TestBed.createComponent(AdminStorageComponent);
+    fixture.detectChanges();
+    const component=fixture.componentInstance;
+    expect(fixture.nativeElement.textContent).toContain('contracts');
+    expect(fixture.nativeElement.textContent).toContain('pastas');
+    component.openFolder('commerce/contracts/');
+    expect(component.prefix).toBe('commerce/contracts/');
+    expect(service.list).toHaveBeenCalledWith('PRIVATE','commerce/contracts/',null,50);
+    expect(component.breadcrumbs.map(item => item.name))
+      .toEqual(['Raiz','commerce','contracts']);
+    fixture.destroy();
+  });
+
+  it('displays exact linked record and does not allow its deletion', () => {
+    const linked: StoredObject = {
+      ...orphan, referenceStatus:'LINKED', deletable:false,
+      references:[{source:'CONTRACT',recordId:84,artworkId:12,status:'ACTIVE'}]
+    };
+    service.inspect.and.returnValue(of(linked));
+    const fixture=TestBed.createComponent(AdminStorageComponent);
+    fixture.detectChanges();
+    const component=fixture.componentInstance;
+    component.exactKey=key;
+    component.inspectExact();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Contrato assinado #84');
+    expect(fixture.nativeElement.textContent).toContain('Arte #12');
+    expect(fixture.nativeElement.textContent).not.toContain('Excluir órfão definitivamente do R2');
+    component.removeOrphan();
+    expect(service.deleteOrphan).not.toHaveBeenCalled();
     fixture.destroy();
   });
 
