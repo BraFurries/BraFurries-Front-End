@@ -46,9 +46,9 @@ export class CommerceAccessComponent implements OnInit, OnDestroy {
           return;
         }
         // Keep existing bookmarked /painel/gestao-comercial links working.
-        // Finance-only users must never land on a denied catalog screen.
+        // Prefer Financeiro for operators with both grants. Catalog-only users retain access.
         void this.router.navigateByUrl(
-          catalog ? '/painel/gestao-comercial/catalogo' : '/painel/gestao-comercial/financeiro',
+          finance ? '/painel/gestao-comercial/financeiro' : '/painel/gestao-comercial/catalogo',
           { replaceUrl: true }
         ).then(navigated => {
           if (!navigated) {
