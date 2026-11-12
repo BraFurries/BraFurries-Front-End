@@ -10,6 +10,49 @@ export type AdminUserStatus = 'active' | 'muted' | 'banned';
 export type AdminPartnerStatus = 'pending' | 'active' | 'suspended';
 export type AdminPartnerCategory = 'community' | 'creator' | 'artist' | 'event' | 'meet' | 'discord_server' | 'brand' | 'other';
 export type AdminBotStatusValue = 'online' | 'offline' | 'degraded' | 'restarting';
+export type AdminCoddyActivityType = 'PLAYING' | 'LISTENING' | 'WATCHING' | 'CUSTOM';
+export type AdminCoddyAvailability = 'online' | 'idle' | 'dnd' | 'invisible';
+
+export interface AdminCoddyPresence {
+  activityType: AdminCoddyActivityType;
+  activityText: string;
+  availability: AdminCoddyAvailability;
+}
+export interface AdminCoddyPresenceView {
+  desired: AdminCoddyPresence | null;
+  current: AdminCoddyPresence | null;
+  configured: boolean;
+}
+export interface AdminCoddyChannelTarget {
+  channelId: string;
+  name: string;
+  kind: 'text' | 'thread';
+}
+export interface AdminCoddyMessageGuildTarget {
+  communityId: number;
+  communityName: string;
+  guildId: string;
+  guildName: string;
+  channels: AdminCoddyChannelTarget[];
+}
+export interface AdminCoddyMessageTargets {
+  guilds: AdminCoddyMessageGuildTarget[];
+}
+export interface AdminCoddySendMessageRequest {
+  communityId: number;
+  guildId: string;
+  channelId: string;
+  message: string;
+  requestKey: string;
+}
+export interface AdminCoddySendResult {
+  requestKey: string;
+  outcome: 'sent';
+  guildId: string;
+  channelId: string;
+  messageId: string;
+}
+
 export type AdminMetricsPeriod = '7d' | '30d' | 'year';
 export type AnnouncementDestination = 'discord' | 'telegram';
 export type UserIdentityLinkStatus = 'CONFIRMED' | 'SUSPECTED';

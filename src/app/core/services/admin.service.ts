@@ -5,6 +5,11 @@ import { HttpEventStreamService, LiveHttpEvent } from './http-event-stream.servi
 import { environment } from '../../../environments/environment';
 import {
   AdminBotStatus,
+  AdminCoddyPresence,
+  AdminCoddyPresenceView,
+  AdminCoddyMessageTargets,
+  AdminCoddySendMessageRequest,
+  AdminCoddySendResult,
   AdminBotLogsResponse,
   AdminMetrics,
   AdminMetricsPeriod,
@@ -89,6 +94,22 @@ export class AdminService {
 
   getBotStatus(): Observable<AdminBotStatus> {
     return this.http.get<AdminBotStatus>(`${this.baseUrl}/bot/status`);
+  }
+
+  getBotPresence(): Observable<AdminCoddyPresenceView> {
+    return this.http.get<AdminCoddyPresenceView>(`${this.baseUrl}/bot/operations/presence`);
+  }
+
+  updateBotPresence(payload: AdminCoddyPresence): Observable<AdminCoddyPresenceView> {
+    return this.http.put<AdminCoddyPresenceView>(`${this.baseUrl}/bot/operations/presence`, payload);
+  }
+
+  getBotMessageTargets(): Observable<AdminCoddyMessageTargets> {
+    return this.http.get<AdminCoddyMessageTargets>(`${this.baseUrl}/bot/operations/message-targets`);
+  }
+
+  sendBotMessage(payload: AdminCoddySendMessageRequest): Observable<AdminCoddySendResult> {
+    return this.http.post<AdminCoddySendResult>(`${this.baseUrl}/bot/operations/messages`, payload);
   }
 
   watchBotConsole(
