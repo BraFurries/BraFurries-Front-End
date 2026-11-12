@@ -749,6 +749,17 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.contractFile = file;
   }
 
+  discardUnusedTestContract(contract: CommerceSignedAgreement): void {
+    if (!this.access?.owner || this.saving) return;
+    if (!window.confirm(
+      `Excluir DEFINITIVAMENTE o contrato #${contract.id} de teste e seu PDF privado no R2? ` +
+      'Esta ação só funciona se não houver royalties ou minutas assinadas vinculados. ' +
+      'A arte e o modelo serão preservados.'
+    )) return;
+    this.mutate(this.catalog.discardUnusedTestContract(contract.artworkId,contract.id),
+      'Contrato de teste e respectivo PDF privado excluídos.');
+  }
+
   terminateContract(contract: CommerceSignedAgreement): void {
     if (!this.can('CONTRACTS_MANAGE') || contract.status !== 'ACTIVE') return;
     if (!window.confirm(
