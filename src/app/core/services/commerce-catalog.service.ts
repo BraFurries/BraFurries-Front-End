@@ -283,10 +283,6 @@ export class CommerceCatalogService {
     );
   }
 
-  deleteOrphanedContractPdf(key: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/contract-documents/cleanup-orphan`,{key});
-  }
-
   terminateContract(artworkId: number, contractId: number): Observable<void> {
     return this.http.post<void>(
       `${this.base}/artworks/${artworkId}/contracts/${contractId}/terminate`,{}
