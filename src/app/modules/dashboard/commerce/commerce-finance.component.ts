@@ -244,7 +244,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
         : kind === 'order' || kind === 'order-receipt' ? 'orders'
         : kind === 'cash' || kind === 'cash-metadata' ? 'cash' : 'statements';
     if (kind === 'order-receipt' &&
-        (this.selectedOrderId == null || this.selectedOrder?.status === 'CANCELLED')) return;
+        (!this.selectedOrder || this.selectedOrder.status === 'CANCELLED')) return;
     if ((kind === 'payment' || kind === 'payment-metadata') && !this.selectedStatement) return;
     if (kind === 'payment' && !['APPROVED', 'PARTIALLY_PAID'].includes(this.selectedStatement!.status)) return;
     if (kind === 'cash-metadata' && this.editingCashMetadataId == null) return;
@@ -258,7 +258,41 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   }
 
   backToList(): void {
+    // Explicitly leaving a form abandons its draft. An in-flight failed request
+    // stays on the form with its idempotency key so retry is still safe.
+    if (this.formKind === 'sale') {
+      this.saleRequestKey = '';
+      this.saleLines = [];
+      this.saleReference = '';
+      this.buyerLabel = '';
+      this.saleNotes = '';
+      this.saleProcessingProvider = '';
+      this.saleProcessingFeePercent = 0;
+      this.saleProcessingFeeFixed = 0;
+    }
     if (this.formKind === 'order') this.cancelEditOrder();
+    if (this.formKind === 'order-receipt') {
+      this.orderReceiptKey = '';
+      this.orderReceiptAmount = 0;
+      this.orderReceiptReference = '';
+      this.orderReceiptNotes = '';
+    }
+    if (this.formKind === 'cash') {
+      this.cashRequestKey = '';
+      this.cashForm.amount = 0;
+      this.cashForm.description = '';
+      this.cashForm.counterpartyLabel = '';
+      this.cashForm.counterpartyUserId = null;
+      this.cashForm.externalReference = '';
+      this.cashForm.notes = '';
+    }
+    if (this.formKind === 'statement') this.statementArtistId = null;
+    if (this.formKind === 'payment') {
+      this.paymentRequestKey = '';
+      this.paymentAmount = 0;
+      this.paymentReference = '';
+      this.paymentNotes = '';
+    }
     if (this.formKind === 'cash-metadata') this.cancelCashMetadataEdit();
     if (this.formKind === 'payment-metadata') this.cancelPaymentMetadataEdit();
     this.formKind = null;
