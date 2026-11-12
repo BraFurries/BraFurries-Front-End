@@ -19,7 +19,7 @@
   </p>
 
   <ng-container *ngIf="!loading && access?.enabled && visibleTabs().length > 0">
-    <nav class="flex flex-wrap gap-2" aria-label="Seções financeiras">
+    <nav *ngIf="screen === 'browse'" class="flex flex-wrap gap-2" aria-label="Seções financeiras">
       <button *ngFor="let tab of visibleTabs()" type="button" (click)="selectTab(tab.key)"
         [attr.aria-current]="activeTab === tab.key ? 'page' : null"
         [ngClass]="activeTab === tab.key ? 'bg-braPurple text-white' : 'bg-white text-gray-700'"
@@ -30,10 +30,34 @@
         class="rounded-full border bg-white px-4 py-2 text-sm font-bold">Atualizar</button>
     </nav>
 
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-purple-50 p-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wide text-braPurple">
+          {{ screen === 'browse' ? 'Visualização e histórico' : 'Cadastro ou retificação' }}
+        </p>
+        <h2 class="font-amaranth text-xl font-bold text-braDark">
+          {{ screen === 'browse' ? 'Registros financeiros' : formTitle }}
+        </h2>
+        <p class="text-xs text-gray-600">
+          {{ screen === 'browse'
+            ? 'Consulte os registros, detalhes e históricos antes de adicionar ou alterar um lançamento.'
+            : 'Os dados são validados e auditados pela API. Retorne à listagem após salvar.' }}
+        </p>
+      </div>
+      <button *ngIf="screen === 'browse' && addAction as action" type="button"
+        (click)="openForm(action.kind)"
+        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">
+        + {{ action.label }}
+      </button>
+      <button *ngIf="screen === 'form'" type="button" (click)="backToList()"
+        class="rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-braPurple">
+        Voltar à visualização
+      </button>
+    </div>
 
-    <section *ngIf="activeTab === 'orders' && can('SALES_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <section *ngIf="activeTab === 'orders' && can('SALES_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form' && formKind === 'order'"
+        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ editingOrderId == null ? 'Cadastrar encomenda ou reserva' : 'Corrigir encomenda #' + editingOrderId }}</h2>
         <p *ngIf="editingOrderId != null" class="rounded-lg bg-blue-50 p-3 text-xs text-blue-900">
           Apenas encomendas abertas e sem qualquer histórico de recebimentos podem ser editadas.
@@ -129,10 +153,10 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingOrderId == null ? 'Cadastrar encomenda' : 'Salvar correção' }}
         </button>
-        <button *ngIf="editingOrderId != null" type="button" (click)="cancelEditOrder()"
+        <button *ngIf="editingOrderId != null" type="button" (click)="backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Acompanhar encomendas</h2>
         <p *ngIf="!orders.length" class="text-sm text-gray-500">Nenhuma encomenda cadastrada.</p>
         <article *ngFor="let order of orders" class="space-y-2 rounded-xl border p-4">
@@ -264,9 +288,9 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'sales' && can('SALES_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <section *ngIf="activeTab === 'sales' && can('SALES_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form' && formKind === 'sale'"
+        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Registrar venda física</h2>
         <p class="text-xs text-gray-500">
           Os valores, contratos e custos do lote serão registrados como histórico no momento da venda.
@@ -382,7 +406,7 @@
         </button>
       </div>
 
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Histórico de vendas</h2>
         <p *ngIf="!sales.length" class="text-sm text-gray-500">Nenhuma venda cadastrada.</p>
         <article *ngFor="let sale of sales" class="rounded-xl border p-4">
@@ -447,7 +471,8 @@
       </div>
     </section>
 
-    <ng-container *ngIf="(activeTab === 'royalties' || activeTab === 'statements' || activeTab === 'cash') && can('FINANCE_VIEW')">
+    <ng-container *ngIf="screen === 'browse' &&
+      (activeTab === 'royalties' || activeTab === 'statements' || activeTab === 'cash') && can('FINANCE_VIEW')">
       <div class="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4">
         <label class="text-sm font-semibold">Ano
           <input type="number" min="2000" max="2200" step="1" [(ngModel)]="periodYear"
@@ -468,7 +493,7 @@
     </ng-container>
 
     <section *ngIf="activeTab === 'cash' && can('FINANCE_VIEW')" class="space-y-6">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Movimentação do período</h2>
         <p class="text-sm text-gray-600">
           Visão de caixa, não de lucro contábil. Aportes não são vendas ou receitas operacionais.
@@ -524,8 +549,9 @@
         </div>
       </div>
 
-      <div class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
-        <div *ngIf="can('CASHFLOW_MANAGE')" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div class="space-y-6">
+        <div *ngIf="screen === 'form' && formKind === 'cash' && can('CASHFLOW_MANAGE')"
+          class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
           <h2 class="font-amaranth text-xl font-bold">Nova entrada, saída ou aporte</h2>
           <label class="block text-sm font-semibold">Natureza da movimentação
             <select [(ngModel)]="cashForm.movementType"
@@ -612,7 +638,7 @@
           </button>
         </div>
 
-        <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
           <h2 class="font-amaranth text-xl font-bold">Entradas, saídas e aportes registrados</h2>
           <p *ngIf="!cashMovements.length" class="text-sm text-gray-500">
             Nenhuma movimentação avulsa neste período.
@@ -752,8 +778,8 @@
     </section>
 
     <section *ngIf="activeTab === 'statements' && can('FINANCE_VIEW')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,410px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      class="space-y-6 xl:grid xl:grid-cols-[minmax(280px,410px)_1fr] xl:gap-6">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Fechamentos mensais</h2>
         <p class="text-sm text-gray-600">
           Um demonstrativo por artista e mês. Só é possível fechar períodos já encerrados.
@@ -790,7 +816,7 @@
         </button>
       </div>
 
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <ng-container *ngIf="selectedStatement as statement; else selectStatementHint">
           <h2 class="font-amaranth text-xl font-bold">Demonstrativo #{{ statement.id }}</h2>
           <p class="text-sm text-gray-600">
