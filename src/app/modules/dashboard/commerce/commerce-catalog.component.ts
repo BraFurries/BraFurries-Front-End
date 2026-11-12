@@ -41,6 +41,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   saving = false;
   searchingArtists = false;
   errorMessage = '';
+  loadErrorMessage = '';
   successMessage = '';
 
   templates: CommerceContractTemplate[] = [];
@@ -262,6 +263,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   reload(): void {
     this.loading = true;
     this.failedLoadSections = [];
+    this.loadErrorMessage = '';
     this.errorMessage = '';
     const tasks: Observable<unknown>[] = [];
     if (this.can('ARTWORKS_MANAGE') || this.can('CONTRACTS_MANAGE')) {
@@ -311,7 +313,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         this.failedLoadSections.push(status
           ? `${section} (HTTP ${status})` : `${section} (falha de conexão)`);
         // Do not expose response bodies or private document identifiers in the UI.
-        this.errorMessage = 'Não foi possível carregar: ' +
+        this.loadErrorMessage = 'Não foi possível carregar: ' +
           this.failedLoadSections.join(', ') + '. Confira os acessos e tente atualizar.';
         return of(null);
       })
