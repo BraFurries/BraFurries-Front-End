@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject, catchError, forkJoin, map, of, takeUntil, tap } from 'rxjs';
 import {
   PlatformAccess,
@@ -40,6 +41,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   saving = false;
   searchingArtists = false;
   errorMessage = '';
+  loadErrorMessage = '';
   successMessage = '';
 
   templates: CommerceContractTemplate[] = [];
@@ -110,6 +112,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   artworkFileDescription = '';
 
   private readonly destroy$ = new Subject<void>();
+  private failedLoadSections: string[] = [];
 
   constructor(
     private readonly accessService: PlatformAccessService,
@@ -259,25 +262,28 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
 
   reload(): void {
     this.loading = true;
+    this.failedLoadSections = [];
+    this.loadErrorMessage = '';
+    this.errorMessage = '';
     const tasks: Observable<unknown>[] = [];
     if (this.can('ARTWORKS_MANAGE') || this.can('CONTRACTS_MANAGE')) {
-      tasks.push(this.fetch(this.catalog.artworks(), items => this.artworks = items));
+      tasks.push(this.fetch('Artes',this.catalog.artworks(), items => this.artworks = items));
     }
     if (this.can('ARTWORKS_MANAGE')) {
-      tasks.push(this.fetch(this.artistService.profiles(), items => this.externalArtists = items));
+      tasks.push(this.fetch('Artistas',this.artistService.profiles(), items => this.externalArtists = items));
     }
     if (this.can('CONTRACTS_MANAGE')) {
-      tasks.push(this.fetch(this.catalog.templates(), items => this.templates = items));
+      tasks.push(this.fetch('Modelos de contratos',this.catalog.templates(), items => this.templates = items));
     }
     if (this.can('SUPPLIERS_MANAGE')) {
-      tasks.push(this.fetch(this.catalog.suppliers(), items => this.suppliers = items));
+      tasks.push(this.fetch('Fornecedores',this.catalog.suppliers(), items => this.suppliers = items));
     }
     if (this.can('PRODUCTS_MANAGE')) {
-      tasks.push(this.fetch(this.catalog.products(), items => this.products = items));
-      tasks.push(this.fetch(this.catalog.supplierChoices(), items => this.supplierChoices = items));
+      tasks.push(this.fetch('Produtos',this.catalog.products(), items => this.products = items));
+      tasks.push(this.fetch('Fornecedores disponíveis',this.catalog.supplierChoices(), items => this.supplierChoices = items));
     }
     if (this.can('SUPPLIERS_MANAGE') && this.can('PRODUCTS_MANAGE')) {
-      tasks.push(this.fetch(this.catalog.productionBatches(), items => this.batches = items));
+      tasks.push(this.fetch('Lotes de produção',this.catalog.productionBatches(), items => this.batches = items));
     }
     if (!tasks.length) {
       this.loading = false;
@@ -297,12 +303,18 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     });
   }
 
-  private fetch<T>(request: Observable<T>, apply: (value: T) => void): Observable<unknown> {
+  private fetch<T>(section: string, request: Observable<T>,
+                   apply: (value: T) => void): Observable<unknown> {
     return request.pipe(
       tap(apply),
       map(() => null),
-      catchError(() => {
-        this.errorMessage = 'Alguns cadastros não puderam ser carregados. Confira os acessos e tente atualizar.';
+      catchError((error: unknown) => {
+        const status = error instanceof HttpErrorResponse ? error.status : 0;
+        this.failedLoadSections.push(status
+          ? `${section} (HTTP ${status})` : `${section} (falha de conexão)`);
+        // Do not expose response bodies or private document identifiers in the UI.
+        this.loadErrorMessage = 'Não foi possível carregar: ' +
+          this.failedLoadSections.join(', ') + '. Confira os acessos e tente atualizar.';
         return of(null);
       })
     );
