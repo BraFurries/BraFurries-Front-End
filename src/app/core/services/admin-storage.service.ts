@@ -55,6 +55,14 @@ export class AdminStorageService {
     return this.http.post<StoredObject>(`${this.base}/objects/inspect`, { bucket, key });
   }
 
+  /** Owner-only business operation: removes an unsigned preparation and its R2 PDF. */
+  deleteUnsignedPreparation(bucket: StorageBucket,key: string,etag: string,
+                            artworkId: number,preparationId: number): Observable<void> {
+    return this.http.post<void>(`${this.base}/objects/delete-unsigned-preparation`, {
+      bucket,key,etag,artworkId,preparationId
+    });
+  }
+
   deleteOrphan(bucket: StorageBucket, key: string, etag: string): Observable<void> {
     return this.http.post<void>(`${this.base}/objects/delete-orphan`,
       { bucket, key, etag });
