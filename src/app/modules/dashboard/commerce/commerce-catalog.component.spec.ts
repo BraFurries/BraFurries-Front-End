@@ -27,7 +27,7 @@ describe('CommerceCatalogComponent', () => {
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
-      'searchArtists','downloadContract','terminateContract',
+      'searchArtists','downloadContract','terminateContract','discardUnusedTestContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
       'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
@@ -177,6 +177,40 @@ describe('CommerceCatalogComponent', () => {
     expect(component.visibleTabs().some(t => t.key === 'contracts')).toBeFalse();
     expect(catalog.contracts).not.toHaveBeenCalled();
     expect(catalog.downloadContract).not.toHaveBeenCalled();
+  });
+
+  it('keeps irreversible test contract deletion owner-only', async () => {
+    await create(['CONTRACTS_MANAGE'],false,true);
+    const agreement = {
+      id:44,artworkId:12,templateId:13,status:'ACTIVE',modality:'ROYALTY',
+      royaltyMethod:'PERCENT_GROSS',royaltyPercent:10,
+      royaltyFixedAmount:null,oneTimeAmount:0,effectiveFrom:'2026-11-12',
+      effectiveUntil:null,sha256:'abc',sizeBytes:512,artistUserId:31
+    } as unknown as import('../../../core/services/commerce-catalog.service').CommerceSignedAgreement;
+    component.contracts = [agreement];
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Excluir contrato de teste e PDF');
+    component.discardUnusedTestContract(agreement);
+    expect(catalog.discardUnusedTestContract).not.toHaveBeenCalled();
+  });
+
+  it('lets owner discard unused test agreement and private PDF after confirmation', async () => {
+    await create(['CONTRACTS_MANAGE'],true);
+    const agreement = {
+      id:44,artworkId:12,templateId:13,status:'ACTIVE',modality:'ROYALTY',
+      royaltyMethod:'PERCENT_GROSS',royaltyPercent:10,
+      royaltyFixedAmount:null,oneTimeAmount:0,effectiveFrom:'2026-11-12',
+      effectiveUntil:null,sha256:'abc',sizeBytes:512,artistUserId:31
+    } as unknown as import('../../../core/services/commerce-catalog.service').CommerceSignedAgreement;
+    component.contracts = [agreement];
+    catalog.discardUnusedTestContract.and.returnValue(of(void 0));
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Excluir contrato de teste e PDF');
+    spyOn(window,'confirm').and.returnValue(true);
+    component.discardUnusedTestContract(agreement);
+    expect(catalog.discardUnusedTestContract).toHaveBeenCalledWith(12,44);
   });
 
   it('keeps only operational catalog and finance navigation, without Teams or Access', async () => {
