@@ -43,9 +43,7 @@ export class AdminStorageService {
   }
 
   inspect(bucket: StorageBucket, key: string): Observable<StoredObject> {
-    return this.http.get<StoredObject>(`${this.base}/objects/inspect`, {
-      params: new HttpParams().set('bucket', bucket).set('key', key)
-    });
+    return this.http.post<StoredObject>(`${this.base}/objects/inspect`, { bucket, key });
   }
 
   deleteOrphan(bucket: StorageBucket, key: string, etag: string): Observable<void> {
