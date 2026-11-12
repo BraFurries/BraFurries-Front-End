@@ -20,7 +20,9 @@ describe('CommerceCatalogComponent', () => {
     access = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
     catalog = jasmine.createSpyObj<CommerceCatalogService>('CommerceCatalogService', [
       'templates','artworks','suppliers','supplierChoices','products','productionBatches',
-      'productArtworks','contracts','createArtwork','createTemplate',
+      'productArtworks','contracts','contractPreparations','prepareContract',
+      'downloadPreparation','uploadSignedPreparation','cancelPreparation',
+      'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
       'searchArtists','signContract','downloadContract','terminateContract',
@@ -52,7 +54,7 @@ describe('CommerceCatalogComponent', () => {
         creationCost: 100, status: 'ACTIVE', description: null }
     ]));
     catalog.templates.and.returnValue(of([{
-      id: 13, name: 'Royalties', modality: 'ROYALTY', royaltyMethod: 'PERCENT_GROSS',
+      id: 13, name: 'Royalties', fullText: 'Termos integrais do acordo.', modality: 'ROYALTY', royaltyMethod: 'PERCENT_GROSS',
       royaltyPercent: 10, royaltyFixedAmount: null, active: true, description: null
     }]));
     catalog.suppliers.and.returnValue(of([]));
@@ -64,6 +66,10 @@ describe('CommerceCatalogComponent', () => {
     }]));
     catalog.productionBatches.and.returnValue(of([]));
     catalog.contracts.and.returnValue(of([]));
+    catalog.contractPreparations.and.returnValue(of([]));
+    catalog.prepareContract.and.returnValue(of({id:91}));
+    catalog.uploadSignedPreparation.and.returnValue(of({id:92}));
+    catalog.cancelPreparation.and.returnValue(of(void 0));
     catalog.artworkFiles.and.returnValue(of([]));
     catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
@@ -384,7 +390,7 @@ describe('CommerceCatalogComponent', () => {
     component.openCreate('contracts', 12);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Assinado #21');
-    expect(fixture.nativeElement.textContent).toContain('Registrar contrato assinado');
+    expect(fixture.nativeElement.textContent).toContain('Gerar PDF para assinatura');
   });
 
   it('renders the same fixed navigation base and link order as Financeiro', async () => {
@@ -396,5 +402,71 @@ describe('CommerceCatalogComponent', () => {
       '/painel/gestao-comercial/financeiro', '/painel/gestao-comercial/catalogo'
     ]);
     expect(links[1].getAttribute('aria-current')).toBe('page');
+  });
+
+  it('requires complete clauses in template editing and includes them in the API payload', async () => {
+    await create(['CONTRACTS_MANAGE']);
+    component.openCreate('templates');
+    component.templateForm.name = 'Licença de obras';
+    component.templateForm.fullText = '';
+    component.createTemplate();
+    expect(catalog.createTemplate).not.toHaveBeenCalled();
+    component.templateForm.fullText = '1. A licença de reprodução não transfere direitos morais.';
+    component.createTemplate();
+    expect(catalog.createTemplate).toHaveBeenCalledWith(jasmine.objectContaining({
+      fullText:'1. A licença de reprodução não transfere direitos morais.'
+    }));
+  });
+
+  it('prepares a PDF using explicit legal parties without registering a signed contract', async () => {
+    await create(['CONTRACTS_MANAGE']);
+    component.selectTab('contracts');
+    component.openCreate('contracts',12);
+    component.contractForm.templateId=13;
+    component.contractorParty={legalName:'Responsável',
+      document:'12345678900',address:'Rua A',representative:''};
+    component.artistParty={legalName:'Artista titular',
+      document:'98765432100',address:'Rua B',representative:''};
+    component.prepareContract();
+    expect(catalog.prepareContract).toHaveBeenCalledWith(12,
+      jasmine.objectContaining({
+        templateId:13,
+        contractor:jasmine.objectContaining({legalName:'Responsável'}),
+        artist:jasmine.objectContaining({legalName:'Artista titular'})
+      }));
+    expect(catalog.signContract).not.toHaveBeenCalled();
+    expect(component.screen).toBe('browse');
+  });
+
+  it('registers a signed PDF only after explicit human review of a pending draft', async () => {
+    await create(['CONTRACTS_MANAGE']);
+    const item={
+      id:91, artworkId:12,templateId:13,artistUserId:31,templateName:'Royalties',
+      status:'PENDING' as const,signedContractId:null,effectiveFrom:'2026-11-12',
+      effectiveUntil:null,createdAt:'2026-11-12T02:00:00',completedAt:null
+    };
+    component.openUploadPreparation(item);
+    const file = new File(['%PDF-1.4\n%%EOF'],'assinado.pdf',{type:'application/pdf'});
+    component.contractFile=file;
+    component.uploadSignedPreparation();
+    expect(catalog.uploadSignedPreparation).not.toHaveBeenCalled();
+    component.signedFileReviewed=true;
+    component.uploadSignedPreparation();
+    expect(catalog.uploadSignedPreparation).toHaveBeenCalledWith(12,91,file);
+    expect(component.screen).toBe('browse');
+  });
+
+  it('shows pending and signed preparations separately from signed contract history', async () => {
+    await create(['CONTRACTS_MANAGE']);
+    catalog.contractPreparations.and.returnValue(of([{
+      id:91,artworkId:12,templateId:13,artistUserId:31,templateName:'Royalties',
+      status:'PENDING',signedContractId:null,effectiveFrom:'2026-11-12',
+      effectiveUntil:null,createdAt:'2026-11-12T02:00:00',completedAt:null
+    }]));
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Aguardando assinatura');
+    expect(fixture.nativeElement.textContent).toContain('Baixar PDF gerado');
+    expect(fixture.nativeElement.textContent).not.toContain('+ Gerar contrato para assinatura');
   });
 });
