@@ -45,6 +45,7 @@ describe('AdminComponent area tabs', () => {
     expect(fixture.nativeElement.querySelector('a[href="/usuarios"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/presenca-coddy"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/permissoes"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/armazenamento"]')).toBeNull();
   });
 
   it('exposes Permissions to the owner without giving additional admin tabs', () => {
@@ -52,6 +53,7 @@ describe('AdminComponent area tabs', () => {
     const component = mount();
     expect(component.isPermissionsOwner).toBeTrue();
     expect(fixture.nativeElement.querySelector('a[href="/permissoes"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/armazenamento"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/metricas"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/presenca-coddy"]')).toBeNull();
   });
@@ -72,5 +74,6 @@ describe('AdminComponent area tabs', () => {
     const component = mount();
     expect(component.canManagePartners).toBeFalse();
     expect(component.isPermissionsOwner).toBeFalse();
+    expect(fixture.nativeElement.querySelector('a[href="/armazenamento"]')).toBeNull();
   });
 });
