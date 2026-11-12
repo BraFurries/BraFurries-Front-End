@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { PlatformAccessService } from '../../../../../core/services/platform-access.service';
 import { AdminStorageService, StorageObjectPage, StoredObject } from '../../../../../core/services/admin-storage.service';
 import { AdminStorageComponent } from './admin-storage.component';
@@ -72,6 +72,24 @@ describe('AdminStorageComponent', () => {
     expect(service.deleteOrphan).toHaveBeenCalledOnceWith('PRIVATE',key,'"etag"');
     expect(component.selected).toBeNull();
     expect(component.successMessage).toContain('excluído');
+    fixture.destroy();
+  });
+
+  it('ignores a stale private inspection after switching to public bucket', () => {
+    const pending = new Subject<StoredObject>();
+    service.inspect.and.returnValue(pending.asObservable());
+    const fixture = TestBed.createComponent(AdminStorageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.exactKey = key;
+    component.inspectExact();
+    expect(service.inspect).toHaveBeenCalledWith('PRIVATE', key);
+    component.changeBucket('PUBLIC');
+    pending.next(orphan);
+    fixture.detectChanges();
+    expect(component.bucket).toBe('PUBLIC');
+    expect(component.selected).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Excluir órfão definitivamente do R2');
     fixture.destroy();
   });
 
