@@ -179,6 +179,20 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.downloadContract).not.toHaveBeenCalled();
   });
 
+  it('allows owner to clean orphan PDF only after confirmation', async () => {
+    await create(['CONTRACTS_MANAGE'],true);
+    const key='commerce/contracts/20/12345678-1234-1234-1234-123456789abc.pdf';
+    catalog.deleteOrphanedContractPdf.and.returnValue(of(void 0));
+    component.selectTab('contracts');
+    component.orphanedPdfKey=key;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Excluir somente este PDF do R2');
+    spyOn(window,'confirm').and.returnValue(true);
+    component.deleteOrphanedContractPdf();
+    expect(catalog.deleteOrphanedContractPdf).toHaveBeenCalledOnceWith(key);
+    expect(component.orphanedPdfKey).toBe('');
+  });
+
   it('keeps irreversible test contract deletion owner-only', async () => {
     await create(['CONTRACTS_MANAGE'],false,true);
     const agreement = {
