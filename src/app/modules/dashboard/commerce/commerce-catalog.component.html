@@ -2,6 +2,8 @@
   <app-commerce-navigation active="catalogo"></app-commerce-navigation>
 
   <p *ngIf="loading" role="status" class="rounded-xl bg-white p-4 text-gray-600">Carregando cadastros...</p>
+  <p *ngIf="loadErrorMessage" role="alert"
+     class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ loadErrorMessage }}</p>
   <p *ngIf="errorMessage" role="alert"
      class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ errorMessage }}</p>
   <p *ngIf="successMessage" role="status"
