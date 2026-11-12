@@ -9,6 +9,12 @@ export function getSocialAuthErrorMessage(message?: string | null): string | nul
   }
 
   const normalized = message.trim().toLowerCase();
+  if (normalized === 'google_account_link_required') {
+    return 'Este e-mail já está associado a uma conta BraFurries, mas não foi possível conectá-la automaticamente ao Google. Entre com e-mail e senha, confirme seu e-mail em Perfil se necessário e use “Conectar Google a esta conta”. Se perdeu a senha, use “Esqueceu a senha?”. Nenhuma conta nova foi criada.';
+  }
+  if (normalized === 'provider_login_disabled') {
+    return 'O login por este provedor foi desativado nesta conta. Entre com e-mail e senha e reative o provedor em Perfil.';
+  }
   if (normalized === 'account_consolidated') {
     return 'Esta conta foi unificada. Entre novamente com um dos provedores já comprovados.';
   }
