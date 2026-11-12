@@ -75,6 +75,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
     catalog.productArtworks.and.returnValue(of([]));
     catalog.searchArtists.and.returnValue(of([{ id: 31, name: 'Artista' }]));
+    catalog.createTemplate.and.returnValue(of({id: 60}));
     catalog.createArtwork.and.returnValue(of({ id: 14 }));
     catalog.linkArtwork.and.returnValue(of(void 0));
 
