@@ -1,16 +1,5 @@
 <section class="mx-auto max-w-7xl space-y-6 p-5 md:p-10">
-  <header>
-    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Gestão interna · exclusivamente BraFurries</p>
-    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Financeiro Comercial</h1>
-    <p class="mt-2 text-sm text-gray-600">
-      Vendas físicas com taxas, entradas, despesas, aportes, royalties e fechamentos mensais.
-      Nenhum saldo ou moeda da loja virtual do Discord participa desses registros.
-    </p>
-    <nav class="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-braPurple">
-      <a routerLink="/painel/gestao-comercial/catalogo">Cadastros comerciais</a>
-      <span aria-current="page" class="text-gray-500">Financeiro</span>
-    </nav>
-  </header>
+  <app-commerce-navigation active="financeiro"></app-commerce-navigation>
 
   <p *ngIf="errorMessage" role="alert"
      class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -30,7 +19,7 @@
   </p>
 
   <ng-container *ngIf="!loading && access?.enabled && visibleTabs().length > 0">
-    <nav class="flex flex-wrap gap-2" aria-label="Seções financeiras">
+    <nav *ngIf="screen === 'browse'" class="flex flex-wrap gap-2" aria-label="Seções financeiras">
       <button *ngFor="let tab of visibleTabs()" type="button" (click)="selectTab(tab.key)"
         [attr.aria-current]="activeTab === tab.key ? 'page' : null"
         [ngClass]="activeTab === tab.key ? 'bg-braPurple text-white' : 'bg-white text-gray-700'"
@@ -41,10 +30,34 @@
         class="rounded-full border bg-white px-4 py-2 text-sm font-bold">Atualizar</button>
     </nav>
 
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-purple-50 p-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wide text-braPurple">
+          {{ screen === 'browse' ? 'Visualização e histórico' : 'Cadastro ou retificação' }}
+        </p>
+        <h2 class="font-amaranth text-xl font-bold text-braDark">
+          {{ screen === 'browse' ? 'Registros financeiros' : formTitle }}
+        </h2>
+        <p class="text-xs text-gray-600">
+          {{ screen === 'browse'
+            ? 'Consulte os registros, detalhes e históricos antes de adicionar ou alterar um lançamento.'
+            : 'Os dados são validados e auditados pela API. Retorne à listagem após salvar.' }}
+        </p>
+      </div>
+      <button *ngIf="screen === 'browse' && addAction as action" type="button"
+        (click)="openForm(action.kind)"
+        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">
+        + {{ action.label }}
+      </button>
+      <button *ngIf="screen === 'form'" type="button" (click)="backToList()"
+        class="rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-braPurple">
+        Voltar à visualização
+      </button>
+    </div>
 
-    <section *ngIf="activeTab === 'orders' && can('SALES_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <section *ngIf="activeTab === 'orders' && can('SALES_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form' && formKind === 'order'"
+        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ editingOrderId == null ? 'Cadastrar encomenda ou reserva' : 'Corrigir encomenda #' + editingOrderId }}</h2>
         <p *ngIf="editingOrderId != null" class="rounded-lg bg-blue-50 p-3 text-xs text-blue-900">
           Apenas encomendas abertas e sem qualquer histórico de recebimentos podem ser editadas.
@@ -140,10 +153,54 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingOrderId == null ? 'Cadastrar encomenda' : 'Salvar correção' }}
         </button>
-        <button *ngIf="editingOrderId != null" type="button" (click)="cancelEditOrder()"
+        <button *ngIf="editingOrderId != null" type="button" (click)="backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'form' && formKind === 'order-receipt' && selectedOrder as order"
+        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Anotar recebimento · encomenda #{{ order.id }}</h2>
+        <p class="text-sm text-gray-600">Comprador: {{ order.buyerLabel }} · Saldo:
+          {{ order.totalAmount - order.paidAmount | currency:'BRL' }}
+        </p>
+        <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          Recebimentos de encomendas não geram receita no caixa nem afetam estoque ou royalties.
+        </p>
+              <div *ngIf="selectedOrder && selectedOrder.status !== 'CANCELLED'" class="grid grid-cols-2 gap-2">
+                <label class="text-xs font-semibold">Valor recebido
+                  <input type="number" [(ngModel)]="orderReceiptAmount" min=".01" step=".01"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+                <label class="text-xs font-semibold">Data do recebimento
+                  <input type="date" [(ngModel)]="orderReceiptDate"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+                <label class="text-xs font-semibold">Meio
+                  <select [(ngModel)]="orderReceiptMethod"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                    <option value="PIX">Pix</option>
+                    <option value="CASH">Dinheiro</option>
+                    <option value="CARD_DEBIT">Cartão débito</option>
+                    <option value="CARD_CREDIT">Cartão crédito</option>
+                    <option value="BANK_TRANSFER">Transferência</option>
+                    <option value="BANK_SLIP">Boleto</option>
+                    <option value="OTHER">Outros</option>
+                  </select>
+                </label>
+                <label class="text-xs font-semibold">Referência (opcional)
+                  <input [(ngModel)]="orderReceiptReference" maxlength="120"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+              </div>
+              <button *ngIf="selectedOrder && selectedOrder.status !== 'CANCELLED'"
+                type="button" (click)="receiveOrderPayment()"
+                [disabled]="saving || orderReceiptAmount <= 0"
+                class="rounded-lg border border-braPurple px-3 py-2 text-xs font-bold text-braPurple disabled:opacity-50">
+                Anotar recebimento
+              </button>
+
+      </div>
+
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Acompanhar encomendas</h2>
         <p *ngIf="!orders.length" class="text-sm text-gray-500">Nenhuma encomenda cadastrada.</p>
         <article *ngFor="let order of orders" class="space-y-2 rounded-xl border p-4">
@@ -226,37 +283,10 @@
                 {{ payment.eventKind === 'RECEIPT' ? 'Recebido' : 'Estornado' }}:
                 {{ payment.amount | currency:'BRL' }} · {{ payment.receivedOn }}
               </p>
-              <div *ngIf="order.status !== 'CANCELLED'" class="grid grid-cols-2 gap-2">
-                <label class="text-xs font-semibold">Valor recebido
-                  <input type="number" [(ngModel)]="orderReceiptAmount" min=".01" step=".01"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <label class="text-xs font-semibold">Data do recebimento
-                  <input type="date" [(ngModel)]="orderReceiptDate"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <label class="text-xs font-semibold">Meio
-                  <select [(ngModel)]="orderReceiptMethod"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                    <option value="PIX">Pix</option>
-                    <option value="CASH">Dinheiro</option>
-                    <option value="CARD_DEBIT">Cartão débito</option>
-                    <option value="CARD_CREDIT">Cartão crédito</option>
-                    <option value="BANK_TRANSFER">Transferência</option>
-                    <option value="BANK_SLIP">Boleto</option>
-                    <option value="OTHER">Outros</option>
-                  </select>
-                </label>
-                <label class="text-xs font-semibold">Referência (opcional)
-                  <input [(ngModel)]="orderReceiptReference" maxlength="120"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-              </div>
-              <button *ngIf="order.status !== 'CANCELLED'"
-                type="button" (click)="receiveOrderPayment()"
-                [disabled]="saving || orderReceiptAmount <= 0"
-                class="rounded-lg border border-braPurple px-3 py-2 text-xs font-bold text-braPurple disabled:opacity-50">
-                Anotar recebimento
+              <button *ngIf="order.status !== 'CANCELLED'" type="button"
+                (click)="openForm('order-receipt')"
+                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">
+                + Anotar recebimento
               </button>
               <label class="block text-xs font-semibold">Motivo de estorno
                 <input [(ngModel)]="orderReversalReason" maxlength="500"
@@ -275,9 +305,9 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'sales' && can('SALES_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <section *ngIf="activeTab === 'sales' && can('SALES_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form' && formKind === 'sale'"
+        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Registrar venda física</h2>
         <p class="text-xs text-gray-500">
           Os valores, contratos e custos do lote serão registrados como histórico no momento da venda.
@@ -393,7 +423,7 @@
         </button>
       </div>
 
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Histórico de vendas</h2>
         <p *ngIf="!sales.length" class="text-sm text-gray-500">Nenhuma venda cadastrada.</p>
         <article *ngFor="let sale of sales" class="rounded-xl border p-4">
@@ -458,7 +488,8 @@
       </div>
     </section>
 
-    <ng-container *ngIf="(activeTab === 'royalties' || activeTab === 'statements' || activeTab === 'cash') && can('FINANCE_VIEW')">
+    <ng-container *ngIf="screen === 'browse' &&
+      (activeTab === 'royalties' || activeTab === 'statements' || activeTab === 'cash') && can('FINANCE_VIEW')">
       <div class="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4">
         <label class="text-sm font-semibold">Ano
           <input type="number" min="2000" max="2200" step="1" [(ngModel)]="periodYear"
@@ -479,7 +510,34 @@
     </ng-container>
 
     <section *ngIf="activeTab === 'cash' && can('FINANCE_VIEW')" class="space-y-6">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+            <div *ngIf="screen === 'form' && formKind === 'cash-metadata' && editingCashMetadataId != null"
+              class="max-w-3xl space-y-3 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+              <h3 class="font-amaranth text-lg font-bold">Retificar movimentação #{{ editingCashMetadataId }}</h3>
+              <p class="text-xs">Somente descrição, referência e observações. Valor, data e origem permanecem intactos.</p>
+              <label class="block text-xs font-semibold">Descrição
+                <input [(ngModel)]="cashMetadataDescription" maxlength="500" class="mt-1 w-full rounded-lg border p-2">
+              </label>
+              <label class="block text-xs font-semibold">Referência
+                <input [(ngModel)]="cashMetadataReference" maxlength="120" class="mt-1 w-full rounded-lg border p-2">
+              </label>
+              <label class="block text-xs font-semibold">Observações
+                <textarea [(ngModel)]="cashMetadataNotes" rows="2" maxlength="5000"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <label class="block text-xs font-semibold">Justificativa obrigatória
+                <textarea [(ngModel)]="cashMetadataReason" rows="2" minlength="3" maxlength="500"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <button type="button" [disabled]="saving || cashMetadataReason.trim().length < 3"
+                (click)="submitCashMetadataCorrection()"
+                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                Salvar retificação
+              </button>
+              <button type="button" (click)="backToList()"
+                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
+            </div>
+
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Movimentação do período</h2>
         <p class="text-sm text-gray-600">
           Visão de caixa, não de lucro contábil. Aportes não são vendas ou receitas operacionais.
@@ -535,8 +593,9 @@
         </div>
       </div>
 
-      <div class="grid gap-6 xl:grid-cols-[minmax(310px,440px)_1fr]">
-        <div *ngIf="can('CASHFLOW_MANAGE')" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div class="space-y-6">
+        <div *ngIf="screen === 'form' && formKind === 'cash' && can('CASHFLOW_MANAGE')"
+          class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
           <h2 class="font-amaranth text-xl font-bold">Nova entrada, saída ou aporte</h2>
           <label class="block text-sm font-semibold">Natureza da movimentação
             <select [(ngModel)]="cashForm.movementType"
@@ -623,7 +682,7 @@
           </button>
         </div>
 
-        <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
           <h2 class="font-amaranth text-xl font-bold">Entradas, saídas e aportes registrados</h2>
           <p *ngIf="!cashMovements.length" class="text-sm text-gray-500">
             Nenhuma movimentação avulsa neste período.
@@ -680,31 +739,6 @@
                 <p>Referência: {{ r.previousReference || '—' }} → {{ r.updatedReference || '—' }}</p>
                 <p>Observações: {{ r.previousNotes || '—' }} → {{ r.updatedNotes || '—' }}</p>
               </div>
-            </div>
-            <div *ngIf="editingCashMetadataId === movement.id"
-              class="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <p class="text-xs">Somente descrição, referência e observações. Valor, data e origem permanecem intactos.</p>
-              <label class="block text-xs font-semibold">Descrição
-                <input [(ngModel)]="cashMetadataDescription" maxlength="500" class="mt-1 w-full rounded-lg border p-2">
-              </label>
-              <label class="block text-xs font-semibold">Referência
-                <input [(ngModel)]="cashMetadataReference" maxlength="120" class="mt-1 w-full rounded-lg border p-2">
-              </label>
-              <label class="block text-xs font-semibold">Observações
-                <textarea [(ngModel)]="cashMetadataNotes" rows="2" maxlength="5000"
-                  class="mt-1 w-full rounded-lg border p-2"></textarea>
-              </label>
-              <label class="block text-xs font-semibold">Justificativa obrigatória
-                <textarea [(ngModel)]="cashMetadataReason" rows="2" minlength="3" maxlength="500"
-                  class="mt-1 w-full rounded-lg border p-2"></textarea>
-              </label>
-              <button type="button" [disabled]="saving || cashMetadataReason.trim().length < 3"
-                (click)="submitCashMetadataCorrection()"
-                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-                Salvar retificação
-              </button>
-              <button type="button" (click)="cancelCashMetadataEdit()"
-                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
             </div>
             <button *ngIf="can('CASHFLOW_MANAGE') && movement.eventKind === 'POSTED'"
               type="button" (click)="startCashReversal(movement)"
@@ -763,14 +797,8 @@
     </section>
 
     <section *ngIf="activeTab === 'statements' && can('FINANCE_VIEW')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,410px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 class="font-amaranth text-xl font-bold">Fechamentos mensais</h2>
-        <p class="text-sm text-gray-600">
-          Um demonstrativo por artista e mês. Só é possível fechar períodos já encerrados.
-          Com o rascunho criado, vendas e estornos daquele artista/mês ficam congelados.
-        </p>
-        <div *ngIf="can('SETTLEMENTS_MANAGE')" class="space-y-3 rounded-xl bg-gray-50 p-3">
+      class="space-y-6 xl:grid xl:grid-cols-[minmax(280px,410px)_1fr] xl:gap-6">
+        <div *ngIf="screen === 'form' && formKind === 'statement' && can('SETTLEMENTS_MANAGE')" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm xl:col-span-2">
           <label class="block text-sm font-semibold">Artista do período
             <select [(ngModel)]="statementArtistId" class="mt-1 w-full rounded-lg border px-3 py-2">
               <option [ngValue]="null">Selecione o artista</option>
@@ -785,6 +813,76 @@
             Gerar rascunho
           </button>
         </div>
+
+          <div *ngIf="screen === 'form' && formKind === 'payment' && can('PAYMENTS_RECORD') &&
+             (selectedStatement?.status === 'APPROVED' || selectedStatement?.status === 'PARTIALLY_PAID')"
+            class="max-w-3xl space-y-4 rounded-2xl border border-purple-100 bg-white p-5 shadow-sm xl:col-span-2">
+            <h3 class="font-bold">Registrar pagamento realizado</h3>
+            <p *ngIf="selectedStatement as statement" class="rounded-lg bg-purple-50 p-3 text-sm text-gray-700">
+              Artista: <strong>{{ statement.artistName }}</strong> · Fechamento #{{ statement.id }} ·
+              Saldo a pagar: <strong>{{ statementBalance | currency:'BRL' }}</strong>
+            </p>
+            <p class="text-xs text-gray-600">
+              Este registro não transfere dinheiro. Informe uma transferência já efetuada
+              e uma referência externa única para evitar baixas duplicadas.
+            </p>
+            <label class="block text-sm font-semibold">Valor pago (R$)
+              <input type="number" min=".01" step=".01" [(ngModel)]="paymentAmount"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Data da transferência
+              <input type="date" [(ngModel)]="paymentDate"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Referência da transferência
+              <input [(ngModel)]="paymentReference" maxlength="120"
+                placeholder="ID da transferência ou comprovante"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Observações (opcional)
+              <textarea [(ngModel)]="paymentNotes" maxlength="5000" rows="2"
+                class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+            </label>
+            <button type="button" [disabled]="saving || paymentAmount <= 0 || !paymentReference.trim()"
+              (click)="recordPayment()"
+              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+              Registrar pagamento externo
+            </button>
+          </div>
+
+
+            <div *ngIf="screen === 'form' && formKind === 'payment-metadata' && editingPaymentMetadataId != null"
+              class="max-w-3xl space-y-3 rounded-2xl border border-blue-200 bg-blue-50 p-5 xl:col-span-2">
+              <h3 class="font-amaranth text-lg font-bold">Retificar pagamento #{{ editingPaymentMetadataId }}</h3>
+              <p class="text-xs">Somente referência e observações. Valor e data do pagamento não mudam.</p>
+              <label class="block text-xs font-semibold">Referência bancária
+                <input [(ngModel)]="paymentMetadataReference" maxlength="120"
+                  class="mt-1 w-full rounded-lg border p-2">
+              </label>
+              <label class="block text-xs font-semibold">Observações
+                <textarea [(ngModel)]="paymentMetadataNotes" rows="2" maxlength="5000"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <label class="block text-xs font-semibold">Justificativa obrigatória
+                <textarea [(ngModel)]="paymentMetadataReason" rows="2" minlength="3" maxlength="500"
+                  class="mt-1 w-full rounded-lg border p-2"></textarea>
+              </label>
+              <button type="button" [disabled]="saving || !paymentMetadataReference.trim()
+                  || paymentMetadataReason.trim().length < 3"
+                (click)="submitPaymentMetadataCorrection()"
+                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                Salvar retificação
+              </button>
+              <button type="button" (click)="backToList()"
+                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
+            </div>
+
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Fechamentos mensais</h2>
+        <p class="text-sm text-gray-600">
+          Um demonstrativo por artista e mês. Só é possível fechar períodos já encerrados.
+          Com o rascunho criado, vendas e estornos daquele artista/mês ficam congelados.
+        </p>
         <p *ngIf="!statements.length" class="text-sm text-gray-500">
           Nenhum demonstrativo criado para este período.
         </p>
@@ -801,7 +899,7 @@
         </button>
       </div>
 
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <ng-container *ngIf="selectedStatement as statement; else selectStatementHint">
           <h2 class="font-amaranth text-xl font-bold">Demonstrativo #{{ statement.id }}</h2>
           <p class="text-sm text-gray-600">
@@ -834,37 +932,16 @@
           </div>
 
           <div *ngIf="can('PAYMENTS_RECORD') &&
-             (statement.status === 'APPROVED' || statement.status === 'PARTIALLY_PAID')"
-            class="space-y-3 rounded-xl bg-purple-50 p-4">
-            <h3 class="font-bold">Registrar pagamento realizado</h3>
-            <p class="text-xs text-gray-600">
-              Este registro não transfere dinheiro. Informe uma transferência já efetuada
-              e uma referência externa única para evitar baixas duplicadas.
-            </p>
-            <label class="block text-sm font-semibold">Valor pago (R$)
-              <input type="number" min=".01" step=".01" [(ngModel)]="paymentAmount"
-                class="mt-1 w-full rounded-lg border px-3 py-2">
-            </label>
-            <label class="block text-sm font-semibold">Data da transferência
-              <input type="date" [(ngModel)]="paymentDate"
-                class="mt-1 w-full rounded-lg border px-3 py-2">
-            </label>
-            <label class="block text-sm font-semibold">Referência da transferência
-              <input [(ngModel)]="paymentReference" maxlength="120"
-                placeholder="ID da transferência ou comprovante"
-                class="mt-1 w-full rounded-lg border px-3 py-2">
-            </label>
-            <label class="block text-sm font-semibold">Observações (opcional)
-              <textarea [(ngModel)]="paymentNotes" maxlength="5000" rows="2"
-                class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
-            </label>
-            <button type="button" [disabled]="saving || paymentAmount <= 0 || !paymentReference.trim()"
-              (click)="recordPayment()"
-              class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-              Registrar pagamento externo
+            (statement.status === 'APPROVED' || statement.status === 'PARTIALLY_PAID')"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-purple-50 p-3">
+            <span class="text-xs text-gray-700">
+              Pagamento bancário já realizado? Registre o repasse neste fechamento.
+            </span>
+            <button type="button" [disabled]="saving" (click)="openForm('payment')"
+              class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+              + Registrar pagamento
             </button>
           </div>
-
           <h3 class="font-bold">Pagamentos registrados</h3>
           <p *ngIf="!payments.length" class="text-sm text-gray-500">Nenhum pagamento registrado.</p>
           <article *ngFor="let payment of payments"
@@ -908,30 +985,6 @@
                 <p>Referência: {{ r.previousReference }} → {{ r.updatedReference }}</p>
                 <p>Observações: {{ r.previousNotes || '—' }} → {{ r.updatedNotes || '—' }}</p>
               </div>
-            </div>
-            <div *ngIf="editingPaymentMetadataId === payment.id"
-              class="mt-2 space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <p class="text-xs">Somente referência e observações. Valor e data do pagamento não mudam.</p>
-              <label class="block text-xs font-semibold">Referência bancária
-                <input [(ngModel)]="paymentMetadataReference" maxlength="120"
-                  class="mt-1 w-full rounded-lg border p-2">
-              </label>
-              <label class="block text-xs font-semibold">Observações
-                <textarea [(ngModel)]="paymentMetadataNotes" rows="2" maxlength="5000"
-                  class="mt-1 w-full rounded-lg border p-2"></textarea>
-              </label>
-              <label class="block text-xs font-semibold">Justificativa obrigatória
-                <textarea [(ngModel)]="paymentMetadataReason" rows="2" minlength="3" maxlength="500"
-                  class="mt-1 w-full rounded-lg border p-2"></textarea>
-              </label>
-              <button type="button" [disabled]="saving || !paymentMetadataReference.trim()
-                  || paymentMetadataReason.trim().length < 3"
-                (click)="submitPaymentMetadataCorrection()"
-                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-                Salvar retificação
-              </button>
-              <button type="button" (click)="cancelPaymentMetadataEdit()"
-                class="ml-2 rounded-lg border px-3 py-2 text-xs">Voltar</button>
             </div>
             <div *ngIf="access?.owner && payment.eventKind === 'PAYMENT'
                 && !artistPaymentWasReversed(payment.id)" class="mt-2">

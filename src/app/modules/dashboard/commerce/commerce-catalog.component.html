@@ -1,17 +1,5 @@
 <section class="mx-auto max-w-7xl space-y-6 p-5 md:p-10">
-  <header>
-    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Gestão interna · somente BraFurries</p>
-    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Catálogo Comercial</h1>
-    <p class="mt-2 max-w-3xl text-sm text-gray-600">
-      Obras e artistas, contratos assinados, fornecedores e produtos físicos, sem misturar
-      valores em reais à economia virtual do Discord.
-    </p>
-    <nav class="mt-4 flex flex-wrap gap-3 text-sm">
-      <a routerLink="/painel/gestao-comercial/financeiro"
-        class="font-semibold text-braPurple hover:underline">Financeiro</a>
-      <span class="font-bold text-gray-400" aria-current="page">Cadastros</span>
-    </nav>
-  </header>
+  <app-commerce-navigation active="catalogo"></app-commerce-navigation>
 
   <p *ngIf="loading" role="status" class="rounded-xl bg-white p-4 text-gray-600">Carregando cadastros...</p>
   <p *ngIf="errorMessage" role="alert"

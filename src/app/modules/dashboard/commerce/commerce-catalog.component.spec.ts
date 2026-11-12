@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
+import { CommerceNavigationComponent } from './commerce-navigation.component';
 import { of } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
@@ -72,7 +73,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.linkArtwork.and.returnValue(of(void 0));
 
     await TestBed.configureTestingModule({
-      declarations: [CommerceCatalogComponent],
+      declarations: [CommerceCatalogComponent, CommerceNavigationComponent],
       imports: [CommonModule, FormsModule, RouterTestingModule],
       providers: [
         { provide: PlatformAccessService, useValue: access },
@@ -384,5 +385,16 @@ describe('CommerceCatalogComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Assinado #21');
     expect(fixture.nativeElement.textContent).toContain('Registrar contrato assinado');
+  });
+
+  it('renders the same fixed navigation base and link order as Financeiro', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const nav = fixture.nativeElement.querySelector('nav[aria-label="Áreas da Gestão Comercial"]') as HTMLElement;
+    const links = Array.from(nav.querySelectorAll('a')) as HTMLAnchorElement[];
+    expect(links.map(link => link.textContent?.trim())).toEqual(['Financeiro', 'Cadastros']);
+    expect(links.map(link => new URL(link.href).pathname)).toEqual([
+      '/painel/gestao-comercial/financeiro', '/painel/gestao-comercial/catalogo'
+    ]);
+    expect(links[1].getAttribute('aria-current')).toBe('page');
   });
 });

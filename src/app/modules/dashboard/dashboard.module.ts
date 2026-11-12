@@ -25,6 +25,7 @@ import { CommunityAccessComponent } from './community-access/community-access.co
 import { CommerceAccessComponent } from './commerce/commerce-access.component';
 import { CommerceCatalogComponent } from './commerce/commerce-catalog.component';
 import { CommerceFinanceComponent } from './commerce/commerce-finance.component';
+import { CommerceNavigationComponent } from './commerce/commerce-navigation.component';
 import { CommerceArtistPortalComponent } from './commerce/commerce-artist-portal.component';
 import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
@@ -65,6 +66,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     CommerceAccessComponent,
     CommerceCatalogComponent,
     CommerceFinanceComponent,
+    CommerceNavigationComponent,
     CommerceArtistPortalComponent,
     CommunityActivityComponent,
     CommunityContextLayoutComponent,

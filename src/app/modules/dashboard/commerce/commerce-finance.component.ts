@@ -12,6 +12,8 @@ import {
 } from '../../../core/services/commerce-finance.service';
 
 type FinanceTab = 'sales' | 'orders' | 'royalties' | 'statements' | 'cash';
+type FinanceForm = 'sale' | 'order' | 'order-receipt' | 'cash' |
+  'statement' | 'payment' | 'cash-metadata' | 'payment-metadata';
 
 interface SaleDraftLine {
   batchId: number | null;
@@ -47,6 +49,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
 
   access: PlatformAccess | null = null;
   activeTab: FinanceTab = 'sales';
+  screen: 'browse' | 'form' = 'browse';
+  formKind: FinanceForm | null = null;
   loading = true;
   saving = false;
   errorMessage = '';
@@ -217,9 +221,111 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
 
   selectTab(tab: FinanceTab): void {
     if (!this.visibleTabs().some(item => item.key === tab)) return;
+    this.backToList();
     this.activeTab = tab;
     this.errorMessage = '';
     this.successMessage = '';
+  }
+
+  /** All financial entry/correction forms are exclusive to the record lists. */
+  openForm(kind: FinanceForm): void {
+    const has = (p: PlatformPermissionCode) => this.can(p);
+    const allowed =
+      (kind === 'sale' || kind === 'order' || kind === 'order-receipt')
+        ? has('SALES_MANAGE')
+        : (kind === 'cash' || kind === 'cash-metadata')
+          ? has('FINANCE_VIEW') && has('CASHFLOW_MANAGE')
+          : kind === 'statement'
+            ? has('FINANCE_VIEW') && has('SETTLEMENTS_MANAGE')
+            : has('FINANCE_VIEW') && has('PAYMENTS_RECORD');
+    if (!allowed) return;
+    const tab: FinanceTab =
+      kind === 'sale' ? 'sales'
+        : kind === 'order' || kind === 'order-receipt' ? 'orders'
+        : kind === 'cash' || kind === 'cash-metadata' ? 'cash' : 'statements';
+    if (kind === 'order-receipt' &&
+        (!this.selectedOrder || this.selectedOrder.status === 'CANCELLED')) return;
+    if ((kind === 'payment' || kind === 'payment-metadata') && !this.selectedStatement) return;
+    if (kind === 'payment' && !['APPROVED', 'PARTIALLY_PAID'].includes(this.selectedStatement!.status)) return;
+    if (kind === 'cash-metadata' && this.editingCashMetadataId == null) return;
+    if (kind === 'payment-metadata' && this.editingPaymentMetadataId == null) return;
+    if (kind === 'order') this.cancelEditOrder();
+    this.activeTab = tab;
+    this.formKind = kind;
+    this.screen = 'form';
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  backToList(): void {
+    // Explicitly leaving a form abandons its draft. An in-flight failed request
+    // stays on the form with its idempotency key so retry is still safe.
+    if (this.formKind === 'sale') {
+      this.saleRequestKey = '';
+      this.saleLines = [];
+      this.saleReference = '';
+      this.buyerLabel = '';
+      this.saleNotes = '';
+      this.saleProcessingProvider = '';
+      this.saleProcessingFeePercent = 0;
+      this.saleProcessingFeeFixed = 0;
+    }
+    if (this.formKind === 'order') this.cancelEditOrder();
+    if (this.formKind === 'order-receipt') {
+      this.orderReceiptKey = '';
+      this.orderReceiptAmount = 0;
+      this.orderReceiptReference = '';
+      this.orderReceiptNotes = '';
+    }
+    if (this.formKind === 'cash') {
+      this.cashRequestKey = '';
+      this.cashForm.amount = 0;
+      this.cashForm.description = '';
+      this.cashForm.counterpartyLabel = '';
+      this.cashForm.counterpartyUserId = null;
+      this.cashForm.externalReference = '';
+      this.cashForm.notes = '';
+    }
+    if (this.formKind === 'statement') this.statementArtistId = null;
+    if (this.formKind === 'payment') {
+      this.paymentRequestKey = '';
+      this.paymentAmount = 0;
+      this.paymentReference = '';
+      this.paymentNotes = '';
+    }
+    if (this.formKind === 'cash-metadata') this.cancelCashMetadataEdit();
+    if (this.formKind === 'payment-metadata') this.cancelPaymentMetadataEdit();
+    this.formKind = null;
+    this.screen = 'browse';
+    this.errorMessage = '';
+  }
+
+  get formTitle(): string {
+    const titles: Record<FinanceForm, string> = {
+      sale: 'Nova venda física', order: this.editingOrderId == null
+        ? 'Nova encomenda' : 'Corrigir encomenda',
+      'order-receipt': 'Anotar recebimento da encomenda',
+      cash: 'Nova movimentação de caixa',
+      statement: 'Novo fechamento mensal',
+      payment: 'Registrar pagamento ao artista',
+      'cash-metadata': 'Retificar lançamento de caixa',
+      'payment-metadata': 'Retificar registro de pagamento'
+    };
+    return this.formKind ? titles[this.formKind] : '';
+  }
+
+  get addAction(): { kind: FinanceForm; label: string } | null {
+    switch (this.activeTab) {
+      case 'sales': return this.can('SALES_MANAGE')
+        ? { kind: 'sale', label: 'Nova venda' } : null;
+      case 'orders': return this.can('SALES_MANAGE')
+        ? { kind: 'order', label: 'Nova encomenda' } : null;
+      case 'cash': return this.can('CASHFLOW_MANAGE') && this.can('FINANCE_VIEW')
+        ? { kind: 'cash', label: 'Nova movimentação' } : null;
+      case 'statements': return this.can('SETTLEMENTS_MANAGE') && this.can('FINANCE_VIEW')
+        ? { kind: 'statement', label: 'Novo fechamento' } : null;
+      default: return null;
+    }
   }
 
   reload(): void {
@@ -337,6 +443,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       processingFeePercent: this.saleProcessingFeePercent,
       processingFeeFixed: this.saleProcessingFeeFixed
     }), 'Venda registrada e royalties apurados.', () => {
+      this.formKind = null;
+      this.screen = 'browse';
       this.saleRequestKey = '';
       this.saleLines = [];
       this.saleReference = '';
@@ -402,6 +510,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       ? 'Encomenda cadastrada sem movimentação de estoque ou royalties.'
       : 'Encomenda aberta corrigida; histórico financeiro preservado.', () => {
       this.cancelEditOrder();
+      this.formKind = null;
+      this.screen = 'browse';
     });
   }
 
@@ -429,6 +539,9 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
           productId:item.productId,label:item.label,size:item.size,
           quantity:item.quantity,unitPrice:item.unitPrice
         }));
+        this.activeTab = 'orders';
+        this.formKind = 'order';
+        this.screen = 'form';
         this.errorMessage='';
       },
       error:()=>this.errorMessage='Não foi possível carregar os dados para correção.'
@@ -512,6 +625,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       externalReference:this.orderReceiptReference.trim() || null,
       notes:this.orderReceiptNotes.trim() || null
     }), 'Recebimento registrado apenas na encomenda (não no caixa).',() => {
+      this.formKind = null;
+      this.screen = 'browse';
       this.orderReceiptKey = '';
       this.orderReceiptAmount = 0;
       this.orderReceiptReference = '';
@@ -593,7 +708,11 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       || this.statementArtistId == null) return;
     this.mutate(this.finance.createStatement(
       this.statementArtistId,this.periodYear,this.periodMonth
-    ),'Demonstrativo mensal criado. Revise antes de aprovar.');
+    ),'Demonstrativo mensal criado. Revise antes de aprovar.', () => {
+      this.formKind = null;
+      this.screen = 'browse';
+      this.statementArtistId = null;
+    });
   }
 
   selectStatement(statement: CommerceStatement): void {
@@ -663,6 +782,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       paidOn:this.paymentDate,externalReference:this.paymentReference.trim(),
       notes:this.paymentNotes.trim() || null
     }), 'Pagamento externo registrado com auditoria.',() => {
+      this.formKind = null;
+      this.screen = 'browse';
       this.paymentRequestKey='';
       this.paymentAmount=0;
       this.paymentReference='';
@@ -677,6 +798,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     this.paymentMetadataReference=payment.externalReference;
     this.paymentMetadataNotes=payment.notes || '';
     this.paymentMetadataReason='';
+    this.openForm('payment-metadata');
   }
 
   cancelPaymentMetadataEdit(): void {
@@ -697,7 +819,11 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.paymentMetadataReference.trim(),this.paymentMetadataNotes.trim() || null,
       this.paymentMetadataReason.trim()),
       'Referência/observação retificada; valor do repasse e histórico preservados.',
-      ()=>this.cancelPaymentMetadataEdit());
+      ()=>{
+        this.cancelPaymentMetadataEdit();
+        this.formKind = null;
+        this.screen = 'browse';
+      });
   }
 
   togglePaymentMetadataHistory(paymentId:number): void {
@@ -771,6 +897,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     this.cashMetadataReference=movement.externalReference || '';
     this.cashMetadataNotes=movement.notes || '';
     this.cashMetadataReason='';
+    this.openForm('cash-metadata');
   }
 
   cancelCashMetadataEdit(): void {
@@ -790,7 +917,11 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.cashMetadataDescription.trim(),this.cashMetadataReference.trim() || null,
       this.cashMetadataNotes.trim() || null,this.cashMetadataReason.trim()),
       'Dados administrativos retificados; valor financeiro preservado.',
-      ()=>this.cancelCashMetadataEdit());
+      ()=>{
+        this.cancelCashMetadataEdit();
+        this.formKind = null;
+        this.screen = 'browse';
+      });
   }
 
   toggleCashMetadataHistory(id:number): void {
@@ -841,6 +972,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       externalReference:form.externalReference.trim() || null,
       notes:form.notes.trim() || null
     }), 'Movimentação registrada com histórico e auditoria.', () => {
+      this.formKind = null;
+      this.screen = 'browse';
       this.cashRequestKey = '';
       this.cashForm.amount = 0;
       this.cashForm.description = '';

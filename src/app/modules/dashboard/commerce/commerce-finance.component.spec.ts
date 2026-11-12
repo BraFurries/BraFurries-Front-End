@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
+import { CommerceNavigationComponent } from './commerce-navigation.component';
 import { of, throwError } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceFinanceService, CommerceStatement } from '../../../core/services/commerce-finance.service';
@@ -79,7 +80,7 @@ describe('CommerceFinanceComponent', () => {
     finance.discardStatement.and.returnValue(of(void 0));
 
     await TestBed.configureTestingModule({
-      declarations:[CommerceFinanceComponent],
+      declarations:[CommerceFinanceComponent, CommerceNavigationComponent],
       imports:[CommonModule,FormsModule,RouterTestingModule],
       providers:[
         {provide:PlatformAccessService,useValue:access},
@@ -476,5 +477,86 @@ describe('CommerceFinanceComponent', () => {
     expect(finance.artistPaymentMetadataHistory).toHaveBeenCalledWith(3,99);
     expect(component.paymentMetadataHistoryRows[0].updatedReference).toBe('PIX-B');
     expect(finance.correctArtistPaymentMetadata).not.toHaveBeenCalled();
+  });
+
+  it('uses the same stable commercial navigation labels and URL base', async () => {
+    await init(['SALES_MANAGE']);
+    const nav = fixture.nativeElement.querySelector('nav[aria-label="Áreas da Gestão Comercial"]') as HTMLElement;
+    const links = Array.from(nav.querySelectorAll('a')) as HTMLAnchorElement[];
+    expect(links.map(link => link.textContent?.trim())).toEqual(['Financeiro', 'Cadastros']);
+    expect(links.map(link => new URL(link.href).pathname)).toEqual([
+      '/painel/gestao-comercial/financeiro', '/painel/gestao-comercial/catalogo'
+    ]);
+    expect(links[0].getAttribute('aria-current')).toBe('page');
+  });
+
+  it('separates the sales form from its listing and goes back after saving', async () => {
+    await init(['SALES_MANAGE']);
+    expect(fixture.nativeElement.textContent).toContain('Histórico de vendas');
+    component.openForm('sale');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Registrar venda física');
+    expect(fixture.nativeElement.textContent).not.toContain('Histórico de vendas');
+    component.saleLines = [{batchId:1, quantity:1, unitPrice:60}];
+    component.createSale();
+    expect(finance.createSale).toHaveBeenCalled();
+    expect(component.screen).toBe('browse');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Histórico de vendas');
+  });
+
+  it('uses an exclusive form for cash records and respects cashflow grants', async () => {
+    await init(['FINANCE_VIEW']);
+    component.selectTab('cash');
+    component.openForm('cash');
+    expect(component.screen).toBe('browse');
+    component.access = {enabled:true,owner:false,permissions:['FINANCE_VIEW','CASHFLOW_MANAGE']};
+    component.openForm('cash');
+    fixture.detectChanges();
+    expect(component.screen).toBe('form');
+    expect(fixture.nativeElement.textContent).toContain('Nova entrada, saída ou aporte');
+    expect(fixture.nativeElement.textContent).not.toContain('Entradas, saídas e aportes registrados');
+    component.backToList();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Entradas, saídas e aportes registrados');
+  });
+
+  it('opens monthly closing and artist payout forms without displaying the statement list', async () => {
+    await init(['FINANCE_VIEW','SETTLEMENTS_MANAGE','PAYMENTS_RECORD']);
+    component.selectTab('statements');
+    component.openForm('statement');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Gerar rascunho');
+    expect(fixture.nativeElement.textContent).not.toContain('Fechamentos mensais');
+    component.backToList();
+    component.selectStatement(statement);
+    component.openForm('payment');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Registrar pagamento externo');
+    expect(fixture.nativeElement.textContent).not.toContain('Pagamentos registrados');
+  });
+
+  it('preserves draft order data while separating corrections and order receipts', async () => {
+    await init(['SALES_MANAGE']);
+    component.selectTab('orders');
+    component.openForm('order');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Cadastrar encomenda');
+    expect(fixture.nativeElement.textContent).not.toContain('Acompanhar encomendas');
+    component.backToList();
+    expect(component.editingOrderId).toBeNull();
+    component.openForm('order-receipt');
+    expect(component.screen).toBe('browse');
+  });
+
+  it('requires the correct grants to open payout and cash correction screens', async () => {
+    await init(['FINANCE_VIEW']);
+    component.selectTab('statements');
+    component.selectStatement(statement);
+    component.openForm('payment');
+    expect(component.screen).toBe('browse');
+    component.selectTab('cash');
+    component.openForm('cash-metadata');
+    expect(component.screen).toBe('browse');
   });
 });
