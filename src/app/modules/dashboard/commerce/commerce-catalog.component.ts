@@ -61,6 +61,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   contractMode: 'prepare' | 'upload' = 'prepare';
   selectedPreparationId: number | null = null;
   signedFileReviewed = false;
+  orphanedPdfKey = '';
   contractorParty = {legalName:'',document:'',address:'',representative:''};
   artistParty = {legalName:'',document:'',address:'',representative:''};
   links: CommerceProductArtwork[] = [];
@@ -747,6 +748,35 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       return;
     }
     this.contractFile = file;
+  }
+
+  deleteOrphanedContractPdf(): void {
+    if (!this.access?.owner || this.saving) return;
+    const key = this.orphanedPdfKey.trim();
+    if (!/^commerce\\/contracts\\/[1-9][0-9]*\\/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\\.pdf$/.test(key)) {
+      this.errorMessage = 'Informe a chave exata do PDF privado, no formato commerce/contracts/{arte}/{uuid}.pdf.';
+      return;
+    }
+    if (!window.confirm(
+      'Excluir definitivamente este PDF privado órfão do R2? ' +
+      'A API verificará antes que ele não esteja vinculado a contrato ou minuta.'
+    )) return;
+    this.saving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.catalog.deleteOrphanedContractPdf(key)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          this.saving = false;
+          this.orphanedPdfKey = '';
+          this.successMessage = 'PDF órfão removido do armazenamento privado.';
+        },
+        error: () => {
+          this.saving = false;
+          this.errorMessage = 'Não foi possível excluir o PDF órfão. ' +
+            'Confira a chave e se ele ainda está vinculado a um contrato ou minuta.';
+        }
+      });
   }
 
   discardUnusedTestContract(contract: CommerceSignedAgreement): void {
