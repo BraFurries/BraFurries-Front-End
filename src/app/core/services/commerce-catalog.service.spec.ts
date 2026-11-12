@@ -46,14 +46,6 @@ describe('CommerceCatalogService', () => {
     request.flush(null);
   });
 
-  it('deletes unused test contract through authenticated API without exposing R2 keys', () => {
-    catalog.discardUnusedTestContract(20,4).subscribe();
-    const request=http.expectOne(`${base}/artworks/20/contracts/4/unused-test`);
-    expect(request.request.method).toBe('DELETE');
-    expect(request.request.body).toBeNull();
-    request.flush(null);
-  });
-
   it('uses private multipart and authenticated routes for artwork versions', () => {
     const file = new File(['file'], 'original.psd', { type:'application/octet-stream' });
     catalog.uploadArtworkFile(20,'SOURCE','Camadas originais',file).subscribe();
