@@ -24,7 +24,7 @@
     Você não tem permissão para acessar os cadastros comerciais.
   </div>
   <ng-container *ngIf="!loading && visibleTabs().length">
-    <nav class="flex flex-wrap gap-2" aria-label="Seções do catálogo">
+    <nav *ngIf="screen === 'browse'" class="flex flex-wrap gap-2" aria-label="Seções do catálogo">
       <button *ngFor="let tab of visibleTabs()" type="button" (click)="selectTab(tab.key)"
         [attr.aria-current]="activeTab === tab.key ? 'page' : null"
         [ngClass]="activeTab === tab.key ? 'bg-braPurple text-white' : 'bg-white text-gray-700 hover:bg-purple-50'"
@@ -36,9 +36,30 @@
       </button>
     </nav>
 
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-purple-50 p-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wide text-braPurple">
+          {{ screen === 'browse' ? 'Visualização de registros' : 'Cadastro e edição' }}
+        </p>
+        <h2 class="font-amaranth text-xl font-bold text-braDark">{{ screen === 'browse' ? 'Catálogo e relacionamentos' : newLabel() }}</h2>
+        <p class="text-xs text-gray-600">{{ screen === 'browse'
+          ? 'Expanda o registro para consultar seus vínculos e documentos.'
+          : 'Salve os dados para retornar à visualização.' }}</p>
+      </div>
+      <button *ngIf="screen === 'browse' && activeTab !== 'contracts'" type="button"
+        (click)="openCreate(activeTab)"
+        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">
+        + {{ newLabel() }}
+      </button>
+      <button *ngIf="screen === 'form'" type="button" (click)="backToList()"
+        class="rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-braPurple">
+        Voltar à visualização
+      </button>
+    </div>
+
     <section *ngIf="activeTab === 'artworks' && can('ARTWORKS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ editingArtworkId == null ? 'Cadastrar arte' : 'Editar obra #' + editingArtworkId }}</h2>
         <p *ngIf="editingArtworkId != null" class="text-xs text-amber-800">
           Se houver contrato ou royalties, somente título e descrição poderão ser corrigidos.
@@ -124,7 +145,7 @@
         <button *ngIf="editingArtworkId != null" type="button" (click)="cancelEditArtwork()"
           class="ml-2 rounded-lg border px-4 py-2 font-bold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Artes cadastradas</h2>
         <p *ngIf="!artworks.length" class="text-sm text-gray-500">Nenhuma arte cadastrada.</p>
         <div *ngFor="let item of artworks" class="rounded-xl border p-4">
@@ -288,9 +309,8 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'templates' && can('CONTRACTS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <section *ngIf="activeTab === 'templates' && can('CONTRACTS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ editingTemplateId == null ? 'Novo modelo de contrato' : 'Editar modelo #' + editingTemplateId }}</h2>
         <label class="block text-sm font-semibold">Nome do modelo
           <input [(ngModel)]="templateForm.name" maxlength="160"
@@ -340,7 +360,7 @@
         <button *ngIf="editingTemplateId != null" type="button" (click)="cancelEditTemplate()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Modelos cadastrados</h2>
         <p *ngIf="!templates.length" class="text-sm text-gray-500">Nenhum modelo cadastrado.</p>
         <article *ngFor="let model of templates" class="rounded-xl border p-4">
@@ -447,9 +467,8 @@
       </article>
     </section>
 
-    <section *ngIf="activeTab === 'suppliers' && can('SUPPLIERS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5">
+    <section *ngIf="activeTab === 'suppliers' && can('SUPPLIERS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">{{ editingSupplierId == null ? 'Cadastrar fornecedor' : 'Editar fornecedor #' + editingSupplierId }}</h2>
         <label class="block text-sm font-semibold">Nome
           <input [(ngModel)]="supplierForm.name" maxlength="180"
@@ -478,7 +497,7 @@
         <button *ngIf="editingSupplierId != null" type="button" (click)="cancelEditSupplier()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">Fornecedores</h2>
         <p *ngIf="!suppliers.length" class="text-sm text-gray-500">Nenhum fornecedor cadastrado.</p>
         <article *ngFor="let supplier of suppliers" class="rounded-xl border p-4">
@@ -502,9 +521,8 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'products' && can('PRODUCTS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5">
+    <section *ngIf="activeTab === 'products' && can('PRODUCTS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">{{ editingProductId == null ? 'Cadastrar produto' : 'Editar produto #' + editingProductId }}</h2>
         <label class="block text-sm font-semibold">Código SKU
           <input [(ngModel)]="productForm.sku" maxlength="80" class="mt-1 w-full rounded-lg border px-3 py-2">
@@ -540,7 +558,7 @@
         <button *ngIf="editingProductId != null" type="button" (click)="cancelEditProduct()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">Catálogo de produtos</h2>
         <p *ngIf="!products.length" class="text-sm text-gray-500">Nenhum produto cadastrado.</p>
         <article *ngFor="let product of products" class="rounded-xl border p-4">
@@ -605,9 +623,8 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'production' && can('PRODUCTS_MANAGE') && can('SUPPLIERS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5">
+    <section *ngIf="activeTab === 'production' && can('PRODUCTS_MANAGE') && can('SUPPLIERS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">
           {{ editingBatchId == null ? 'Registrar lote de produção' : 'Corrigir lote #' + editingBatchId }}
         </h2>
@@ -665,7 +682,7 @@
             class="rounded-lg border px-4 py-2 font-semibold">Cancelar edição</button>
         </div>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">Lotes registrados</h2>
         <p *ngIf="!batches.length" class="text-sm text-gray-500">Nenhum lote produzido.</p>
         <article *ngFor="let batch of batches" class="rounded-xl border p-4">
