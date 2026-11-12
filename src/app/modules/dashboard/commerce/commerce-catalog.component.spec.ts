@@ -25,7 +25,7 @@ describe('CommerceCatalogComponent', () => {
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
-      'searchArtists','signContract','downloadContract','terminateContract',
+      'searchArtists','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
       'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
@@ -435,7 +435,7 @@ describe('CommerceCatalogComponent', () => {
         contractor:jasmine.objectContaining({legalName:'Responsável'}),
         artist:jasmine.objectContaining({legalName:'Artista titular'})
       }));
-    expect(catalog.signContract).not.toHaveBeenCalled();
+    expect(catalog.uploadSignedPreparation).not.toHaveBeenCalled();
     expect(component.screen).toBe('browse');
   });
 
