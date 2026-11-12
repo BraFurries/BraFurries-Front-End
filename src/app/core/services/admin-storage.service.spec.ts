@@ -32,9 +32,9 @@ describe('AdminStorageService', () => {
     const key='commerce/contracts/12/12345678-1234-1234-1234-123456789abc.pdf';
     service.inspect('PRIVATE',key).subscribe();
     const req=http.expectOne(request => request.url.endsWith('/objects/inspect'));
-    expect(req.request.method).toBe('GET');
-    expect(req.request.params.get('key')).toBe(key);
-    expect(req.request.params.get('bucket')).toBe('PRIVATE');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({bucket:'PRIVATE',key});
+    expect(req.request.params.keys()).toEqual([]);
     req.flush({ key, sizeBytes:12, lastModified:null, contentType:'application/pdf',
       etag:'"hash"', category:'CONTRACT_DOCUMENT', referenceStatus:'ORPHAN',
       referenceLabel:'Contrato', deletable:true });
