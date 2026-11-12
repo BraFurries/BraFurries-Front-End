@@ -257,6 +257,14 @@ export class UserService {
     );
   }
 
+  /** Bind a first-time Google identity using local password and fresh OAuth proof. */
+  connectGoogleLogin(ticket: string, password: string): Observable<SocialLoginChangeResult> {
+    return this.http.post<SocialLoginChangeResult>(
+      `${environment.apiBaseUrl}/user/me/social-logins/google/connect-oauth`,
+      { ticket, password }
+    );
+  }
+
   getLocalEmailProof(): Observable<LocalEmailProofStatus> {
     return this.http.get<LocalEmailProofStatus>(
       `${environment.apiBaseUrl}/user/me/local-email-verification`

@@ -40,7 +40,8 @@ describe('PerfilComponent', () => {
       'finishAccountConsolidation', 'getSocialLogins', 'disableSocialLogin',
       'enableDiscordLogin', 'finishSocialLoginSecurityChange',
       'getLocalEmailProof', 'requestLocalEmailProof',
-      'beginGoogleLoginProof', 'openGoogleReactivationOAuth', 'enableGoogleLogin'
+      'beginGoogleLoginProof', 'openGoogleReactivationOAuth', 'enableGoogleLogin',
+      'connectGoogleLogin'
     ]);
     userService.getSocialLogins.and.returnValue(of([]));
     userService.getLocalEmailProof.and.returnValue(of({email: 'luna@example.com', verified: true}));
@@ -461,6 +462,42 @@ describe('PerfilComponent', () => {
     expect(userService.beginGoogleLoginProof).toHaveBeenCalled();
     expect(userService.openGoogleReactivationOAuth).toHaveBeenCalledOnceWith('fresh-google-ticket');
     expect(userService.enableGoogleLogin).not.toHaveBeenCalled();
+  });
+
+  it('offers initial Google connection without starting another registration', () => {
+    component.socialLogins = [];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Conectar Google a esta conta');
+    userService.beginGoogleLoginProof.and.returnValue(of({ticket: 'new-google-ticket'}));
+    component.startGoogleConnection();
+    expect(userService.beginGoogleLoginProof).toHaveBeenCalledTimes(1);
+    expect(userService.openGoogleReactivationOAuth).toHaveBeenCalledWith('new-google-ticket');
+    expect(userService.connectGoogleLogin).not.toHaveBeenCalled();
+  });
+
+  it('connects Google only after independent OAuth proof and local password', () => {
+    component.socialLogins = [];
+    component.googleLoginTicket = 'confirmed-google-ticket';
+    component.socialLoginPassword = 'local-password';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Confirmar vínculo com Google');
+    userService.connectGoogleLogin.and.returnValue(of({status: 'RELOGIN_REQUIRED'}));
+
+    component.confirmGoogleConnection();
+
+    expect(userService.connectGoogleLogin)
+      .toHaveBeenCalledOnceWith('confirmed-google-ticket', 'local-password');
+    expect(userService.finishSocialLoginSecurityChange).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(component.googleLoginTicket).toBe('');
+  });
+
+  it('does not offer initial Google connection over an existing disabled identity', () => {
+    component.socialLogins = [{identityId: 19, provider: 'google', loginEnabled: false}];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Conectar Google a esta conta');
+    component.startGoogleConnection();
+    expect(userService.beginGoogleLoginProof).not.toHaveBeenCalled();
   });
 
   it('reenables Google with the OAuth ticket plus BraFurries password', () => {

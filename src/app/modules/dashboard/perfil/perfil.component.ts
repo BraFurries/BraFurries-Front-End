@@ -135,7 +135,17 @@ export class PerfilComponent implements OnInit, OnDestroy {
   }
 
   startGoogleLoginReactivation(): void {
-    if (this.googleLoginStarting || !this.hasDisabledSocialLogin('google')) return;
+    if (!this.hasDisabledSocialLogin('google')) return;
+    this.startGoogleProof();
+  }
+
+  startGoogleConnection(): void {
+    if (this.hasSocialLogin('google')) return;
+    this.startGoogleProof();
+  }
+
+  private startGoogleProof(): void {
+    if (this.googleLoginStarting) return;
     this.googleLoginStarting = true;
     this.googleLoginError = '';
     this.userService.beginGoogleLoginProof().pipe(takeUntil(this.destroy$)).subscribe({
@@ -173,6 +183,35 @@ export class PerfilComponent implements OnInit, OnDestroy {
           this.socialLoginPassword = '';
           this.googleLoginError =
             'Falha ao reativar o Google. Confira a senha e faça uma nova comprovação.';
+        }
+      });
+  }
+
+  confirmGoogleConnection(): void {
+    if (!this.googleLoginTicket || this.hasSocialLogin('google') ||
+        !this.socialLoginPassword || this.socialLoginChanging) {
+      this.googleLoginError = 'Confirme o Google e informe sua senha BraFurries.';
+      return;
+    }
+    this.socialLoginChanging = true;
+    this.googleLoginError = '';
+    this.userService.connectGoogleLogin(this.googleLoginTicket, this.socialLoginPassword)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          this.socialLoginChanging = false;
+          this.googleLoginTicket = '';
+          this.socialLoginPassword = '';
+          if (result.status === 'RELOGIN_REQUIRED') {
+            this.userService.finishSocialLoginSecurityChange();
+            this.router.navigate(['/login']);
+          } else {
+            this.loadSocialLogins();
+          }
+        },
+        error: () => {
+          this.socialLoginChanging = false;
+          this.socialLoginPassword = '';
+          this.googleLoginError = 'Não foi possível conectar o Google. Confira a senha, a confirmação de e-mail e se essa identidade já pertence a outra conta.';
         }
       });
   }
@@ -235,6 +274,10 @@ export class PerfilComponent implements OnInit, OnDestroy {
         this.socialLoginsError = 'Não foi possível consultar os métodos de acesso.';
       }
     });
+  }
+
+  hasSocialLogin(provider: 'google' | 'discord'): boolean {
+    return this.socialLogins.some(identity => identity.provider === provider);
   }
 
   hasDisabledSocialLogin(provider: 'google' | 'discord'): boolean {
