@@ -27,7 +27,7 @@ describe('CommerceCatalogComponent', () => {
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
-      'searchArtists','downloadContract','terminateContract','discardUnusedTestContract',
+      'searchArtists','downloadContract','terminateContract','discardUnusedTestContract','deleteOrphanedContractPdf',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
       'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
