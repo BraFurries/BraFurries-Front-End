@@ -753,7 +753,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   deleteOrphanedContractPdf(): void {
     if (!this.access?.owner || this.saving) return;
     const key = this.orphanedPdfKey.trim();
-    if (!/^commerce\\/contracts\\/[1-9][0-9]*\\/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\\.pdf$/.test(key)) {
+    if (!/^commerce\/contracts\/[1-9][0-9]*\/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\.pdf$/.test(key)) {
       this.errorMessage = 'Informe a chave exata do PDF privado, no formato commerce/contracts/{arte}/{uuid}.pdf.';
       return;
     }
