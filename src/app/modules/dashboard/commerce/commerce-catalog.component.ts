@@ -10,7 +10,7 @@ import {
 } from '../../../core/services/commerce-artist.service';
 import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch, CommerceBatchRevision,
-  CommerceCatalogService, CommerceContractTemplate, CommerceProduct,
+  CommerceCatalogService, CommerceContractTemplate, CommerceContractPreparation, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
 } from '../../../core/services/commerce-catalog.service';
 
@@ -55,6 +55,12 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   batchRevisions: CommerceBatchRevision[] = [];
   batchHistoryLoading = false;
   contracts: CommerceSignedAgreement[] = [];
+  preparations: CommerceContractPreparation[] = [];
+  contractMode: 'prepare' | 'upload' = 'prepare';
+  selectedPreparationId: number | null = null;
+  signedFileReviewed = false;
+  contractorParty = {legalName:'',document:'',address:'',representative:''};
+  artistParty = {legalName:'',document:'',address:'',representative:''};
   links: CommerceProductArtwork[] = [];
   artistCandidates: CommerceArtist[] = [];
   externalArtists: CommercialArtist[] = [];
@@ -80,7 +86,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
 
   templateForm = {
     name: '', description: '', modality: 'ROYALTY', royaltyMethod: 'PERCENT_GROSS',
-    royaltyPercent: 10 as number | null, royaltyFixedAmount: null as number | null
+    royaltyPercent: 10 as number | null, royaltyFixedAmount: null as number | null,
+    fullText: ''
   };
   artworkForm = { title: '', description: '', artistUserId: null as number | null, creationCost: 0 };
   supplierForm = { name: '', contactName: '', email: '', phone: '', notes: '' };
@@ -182,10 +189,15 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       this.allocation = null;
     }
     if (tab === 'contracts') {
+      this.contractMode = 'prepare';
+      this.selectedPreparationId = null;
       this.contractFile = null;
+      this.signedFileReviewed = false;
       this.contractForm.templateId = null;
       this.contractForm.effectiveUntil = '';
       this.contractForm.oneTimeAmount = 0;
+      this.contractorParty = {legalName:'',document:'',address:'',representative:''};
+      this.artistParty = {legalName:'',document:'',address:'',representative:''};
     }
     this.returnToArtworkForm = returningFromArtwork;
     if (tab === 'files' || tab === 'contracts') {
@@ -219,7 +231,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   newLabel(): string {
     const labels: Record<CatalogTab, string> = {
       artworks: 'Nova arte', artists: 'Novo artista', files: 'Novo arquivo',
-      templates: 'Novo modelo', contracts: 'Novo contrato assinado',
+      templates: 'Novo modelo', contracts: 'Preparar contrato para assinatura',
       suppliers: 'Novo fornecedor', products: 'Novo produto',
       links: 'Vincular arte', production: 'Novo lote'
     };
@@ -483,23 +495,28 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.screen='form';
     this.editingTemplateId=model.id;
     this.templateForm={
-      name:model.name,description:model.description || '',modality:model.modality,
-      royaltyMethod:model.royaltyMethod,royaltyPercent:model.royaltyPercent,
-      royaltyFixedAmount:model.royaltyFixedAmount
+      name:model.name,description:model.description || '',fullText:model.fullText || '',
+      modality:model.modality,royaltyMethod:model.royaltyMethod,
+      royaltyPercent:model.royaltyPercent,royaltyFixedAmount:model.royaltyFixedAmount
     };
   }
 
   cancelEditTemplate(): void {
     this.editingTemplateId=null;
     this.templateForm={name:'',description:'',modality:'ROYALTY',royaltyMethod:'PERCENT_GROSS',
-      royaltyPercent:10,royaltyFixedAmount:null};
+      royaltyPercent:10,royaltyFixedAmount:null,fullText:''};
   }
 
   createTemplate(): void {
     if (!this.can('CONTRACTS_MANAGE')) return;
     const form=this.templateForm;
+    if (!form.fullText.trim()) {
+      this.errorMessage='Escreva as cláusulas, termos e concessões do contrato antes de salvar.';
+      return;
+    }
     const payload={
-      name:form.name,description:form.description || null,modality:form.modality,
+      name:form.name,description:form.description || null,fullText:form.fullText,
+      modality:form.modality,
       royaltyMethod:form.royaltyMethod,
       royaltyPercent:form.royaltyMethod.startsWith('PERCENT_')?form.royaltyPercent:null,
       royaltyFixedAmount:form.royaltyMethod.startsWith('FIXED_')?form.royaltyFixedAmount:null
@@ -720,22 +737,6 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.contractFile = file;
   }
 
-  signContract(): void {
-    if (!this.can('CONTRACTS_MANAGE') || this.selectedArtworkId == null
-      || this.contractForm.templateId == null || !this.contractFile) {
-      this.errorMessage = 'Escolha a arte, o modelo e o PDF assinado.';
-      return;
-    }
-    if (!window.confirm('Confirma que este PDF está assinado e contém os termos válidos do contrato?')) return;
-    this.mutate(this.catalog.signContract(this.selectedArtworkId,{
-      templateId: this.contractForm.templateId,
-      effectiveFrom: this.contractForm.effectiveFrom,
-      effectiveUntil: this.contractForm.effectiveUntil || null,
-      oneTimeAmount: this.contractForm.oneTimeAmount,
-      file: this.contractFile
-    }), 'Contrato assinado registrado e vinculado à arte.');
-  }
-
   terminateContract(contract: CommerceSignedAgreement): void {
     if (!this.can('CONTRACTS_MANAGE') || contract.status !== 'ACTIVE') return;
     if (!window.confirm(
@@ -836,10 +837,23 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   reloadContracts(): void {
     if (!this.can('CONTRACTS_MANAGE') || this.selectedArtworkId == null) {
       this.contracts = [];
+      this.preparations = [];
       return;
     }
     this.contracts = [];
+    this.preparations = [];
     const artworkId = this.selectedArtworkId;
+    this.catalog.contractPreparations(artworkId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: items => {
+          if (this.selectedArtworkId === artworkId) this.preparations = items;
+        },
+        error: () => {
+          if (this.selectedArtworkId === artworkId) {
+            this.errorMessage = 'Falha ao carregar as minutas de contrato.';
+          }
+        }
+      });
     this.catalog.contracts(artworkId)
       .pipe(takeUntil(this.destroy$)).subscribe({
         next: items => {
@@ -851,6 +865,103 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
           }
         }
       });
+  }
+
+  /** Drafts are not effective contracts. No signed document is stored until step 2. */
+  prepareContract(): void {
+    const artworkId = this.selectedArtworkId;
+    const form = this.contractForm;
+    if (!this.can('CONTRACTS_MANAGE') || artworkId == null ||
+        form.templateId == null || !form.effectiveFrom ||
+        [this.contractorParty,this.artistParty].some(p =>
+          !p.legalName.trim() || !p.document.trim() || !p.address.trim())) {
+      this.errorMessage = 'Informe a arte, modelo, vigência e identificação legal das duas partes.';
+      return;
+    }
+    const selected = this.templates.find(t => t.id === form.templateId);
+    if (!selected?.active || !selected.fullText?.trim()) {
+      this.errorMessage = 'Este modelo precisa de cláusulas completas antes da geração.';
+      return;
+    }
+    this.mutate(this.catalog.prepareContract(artworkId,{
+      templateId:form.templateId,
+      effectiveFrom:form.effectiveFrom,
+      effectiveUntil:form.effectiveUntil || null,
+      oneTimeAmount:form.oneTimeAmount,
+      contractor: {
+        ...this.contractorParty,representative:this.contractorParty.representative || null
+      },
+      artist: {
+        ...this.artistParty,representative:this.artistParty.representative || null
+      }
+    }), 'Minuta gerada e guardada em arquivo privado. Baixe o PDF para assinatura.', () => {
+      this.contractMode = 'prepare';
+    });
+  }
+
+  openUploadPreparation(item: CommerceContractPreparation): void {
+    if (!this.can('CONTRACTS_MANAGE') || item.status !== 'PENDING' ||
+        item.artworkId !== this.selectedArtworkId) return;
+    this.selectedPreparationId = item.id;
+    this.contractMode = 'upload';
+    this.contractFile = null;
+    this.signedFileReviewed = false;
+    this.activeTab = 'contracts';
+    this.screen = 'form';
+    this.errorMessage = '';
+  }
+
+  uploadSignedPreparation(): void {
+    if (!this.can('CONTRACTS_MANAGE') || this.selectedArtworkId == null ||
+        this.selectedPreparationId == null || !this.contractFile ||
+        !this.signedFileReviewed) {
+      this.errorMessage = 'Selecione o PDF assinado e confirme a conferência das partes e assinaturas.';
+      return;
+    }
+    if (this.contractFile.size > 8*1024*1024 ||
+        (this.contractFile.type && this.contractFile.type !== 'application/pdf')) {
+      this.errorMessage = 'O contrato assinado deve ser um PDF de até 8 MB.';
+      return;
+    }
+    this.mutate(this.catalog.uploadSignedPreparation(
+      this.selectedArtworkId,this.selectedPreparationId,this.contractFile),
+      'Contrato assinado registrado. A obra agora utiliza as condições congeladas da minuta.',
+      () => {
+        this.selectedPreparationId = null;
+        this.contractFile = null;
+        this.signedFileReviewed = false;
+        this.contractMode = 'prepare';
+      });
+  }
+
+  downloadPreparation(item: CommerceContractPreparation): void {
+    if (!this.can('CONTRACTS_MANAGE') || item.artworkId !== this.selectedArtworkId) return;
+    this.catalog.downloadPreparation(item.artworkId,item.id)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: blob => {
+          const url=URL.createObjectURL(blob);
+          const anchor=document.createElement('a');
+          anchor.href=url;
+          anchor.download='contrato-para-assinatura-' + item.id + '.pdf';
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          setTimeout(()=>URL.revokeObjectURL(url),5000);
+        },
+        error: () => this.errorMessage='Não foi possível baixar a minuta privada.'
+      });
+  }
+
+  cancelPreparation(item: CommerceContractPreparation): void {
+    if (!this.can('CONTRACTS_MANAGE') || item.status !== 'PENDING' ||
+        item.artworkId !== this.selectedArtworkId || this.saving) return;
+    if (!window.confirm('Cancelar esta minuta? Um novo documento precisará ser gerado e assinado.')) return;
+    this.mutate(this.catalog.cancelPreparation(item.artworkId,item.id),
+      'Minuta cancelada, com histórico preservado.');
+  }
+
+  get hasPendingPreparation(): boolean {
+    return this.preparations.some(item => item.status === 'PENDING');
   }
 
   reloadLinks(): void {

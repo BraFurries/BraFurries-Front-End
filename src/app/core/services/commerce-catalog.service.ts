@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 
 export interface CreatedCommerceEntity { id: number; }
 export interface CommerceContractTemplate {
-  id: number; name: string; description: string | null; modality: string;
+  id: number; name: string; description: string | null; fullText: string | null; modality: string;
   royaltyMethod: string; royaltyPercent: number | null; royaltyFixedAmount: number | null; active: boolean;
 }
 export interface CommerceArtist { id: number; name: string; }
@@ -48,8 +48,22 @@ export interface CommerceSignedAgreement {
   sha256: string; sizeBytes: number; status: 'ACTIVE' | 'TERMINATED';
 }
 export interface CreateTemplateInput {
-  name: string; description: string | null; modality: string; royaltyMethod: string;
-  royaltyPercent: number | null; royaltyFixedAmount: number | null;
+  name: string; description: string | null; fullText: string; modality: string;
+  royaltyMethod: string; royaltyPercent: number | null; royaltyFixedAmount: number | null;
+}
+export interface ContractPartyInput {
+  legalName: string; document: string; address: string; representative: string | null;
+}
+export interface PrepareContractInput {
+  templateId: number;
+  effectiveFrom: string; effectiveUntil: string | null; oneTimeAmount: number;
+  contractor: ContractPartyInput; artist: ContractPartyInput;
+}
+export interface CommerceContractPreparation {
+  id: number; artworkId: number; templateId: number; artistUserId: number;
+  templateName: string; status: 'PENDING' | 'SIGNED' | 'CANCELLED';
+  signedContractId: number | null; effectiveFrom: string; effectiveUntil: string | null;
+  createdAt: string; completedAt: string | null;
 }
 export interface CreateArtworkInput {
   title: string; description: string | null; artistUserId: number; creationCost: number;
@@ -228,19 +242,37 @@ export class CommerceCatalogService {
     return this.http.get<CommerceSignedAgreement[]>(`${this.base}/artworks/${artworkId}/contracts`);
   }
 
-  signContract(artworkId: number, input: {
-    templateId: number; effectiveFrom: string; effectiveUntil: string | null;
-    oneTimeAmount: number; file: File;
-  }): Observable<CreatedCommerceEntity> {
-    const body = new FormData();
-    body.append('templateId',String(input.templateId));
-    body.append('effectiveFrom',input.effectiveFrom);
-    if (input.effectiveUntil) body.append('effectiveUntil',input.effectiveUntil);
-    body.append('oneTimeAmount',input.oneTimeAmount.toFixed(2));
-    body.append('file',input.file,input.file.name);
-    // Browser defines multipart boundary. Never force Content-Type manually.
+  contractPreparations(artworkId: number): Observable<CommerceContractPreparation[]> {
+    return this.http.get<CommerceContractPreparation[]>(
+      `${this.base}/artworks/${artworkId}/contract-preparations`
+    );
+  }
+
+  prepareContract(artworkId: number,input: PrepareContractInput): Observable<CreatedCommerceEntity> {
     return this.http.post<CreatedCommerceEntity>(
-      `${this.base}/artworks/${artworkId}/contracts`,body
+      `${this.base}/artworks/${artworkId}/contract-preparations`,input
+    );
+  }
+
+  downloadPreparation(artworkId: number,preparationId: number): Observable<Blob> {
+    return this.http.get(
+      `${this.base}/artworks/${artworkId}/contract-preparations/${preparationId}/download`,
+      { responseType:'blob' }
+    );
+  }
+
+  uploadSignedPreparation(artworkId: number,preparationId: number,file: File): Observable<CreatedCommerceEntity> {
+    const body = new FormData();
+    body.append('reviewed','true');
+    body.append('file',file,file.name);
+    return this.http.post<CreatedCommerceEntity>(
+      `${this.base}/artworks/${artworkId}/contract-preparations/${preparationId}/signed`,body
+    );
+  }
+
+  cancelPreparation(artworkId: number,preparationId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/artworks/${artworkId}/contract-preparations/${preparationId}/cancel`,{}
     );
   }
 

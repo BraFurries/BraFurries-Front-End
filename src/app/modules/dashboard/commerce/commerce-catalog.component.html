@@ -349,11 +349,19 @@
           <textarea [(ngModel)]="templateForm.description" rows="3" maxlength="5000"
             class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
         </label>
-        <p class="text-xs text-gray-500">
-          Este é um modelo de regras, não um contrato assinado. As condições serão congeladas
-          quando o contrato efetivo for registrado.
+        <label class="block text-sm font-semibold">
+          Texto integral do contrato: cláusulas, termos e concessões
+          <textarea [(ngModel)]="templateForm.fullText" rows="18" maxlength="60000"
+            placeholder="1. OBJETO&#10;...&#10;2. DIREITOS E CONCESSÕES&#10;...&#10;3. OBRIGAÇÕES DAS PARTES&#10;..."
+            class="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm"></textarea>
+        </label>
+        <p class="text-xs text-gray-600">
+          Escreva todas as cláusulas do acordo. A plataforma acrescenta automaticamente
+          qualificação das partes, condições financeiras, vigência e duas linhas de assinatura
+          ao gerar o PDF. O modelo pode ser editado, mas as minutas já emitidas são preservadas.
+          Limite: 60.000 caracteres; texto simples, sem HTML ou scripts.
         </p>
-        <button type="button" [disabled]="saving || !templateForm.name" (click)="createTemplate()"
+        <button type="button" [disabled]="saving || !templateForm.name || !templateForm.fullText.trim()" (click)="createTemplate()"
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingTemplateId == null ? 'Cadastrar modelo' : 'Salvar alterações' }}
         </button>
@@ -373,6 +381,15 @@
             Valor fixo: {{ model.royaltyFixedAmount | currency:'BRL' }}
           </p>
           <p class="mt-1 text-xs text-gray-500">{{ model.active ? 'Ativo' : 'Desativado' }}</p>
+          <div *ngIf="model.fullText; else legacyContract" class="mt-3 rounded-lg border bg-gray-50 p-3">
+            <p class="mb-2 text-xs font-bold text-braDark">Cláusulas e concessões cadastradas</p>
+            <p class="max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700">{{ model.fullText }}</p>
+          </div>
+          <ng-template #legacyContract>
+            <p class="mt-2 text-xs font-semibold text-amber-800">
+              Modelo antigo sem texto integral — edite antes de gerar contratos.
+            </p>
+          </ng-template>
           <div class="mt-3 flex flex-wrap gap-2">
             <button type="button" [disabled]="saving" (click)="startEditTemplate(model)"
               class="rounded-lg border px-3 py-2 text-sm font-semibold">Editar</button>
@@ -389,56 +406,176 @@
 
     <section *ngIf="activeTab === 'contracts' && can('CONTRACTS_MANAGE')"
       class="space-y-5 rounded-2xl border bg-white p-5 shadow-sm">
-      <h2 class="font-amaranth text-xl font-bold">Contratos assinados por arte</h2>
-      <p class="text-sm text-gray-600">O PDF fica em bucket privado. Apenas quem pode gerenciar contratos pode baixá-lo.</p>
+      <h2 class="font-amaranth text-xl font-bold">Contratos, minutas e assinaturas</h2>
+      <p class="text-sm text-gray-600">
+        Primeiro gere o documento pronto, baixe-o e recolha as assinaturas fora da plataforma.
+        Depois envie o PDF assinado e confira-o. Minutas não ativam direitos nem royalties.
+        Todos os documentos são privados.
+      </p>
       <label class="block max-w-xl text-sm font-semibold">Arte contratada
         <select [(ngModel)]="selectedArtworkId" (ngModelChange)="reloadContracts()"
+          [disabled]="screen === 'form'"
           class="mt-1 w-full rounded-lg border px-3 py-2">
           <option *ngFor="let art of artworks" [ngValue]="art.id">
             {{ art.title }} — {{ art.artistName }}
           </option>
         </select>
       </label>
-      <button *ngIf="screen === 'browse' && selectedArtworkId != null" type="button"
-        (click)="openCreate('contracts', selectedArtworkId)"
-        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">+ Registrar contrato assinado</button>
-      <div *ngIf="screen === 'form' && selectedArtworkId != null"
-        class="grid gap-4 rounded-xl bg-gray-50 p-4 md:grid-cols-2">
-        <label class="text-sm font-semibold">Modelo de contrato
-          <select [(ngModel)]="contractForm.templateId" class="mt-1 w-full rounded-lg border px-3 py-2">
-            <option [ngValue]="null">Selecione um modelo</option>
-            <option *ngFor="let model of templates" [ngValue]="model.id" [disabled]="!model.active">
-              {{ model.name }}
-            </option>
-          </select>
-        </label>
-        <label class="text-sm font-semibold">Pagamento único previsto (R$)
-          <input type="number" min="0" step=".01" [(ngModel)]="contractForm.oneTimeAmount"
-            class="mt-1 w-full rounded-lg border px-3 py-2">
-        </label>
-        <label class="text-sm font-semibold">Vigência a partir de
-          <input type="date" [(ngModel)]="contractForm.effectiveFrom"
-            class="mt-1 w-full rounded-lg border px-3 py-2">
-        </label>
-        <label class="text-sm font-semibold">Término de vigência (opcional)
-          <input type="date" [(ngModel)]="contractForm.effectiveUntil"
-            class="mt-1 w-full rounded-lg border px-3 py-2">
-        </label>
-        <label class="text-sm font-semibold md:col-span-2">Contrato assinado em PDF (até 8 MB)
+      <button *ngIf="screen === 'browse' && selectedArtworkId != null && !hasPendingPreparation"
+        type="button" (click)="openCreate('contracts',selectedArtworkId)"
+        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">
+        + Gerar contrato para assinatura
+      </button>
+      <p *ngIf="screen === 'browse' && hasPendingPreparation"
+        class="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+        Já existe uma minuta aguardando assinatura para esta arte.
+        Utilize-a ou cancele-a antes de gerar outra.
+      </p>
+
+      <div *ngIf="screen === 'form' && contractMode === 'prepare' && selectedArtworkId != null"
+        class="max-w-4xl space-y-5 rounded-xl bg-gray-50 p-4">
+        <h3 class="font-amaranth text-lg font-bold">1 · Preparar documento</h3>
+        <p class="text-sm text-gray-600">
+          As informações legais são fornecidas manualmente. Não usamos automaticamente o
+          nome artístico, apelidos, CPF ou e-mail de contas sociais.
+        </p>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="text-sm font-semibold">Modelo com cláusulas completas
+            <select [(ngModel)]="contractForm.templateId" class="mt-1 w-full rounded-lg border px-3 py-2">
+              <option [ngValue]="null">Selecione o modelo</option>
+              <option *ngFor="let model of templates" [ngValue]="model.id"
+                [disabled]="!model.active || !model.fullText">
+                {{ model.name }} {{ !model.fullText ? '(preencher cláusulas)' : '' }}
+              </option>
+            </select>
+          </label>
+          <label class="text-sm font-semibold">Pagamento único previsto (R$)
+            <input type="number" min="0" step=".01" [(ngModel)]="contractForm.oneTimeAmount"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="text-sm font-semibold">Vigência a partir de
+            <input type="date" [(ngModel)]="contractForm.effectiveFrom"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <label class="text-sm font-semibold">Término (opcional)
+            <input type="date" [(ngModel)]="contractForm.effectiveUntil"
+              class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+        </div>
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-3 rounded-lg border bg-white p-4">
+            <h4 class="font-bold text-braPurple">Contratante · responsável pela BraFurries</h4>
+            <label class="block text-sm font-semibold">Nome legal / razão social
+              <input [(ngModel)]="contractorParty.legalName" maxlength="180"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Documento (CPF/CNPJ ou equivalente)
+              <input [(ngModel)]="contractorParty.document" maxlength="32"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Endereço completo
+              <textarea [(ngModel)]="contractorParty.address" rows="2" maxlength="500"
+                class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+            </label>
+            <label class="block text-sm font-semibold">Representante legal (se aplicável)
+              <input [(ngModel)]="contractorParty.representative" maxlength="180"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+          </div>
+          <div class="space-y-3 rounded-lg border bg-white p-4">
+            <h4 class="font-bold text-braPurple">Contratado(a) · titular da obra</h4>
+            <label class="block text-sm font-semibold">Nome legal / razão social
+              <input [(ngModel)]="artistParty.legalName" maxlength="180"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Documento (CPF/CNPJ ou equivalente)
+              <input [(ngModel)]="artistParty.document" maxlength="32"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+            <label class="block text-sm font-semibold">Endereço completo
+              <textarea [(ngModel)]="artistParty.address" rows="2" maxlength="500"
+                class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+            </label>
+            <label class="block text-sm font-semibold">Representante legal (se aplicável)
+              <input [(ngModel)]="artistParty.representative" maxlength="180"
+                class="mt-1 w-full rounded-lg border px-3 py-2">
+            </label>
+          </div>
+        </div>
+        <p class="rounded-lg bg-purple-50 p-3 text-xs text-gray-700">
+          A plataforma incluirá a obra, as partes, os termos integrais, os valores,
+          a vigência e as linhas para assinatura. Nenhuma assinatura é criada automaticamente.
+        </p>
+        <button type="button" [disabled]="saving || contractForm.templateId == null ||
+          !contractorParty.legalName.trim() || !contractorParty.document.trim() ||
+          !contractorParty.address.trim() || !artistParty.legalName.trim() ||
+          !artistParty.document.trim() || !artistParty.address.trim()"
+          (click)="prepareContract()"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          Gerar PDF para assinatura
+        </button>
+      </div>
+
+      <div *ngIf="screen === 'form' && contractMode === 'upload' && selectedPreparationId != null"
+        class="max-w-3xl space-y-4 rounded-xl border bg-gray-50 p-5">
+        <h3 class="font-amaranth text-lg font-bold">2 · Receber contrato assinado</h3>
+        <p class="text-sm text-gray-700">
+          Minuta #{{ selectedPreparationId }}. Faça upload somente após as duas partes
+          assinarem o documento gerado e você conferir que termos, partes e valores
+          correspondem ao PDF originalmente enviado para assinatura.
+        </p>
+        <label class="block text-sm font-semibold">Contrato assinado (PDF de até 8 MB)
           <input type="file" accept=".pdf,application/pdf" (change)="onContractFile($event)"
             class="mt-1 block w-full rounded-lg border bg-white p-2 text-sm">
         </label>
-        <div class="md:col-span-2">
-          <button type="button" [disabled]="saving || contractForm.templateId == null || !contractFile"
-            (click)="signContract()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
-            Registrar contrato assinado
-          </button>
-          <p class="mt-2 text-xs text-gray-500">
-            O registro aplica a versão atual do modelo à arte. Só pode haver um contrato ativo por obra.
-          </p>
-        </div>
+        <label class="flex items-start gap-2 text-sm font-semibold">
+          <input type="checkbox" [(ngModel)]="signedFileReviewed" class="mt-1">
+          <span>Conferi as identidades, as cláusulas, a vigência e as assinaturas
+            presentes no arquivo. Entendo que o sistema não autentica assinaturas.</span>
+        </label>
+        <button type="button" [disabled]="saving || !contractFile || !signedFileReviewed"
+          (click)="uploadSignedPreparation()"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          Registrar PDF assinado
+        </button>
       </div>
+
       <ng-container *ngIf="screen === 'browse'">
+        <div class="space-y-3">
+          <h3 class="font-amaranth text-lg font-bold">Documentos gerados</h3>
+          <p *ngIf="!preparations.length" class="text-sm text-gray-500">
+            Nenhuma minuta gerada para esta arte.
+          </p>
+          <article *ngFor="let item of preparations" class="rounded-xl border p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <strong>Minuta #{{ item.id }} · {{ item.templateName }}</strong>
+              <span class="text-xs font-bold">
+                {{ item.status === 'PENDING' ? 'Aguardando assinatura' :
+                   item.status === 'SIGNED' ? 'Assinada e registrada' : 'Cancelada' }}
+              </span>
+            </div>
+            <p class="mt-1 text-xs text-gray-600">
+              Vigência: {{ item.effectiveFrom }} até {{ item.effectiveUntil || 'indeterminada' }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button type="button" (click)="downloadPreparation(item)"
+                class="rounded-lg border px-3 py-2 text-sm font-semibold">
+                Baixar PDF gerado
+              </button>
+              <button *ngIf="item.status === 'PENDING'" type="button"
+                (click)="openUploadPreparation(item)"
+                class="rounded-lg bg-braPurple px-3 py-2 text-sm font-bold text-white">
+                Enviar contrato assinado
+              </button>
+              <button *ngIf="item.status === 'PENDING'" type="button" [disabled]="saving"
+                (click)="cancelPreparation(item)"
+                class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
+                Cancelar minuta
+              </button>
+            </div>
+          </article>
+        </div>
+        <h3 class="border-t pt-4 font-amaranth text-lg font-bold">Contratos assinados</h3>
       <p *ngIf="selectedArtworkId != null && !contracts.length" class="text-sm text-gray-500">
         Esta arte ainda não tem contratos registrados.
       </p>
@@ -477,6 +614,7 @@
           </button>
         </div>
       </article>
+
       </ng-container>
     </section>
 
