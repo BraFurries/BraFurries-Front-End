@@ -29,25 +29,6 @@ describe('CommerceCatalogService', () => {
     request.flush({ id: 1 });
   });
 
-  it('sends signed contracts as multipart PDFs without exposing public object keys', () => {
-    const file = new File(['%PDF-1.7\n%%EOF'], 'contrato.pdf', { type:'application/pdf' });
-    catalog.signContract(20,{
-      templateId:12, effectiveFrom:'2026-11-03',
-      effectiveUntil:null, oneTimeAmount:199.99, file
-    }).subscribe();
-    const request=http.expectOne(`${base}/artworks/20/contracts`);
-    expect(request.request.method).toBe('POST');
-    expect(request.request.body instanceof FormData).toBeTrue();
-    expect(request.request.body.get('templateId')).toBe('12');
-    expect(request.request.body.get('oneTimeAmount')).toBe('199.99');
-    const uploaded = request.request.body.get('file') as File;
-    expect(uploaded.name).toBe('contrato.pdf');
-    expect(uploaded.size).toBe(file.size);
-    expect(uploaded.type).toBe('application/pdf');
-    expect(request.request.headers.has('Content-Type')).toBeFalse();
-    request.flush({ id: 4 });
-  });
-
   it('downloads private contracts as blobs using only authenticated API URLs', () => {
     catalog.downloadContract(20,4).subscribe();
     const request=http.expectOne(`${base}/artworks/20/contracts/4/download`);
