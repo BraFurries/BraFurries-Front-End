@@ -53,7 +53,7 @@
       </button>
       <button *ngIf="screen === 'form'" type="button" (click)="backToList()"
         class="rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-braPurple">
-        Voltar à visualização
+        {{ returnToArtworkForm && activeTab === 'artists' ? 'Voltar ao cadastro da arte' : 'Voltar à visualização' }}
       </button>
     </div>
 
@@ -109,7 +109,7 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingArtworkId == null ? 'Cadastrar arte' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingArtworkId != null" type="button" (click)="cancelEditArtwork()"
+        <button *ngIf="editingArtworkId != null" type="button" (click)="cancelEditArtwork(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 font-bold">Cancelar edição</button>
       </div>
       <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
@@ -208,7 +208,7 @@
               class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
               {{ editingArtistId == null ? 'Salvar artista externa e selecionar' : 'Salvar alterações' }}
             </button>
-            <button *ngIf="editingArtistId != null" type="button" (click)="cancelEditArtist()"
+            <button *ngIf="editingArtistId != null" type="button" (click)="cancelEditArtist(); backToList()"
               class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
           </div>
     </section>
@@ -369,7 +369,7 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingTemplateId == null ? 'Cadastrar modelo' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingTemplateId != null" type="button" (click)="cancelEditTemplate()"
+        <button *ngIf="editingTemplateId != null" type="button" (click)="cancelEditTemplate(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
       <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
@@ -519,7 +519,7 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingSupplierId == null ? 'Cadastrar fornecedor' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingSupplierId != null" type="button" (click)="cancelEditSupplier()"
+        <button *ngIf="editingSupplierId != null" type="button" (click)="cancelEditSupplier(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
       <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
@@ -580,7 +580,7 @@
           (click)="createProduct()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingProductId == null ? 'Cadastrar produto' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingProductId != null" type="button" (click)="cancelEditProduct()"
+        <button *ngIf="editingProductId != null" type="button" (click)="cancelEditProduct(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
       <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
@@ -717,7 +717,7 @@
             (click)="createProduction()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
             {{ editingBatchId == null ? 'Registrar lote' : 'Salvar correção' }}
           </button>
-          <button *ngIf="editingBatchId != null" type="button" (click)="cancelEditBatch()"
+          <button *ngIf="editingBatchId != null" type="button" (click)="cancelEditBatch(); backToList()"
             class="rounded-lg border px-4 py-2 font-semibold">Cancelar edição</button>
         </div>
       </div>
