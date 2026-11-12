@@ -1,116 +1,228 @@
-<div class="space-y-6">
-  <div class="flex justify-between items-center">
-    <h2 class="text-2xl font-amaranth font-bold text-gray-800">Métricas e Engajamento</h2>
-    <select [(ngModel)]="period" (change)="loadMetrics()"
-            class="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-braPurple focus:border-braPurple block p-2.5 font-bold shadow-sm">
-      <option value="7d">Últimos 7 dias</option>
-      <option value="30d">Últimos 30 dias</option>
-      <option value="year">Este Ano</option>
-    </select>
-  </div>
+<section class="space-y-6">
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h2 class="font-amaranth text-2xl font-bold text-gray-800">Métricas da BraFurries e do Coddy</h2>
+      <p class="mt-1 max-w-3xl text-sm text-gray-600">
+        Indicadores registrados de fato, sem projeções de histórico nem soma duplicada de servidores.
+        Datas de apuração em UTC.
+      </p>
+    </div>
+    <label class="text-sm font-semibold text-gray-700">
+      Período
+      <select [(ngModel)]="period" (change)="loadMetrics()"
+        class="mt-1 block rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-bold shadow-sm"
+        [disabled]="loading">
+        <option value="7d">Últimos 7 dias</option>
+        <option value="30d">Últimos 30 dias</option>
+        <option value="year">Desde janeiro</option>
+      </select>
+    </label>
+  </header>
 
-  <p *ngIf="errorMessage" class="text-sm font-bold text-red-600">{{ errorMessage }}</p>
-
-  <div *ngIf="loading" class="bg-white rounded-2xl p-6 border border-gray-100 text-sm text-gray-500">
-    Carregando métricas...
-  </div>
+  <p *ngIf="loading" role="status" class="rounded-2xl border bg-white p-6 text-sm text-gray-600">
+    Consultando as observações registradas...
+  </p>
+  <p *ngIf="errorMessage" role="alert"
+     class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ errorMessage }}</p>
 
   <ng-container *ngIf="metrics as data">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <p class="text-gray-500 text-sm font-bold">Comandos do Bot</p>
-          <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.summary.commandsExecuted | number:'1.0-0' }}</h3>
-          <p class="text-green-500 text-xs mt-2 font-bold">+{{ data.summary.commandsGrowthPercent }}% no período</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">🤖</div>
-      </div>
-
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <p class="text-gray-500 text-sm font-bold">Acessos Diários</p>
-          <h3 class="text-3xl font-amaranth font-bold text-blue-500 mt-1">{{ data.summary.dailyUniqueVisits | number:'1.0-0' }}</h3>
-          <p class="text-green-500 text-xs mt-2 font-bold">+{{ data.summary.newRegistrations | number:'1.0-0' }} cadastros</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 text-xl">🌐</div>
-      </div>
-
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <p class="text-gray-500 text-sm font-bold">Vinculação Discord</p>
-          <h3 class="text-3xl font-amaranth font-bold text-braPurple mt-1">{{ data.summary.discordLinkRate }}%</h3>
-          <p class="text-gray-400 text-xs mt-2 font-bold leading-tight">dos usuários logados</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-braPurple/10 flex items-center justify-center text-braPurple text-xl">🎮</div>
-      </div>
-
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <p class="text-gray-500 text-sm font-bold">Vinculação Telegram</p>
-          <h3 class="text-3xl font-amaranth font-bold text-braCyan mt-1">{{ data.summary.telegramLinkRate }}%</h3>
-          <p class="text-gray-400 text-xs mt-2 font-bold leading-tight">dos usuários logados</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-braCyan/10 flex items-center justify-center text-braCyan text-xl">📱</div>
-      </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+      <span>{{ dateLabel(data.startDate) }} a {{ dateLabel(data.endDate) }}</span>
+      <span *ngIf="data.lastSnapshotAt">Última medição de membros: {{ data.lastSnapshotAt | date:'dd/MM/yyyy HH:mm':'UTC' }} UTC</span>
+      <span *ngIf="!data.lastSnapshotAt">Aguardando a primeira medição de membros e alcance</span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
-        <h3 class="text-lg font-amaranth font-bold text-gray-800 mb-4">Crescimento da Comunidade</h3>
-        <div class="h-64 bg-gray-50 rounded-2xl flex items-end justify-between p-4 gap-2 relative">
-          <div *ngFor="let item of data.communityGrowth" class="w-full bg-braPurple rounded-t-lg relative group"
-               [style.height.%]="getGrowthHeight(item.value)">
-            <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition">
-              {{ item.value | number:'1.0-0' }}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <p class="text-sm font-semibold text-gray-500">Membros na BraFurries</p>
+        <p class="mt-2 font-amaranth text-3xl font-bold text-braPurple">
+          {{ data.summary.brafurriesMembers === null ? '—' : (data.summary.brafurriesMembers | number:'1.0-0') }}
+        </p>
+        <p class="mt-2 text-xs font-semibold" [ngClass]="deltaClass(data.summary.brafurriesDelta)">
+          {{ deltaText(data.summary.brafurriesDelta) }}
+        </p>
+        <p class="mt-2 text-xs text-gray-500">Identidades presentes no Discord oficial, com reconciliação saudável.</p>
+      </article>
+
+      <article class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <p class="text-sm font-semibold text-gray-500">Alcance único do Coddy</p>
+        <p class="mt-2 font-amaranth text-3xl font-bold text-braPurple">
+          {{ data.summary.coddyReach === null ? '—' : (data.summary.coddyReach | number:'1.0-0') }}
+        </p>
+        <p class="mt-2 text-xs font-semibold" [ngClass]="deltaClass(data.summary.coddyReachDelta)">
+          {{ deltaText(data.summary.coddyReachDelta) }}
+        </p>
+        <p class="mt-2 text-xs text-gray-500">
+          Identidades distintas, sem duplicação entre servidores reconciliados.
+        </p>
+      </article>
+
+      <article class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <p class="text-sm font-semibold text-gray-500">Comandos concluídos</p>
+        <p class="mt-2 font-amaranth text-3xl font-bold text-braPurple">
+          {{ data.summary.commandsExecuted === null ? '—' : (data.summary.commandsExecuted | number:'1.0-0') }}
+        </p>
+        <p class="mt-2 text-xs text-gray-600">
+          <ng-container *ngIf="data.summary.commandsGrowthPercent !== null; else noComparison">
+            {{ data.summary.commandsGrowthPercent > 0 ? '+' : '' }}{{ data.summary.commandsGrowthPercent | number:'1.0-2' }}% versus período anterior
+          </ng-container>
+          <ng-template #noComparison>Sem comparação completa com o período anterior</ng-template>
+        </p>
+        <p class="mt-2 text-xs text-gray-500">
+          {{ data.summary.commandCoverageComplete ? 'Período integralmente instrumentado' : 'Período parcial ou anterior à instrumentação' }}
+        </p>
+      </article>
+
+      <article class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <p class="text-sm font-semibold text-gray-500">Cobertura do alcance</p>
+        <p class="mt-2 font-amaranth text-3xl font-bold text-braPurple">
+          {{ data.summary.reconciledServers }} / {{ data.summary.activeServers }}
+        </p>
+        <p class="mt-2 text-xs text-gray-600">Servidores ativos com reconciliação completa e saudável.</p>
+        <p *ngIf="data.summary.reconciledServers < data.summary.activeServers"
+           class="mt-2 text-xs font-semibold text-amber-800">
+          O alcance não inclui todos os servidores ativos.
+        </p>
+      </article>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <article class="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+        <h3 class="font-amaranth text-lg font-bold text-gray-800">Crescimento da BraFurries</h3>
+        <p class="mt-1 text-xs text-gray-500">Evolução das identidades presentes na Community oficial, não quantidade de servidores.</p>
+        <ng-container *ngIf="charts.members.count; else noMembersHistory">
+          <div class="mt-4 flex justify-between text-xs text-gray-500">
+            <span>Menor medição: {{ charts.members.min | number:'1.0-0' }}</span>
+            <span>Maior medição: {{ charts.members.max | number:'1.0-0' }}</span>
+          </div>
+          <svg class="mt-2 h-48 w-full" viewBox="0 0 600 200" preserveAspectRatio="none"
+               role="img" aria-label="Evolução diária dos membros observados na BraFurries">
+            <line x1="20" y1="174" x2="580" y2="174" stroke="#e5e7eb" stroke-width="1"/>
+            <polyline *ngFor="let line of charts.members.segments"
+              [attr.points]="line.points" fill="none" stroke="#7c3aed" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round"/>
+            <circle *ngFor="let point of charts.members.markers"
+              [attr.cx]="point.x" [attr.cy]="point.y" r="3" fill="#7c3aed">
+              <title>{{ dateLabel(point.date) }}: {{ point.value | number:'1.0-0' }}</title>
+            </circle>
+          </svg>
+          <p class="mt-1 flex justify-between text-xs text-gray-400">
+            <span>{{ dateLabel(data.startDate) }}</span><span>{{ dateLabel(data.endDate) }}</span>
+          </p>
+          <p *ngIf="charts.members.count < 2" class="mt-2 text-xs text-amber-800">
+            Apenas uma medição disponível; ainda não é possível estabelecer uma tendência.
+          </p>
+        </ng-container>
+        <ng-template #noMembersHistory>
+          <p class="mt-4 rounded-xl bg-gray-50 p-5 text-sm text-gray-600">
+            Ainda não há medição confiável da BraFurries neste período.
+          </p>
+        </ng-template>
+      </article>
+
+      <article class="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+        <h3 class="font-amaranth text-lg font-bold text-gray-800">Evolução do alcance do Coddy</h3>
+        <p class="mt-1 text-xs text-gray-500">Identidades distintas observadas em servidores ativos reconciliados; não é audiência humana estimada.</p>
+        <ng-container *ngIf="charts.reach.count; else noReachHistory">
+          <div class="mt-4 flex justify-between text-xs text-gray-500">
+            <span>Menor medição: {{ charts.reach.min | number:'1.0-0' }}</span>
+            <span>Maior medição: {{ charts.reach.max | number:'1.0-0' }}</span>
+          </div>
+          <svg class="mt-2 h-48 w-full" viewBox="0 0 600 200" preserveAspectRatio="none"
+               role="img" aria-label="Alcance deduplicado do Coddy registrado por dia">
+            <line x1="20" y1="174" x2="580" y2="174" stroke="#e5e7eb" stroke-width="1"/>
+            <polyline *ngFor="let line of charts.reach.segments"
+              [attr.points]="line.points" fill="none" stroke="#0891b2" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round"/>
+            <circle *ngFor="let point of charts.reach.markers"
+              [attr.cx]="point.x" [attr.cy]="point.y" r="3" fill="#0891b2">
+              <title>{{ dateLabel(point.date) }}: {{ point.value | number:'1.0-0' }}</title>
+            </circle>
+          </svg>
+          <p class="mt-1 flex justify-between text-xs text-gray-400">
+            <span>{{ dateLabel(data.startDate) }}</span><span>{{ dateLabel(data.endDate) }}</span>
+          </p>
+          <p *ngIf="charts.reach.count < 2" class="mt-2 text-xs text-amber-800">
+            Ainda não existem duas medições comparáveis para avaliar crescimento.
+          </p>
+        </ng-container>
+        <ng-template #noReachHistory>
+          <p class="mt-4 rounded-xl bg-gray-50 p-5 text-sm text-gray-600">
+            Sem medição de alcance com cobertura reconciliada neste período.
+          </p>
+        </ng-template>
+      </article>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <article class="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+        <h3 class="font-amaranth text-lg font-bold text-gray-800">Comandos usados por dia</h3>
+        <p class="mt-1 text-xs text-gray-500">Conclusões reais de slash e comandos de prefixo. Falhas e tentativas não entram no total.</p>
+        <ng-container *ngIf="charts.commands.count; else noCommandHistory">
+          <div class="mt-4 flex justify-between text-xs text-gray-500">
+            <span>Mínimo diário: {{ charts.commands.min | number:'1.0-0' }}</span>
+            <span>Máximo diário: {{ charts.commands.max | number:'1.0-0' }}</span>
+          </div>
+          <svg class="mt-2 h-48 w-full" viewBox="0 0 600 200" preserveAspectRatio="none"
+               role="img" aria-label="Execuções de comandos bem-sucedidas por dia">
+            <line x1="20" y1="174" x2="580" y2="174" stroke="#e5e7eb" stroke-width="1"/>
+            <polyline *ngFor="let line of charts.commands.segments"
+              [attr.points]="line.points" fill="none" stroke="#7c3aed" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round"/>
+            <circle *ngFor="let point of charts.commands.markers"
+              [attr.cx]="point.x" [attr.cy]="point.y" r="3" fill="#7c3aed">
+              <title>{{ dateLabel(point.date) }}: {{ point.value | number:'1.0-0' }} execuções</title>
+            </circle>
+          </svg>
+          <p class="mt-1 flex justify-between text-xs text-gray-400">
+            <span>{{ dateLabel(data.startDate) }}</span><span>{{ dateLabel(data.endDate) }}</span>
+          </p>
+        </ng-container>
+        <ng-template #noCommandHistory>
+          <p class="mt-4 rounded-xl bg-gray-50 p-5 text-sm text-gray-600">
+            Sem eventos de comandos registrados neste período. Os usos anteriores à coleta não são recuperáveis.
+          </p>
+        </ng-template>
+      </article>
+
+      <article class="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+        <h3 class="font-amaranth text-lg font-bold text-gray-800">Comandos mais utilizados</h3>
+        <p class="mt-1 text-xs text-gray-500">Classificação pelo total de execuções concluídas no período selecionado.</p>
+        <ol *ngIf="data.topCommands.length; else noRanking" class="mt-5 space-y-4">
+          <li *ngFor="let item of data.topCommands; index as i">
+            <div class="flex items-center justify-between gap-3 text-sm">
+              <span class="min-w-0 truncate font-semibold text-gray-800">
+                <span class="mr-2 text-gray-400">{{ i + 1 }}.</span> /{{ item.command }}
+              </span>
+              <span class="shrink-0 font-bold text-braPurple">{{ item.executions | number:'1.0-0' }} usos</span>
             </div>
-          </div>
-        </div>
-        <div class="flex justify-between mt-2 text-xs text-gray-400 font-bold px-2">
-          <span *ngFor="let item of data.communityGrowth">{{ item.label }}</span>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
-        <h3 class="text-lg font-amaranth font-bold text-gray-800 mb-4">Plataformas</h3>
-        <div class="h-64 flex items-center justify-center relative">
-          <div class="text-center">
-            <p class="text-4xl font-bold font-amaranth text-gray-800">
-              {{ (data.platformDistribution.length ? data.platformDistribution[0].members : 0) | number:'1.0-0' }}
-            </p>
-            <p class="text-xs text-gray-500">maior plataforma</p>
-          </div>
-        </div>
-        <div class="flex justify-center gap-4 mt-4 text-sm font-bold">
-          <div *ngFor="let platform of data.platformDistribution" class="flex items-center gap-1.5">
-            <span class="w-3 h-3 rounded-full"
-                  [ngClass]="{
-                    'bg-braPurple': platform.platform === 'discord',
-                    'bg-braCyan': platform.platform === 'telegram',
-                    'bg-blue-500': platform.platform === 'site'
-                  }"></span>
-            {{ getPlatformLabel(platform.platform) }} ({{ platform.percentage }}%)
-          </div>
-        </div>
-      </div>
+            <div class="mt-2 h-2 w-full rounded-full bg-gray-100" role="progressbar"
+                 [attr.aria-valuenow]="commandShare(item.executions)"
+                 aria-valuemin="0" aria-valuemax="100"
+                 [attr.aria-label]="'Participação do comando ' + item.command">
+              <div class="h-2 rounded-full bg-braPurple" [style.width.%]="commandShare(item.executions)"></div>
+            </div>
+          </li>
+        </ol>
+        <ng-template #noRanking>
+          <p class="mt-4 rounded-xl bg-gray-50 p-5 text-sm text-gray-600">
+            Ainda não há comandos contabilizados para este período.
+          </p>
+        </ng-template>
+      </article>
     </div>
 
-    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
-      <h3 class="text-lg font-amaranth font-bold text-gray-800 mb-4">Top 5 Comandos do Coddy</h3>
-      <div class="space-y-3">
-        <div *ngFor="let cmd of data.topCommands; let i = index" class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition">
-          <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 font-bold font-amaranth">
-            #{{ i + 1 }}
-          </div>
-          <div class="flex-1">
-            <p class="text-sm font-bold text-gray-800">{{ cmd.command }}</p>
-            <p class="text-xs text-gray-500">{{ cmd.description }}</p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm font-bold text-braPurple">{{ cmd.uses | number:'1.0-0' }}</p>
-            <p class="text-[10px] text-gray-400">usos</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <footer class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs leading-relaxed text-gray-600">
+      <strong>Como interpretar:</strong>
+      <p class="mt-1">
+        As medições de membros e alcance começaram em
+        {{ data.snapshotTrackingSince ? dateLabel(data.snapshotTrackingSince) : 'data ainda não registrada' }}.
+        A instrumentação de comandos tem primeiro evento em
+        {{ data.commandTrackingSince ? (data.commandTrackingSince | date:'dd/MM/yyyy HH:mm':'UTC') + ' UTC' : 'data ainda não registrada' }}.
+        Lacunas são mostradas como dados indisponíveis, nunca como zero. O alcance considera somente
+        servidores ativos com reconciliação completa; pode incluir contas automatizadas e não mede
+        pessoas únicas verificadas.
+      </p>
+    </footer>
   </ng-container>
-</div>
+</section>
