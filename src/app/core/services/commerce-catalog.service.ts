@@ -283,6 +283,12 @@ export class CommerceCatalogService {
     );
   }
 
+  discardUnusedTestContract(artworkId: number, contractId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/artworks/${artworkId}/contracts/${contractId}/unused-test`
+    );
+  }
+
   terminateContract(artworkId: number, contractId: number): Observable<void> {
     return this.http.post<void>(
       `${this.base}/artworks/${artworkId}/contracts/${contractId}/terminate`,{}
