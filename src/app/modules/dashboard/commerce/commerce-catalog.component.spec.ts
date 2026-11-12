@@ -501,4 +501,54 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Baixar PDF gerado');
     expect(fixture.nativeElement.textContent).not.toContain('+ Gerar contrato para assinatura');
   });
+
+  it('shows readable labels in model cards and form while preserving enum values in the API payload', async () => {
+    await create(['CONTRACTS_MANAGE'], false, true, () => {
+      catalog.templates.and.returnValue(of([{
+        id: 13, name: 'Compra única', description: null, fullText: 'Cláusulas do acordo.',
+        modality: 'ONE_TIME_FEE', royaltyMethod: 'NONE', royaltyPercent: null,
+        royaltyFixedAmount: null, active: true
+      }]));
+    });
+    component.selectTab('templates');
+    fixture.detectChanges();
+    const listing = fixture.nativeElement.textContent as string;
+    expect(listing).toContain('Pagamento único pela obra');
+    expect(listing).toContain('Sem royalties previstos');
+    expect(listing).not.toContain('ONE_TIME_FEE');
+
+    component.openCreate('templates');
+    component.templateForm = {
+      ...component.templateForm, name: 'Compra única',
+      modality: 'ONE_TIME_FEE', royaltyMethod: 'NONE',
+      royaltyPercent: null, royaltyFixedAmount: null, fullText: 'Cláusulas do acordo.'
+    };
+    fixture.detectChanges();
+    const form = fixture.nativeElement.textContent as string;
+    expect(form).toContain('Os direitos concedidos dependem das cláusulas');
+    expect(form).toContain('isso não exclui um pagamento único');
+    component.createTemplate();
+    expect(catalog.createTemplate).toHaveBeenCalledWith(jasmine.objectContaining({
+      modality: 'ONE_TIME_FEE', royaltyMethod: 'NONE'
+    }));
+  });
+
+  it('describes the legacy signed-contract snapshot without exposing raw contract codes', async () => {
+    await create(['CONTRACTS_MANAGE'], false, true, () => {
+      catalog.contracts.and.returnValue(of([{
+        id: 21, artworkId: 12, templateId: 13, artistUserId: 31,
+        modality: 'ONE_TIME_FEE', royaltyMethod: 'NONE',
+        royaltyPercent: null, royaltyFixedAmount: null, oneTimeAmount: 800,
+        effectiveFrom: '2026-11-01', effectiveUntil: null,
+        sha256: 'abc123', sizeBytes: 5000, status: 'ACTIVE'
+      }]));
+    });
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Pagamento único pela obra');
+    expect(text).toContain('Sem royalties previstos');
+    expect(text).toContain('Pagamento único acordado:');
+    expect(text).not.toContain('ONE_TIME_FEE');
+  });
 });

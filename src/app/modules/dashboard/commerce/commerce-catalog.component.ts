@@ -10,6 +10,10 @@ import {
   CommercialArtist, CommerceArtistService, IssuedArtistInvitation
 } from '../../../core/services/commerce-artist.service';
 import {
+  CONTRACT_MODALITIES, CONTRACT_ROYALTY_METHODS,
+  contractModalityDetails, contractRoyaltyDetails
+} from './commerce-contract-labels';
+import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch, CommerceBatchRevision,
   CommerceCatalogService, CommerceContractTemplate, CommerceContractPreparation, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
@@ -24,6 +28,10 @@ type CatalogTab = 'artworks' | 'artists' | 'files' | 'templates' | 'contracts' |
   templateUrl: './commerce-catalog.component.html'
 })
 export class CommerceCatalogComponent implements OnInit, OnDestroy {
+  readonly contractModalities = CONTRACT_MODALITIES;
+  readonly contractRoyaltyMethods = CONTRACT_ROYALTY_METHODS;
+  readonly modalityDetails = contractModalityDetails;
+  readonly royaltyDetails = contractRoyaltyDetails;
   readonly tabs: { key: CatalogTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'artworks', label: 'Artes', permissions: ['ARTWORKS_MANAGE'] },
     { key: 'artists', label: 'Artistas', permissions: ['ARTWORKS_MANAGE'] },

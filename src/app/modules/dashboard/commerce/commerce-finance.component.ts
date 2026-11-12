@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { contractRoyaltyDetails } from './commerce-contract-labels';
 import { Observable, Subject, forkJoin, of, takeUntil, catchError } from 'rxjs';
 import { PlatformAccess, PlatformAccessService, PlatformPermissionCode } from
   '../../../core/services/platform-access.service';
@@ -39,6 +40,7 @@ function brazilToday(): string {
   templateUrl: './commerce-finance.component.html'
 })
 export class CommerceFinanceComponent implements OnInit, OnDestroy {
+  readonly royaltyDetails = contractRoyaltyDetails;
   readonly tabs: { key: FinanceTab; label: string; permissions: PlatformPermissionCode[] }[] = [
     { key: 'sales', label: 'Vendas físicas', permissions: ['SALES_MANAGE'] },
     { key: 'orders', label: 'Encomendas', permissions: ['SALES_MANAGE'] },
