@@ -35,6 +35,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   access: PlatformAccess | null = null;
   activeTab: CatalogTab = 'artworks';
   screen: 'browse' | 'form' = 'browse';
+  returnToArtworkForm = false;
   loading = true;
   saving = false;
   searchingArtists = false;
@@ -145,6 +146,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     if (!this.visibleTabs().some(item => item.key === tab)) return;
     this.activeTab = tab;
     this.screen = 'browse';
+    this.returnToArtworkForm = false;
     this.errorMessage = '';
     this.successMessage = '';
     if (tab === 'contracts') this.reloadContracts();
@@ -162,12 +164,15 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       production: ['PRODUCTS_MANAGE', 'SUPPLIERS_MANAGE']
     };
     if (!(permission[tab] ?? []).every(code => this.can(code))) return;
-    this.cancelEditArtwork();
-    this.cancelEditArtist();
-    this.cancelEditTemplate();
-    this.cancelEditSupplier();
-    this.cancelEditProduct();
-    this.cancelEditBatch();
+    const returningFromArtwork = tab === 'artists' &&
+      this.activeTab === 'artworks' && this.screen === 'form';
+    if (tab === 'artworks') this.cancelEditArtwork();
+    if (tab === 'artists') this.cancelEditArtist();
+    if (tab === 'templates') this.cancelEditTemplate();
+    if (tab === 'suppliers') this.cancelEditSupplier();
+    if (tab === 'products') this.cancelEditProduct();
+    if (tab === 'production') this.cancelEditBatch();
+    this.returnToArtworkForm = returningFromArtwork;
     if (tab === 'files' || tab === 'contracts') {
       if (parentId != null) this.selectedArtworkId = parentId;
       if (this.selectedArtworkId == null) return;
@@ -183,7 +188,14 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   backToList(): void {
+    if (this.activeTab === 'artists' && this.returnToArtworkForm) {
+      this.activeTab = 'artworks';
+      this.screen = 'form';
+      this.returnToArtworkForm = false;
+      return;
+    }
     this.screen = 'browse';
+    this.returnToArtworkForm = false;
     if (this.activeTab === 'files') this.activeTab = 'artworks';
     if (this.activeTab === 'links') this.activeTab = 'products';
     this.errorMessage = '';
@@ -292,6 +304,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   startEditArtist(artist: CommercialArtist): void {
     this.activeTab='artists';
     this.screen='form';
+    this.returnToArtworkForm = false;
     this.editingArtistId=artist.userId;
     this.externalArtistForm={
       artistName:artist.artistName,telegramHandle:artist.telegramHandle || '',
@@ -339,7 +352,9 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
           this.artistSearch=payload.artistName;
         }
         this.cancelEditArtist();
-        this.screen='browse';
+        this.activeTab = this.returnToArtworkForm ? 'artworks' : 'artists';
+        this.screen = this.returnToArtworkForm ? 'form' : 'browse';
+        this.returnToArtworkForm = false;
         this.successMessage=editing==null
           ? 'Artista externa cadastrada e selecionada.' : 'Dados da artista atualizados.';
         this.reload();
