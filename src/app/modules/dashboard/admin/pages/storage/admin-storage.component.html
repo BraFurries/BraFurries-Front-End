@@ -10,7 +10,11 @@
   <p *ngIf="checkingAccess" role="status" class="rounded-xl bg-white p-4 text-sm text-gray-600">
     Verificando acesso administrativo...
   </p>
-  <div *ngIf="!checkingAccess && !owner"
+  <p *ngIf="!checkingAccess && !owner && errorMessage" role="alert"
+     class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    {{ errorMessage }}
+  </p>
+  <div *ngIf="!checkingAccess && !owner && !errorMessage"
        class="rounded-xl border bg-white p-5 text-sm text-gray-600">
     Esta área é exclusiva do responsável pela BraFurries.
   </div>
