@@ -156,6 +156,50 @@
         <button *ngIf="editingOrderId != null" type="button" (click)="backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
+      <div *ngIf="screen === 'form' && formKind === 'order-receipt' && selectedOrder as order"
+        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Anotar recebimento · encomenda #{{ order.id }}</h2>
+        <p class="text-sm text-gray-600">Comprador: {{ order.buyerLabel }} · Saldo:
+          {{ order.totalAmount - order.paidAmount | currency:'BRL' }}
+        </p>
+        <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          Recebimentos de encomendas não geram receita no caixa nem afetam estoque ou royalties.
+        </p>
+              <div *ngIf="selectedOrder && selectedOrder.status !== 'CANCELLED'" class="grid grid-cols-2 gap-2">
+                <label class="text-xs font-semibold">Valor recebido
+                  <input type="number" [(ngModel)]="orderReceiptAmount" min=".01" step=".01"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+                <label class="text-xs font-semibold">Data do recebimento
+                  <input type="date" [(ngModel)]="orderReceiptDate"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+                <label class="text-xs font-semibold">Meio
+                  <select [(ngModel)]="orderReceiptMethod"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                    <option value="PIX">Pix</option>
+                    <option value="CASH">Dinheiro</option>
+                    <option value="CARD_DEBIT">Cartão débito</option>
+                    <option value="CARD_CREDIT">Cartão crédito</option>
+                    <option value="BANK_TRANSFER">Transferência</option>
+                    <option value="BANK_SLIP">Boleto</option>
+                    <option value="OTHER">Outros</option>
+                  </select>
+                </label>
+                <label class="text-xs font-semibold">Referência (opcional)
+                  <input [(ngModel)]="orderReceiptReference" maxlength="120"
+                    class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+              </div>
+              <button *ngIf="selectedOrder && selectedOrder.status !== 'CANCELLED'"
+                type="button" (click)="receiveOrderPayment()"
+                [disabled]="saving || orderReceiptAmount <= 0"
+                class="rounded-lg border border-braPurple px-3 py-2 text-xs font-bold text-braPurple disabled:opacity-50">
+                Anotar recebimento
+              </button>
+
+      </div>
+
       <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Acompanhar encomendas</h2>
         <p *ngIf="!orders.length" class="text-sm text-gray-500">Nenhuma encomenda cadastrada.</p>
@@ -239,37 +283,10 @@
                 {{ payment.eventKind === 'RECEIPT' ? 'Recebido' : 'Estornado' }}:
                 {{ payment.amount | currency:'BRL' }} · {{ payment.receivedOn }}
               </p>
-              <div *ngIf="order.status !== 'CANCELLED'" class="grid grid-cols-2 gap-2">
-                <label class="text-xs font-semibold">Valor recebido
-                  <input type="number" [(ngModel)]="orderReceiptAmount" min=".01" step=".01"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <label class="text-xs font-semibold">Data do recebimento
-                  <input type="date" [(ngModel)]="orderReceiptDate"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <label class="text-xs font-semibold">Meio
-                  <select [(ngModel)]="orderReceiptMethod"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                    <option value="PIX">Pix</option>
-                    <option value="CASH">Dinheiro</option>
-                    <option value="CARD_DEBIT">Cartão débito</option>
-                    <option value="CARD_CREDIT">Cartão crédito</option>
-                    <option value="BANK_TRANSFER">Transferência</option>
-                    <option value="BANK_SLIP">Boleto</option>
-                    <option value="OTHER">Outros</option>
-                  </select>
-                </label>
-                <label class="text-xs font-semibold">Referência (opcional)
-                  <input [(ngModel)]="orderReceiptReference" maxlength="120"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-              </div>
-              <button *ngIf="order.status !== 'CANCELLED'"
-                type="button" (click)="receiveOrderPayment()"
-                [disabled]="saving || orderReceiptAmount <= 0"
-                class="rounded-lg border border-braPurple px-3 py-2 text-xs font-bold text-braPurple disabled:opacity-50">
-                Anotar recebimento
+              <button *ngIf="order.status !== 'CANCELLED'" type="button"
+                (click)="openForm('order-receipt')"
+                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">
+                + Anotar recebimento
               </button>
               <label class="block text-xs font-semibold">Motivo de estorno
                 <input [(ngModel)]="orderReversalReason" maxlength="500"
