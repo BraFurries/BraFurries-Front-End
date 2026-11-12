@@ -24,7 +24,7 @@
     Você não tem permissão para acessar os cadastros comerciais.
   </div>
   <ng-container *ngIf="!loading && visibleTabs().length">
-    <nav class="flex flex-wrap gap-2" aria-label="Seções do catálogo">
+    <nav *ngIf="screen === 'browse'" class="flex flex-wrap gap-2" aria-label="Seções do catálogo">
       <button *ngFor="let tab of visibleTabs()" type="button" (click)="selectTab(tab.key)"
         [attr.aria-current]="activeTab === tab.key ? 'page' : null"
         [ngClass]="activeTab === tab.key ? 'bg-braPurple text-white' : 'bg-white text-gray-700 hover:bg-purple-50'"
@@ -36,9 +36,30 @@
       </button>
     </nav>
 
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-purple-50 p-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wide text-braPurple">
+          {{ screen === 'browse' ? 'Visualização de registros' : 'Cadastro e edição' }}
+        </p>
+        <h2 class="font-amaranth text-xl font-bold text-braDark">{{ screen === 'browse' ? 'Catálogo e relacionamentos' : newLabel() }}</h2>
+        <p class="text-xs text-gray-600">{{ screen === 'browse'
+          ? 'Expanda o registro para consultar seus vínculos e documentos.'
+          : 'Salve os dados para retornar à visualização.' }}</p>
+      </div>
+      <button *ngIf="screen === 'browse' && activeTab !== 'contracts'" type="button"
+        (click)="openCreate(activeTab)"
+        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">
+        + {{ newLabel() }}
+      </button>
+      <button *ngIf="screen === 'form'" type="button" (click)="backToList()"
+        class="rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-braPurple">
+        {{ returnToArtworkForm && activeTab === 'artists' ? 'Voltar ao cadastro da arte' : 'Voltar à visualização' }}
+      </button>
+    </div>
+
     <section *ngIf="activeTab === 'artworks' && can('ARTWORKS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+      class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ editingArtworkId == null ? 'Cadastrar arte' : 'Editar obra #' + editingArtworkId }}</h2>
         <p *ngIf="editingArtworkId != null" class="text-xs text-amber-800">
           Se houver contrato ou royalties, somente título e descrição poderão ser corrigidos.
@@ -73,11 +94,90 @@
             O artista pode ser da BraFurries, do Telegram ou de outra rede.
             A conta comercial não precisa ter login.
           </p>
-          <button type="button" (click)="showExternalArtistForm = !showExternalArtistForm"
-            class="text-sm font-bold text-braPurple hover:underline">
-            {{ showExternalArtistForm ? 'Fechar cadastro externo' : '+ Cadastrar artista externa' }}
+          <button type="button" (click)="openCreate('artists')"
+            class="rounded-lg border border-purple-200 px-3 py-2 text-sm font-bold text-braPurple">
+            + Cadastrar artista externo
           </button>
-          <div *ngIf="showExternalArtistForm" class="space-y-3 rounded-xl border border-purple-100 bg-purple-50/40 p-4">
+          <p class="text-xs text-gray-500">O cadastro de artistas é separado das obras.</p>
+        </div>
+        <label class="block text-sm font-semibold">Valor da criação (R$)
+          <input type="number" min="0" step=".01" [(ngModel)]="artworkForm.creationCost"
+            class="mt-1 w-full rounded-lg border px-3 py-2">
+        </label>
+        <button type="button" [disabled]="saving || !artworkForm.title || artworkForm.artistUserId == null"
+          (click)="createArtwork()"
+          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          {{ editingArtworkId == null ? 'Cadastrar arte' : 'Salvar alterações' }}
+        </button>
+        <button *ngIf="editingArtworkId != null" type="button" (click)="cancelEditArtwork(); backToList()"
+          class="ml-2 rounded-lg border px-4 py-2 font-bold">Cancelar edição</button>
+      </div>
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 class="font-amaranth text-xl font-bold">Artes cadastradas</h2>
+        <p *ngIf="!artworks.length" class="text-sm text-gray-500">Nenhuma arte cadastrada.</p>
+        <div *ngFor="let item of artworks" class="rounded-xl border p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-bold text-braDark">{{ item.title }}</h3>
+            <span class="text-xs font-semibold text-gray-500">{{ item.status }}</span>
+          </div>
+          <p class="mt-1 text-sm text-gray-600">Artista: {{ item.artistName }} · ID {{ item.artistUserId }}</p>
+          <p class="mt-1 text-sm font-semibold">Valor da criação: {{ item.creationCost | currency:'BRL' }}</p>
+          <p *ngIf="item.description" class="mt-1 text-sm text-gray-500">{{ item.description }}</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" [disabled]="saving" (click)="startEditArtwork(item)"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold">Editar</button>
+            <button type="button" [disabled]="saving" (click)="toggleArtwork(item)"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold">
+              {{ item.status === 'ARCHIVED' ? 'Reativar' : 'Arquivar' }}
+            </button>
+            <button type="button" [disabled]="saving" (click)="deleteArtwork(item)"
+              class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
+              Excluir se não utilizada
+            </button>
+          </div>
+          <div class="mt-3 border-t border-purple-100 pt-3">
+            <button type="button" (click)="selectArtwork(item.id)"
+              class="text-sm font-bold text-braPurple hover:underline">
+              {{ selectedArtworkId === item.id ? 'Ocultar arquivos e vínculos' : 'Ver arquivos e vínculos da arte' }}
+            </button>
+            <div *ngIf="selectedArtworkId === item.id" class="mt-3 space-y-3 rounded-xl bg-purple-50/50 p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h4 class="font-bold text-braDark">Arquivos desta arte</h4>
+                <button type="button" (click)="openCreate('files', item.id)"
+                  class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">+ Arquivo privado</button>
+              </div>
+              <p *ngIf="!artworkFiles.length" class="text-sm text-gray-500">Nenhum arquivo cadastrado para esta arte.</p>
+              <article *ngFor="let file of artworkFiles" class="rounded-lg border bg-white p-3">
+                <div class="flex flex-wrap justify-between gap-2 text-sm">
+                  <strong class="break-all">{{ file.originalName }}</strong>
+                  <span>{{ file.status === 'ACTIVE' ? 'Ativo' : 'Arquivado' }}</span>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">{{ file.kind }} · {{ file.sizeBytes / 1024 / 1024 | number:'1.1-2' }} MiB
+                  · {{ file.createdAt | date:'dd/MM/yyyy' }}</p>
+                <p *ngIf="file.description" class="mt-1 text-xs text-gray-600">{{ file.description }}</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button type="button" (click)="downloadArtworkFile(file)"
+                    class="rounded-lg border px-3 py-1 text-xs font-semibold">Baixar privado</button>
+                  <button *ngIf="file.status === 'ACTIVE'" type="button" [disabled]="saving"
+                    (click)="archiveArtworkFile(file)"
+                    class="rounded-lg border px-3 py-1 text-xs font-semibold">Arquivar versão</button>
+                </div>
+              </article>
+              <div *ngIf="can('CONTRACTS_MANAGE')" class="border-t pt-3 text-sm">
+                <strong>Contratos vinculados:</strong> {{ contracts.length }}
+                <button type="button" (click)="selectTab('contracts')" class="ml-2 font-bold text-braPurple hover:underline">
+                  Consultar contratos assinados
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section *ngIf="activeTab === 'artists' && screen === 'form' && can('ARTWORKS_MANAGE')"
+      class="max-w-3xl rounded-2xl border bg-white p-5 shadow-sm">
+          <div class="space-y-3 rounded-xl border border-purple-100 bg-purple-50/40 p-4">
             <h3 class="font-semibold text-braDark">{{ editingArtistId == null ? 'Nova artista externa' : 'Editar artista externa' }}</h3>
             <p class="text-xs text-gray-600">
               Criará apenas um registro comercial, sem e-mail de login, senha ou associação
@@ -108,50 +208,12 @@
               class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
               {{ editingArtistId == null ? 'Salvar artista externa e selecionar' : 'Salvar alterações' }}
             </button>
-            <button *ngIf="editingArtistId != null" type="button" (click)="cancelEditArtist()"
+            <button *ngIf="editingArtistId != null" type="button" (click)="cancelEditArtist(); backToList()"
               class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
           </div>
-        </div>
-        <label class="block text-sm font-semibold">Valor da criação (R$)
-          <input type="number" min="0" step=".01" [(ngModel)]="artworkForm.creationCost"
-            class="mt-1 w-full rounded-lg border px-3 py-2">
-        </label>
-        <button type="button" [disabled]="saving || !artworkForm.title || artworkForm.artistUserId == null"
-          (click)="createArtwork()"
-          class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
-          {{ editingArtworkId == null ? 'Cadastrar arte' : 'Salvar alterações' }}
-        </button>
-        <button *ngIf="editingArtworkId != null" type="button" (click)="cancelEditArtwork()"
-          class="ml-2 rounded-lg border px-4 py-2 font-bold">Cancelar edição</button>
-      </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 class="font-amaranth text-xl font-bold">Artes cadastradas</h2>
-        <p *ngIf="!artworks.length" class="text-sm text-gray-500">Nenhuma arte cadastrada.</p>
-        <div *ngFor="let item of artworks" class="rounded-xl border p-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h3 class="font-bold text-braDark">{{ item.title }}</h3>
-            <span class="text-xs font-semibold text-gray-500">{{ item.status }}</span>
-          </div>
-          <p class="mt-1 text-sm text-gray-600">Artista: {{ item.artistName }} · ID {{ item.artistUserId }}</p>
-          <p class="mt-1 text-sm font-semibold">Valor da criação: {{ item.creationCost | currency:'BRL' }}</p>
-          <p *ngIf="item.description" class="mt-1 text-sm text-gray-500">{{ item.description }}</p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <button type="button" [disabled]="saving" (click)="startEditArtwork(item)"
-              class="rounded-lg border px-3 py-2 text-sm font-semibold">Editar</button>
-            <button type="button" [disabled]="saving" (click)="toggleArtwork(item)"
-              class="rounded-lg border px-3 py-2 text-sm font-semibold">
-              {{ item.status === 'ARCHIVED' ? 'Reativar' : 'Arquivar' }}
-            </button>
-            <button type="button" [disabled]="saving" (click)="deleteArtwork(item)"
-              class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
-              Excluir se não utilizada
-            </button>
-          </div>
-        </div>
-      </div>
     </section>
 
-    <section *ngIf="activeTab === 'artworks' && can('ARTWORKS_MANAGE')"
+    <section *ngIf="activeTab === 'artists' && screen === 'browse' && can('ARTWORKS_MANAGE')"
       class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
       <h2 class="font-amaranth text-xl font-bold">Artistas externas</h2>
       <p class="text-sm text-gray-600">
@@ -183,7 +245,7 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'artworks' && access?.owner && issuedInvitation as invite"
+    <section *ngIf="activeTab === 'artists' && screen === 'browse' && access?.owner && issuedInvitation as invite"
       class="space-y-4 rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
       <h2 class="font-amaranth text-xl font-bold">Convite criado para {{ issuedArtistName }}</h2>
       <p class="text-sm text-red-700 font-semibold">
@@ -214,8 +276,8 @@
       </button>
     </section>
 
-    <section *ngIf="activeTab === 'files' && can('ARTWORKS_MANAGE')"
-      class="grid gap-6 lg:grid-cols-2">
+    <section *ngIf="activeTab === 'files' && screen === 'form' && can('ARTWORKS_MANAGE')"
+      class="max-w-3xl">
       <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Arquivos privados da arte</h2>
         <p class="text-sm text-gray-600">
@@ -257,40 +319,10 @@
           Enviar arquivo privado
         </button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 class="font-amaranth text-xl font-bold">Histórico de arquivos</h2>
-        <p *ngIf="selectedArtworkId == null" class="text-sm text-gray-500">Escolha uma arte.</p>
-        <p *ngIf="selectedArtworkId != null && !artworkFiles.length"
-          class="text-sm text-gray-500">Nenhum arquivo cadastrado.</p>
-        <article *ngFor="let file of artworkFiles" class="space-y-2 rounded-xl border p-3">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <strong class="break-all text-sm">{{ file.originalName }}</strong>
-            <span class="text-xs font-semibold"
-              [ngClass]="file.status === 'ARCHIVED' ? 'text-gray-500' : 'text-green-700'">
-              {{ file.status === 'ACTIVE' ? 'Ativo' : 'Arquivado' }}
-            </span>
-          </div>
-          <p class="text-xs text-gray-600">
-            {{ file.kind }} · {{ file.sizeBytes / 1024 / 1024 | number:'1.1-2' }} MiB
-            · {{ file.createdAt | date:'dd/MM/yyyy HH:mm' }}
-          </p>
-          <p *ngIf="file.description" class="text-xs text-gray-600">{{ file.description }}</p>
-          <div class="flex flex-wrap gap-2">
-            <button type="button" (click)="downloadArtworkFile(file)"
-              class="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold">Baixar</button>
-            <button *ngIf="file.status === 'ACTIVE'" type="button" [disabled]="saving"
-              (click)="archiveArtworkFile(file)"
-              class="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
-              Arquivar versão
-            </button>
-          </div>
-        </article>
-      </div>
     </section>
 
-    <section *ngIf="activeTab === 'templates' && can('CONTRACTS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+    <section *ngIf="activeTab === 'templates' && can('CONTRACTS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">{{ editingTemplateId == null ? 'Novo modelo de contrato' : 'Editar modelo #' + editingTemplateId }}</h2>
         <label class="block text-sm font-semibold">Nome do modelo
           <input [(ngModel)]="templateForm.name" maxlength="160"
@@ -337,10 +369,10 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingTemplateId == null ? 'Cadastrar modelo' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingTemplateId != null" type="button" (click)="cancelEditTemplate()"
+        <button *ngIf="editingTemplateId != null" type="button" (click)="cancelEditTemplate(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Modelos cadastrados</h2>
         <p *ngIf="!templates.length" class="text-sm text-gray-500">Nenhum modelo cadastrado.</p>
         <article *ngFor="let model of templates" class="rounded-xl border p-4">
@@ -379,7 +411,11 @@
           </option>
         </select>
       </label>
-      <div *ngIf="selectedArtworkId != null" class="grid gap-4 rounded-xl bg-gray-50 p-4 md:grid-cols-2">
+      <button *ngIf="screen === 'browse' && selectedArtworkId != null" type="button"
+        (click)="openCreate('contracts', selectedArtworkId)"
+        class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">+ Registrar contrato assinado</button>
+      <div *ngIf="screen === 'form' && selectedArtworkId != null"
+        class="grid gap-4 rounded-xl bg-gray-50 p-4 md:grid-cols-2">
         <label class="text-sm font-semibold">Modelo de contrato
           <select [(ngModel)]="contractForm.templateId" class="mt-1 w-full rounded-lg border px-3 py-2">
             <option [ngValue]="null">Selecione um modelo</option>
@@ -414,6 +450,7 @@
           </p>
         </div>
       </div>
+      <ng-container *ngIf="screen === 'browse'">
       <p *ngIf="selectedArtworkId != null && !contracts.length" class="text-sm text-gray-500">
         Esta arte ainda não tem contratos registrados.
       </p>
@@ -421,6 +458,13 @@
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="font-semibold">Contrato #{{ contract.id }} · {{ contract.modality }}</h3>
           <span class="text-xs font-semibold">{{ contract.status === 'ACTIVE' ? 'Ativo' : 'Encerrado' }}</span>
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-braPurple">
+          <span class="rounded bg-purple-50 px-2 py-1">Arte: {{ selectedArtworkName() }}</span>
+          <span aria-hidden="true">→</span>
+          <span class="rounded bg-purple-50 px-2 py-1">Modelo: {{ templateName(contract.templateId) }}</span>
+          <span aria-hidden="true">→</span>
+          <span class="rounded bg-purple-50 px-2 py-1">Assinado #{{ contract.id }}</span>
         </div>
         <p class="mt-1 text-sm text-gray-600">
           {{ contract.royaltyMethod }}
@@ -445,11 +489,11 @@
           </button>
         </div>
       </article>
+      </ng-container>
     </section>
 
-    <section *ngIf="activeTab === 'suppliers' && can('SUPPLIERS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5">
+    <section *ngIf="activeTab === 'suppliers' && can('SUPPLIERS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">{{ editingSupplierId == null ? 'Cadastrar fornecedor' : 'Editar fornecedor #' + editingSupplierId }}</h2>
         <label class="block text-sm font-semibold">Nome
           <input [(ngModel)]="supplierForm.name" maxlength="180"
@@ -475,10 +519,10 @@
           class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingSupplierId == null ? 'Cadastrar fornecedor' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingSupplierId != null" type="button" (click)="cancelEditSupplier()"
+        <button *ngIf="editingSupplierId != null" type="button" (click)="cancelEditSupplier(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">Fornecedores</h2>
         <p *ngIf="!suppliers.length" class="text-sm text-gray-500">Nenhum fornecedor cadastrado.</p>
         <article *ngFor="let supplier of suppliers" class="rounded-xl border p-4">
@@ -502,9 +546,8 @@
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'products' && can('PRODUCTS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5">
+    <section *ngIf="activeTab === 'products' && can('PRODUCTS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">{{ editingProductId == null ? 'Cadastrar produto' : 'Editar produto #' + editingProductId }}</h2>
         <label class="block text-sm font-semibold">Código SKU
           <input [(ngModel)]="productForm.sku" maxlength="80" class="mt-1 w-full rounded-lg border px-3 py-2">
@@ -537,10 +580,10 @@
           (click)="createProduct()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
           {{ editingProductId == null ? 'Cadastrar produto' : 'Salvar alterações' }}
         </button>
-        <button *ngIf="editingProductId != null" type="button" (click)="cancelEditProduct()"
+        <button *ngIf="editingProductId != null" type="button" (click)="cancelEditProduct(); backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">Catálogo de produtos</h2>
         <p *ngIf="!products.length" class="text-sm text-gray-500">Nenhum produto cadastrado.</p>
         <article *ngFor="let product of products" class="rounded-xl border p-4">
@@ -561,11 +604,34 @@
               class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
               Excluir se não utilizado</button>
           </div>
+          <div class="mt-3 border-t border-purple-100 pt-3">
+            <button type="button" (click)="selectProduct(product.id)"
+              class="text-sm font-bold text-braPurple hover:underline">
+              {{ selectedProductId === product.id ? 'Ocultar artes utilizadas' : 'Ver artes utilizadas neste produto' }}
+            </button>
+            <div *ngIf="selectedProductId === product.id" class="mt-3 space-y-3 rounded-xl bg-purple-50/50 p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h4 class="font-bold text-braDark">Artes utilizadas no produto</h4>
+                <button *ngIf="can('CONTRACTS_MANAGE')" type="button" (click)="openCreate('links', product.id)"
+                  class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">+ Vincular arte</button>
+              </div>
+              <p *ngIf="!links.length" class="text-sm text-gray-500">Nenhuma arte vinculada a este produto.</p>
+              <article *ngFor="let link of links" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-3 text-sm">
+                <span class="font-semibold">{{ link.title }}</span>
+                <span class="text-xs text-gray-600">
+                  {{ link.royaltyAllocationPercent == null ? 'Rateio pendente' : link.royaltyAllocationPercent + '%' }}
+                </span>
+                <button *ngIf="can('CONTRACTS_MANAGE')" type="button" [disabled]="saving"
+                  (click)="unlinkArtworkFromProduct(link.artworkId)"
+                  class="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-700">Desvincular</button>
+              </article>
+            </div>
+          </div>
         </article>
       </div>
     </section>
 
-    <section *ngIf="activeTab === 'links' && can('PRODUCTS_MANAGE') && can('CONTRACTS_MANAGE')"
+    <section *ngIf="activeTab === 'links' && screen === 'form' && can('PRODUCTS_MANAGE') && can('CONTRACTS_MANAGE')"
       class="max-w-4xl space-y-4 rounded-2xl border bg-white p-5">
       <h2 class="font-amaranth text-xl font-bold">Artes vinculadas aos produtos</h2>
       <label class="block text-sm font-semibold">Produto
@@ -594,20 +660,10 @@
         (click)="linkArtwork()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
         Vincular arte ao produto
       </button>
-      <h3 class="font-bold">Vínculos deste produto</h3>
-      <p *ngIf="!links.length" class="text-sm text-gray-500">Nenhuma arte vinculada.</p>
-      <div *ngFor="let link of links" class="flex flex-wrap justify-between gap-2 rounded-xl border p-3 text-sm">
-        <span>{{ link.title }}</span>
-        <strong>{{ link.royaltyAllocationPercent == null ? 'Rateio pendente' : link.royaltyAllocationPercent + '%' }}</strong>
-        <button type="button" [disabled]="saving" (click)="unlinkArtworkFromProduct(link.artworkId)"
-          class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
-          Desvincular</button>
-      </div>
     </section>
 
-    <section *ngIf="activeTab === 'production' && can('PRODUCTS_MANAGE') && can('SUPPLIERS_MANAGE')"
-      class="grid gap-6 xl:grid-cols-[minmax(280px,430px)_1fr]">
-      <div class="space-y-4 rounded-2xl border bg-white p-5">
+    <section *ngIf="activeTab === 'production' && can('PRODUCTS_MANAGE') && can('SUPPLIERS_MANAGE')" class="space-y-6">
+      <div *ngIf="screen === 'form'" class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">
           {{ editingBatchId == null ? 'Registrar lote de produção' : 'Corrigir lote #' + editingBatchId }}
         </h2>
@@ -661,11 +717,11 @@
             (click)="createProduction()" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
             {{ editingBatchId == null ? 'Registrar lote' : 'Salvar correção' }}
           </button>
-          <button *ngIf="editingBatchId != null" type="button" (click)="cancelEditBatch()"
+          <button *ngIf="editingBatchId != null" type="button" (click)="cancelEditBatch(); backToList()"
             class="rounded-lg border px-4 py-2 font-semibold">Cancelar edição</button>
         </div>
       </div>
-      <div class="space-y-3 rounded-2xl border bg-white p-5">
+      <div *ngIf="screen === 'browse'" class="space-y-3 rounded-2xl border bg-white p-5">
         <h2 class="font-amaranth text-xl font-bold">Lotes registrados</h2>
         <p *ngIf="!batches.length" class="text-sm text-gray-500">Nenhum lote produzido.</p>
         <article *ngFor="let batch of batches" class="rounded-xl border p-4">

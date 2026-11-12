@@ -29,10 +29,10 @@ describe('CommerceAccessComponent (legacy commercial landing)', () => {
 
   afterEach(() => fixture?.destroy());
 
-  it('routes the owner directly to operational catalog, not a permissions page', async () => {
+  it('routes the owner to finance first, not a permissions page', async () => {
     await open(true, true, []);
     expect(router.navigateByUrl).toHaveBeenCalledWith(
-      '/painel/gestao-comercial/catalogo', { replaceUrl: true });
+      '/painel/gestao-comercial/financeiro', { replaceUrl: true });
     expect(fixture.nativeElement.textContent).not.toContain('Gerenciar permissões administrativas');
   });
 
@@ -46,6 +46,12 @@ describe('CommerceAccessComponent (legacy commercial landing)', () => {
     await open(true, false, ['PRODUCTS_MANAGE']);
     expect(router.navigateByUrl).toHaveBeenCalledWith(
       '/painel/gestao-comercial/catalogo', { replaceUrl: true });
+  });
+
+  it('prefers finance for delegates with both finance and catalog grants', async () => {
+    await open(true, false, ['ARTWORKS_MANAGE', 'FINANCE_VIEW']);
+    expect(router.navigateByUrl).toHaveBeenCalledWith(
+      '/painel/gestao-comercial/financeiro', { replaceUrl: true });
   });
 
   it('does not grant commerce access based only on partner rights', async () => {

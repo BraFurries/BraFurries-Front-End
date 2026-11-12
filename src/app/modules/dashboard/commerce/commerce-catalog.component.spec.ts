@@ -170,9 +170,9 @@ describe('CommerceCatalogComponent', () => {
     expect(component.successMessage).toContain('Arquivo da arte');
   });
 
-  it('offers all eight catalog screens to an authorized owner', async () => {
+  it('offers seven consolidated catalog sections to an authorized owner', async () => {
     await create([],true);
-    expect(component.visibleTabs().length).toBe(8);
+    expect(component.visibleTabs().length).toBe(7);
     expect(catalog.artworks).toHaveBeenCalled();
     expect(catalog.templates).toHaveBeenCalled();
     expect(catalog.suppliers).toHaveBeenCalled();
@@ -301,5 +301,88 @@ describe('CommerceCatalogComponent', () => {
     expect(component.batchRevisions.length).toBe(1);
     expect(component.describeBatchSnapshot(component.batchRevisions[0].afterJson))
       .toContain('12 un.');
+  });
+
+  it('keeps artwork browsing and editing on different screens', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    expect(fixture.nativeElement.textContent).toContain('Artes cadastradas');
+    component.openCreate('artworks');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Cadastrar arte');
+    expect(fixture.nativeElement.textContent).not.toContain('Artes cadastradas');
+    component.backToList();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Artes cadastradas');
+  });
+
+  it('shows private files within the selected artwork record, never under a detached tab', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    catalog.artworkFiles.and.returnValue(of([{
+      id: 51, artworkId: 12, kind: 'SOURCE', originalName: 'mascote.psd',
+      extension: 'psd', mediaType: 'application/octet-stream', description: null,
+      sha256: 'abc', sizeBytes: 4096, status: 'ACTIVE', uploadedByUserId: 1,
+      createdAt: '2026-11-11T13:00:00', archivedAt: null
+    }]));
+    component.reloadFiles();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('mascote.psd');
+    expect(component.visibleTabs().some(tab => tab.key === 'files')).toBeFalse();
+    component.openCreate('files', 12);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Enviar arquivo privado');
+    expect(fixture.nativeElement.textContent).not.toContain('Artes cadastradas');
+  });
+
+  it('shows linked artwork names in product details without requiring contract management to view', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    catalog.productArtworks.and.returnValue(of([{
+      artworkId: 12, title: 'Arte do mascote', royaltyAllocationPercent: 50
+    }]));
+    component.reloadLinks();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Arte do mascote');
+    expect(fixture.nativeElement.textContent).not.toContain('+ Vincular arte');
+    component.openCreate('links', 3);
+    expect(component.activeTab).toBe('products');
+    component.access = { enabled: true, owner: false,
+      permissions: ['PRODUCTS_MANAGE', 'CONTRACTS_MANAGE'] };
+    component.openCreate('links', 3);
+    fixture.detectChanges();
+    expect(component.screen).toBe('form');
+    expect(fixture.nativeElement.textContent).not.toContain('Catálogo de produtos');
+  });
+
+  it('preserves pending artwork values through separate external artist registration', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    component.openCreate('artworks');
+    component.artworkForm.title = 'Obra em andamento';
+    component.openCreate('artists');
+    component.externalArtistForm.artistName = 'Criadora';
+    component.createExternalArtist();
+    expect(component.activeTab).toBe('artworks');
+    expect(component.screen).toBe('form');
+    expect(component.artworkForm.title).toBe('Obra em andamento');
+    expect(component.artworkForm.artistUserId).toBe(44);
+  });
+
+  it('visually relates each signed contract to its artwork and template', async () => {
+    await create(['ARTWORKS_MANAGE','CONTRACTS_MANAGE']);
+    catalog.contracts.and.returnValue(of([{
+      id: 21, artworkId: 12, templateId: 13, artistUserId: 31,
+      modality: 'ROYALTY', royaltyMethod: 'PERCENT_GROSS',
+      royaltyPercent: 10, royaltyFixedAmount: null, oneTimeAmount: 0,
+      effectiveFrom: '2026-11-01', effectiveUntil: null,
+      sha256: 'abc123', sizeBytes: 5000, status: 'ACTIVE'
+    }]));
+    component.selectTab('contracts');
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Arte: Arte A');
+    expect(text).toContain('Modelo: Royalties');
+    expect(text).toContain('Assinado #21');
+    component.openCreate('contracts', 12);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Assinado #21');
+    expect(fixture.nativeElement.textContent).toContain('Registrar contrato assinado');
   });
 });
