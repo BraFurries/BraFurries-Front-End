@@ -103,4 +103,45 @@ describe('CommerceCatalogService', () => {
     }));
     request.flush({ id:7 });
   });
+
+  it('prepares a frozen PDF with complete legal parties via authenticated API only', () => {
+    catalog.prepareContract(20,{
+      templateId:12,effectiveFrom:'2026-11-12',effectiveUntil:null,oneTimeAmount:199.99,
+      contractor:{legalName:'Pessoa responsável',document:'12345678900',address:'Rua A',representative:null},
+      artist:{legalName:'Artista titular',document:'98765432100',address:'Rua B',representative:null}
+    }).subscribe();
+    const req=http.expectOne(`${base}/artworks/20/contract-preparations`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body.contractor.legalName).toBe('Pessoa responsável');
+    expect(req.request.body.artist.legalName).toBe('Artista titular');
+    expect(JSON.stringify(req.request.body)).not.toContain('storage_key');
+    req.flush({id:51});
+  });
+
+  it('gets prepared PDF privately and uploads a human-reviewed signed copy', () => {
+    catalog.contractPreparations(20).subscribe();
+    const list=http.expectOne(`${base}/artworks/20/contract-preparations`);
+    expect(list.request.method).toBe('GET');
+    list.flush([]);
+
+    catalog.downloadPreparation(20,51).subscribe();
+    const download=http.expectOne(`${base}/artworks/20/contract-preparations/51/download`);
+    expect(download.request.responseType).toBe('blob');
+    download.flush(new Blob(['pdf'],{type:'application/pdf'}));
+
+    const signed=new File(['%PDF-1.5\n%%EOF'],'assinatura.pdf',{type:'application/pdf'});
+    catalog.uploadSignedPreparation(20,51,signed).subscribe();
+    const upload=http.expectOne(`${base}/artworks/20/contract-preparations/51/signed`);
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body instanceof FormData).toBeTrue();
+    expect(upload.request.body.get('reviewed')).toBe('true');
+    expect((upload.request.body.get('file') as File).name).toBe('assinatura.pdf');
+    expect(upload.request.headers.has('Content-Type')).toBeFalse();
+    upload.flush({id:8});
+
+    catalog.cancelPreparation(20,52).subscribe();
+    const cancelled=http.expectOne(`${base}/artworks/20/contract-preparations/52/cancel`);
+    expect(cancelled.request.method).toBe('POST');
+    cancelled.flush(null);
+  });
 });
