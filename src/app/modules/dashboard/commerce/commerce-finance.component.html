@@ -1,16 +1,5 @@
 <section class="mx-auto max-w-7xl space-y-6 p-5 md:p-10">
-  <header>
-    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Gestão interna · exclusivamente BraFurries</p>
-    <h1 class="mt-2 font-amaranth text-3xl font-bold text-braDark">Financeiro Comercial</h1>
-    <p class="mt-2 text-sm text-gray-600">
-      Vendas físicas com taxas, entradas, despesas, aportes, royalties e fechamentos mensais.
-      Nenhum saldo ou moeda da loja virtual do Discord participa desses registros.
-    </p>
-    <nav class="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-braPurple">
-      <a routerLink="/painel/gestao-comercial/catalogo">Cadastros comerciais</a>
-      <span aria-current="page" class="text-gray-500">Financeiro</span>
-    </nav>
-  </header>
+  <app-commerce-navigation active="financeiro"></app-commerce-navigation>
 
   <p *ngIf="errorMessage" role="alert"
      class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
