@@ -40,6 +40,19 @@ describe('AdminStorageService', () => {
       referenceLabel:'Contrato', deletable:true });
   });
 
+
+  it('uses a body-only owner operation for a linked unsigned preparation', () => {
+    const key='commerce/contracts/12/12345678-1234-1234-1234-123456789abc.pdf';
+    service.deleteUnsignedPreparation('PRIVATE',key,'"etag"',12,91).subscribe();
+    const req=http.expectOne(request => request.url.endsWith('/objects/delete-unsigned-preparation'));
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      bucket:'PRIVATE',key,etag:'"etag"',artworkId:12,preparationId:91
+    });
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush(null);
+  });
+
   it('requests deletion of only the selected orphan and ETag through the API', () => {
     const key='commerce/artworks/14/12345678-1234-1234-1234-123456789abc.psd';
     service.deleteOrphan('PRIVATE',key,'"same-etag"').subscribe();
