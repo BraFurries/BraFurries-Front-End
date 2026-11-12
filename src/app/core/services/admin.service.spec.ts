@@ -15,6 +15,14 @@ describe('AdminService log contract', () => {
 
   afterEach(() => http.verify());
 
+  it('requests the canonical metrics endpoint with an explicit period', () => {
+    service.getMetrics('30d').subscribe();
+    const request=http.expectOne(req => req.url.endsWith('/admin/metrics/canonical'));
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('period')).toBe('30d');
+    request.flush({period:'30d',dailySnapshots:[],commandUsage:[],topCommands:[]});
+  });
+
   it('sends the consumed cursor, including zero, and preserves the proxy metadata', () => {
     const response = {
       status: 'available', items: [], totalBuffered: 600, limit: 100,
