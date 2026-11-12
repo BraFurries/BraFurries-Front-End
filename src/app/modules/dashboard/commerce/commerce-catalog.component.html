@@ -609,6 +609,11 @@
             class="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-gray-50">
             Baixar PDF privado
           </button>
+          <button *ngIf="access?.owner" type="button"
+            [disabled]="saving" (click)="discardUnusedTestContract(contract)"
+            class="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 disabled:opacity-50">
+            Excluir contrato de teste e PDF
+          </button>
           <button *ngIf="contract.status === 'ACTIVE'" type="button"
             [disabled]="saving" (click)="terminateContract(contract)"
             class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">
