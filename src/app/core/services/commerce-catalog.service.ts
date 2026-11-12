@@ -287,12 +287,6 @@ export class CommerceCatalogService {
     return this.http.post<void>(`${this.base}/contract-documents/cleanup-orphan`,{key});
   }
 
-  discardUnusedTestContract(artworkId: number, contractId: number): Observable<void> {
-    return this.http.delete<void>(
-      `${this.base}/artworks/${artworkId}/contracts/${contractId}/unused-test`
-    );
-  }
-
   terminateContract(artworkId: number, contractId: number): Observable<void> {
     return this.http.post<void>(
       `${this.base}/artworks/${artworkId}/contracts/${contractId}/terminate`,{}
