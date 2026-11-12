@@ -3,7 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
 import { CommerceNavigationComponent } from './commerce-navigation.component';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
 import { CommerceArtistService } from '../../../core/services/commerce-artist.service';
@@ -16,7 +17,8 @@ describe('CommerceCatalogComponent', () => {
   let catalog: jasmine.SpyObj<CommerceCatalogService>;
   let artists: jasmine.SpyObj<CommerceArtistService>;
 
-  async function create(permissions: string[], owner = false, enabled = true): Promise<void> {
+  async function create(permissions: string[], owner = false, enabled = true,
+    setupRequests?: () => void): Promise<void> {
     access = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
     catalog = jasmine.createSpyObj<CommerceCatalogService>('CommerceCatalogService', [
       'templates','artworks','suppliers','supplierChoices','products','productionBatches',
@@ -79,6 +81,8 @@ describe('CommerceCatalogComponent', () => {
     catalog.createArtwork.and.returnValue(of({ id: 14 }));
     catalog.linkArtwork.and.returnValue(of(void 0));
 
+    setupRequests?.();
+
     await TestBed.configureTestingModule({
       declarations: [CommerceCatalogComponent, CommerceNavigationComponent],
       imports: [CommonModule, FormsModule, RouterTestingModule],
@@ -111,6 +115,31 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.artworks).not.toHaveBeenCalled();
     expect(catalog.templates).not.toHaveBeenCalled();
     expect(catalog.suppliers).not.toHaveBeenCalled();
+  });
+
+  it('reports failing contract-template endpoint without hiding successfully loaded artworks', async () => {
+    await create(['ARTWORKS_MANAGE','CONTRACTS_MANAGE'],false,true,() => {
+      catalog.templates.and.returnValue(throwError(() =>
+        new HttpErrorResponse({status:500,statusText:'Internal Server Error'})));
+    });
+    expect(component.artworks.length).toBe(1);
+    expect(component.templates.length).toBe(0);
+    expect(component.errorMessage).toContain('Modelos de contratos (HTTP 500)');
+    expect(component.errorMessage).not.toContain('Internal Server Error');
+  });
+
+  it('continues to display legacy templates without full text', async () => {
+    await create(['CONTRACTS_MANAGE'],false,true,() => {
+      catalog.templates.and.returnValue(of([{
+        id:13,name:'Modelo antigo',description:null,fullText:null,
+        modality:'ROYALTY',royaltyMethod:'PERCENT_GROSS',
+        royaltyPercent:10,royaltyFixedAmount:null,active:true
+      }]));
+    });
+    component.selectTab('templates');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Modelo antigo');
+    expect(fixture.nativeElement.textContent).toContain('Modelo antigo sem texto integral');
   });
 
   it('lets artist managers search real users and register artwork', async () => {
