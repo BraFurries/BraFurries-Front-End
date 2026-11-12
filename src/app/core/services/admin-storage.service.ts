@@ -7,6 +7,13 @@ export type StorageBucket = 'PRIVATE' | 'PUBLIC';
 export type StorageCategory = 'CONTRACT_DOCUMENT' | 'ARTWORK_FILE' | 'OTHER_PRIVATE' | 'PUBLIC_MEDIA';
 export type StorageReferenceStatus = 'LINKED' | 'ORPHAN' | 'RECENT' | 'UNVERIFIED';
 
+export interface StorageObjectReference {
+  source: 'CONTRACT' | 'PREPARATION' | 'ARTWORK_FILE';
+  recordId: number;
+  artworkId: number;
+  status: string;
+}
+
 export interface StoredObject {
   key: string;
   sizeBytes: number;
@@ -17,10 +24,12 @@ export interface StoredObject {
   referenceStatus: StorageReferenceStatus;
   referenceLabel: string;
   deletable: boolean;
+  references: StorageObjectReference[];
 }
 export interface StorageObjectPage {
   bucket: StorageBucket;
   prefix: string;
+  folders: string[];
   objects: StoredObject[];
   nextCursor: string | null;
   truncated: boolean;
