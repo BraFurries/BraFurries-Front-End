@@ -14,7 +14,7 @@ import {
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
 } from '../../../core/services/commerce-catalog.service';
 
-type CatalogTab = 'artworks' | 'files' | 'templates' | 'contracts' |
+type CatalogTab = 'artworks' | 'artists' | 'files' | 'templates' | 'contracts' |
   'suppliers' | 'products' | 'production' | 'links';
 
 @Component({
@@ -24,17 +24,17 @@ type CatalogTab = 'artworks' | 'files' | 'templates' | 'contracts' |
 })
 export class CommerceCatalogComponent implements OnInit, OnDestroy {
   readonly tabs: { key: CatalogTab; label: string; permissions: PlatformPermissionCode[] }[] = [
-    { key: 'artworks', label: 'Artes e artistas', permissions: ['ARTWORKS_MANAGE'] },
-    { key: 'files', label: 'Arquivos das artes', permissions: ['ARTWORKS_MANAGE'] },
+    { key: 'artworks', label: 'Artes', permissions: ['ARTWORKS_MANAGE'] },
+    { key: 'artists', label: 'Artistas', permissions: ['ARTWORKS_MANAGE'] },
     { key: 'templates', label: 'Modelos de contratos', permissions: ['CONTRACTS_MANAGE'] },
     { key: 'contracts', label: 'Contratos assinados', permissions: ['CONTRACTS_MANAGE'] },
     { key: 'suppliers', label: 'Fornecedores', permissions: ['SUPPLIERS_MANAGE'] },
     { key: 'products', label: 'Produtos', permissions: ['PRODUCTS_MANAGE'] },
-    { key: 'links', label: 'Artes nos produtos', permissions: ['PRODUCTS_MANAGE', 'CONTRACTS_MANAGE'] },
     { key: 'production', label: 'Lotes de produção', permissions: ['PRODUCTS_MANAGE', 'SUPPLIERS_MANAGE'] }
   ];
   access: PlatformAccess | null = null;
   activeTab: CatalogTab = 'artworks';
+  screen: 'browse' | 'form' = 'browse';
   loading = true;
   saving = false;
   searchingArtists = false;
@@ -144,11 +144,78 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   selectTab(tab: CatalogTab): void {
     if (!this.visibleTabs().some(item => item.key === tab)) return;
     this.activeTab = tab;
+    this.screen = 'browse';
     this.errorMessage = '';
     this.successMessage = '';
     if (tab === 'contracts') this.reloadContracts();
-    if (tab === 'files') this.reloadFiles();
-    if (tab === 'links') this.reloadLinks();
+    if (tab === 'artworks') this.reloadFiles();
+    if (tab === 'products') this.reloadLinks();
+  }
+
+  /** List and create/edit are exclusive screens; related documents open from their parent record. */
+  openCreate(tab: CatalogTab, parentId?: number): void {
+    const permission: Partial<Record<CatalogTab, PlatformPermissionCode[]>> = {
+      artworks: ['ARTWORKS_MANAGE'], artists: ['ARTWORKS_MANAGE'],
+      files: ['ARTWORKS_MANAGE'], templates: ['CONTRACTS_MANAGE'],
+      contracts: ['CONTRACTS_MANAGE'], suppliers: ['SUPPLIERS_MANAGE'],
+      products: ['PRODUCTS_MANAGE'], links: ['PRODUCTS_MANAGE', 'CONTRACTS_MANAGE'],
+      production: ['PRODUCTS_MANAGE', 'SUPPLIERS_MANAGE']
+    };
+    if (!(permission[tab] ?? []).every(code => this.can(code))) return;
+    this.cancelEditArtwork();
+    this.cancelEditArtist();
+    this.cancelEditTemplate();
+    this.cancelEditSupplier();
+    this.cancelEditProduct();
+    this.cancelEditBatch();
+    if (tab === 'files' || tab === 'contracts') {
+      if (parentId != null) this.selectedArtworkId = parentId;
+      if (this.selectedArtworkId == null) return;
+    }
+    if (tab === 'links') {
+      if (parentId != null) this.selectedProductId = parentId;
+      if (this.selectedProductId == null) return;
+    }
+    this.activeTab = tab;
+    this.screen = 'form';
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  backToList(): void {
+    this.screen = 'browse';
+    if (this.activeTab === 'files') this.activeTab = 'artworks';
+    if (this.activeTab === 'links') this.activeTab = 'products';
+    this.errorMessage = '';
+  }
+
+  newLabel(): string {
+    const labels: Record<CatalogTab, string> = {
+      artworks: 'Nova arte', artists: 'Novo artista', files: 'Novo arquivo',
+      templates: 'Novo modelo', contracts: 'Novo contrato assinado',
+      suppliers: 'Novo fornecedor', products: 'Novo produto',
+      links: 'Vincular arte', production: 'Novo lote'
+    };
+    return labels[this.activeTab];
+  }
+
+  selectArtwork(id: number): void {
+    this.selectedArtworkId = this.selectedArtworkId === id ? null : id;
+    this.reloadFiles();
+    if (this.can('CONTRACTS_MANAGE')) this.reloadContracts();
+  }
+
+  selectProduct(id: number): void {
+    this.selectedProductId = this.selectedProductId === id ? null : id;
+    this.reloadLinks();
+  }
+
+  templateName(templateId: number): string {
+    return this.templates.find(item => item.id === templateId)?.name ?? 'Modelo #' + templateId;
+  }
+
+  selectedArtworkName(): string {
+    return this.artworks.find(item => item.id === this.selectedArtworkId)?.title ?? 'Arte selecionada';
   }
 
   reload(): void {
@@ -223,9 +290,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   startEditArtist(artist: CommercialArtist): void {
-    // The edit form lives inside the Artworks tab; reveal it when launched
-    // from the external artists list rather than leaving the form invisible.
-    this.activeTab='artworks';
+    this.activeTab='artists';
+    this.screen='form';
     this.editingArtistId=artist.userId;
     this.externalArtistForm={
       artistName:artist.artistName,telegramHandle:artist.telegramHandle || '',
@@ -273,6 +339,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
           this.artistSearch=payload.artistName;
         }
         this.cancelEditArtist();
+        this.screen='browse';
         this.successMessage=editing==null
           ? 'Artista externa cadastrada e selecionada.' : 'Dados da artista atualizados.';
         this.reload();
@@ -331,6 +398,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   startEditArtwork(item: CommerceArtwork): void {
+    this.activeTab='artworks';
+    this.screen='form';
     this.editingArtworkId=item.id;
     this.artworkForm={
       title:item.title,description:item.description || '',
@@ -380,6 +449,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   startEditTemplate(model: CommerceContractTemplate): void {
+    this.activeTab='templates';
+    this.screen='form';
     this.editingTemplateId=model.id;
     this.templateForm={
       name:model.name,description:model.description || '',modality:model.modality,
@@ -423,6 +494,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   startEditSupplier(supplier: CommerceSupplier): void {
+    this.activeTab='suppliers';
+    this.screen='form';
     this.editingSupplierId=supplier.id;
     this.supplierForm={name:supplier.name,contactName:supplier.contactName || '',
       email:supplier.email || '',phone:supplier.phone || '',notes:supplier.notes || ''};
@@ -458,6 +531,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   startEditProduct(product: CommerceProduct): void {
+    this.activeTab='products';
+    this.screen='form';
     this.editingProductId=product.id;
     this.productForm={sku:product.sku,name:product.name,
       description:product.description || '',
@@ -515,6 +590,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   startEditBatch(batch: CommerceBatch): void {
     if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
     this.activeTab='production';
+    this.screen='form';
     this.editingBatchId=batch.id;
     this.productionForm={
       productId:batch.productId,supplierId:batch.supplierId,quantity:batch.quantity,
@@ -676,10 +752,17 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       return;
     }
     this.artworkFiles = [];
-    this.catalog.artworkFiles(this.selectedArtworkId)
+    const artworkId = this.selectedArtworkId;
+    this.catalog.artworkFiles(artworkId)
       .pipe(takeUntil(this.destroy$)).subscribe({
-        next: files => this.artworkFiles = files,
-        error: () => this.errorMessage = 'Falha ao carregar arquivos privados desta arte.'
+        next: files => {
+          if (this.selectedArtworkId === artworkId) this.artworkFiles = files;
+        },
+        error: () => {
+          if (this.selectedArtworkId === artworkId) {
+            this.errorMessage = 'Falha ao carregar arquivos privados desta arte.';
+          }
+        }
       });
   }
 
@@ -725,10 +808,18 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       this.contracts = [];
       return;
     }
-    this.catalog.contracts(this.selectedArtworkId)
+    this.contracts = [];
+    const artworkId = this.selectedArtworkId;
+    this.catalog.contracts(artworkId)
       .pipe(takeUntil(this.destroy$)).subscribe({
-        next: items => this.contracts = items,
-        error: () => this.errorMessage = 'Falha ao carregar os contratos desta arte.'
+        next: items => {
+          if (this.selectedArtworkId === artworkId) this.contracts = items;
+        },
+        error: () => {
+          if (this.selectedArtworkId === artworkId) {
+            this.errorMessage = 'Falha ao carregar os contratos desta arte.';
+          }
+        }
       });
   }
 
@@ -737,11 +828,25 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       this.links = [];
       return;
     }
-    this.catalog.productArtworks(this.selectedProductId)
+    this.links = [];
+    const productId = this.selectedProductId;
+    this.catalog.productArtworks(productId)
       .pipe(takeUntil(this.destroy$)).subscribe({
-        next: items => this.links = items,
-        error: () => this.errorMessage = 'Falha ao carregar as artes do produto.'
+        next: items => {
+          if (this.selectedProductId === productId) this.links = items;
+        },
+        error: () => {
+          if (this.selectedProductId === productId) {
+            this.errorMessage = 'Falha ao carregar as artes do produto.';
+          }
+        }
       });
+  }
+
+  private backToListAfterSave(): void {
+    this.screen = 'browse';
+    if (this.activeTab === 'files') this.activeTab = 'artworks';
+    if (this.activeTab === 'links') this.activeTab = 'products';
   }
 
   private mutate(request: Observable<unknown>, message: string,
@@ -755,6 +860,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         this.saving = false;
         this.successMessage = message;
         afterSuccess?.();
+        this.backToListAfterSave();
         this.reload();
       },
       error: error => {
