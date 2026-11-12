@@ -27,6 +27,7 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
   private cursors: (string | null)[] = [null];
   pageIndex = 0;
   private loadSequence = 0;
+  private inspectSequence = 0;
   private readonly destroy$ = new Subject<void>();
 
   constructor(
@@ -49,12 +50,18 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.loadSequence++;
+    this.inspectSequence++;
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   changeBucket(scope: StorageBucket): void {
-    if (!this.owner) return;
+    if (!this.owner || this.deleting) return;
+    this.inspectSequence++;
+    this.inspecting = false;
+    this.selected = null;
+    this.exactKey = '';
     this.bucket = scope;
     this.prefix = '';
     this.applyFilters();
@@ -84,6 +91,8 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
     if (!this.owner) return;
     const seq = ++this.loadSequence;
     this.loading = true;
+    this.inspectSequence++;
+    this.inspecting = false;
     this.selected = null;
     this.errorMessage = '';
     this.successMessage = '';
@@ -113,17 +122,21 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
 
   private inspectKey(key: string): void {
     if (!this.owner || this.inspecting || !key) return;
+    const sequence = ++this.inspectSequence;
+    const scope = this.bucket;
     this.inspecting = true;
     this.errorMessage = '';
     this.successMessage = '';
     this.selected = null;
-    this.storage.inspect(this.bucket, key).pipe(takeUntil(this.destroy$)).subscribe({
+    this.storage.inspect(scope, key).pipe(takeUntil(this.destroy$)).subscribe({
       next: object => {
+        if (sequence !== this.inspectSequence || scope !== this.bucket) return;
         this.inspecting = false;
         this.selected = object;
         this.exactKey = object.key;
       },
       error: () => {
+        if (sequence !== this.inspectSequence || scope !== this.bucket) return;
         this.inspecting = false;
         this.errorMessage = 'Objeto não encontrado ou impossível de consultar no R2.';
       }
