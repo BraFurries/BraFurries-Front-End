@@ -11,7 +11,7 @@ import {
   AdminCoddySendMessageRequest,
   AdminCoddySendResult,
   AdminBotLogsResponse,
-  AdminMetrics,
+  AdminCanonicalMetrics,
   AdminMetricsPeriod,
   AdminOverview,
   AdminCoddyPresenceResponse,
@@ -87,9 +87,9 @@ export class AdminService {
     });
   }
 
-  getMetrics(period: AdminMetricsPeriod): Observable<AdminMetrics> {
+  getMetrics(period: AdminMetricsPeriod): Observable<AdminCanonicalMetrics> {
     const params = new HttpParams().set('period', period);
-    return this.http.get<AdminMetrics>(`${this.baseUrl}/metrics`, { params });
+    return this.http.get<AdminCanonicalMetrics>(`${this.baseUrl}/metrics/canonical`, { params });
   }
 
   getBotStatus(): Observable<AdminBotStatus> {
