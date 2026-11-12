@@ -122,6 +122,7 @@ jobs:
           --include=**/coddy-presence.component.spec.ts
           --include=**/admin.component.spec.ts
           --include=**/admin.service.spec.ts
+          --include=**/metricas.component.spec.ts
           --include=**/inicio.component.spec.ts
           --include=**/perfil.component.spec.ts
           --include=**/social-auth-error-message.spec.ts
