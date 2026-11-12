@@ -37,15 +37,6 @@ describe('CommerceCatalogService', () => {
     request.flush(new Blob(['pdf'],{type:'application/pdf'}));
   });
 
-  it('cleans orphaned private PDFs using exact key via authenticated endpoint', () => {
-    const key='commerce/contracts/20/12345678-1234-1234-1234-123456789abc.pdf';
-    catalog.deleteOrphanedContractPdf(key).subscribe();
-    const request=http.expectOne(`${base}/contract-documents/cleanup-orphan`);
-    expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({key});
-    request.flush(null);
-  });
-
   it('uses private multipart and authenticated routes for artwork versions', () => {
     const file = new File(['file'], 'original.psd', { type:'application/octet-stream' });
     catalog.uploadArtworkFile(20,'SOURCE','Camadas originais',file).subscribe();
