@@ -591,6 +591,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       externalReference:this.orderReceiptReference.trim() || null,
       notes:this.orderReceiptNotes.trim() || null
     }), 'Recebimento registrado apenas na encomenda (não no caixa).',() => {
+      this.formKind = null;
+      this.screen = 'browse';
       this.orderReceiptKey = '';
       this.orderReceiptAmount = 0;
       this.orderReceiptReference = '';
