@@ -276,22 +276,6 @@ export class CommerceCatalogService {
     );
   }
 
-  signContract(artworkId: number, input: {
-    templateId: number; effectiveFrom: string; effectiveUntil: string | null;
-    oneTimeAmount: number; file: File;
-  }): Observable<CreatedCommerceEntity> {
-    const body = new FormData();
-    body.append('templateId',String(input.templateId));
-    body.append('effectiveFrom',input.effectiveFrom);
-    if (input.effectiveUntil) body.append('effectiveUntil',input.effectiveUntil);
-    body.append('oneTimeAmount',input.oneTimeAmount.toFixed(2));
-    body.append('file',input.file,input.file.name);
-    // Browser defines multipart boundary. Never force Content-Type manually.
-    return this.http.post<CreatedCommerceEntity>(
-      `${this.base}/artworks/${artworkId}/contracts`,body
-    );
-  }
-
   downloadContract(artworkId: number, contractId: number): Observable<Blob> {
     return this.http.get(
       `${this.base}/artworks/${artworkId}/contracts/${contractId}/download`,
