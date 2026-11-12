@@ -124,8 +124,10 @@ describe('CommerceCatalogComponent', () => {
     });
     expect(component.artworks.length).toBe(1);
     expect(component.templates.length).toBe(0);
-    expect(component.errorMessage).toContain('Modelos de contratos (HTTP 500)');
-    expect(component.errorMessage).not.toContain('Internal Server Error');
+    expect(component.loadErrorMessage).toContain('Modelos de contratos (HTTP 500)');
+    expect(component.loadErrorMessage).not.toContain('Internal Server Error');
+    component.selectTab('templates');
+    expect(component.loadErrorMessage).toContain('Modelos de contratos (HTTP 500)');
   });
 
   it('continues to display legacy templates without full text', async () => {
