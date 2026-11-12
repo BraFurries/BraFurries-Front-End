@@ -33,6 +33,18 @@ describe('getSocialAuthErrorMessage', () => {
     expect(message).toContain('Entre novamente');
   });
 
+  it('explains Google email reuse without suggesting duplicate registration', () => {
+    const message = getSocialAuthErrorMessage('GOOGLE_ACCOUNT_LINK_REQUIRED');
+    expect(message).toContain('e-mail e senha');
+    expect(message).toContain('Conectar Google a esta conta');
+    expect(message).toContain('Nenhuma conta nova');
+  });
+
+  it('explains disabled providers without offering another signup', () => {
+    const message = getSocialAuthErrorMessage('PROVIDER_LOGIN_DISABLED');
+    expect(message).toContain('reative o provedor');
+  });
+
   it('preserves unrelated errors', () => {
     expect(getSocialAuthErrorMessage('erro qualquer')).toBe('erro qualquer');
   });
