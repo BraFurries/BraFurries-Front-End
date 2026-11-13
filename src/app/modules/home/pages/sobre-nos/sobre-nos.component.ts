@@ -22,6 +22,8 @@ export class SobreNosComponent implements OnInit {
     const dialog = this.meetDialog?.nativeElement;
     if (dialog?.open) {
       dialog.close();
+      // The native "close" event can be asynchronous; restore focus immediately.
+      this.meetTrigger?.nativeElement.focus();
     }
   }
 
