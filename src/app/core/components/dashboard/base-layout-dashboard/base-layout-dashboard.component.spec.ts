@@ -242,8 +242,9 @@ describe('BaseLayoutDashboardComponent', () => {
     component.toggleCommunityMenu();
     fixture.detectChanges();
 
-    const manageButton = Array.from(fixture.nativeElement.querySelectorAll('button'))
-      .find((button: Element) => button.textContent?.includes('Gerenciar Communities')) as HTMLButtonElement | undefined;
+    const manageButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button');
+    const manageButton = Array.from(manageButtons)
+      .find(button => button.textContent?.includes('Gerenciar Communities'));
     expect(manageButton).toBeTruthy();
     const navigate = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     manageButton!.click();
