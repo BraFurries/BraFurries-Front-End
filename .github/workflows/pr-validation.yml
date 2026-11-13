@@ -128,6 +128,7 @@ jobs:
           --include=**/social-auth-error-message.spec.ts
           --include=**/login.component.spec.ts
           --include=**/social-register.component.spec.ts
+          --include=**/sobre-nos.component.spec.ts
 
       - name: Partner Markdown editor regression tests
         run: >
