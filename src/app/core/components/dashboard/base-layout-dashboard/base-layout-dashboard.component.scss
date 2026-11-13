@@ -14,9 +14,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 
-  // Discreet scroll indicator on the dark sidebar, without a visible track or gutter.
+  // Slim white scroll indicator on the dark sidebar, with no visible track or gutter.
   scrollbar-width: thin;
-  scrollbar-color: rgba(190, 157, 205, 0.48) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.55) transparent;
 
   &::-webkit-scrollbar {
     width: 5px;
@@ -28,12 +28,12 @@
 
   &::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background-color: rgba(190, 157, 205, 0.48);
+    background-color: rgba(255, 255, 255, 0.55);
   }
 
   &:hover::-webkit-scrollbar-thumb,
   &::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(214, 187, 229, 0.78);
+    background-color: rgba(255, 255, 255, 0.85);
   }
 }
 
