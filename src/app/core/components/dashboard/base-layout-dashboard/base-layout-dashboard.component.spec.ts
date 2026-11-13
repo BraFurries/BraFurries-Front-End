@@ -507,10 +507,22 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(fixture.nativeElement.querySelector('a[href="/painel/admin/permissoes"]')).toBeTruthy();
   });
 
-  it('uses canonical Community management navigation', () => {
-    const link = fixture.nativeElement.querySelector('a[href="/painel/comunidades"]');
-    expect(link).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('a[href="/painel/membros"]')).toBeFalsy();
-    expect(fixture.nativeElement.querySelector('a[href="/painel/servidores"]')).toBeFalsy();
+  it('keeps Community management only in the selector dropdown, not in the sidebar links', () => {
+    const navigation = fixture.nativeElement.querySelector('.dashboard-nav') as HTMLElement;
+    expect(navigation.querySelector('a[href="/painel/comunidades"]')).toBeNull();
+
+    component.toggleCommunityMenu();
+    fixture.detectChanges();
+    const manageButtons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button');
+    const manageButton = Array.from(manageButtons)
+      .find(button => button.textContent?.includes('Gerenciar Communities'));
+    expect(manageButton).toBeTruthy();
+
+    const navigate = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    manageButton!.click();
+    expect(navigate).toHaveBeenCalledOnceWith(['/painel/comunidades']);
+
+    expect(navigation.querySelector('a[href="/painel/membros"]')).toBeFalsy();
+    expect(navigation.querySelector('a[href="/painel/servidores"]')).toBeFalsy();
   });
 });
