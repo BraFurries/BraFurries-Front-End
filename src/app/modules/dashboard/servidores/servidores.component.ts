@@ -691,7 +691,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
         return this.portariaRolesDirty || this.portariaEnabledDirty || this.portariaEntryDirty
           || this.portariaFormDirty || this.portariaResultDirty || !!this.clarificationPanel?.dirty;
       case 'moderation-access': return this.staffRolesDirty || this.collaborativeDirty;
-      case 'partners': return this.partnerDiscordDirty;
+      case 'partners': return this.partnerPanel?.dirty ?? this.partnerDiscordDirty;
       case 'logs': return this.orderedLogs.some(log => this.isLogDirty(log));
       default: return false;
     }
