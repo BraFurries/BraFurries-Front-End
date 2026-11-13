@@ -92,23 +92,34 @@
           <article class="overflow-hidden rounded-[2rem] border border-braYellow/30 bg-[#fffaf0] shadow-lg">
             <div class="grid gap-5 p-7 sm:grid-cols-[115px_1fr] sm:p-9">
               <span class="font-amaranth text-4xl font-bold text-[#b47b00]">2026</span>
-              <div>
-                <time datetime="2026-08-08" class="text-xs font-bold uppercase tracking-widest text-[#996500]">8 de agosto de 2026</time>
-                <h3 class="mt-2 font-amaranth text-3xl font-bold">Nosso primeiro meet oficial! 💛</h3>
-                <p class="mt-4 leading-relaxed text-gray-600">Depois de anos conectando pessoas pela internet, celebramos nosso primeiro encontro presencial oficial. Um dia para transformar conversas em abraços e criar memórias para guardar.</p>
+              <div class="grid min-w-0 items-center gap-7 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div>
+                  <time datetime="2026-08-08" class="text-xs font-bold uppercase tracking-widest text-[#996500]">8 de agosto de 2026</time>
+                  <h3 class="mt-2 font-amaranth text-3xl font-bold">Nosso primeiro meet oficial! 💛</h3>
+                  <p class="mt-4 leading-relaxed text-gray-600">Depois de anos conectando pessoas pela internet, celebramos nosso primeiro encontro presencial oficial. Um dia para transformar conversas em abraços e criar memórias para guardar.</p>
+                </div>
+                <figure class="mx-auto w-full max-w-sm rounded-2xl border border-braYellow/20 bg-white p-3 shadow-sm lg:max-w-none">
+                  <button #meetTrigger
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-controls="meet-photo-dialog"
+                    aria-label="Ampliar fotografia oficial do primeiro meet da BraFurries"
+                    (click)="openMeetPhoto()"
+                    class="group relative block w-full cursor-zoom-in overflow-hidden rounded-xl focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-braPurple">
+                    <img
+                      src="assets/images/historia/primeiro-meet-brafurries-2026-preview.webp"
+                      alt="Participantes do primeiro meet oficial da BraFurries reunidos ao ar livre, incluindo pessoas com fursuits."
+                      width="800"
+                      height="600"
+                      loading="lazy"
+                      decoding="async"
+                      class="block h-auto w-full object-contain transition-transform duration-300 group-hover:scale-[1.025]">
+                    <span class="absolute bottom-2 right-2 inline-flex items-center gap-2 rounded-lg bg-braDark/90 px-3 py-2 text-xs font-bold text-white shadow-sm" aria-hidden="true">⌕ Ampliar foto</span>
+                  </button>
+                  <figcaption class="px-2 pt-3 text-center text-xs font-medium text-gray-600">Primeiro meet oficial · 08/08/2026</figcaption>
+                </figure>
               </div>
             </div>
-            <figure class="border-t border-braYellow/20 bg-braDark">
-              <img
-                src="assets/images/historia/primeiro-meet-brafurries-2026.avif"
-                alt="Foto em grupo dos participantes do primeiro meet oficial da BraFurries, ao ar livre, com pessoas e fursuiters reunidos."
-                width="800"
-                height="600"
-                loading="lazy"
-                decoding="async"
-                class="block h-auto w-full object-contain">
-              <figcaption class="px-6 py-4 text-center text-sm font-medium text-gray-200">Primeiro meet oficial da BraFurries · 08/08/2026</figcaption>
-            </figure>
           </article>
         </li>
 
@@ -155,6 +166,28 @@
       </div>
     </div>
   </section>
+  <!-- Dialog nativo: foco contido, Esc para fechar e retorno ao botão após fechamento. -->
+  <dialog #meetDialog
+    id="meet-photo-dialog"
+    aria-labelledby="meet-dialog-title"
+    aria-modal="true"
+    (close)="onMeetDialogClosed()"
+    (click)="onMeetDialogClick($event)"
+    class="m-auto max-h-[95vh] w-[calc(100vw-2rem)] max-w-6xl overflow-auto rounded-3xl border border-white/20 bg-braDark p-3 text-white shadow-2xl backdrop:bg-black/85 sm:p-5">
+    <div class="mb-4 flex items-center justify-between gap-4 px-1">
+      <h2 id="meet-dialog-title" class="font-amaranth text-lg font-bold sm:text-2xl">Primeiro meet oficial da BraFurries</h2>
+      <button type="button" (click)="closeMeetPhoto()" aria-label="Fechar fotografia ampliada" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-3xl text-white transition hover:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-braCyan"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <img
+      src="assets/images/historia/primeiro-meet-brafurries-2026-full.webp"
+      width="2048"
+      height="1536"
+      alt="Fotografia oficial do primeiro meet da BraFurries com participantes reunidos ao ar livre, incluindo pessoas com fursuits."
+      loading="lazy"
+      decoding="async"
+      class="mx-auto block h-auto max-h-[72vh] w-auto max-w-full rounded-xl object-contain">
+    <p class="mt-4 text-center text-sm font-medium text-gray-300">08 de agosto de 2026 · Clique fora ou pressione Esc para fechar</p>
+  </dialog>
 </main>
 
 <app-external-footer></app-external-footer>
