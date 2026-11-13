@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges } from '@angular/core';
-import { finalize, switchMap } from 'rxjs';
+import { finalize, firstValueFrom, switchMap } from 'rxjs';
 import { GuildCategory, GuildChannel, GuildResources } from '../../../core/services/managed-servers.service';
 import {
   PartnerDiscordItem,
@@ -76,6 +76,24 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     );
   }
 
+  get canSaveAll(): boolean {
+    if (!this.enabled || !this.dirty || this.loading || this.saving || this.busyPartnerId !== null) return false;
+    return this.activePartners.every(item => {
+      if (!this.partnerDirty(item)) return true;
+      const draft = this.drafts[item.partnerId];
+      return !!draft
+        && (!draft.exclusiveChannelEnabled || !!item.representativeDiscordUserId)
+        && (!draft.existingTextChannelId || draft.adoptExistingTextChannel);
+    });
+  }
+
+  discard(): void {
+    if (this.saving || this.busyPartnerId !== null || !this.state) return;
+    this.apply(this.state);
+    this.error = '';
+    this.success = '';
+  }
+
   get activePartners(): PartnerDiscordItem[] {
     return this.state?.partners.filter(item => item.status === 'active') ?? [];
   }
@@ -144,69 +162,77 @@ export class PartnerDiscordPanelComponent implements OnChanges, OnDestroy {
     });
   }
 
-  saveConfig(): void {
-    if (!this.enabled || this.saving || !this.hasConfigChanges) return;
+  /**
+   * One user action persists each changed configuration in a deterministic order.
+   * These are independent API writes, not one transaction; successful steps
+   * update the baseline immediately and failed/remaining drafts remain dirty.
+   */
+  async saveAll(): Promise<void> {
+    if (!this.canSaveAll || !this.state) return;
     const guild = this.guildId;
+    const generation = this.generation;
+    const categoryId = this.categoryId || null;
+    const threadParentChannelId = this.parentId || null;
+    const configDirty = this.hasConfigChanges;
+    const changedPartners = this.activePartners
+      .filter(item => this.partnerDirty(item))
+      .map(item => ({ partnerId: item.partnerId, draft: { ...this.drafts[item.partnerId] } }));
     this.saving = true;
     this.savingChange.emit(true);
     this.error = '';
     this.success = '';
-    this.service.updateConfig({
-      categoryId: this.categoryId || null,
-      threadParentChannelId: this.parentId || null
-    }).pipe(finalize(() => this.finishSaving())).subscribe({
-      next: state => {
-        if (guild !== this.guildId) return;
-        this.apply(state);
-        this.success = 'Destino da vitrine configurado. Use Sincronizar para publicar.';
-      },
-      error: failure => {
-        if (guild === this.guildId) {
-          this.error = failure?.error?.message || 'Não foi possível salvar o destino da vitrine.';
+    try {
+      if (configDirty) {
+        const updatedConfig = await firstValueFrom(this.service.updateConfig({
+          categoryId, threadParentChannelId
+        }));
+        if (generation !== this.generation || guild !== this.guildId) return;
+        this.apply(updatedConfig);
+        // Preserve unsaved partner options while adopting the canonical config.
+        for (const item of changedPartners) {
+          if (updatedConfig.partners.some(partner => partner.partnerId === item.partnerId)) {
+            this.drafts[item.partnerId] = { ...item.draft };
+          }
         }
+        this.dirtyChange.emit(this.dirty);
       }
-    });
+      if (changedPartners.length && !this.state.configured) {
+        throw new Error('Configure o destino da vitrine antes de salvar os parceiros.');
+      }
+      for (const change of changedPartners) {
+        if (generation !== this.generation || guild !== this.guildId) return;
+        const persisted = await firstValueFrom(this.service.updatePartner(change.partnerId, change.draft));
+        if (generation !== this.generation || guild !== this.guildId || !this.state) return;
+        this.replaceSavedPartner(persisted);
+        // Synchronization can fail independently: the persisted options remain
+        // saved and can be reconciled using "Sincronizar todos".
+        const applied = await firstValueFrom(this.service.syncPartner(change.partnerId));
+        if (generation !== this.generation || guild !== this.guildId || !this.state) return;
+        this.replaceSavedPartner(applied);
+      }
+      if (generation === this.generation && guild === this.guildId) {
+        this.success = 'Configurações salvas. As publicações atualizadas foram enviadas para sincronização.';
+      }
+    } catch (failure: any) {
+      if (generation === this.generation && guild === this.guildId) {
+        this.error = (failure?.error?.message || failure?.message
+          || 'Não foi possível concluir o salvamento da vitrine.')
+          + ' As configurações restantes continuam pendentes. Caso a sincronização tenha falhado, use Sincronizar todos.';
+      }
+    } finally {
+      this.finishSaving();
+    }
   }
 
-  savePartner(item: PartnerDiscordItem): void {
-    const draft = this.drafts[item.partnerId];
-    if (!this.enabled || !this.state?.configured || !draft || this.saving || this.busyPartnerId != null) return;
-    if (draft.exclusiveChannelEnabled && !item.representativeDiscordUserId) {
-      this.error = 'Defina um representante com Discord vinculado ao cadastro antes de habilitar o canal.';
-      return;
-    }
-    if (draft.existingTextChannelId && !draft.adoptExistingTextChannel) {
-      this.error = 'Confirme a adoção do canal existente para prosseguir.';
-      return;
-    }
-    const guild = this.guildId;
-    this.busyPartnerId = item.partnerId;
-    this.savingChange.emit(true);
-    this.error = '';
-    this.success = '';
-    this.service.updatePartner(item.partnerId, draft).pipe(
-      switchMap(() => this.service.syncPartner(item.partnerId)),
-      finalize(() => { this.busyPartnerId = null; this.savingChange.emit(false); })
-    ).subscribe({
-      next: updated => {
-        if (guild !== this.guildId || !this.state) return;
-        this.state = {
-          ...this.state,
-          partners: this.state.partners.map(current => current.partnerId === updated.partnerId ? updated : current)
-        };
-        this.drafts[updated.partnerId] = this.toDraft(updated);
-        this.success = updated.appliedRevision >= updated.desiredRevision
-          ? 'Parceiro salvo e sincronizado com o Discord.'
-          : 'Preferência salva; sincronização ainda pendente.';
-        this.dirtyChange.emit(this.dirty);
-      },
-      error: failure => {
-        if (guild === this.guildId) {
-          this.error = failure?.error?.message
-            || 'Configuração possivelmente salva, mas não foi possível sincronizar. Recarregue o estado.';
-        }
-      }
-    });
+  private replaceSavedPartner(updated: PartnerDiscordItem): void {
+    if (!this.state) return;
+    this.state = {
+      ...this.state,
+      partners: this.state.partners.map(current =>
+        current.partnerId === updated.partnerId ? updated : current)
+    };
+    this.drafts[updated.partnerId] = this.toDraft(updated);
+    this.dirtyChange.emit(this.dirty);
   }
 
   requestWithdrawal(partnerId: number): void {

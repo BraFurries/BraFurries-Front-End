@@ -84,7 +84,7 @@ describe('PartnerDiscordPanelComponent', () => {
     expect(html.querySelector('.settings-grid .field-control')).not.toBeNull();
     expect(html.querySelector('.partner-grid .partner-card.card')).not.toBeNull();
     expect(html.querySelector('.partner-card .announcement-note')).not.toBeNull();
-    expect(html.querySelector('.partner-card .partner-footer .primary-button')).not.toBeNull();
+    expect(html.querySelector('.partner-card .partner-footer .primary-button')).toBeNull();
     expect(html.querySelector('.partner-card .partner-footer .danger-button')).not.toBeNull();
     expect(html.textContent).toContain('parceiro ativo');
   });
@@ -102,6 +102,67 @@ describe('PartnerDiscordPanelComponent', () => {
     expect(service.getSettings).toHaveBeenCalledTimes(1);
     expect(component.state?.partners.map(item => item.partnerId)).toEqual([31]);
     expect(component.enabled).toBeTrue();
+  });
+
+  it('supports first-time destination configuration through the unified save action', async () => {
+    const unconfigured = settings({
+      configured: false, categoryId: null, threadParentChannelId: null, partners: []
+    });
+    service.getSettings.and.returnValue(of(unconfigured));
+    service.updateConfig.and.returnValue(of(settings({
+      configured: true, categoryId: 'cat-first', partners: []
+    })));
+    component.load();
+    component.onCategoryChanged('cat-first');
+
+    expect(component.dirty).toBeTrue();
+    expect(component.canSaveAll).toBeTrue();
+
+    await component.saveAll();
+
+    expect(service.updateConfig).toHaveBeenCalledOnceWith({
+      categoryId: 'cat-first', threadParentChannelId: null
+    });
+    expect(component.dirty).toBeFalse();
+    expect(component.state?.configured).toBeTrue();
+  });
+
+  it('saves configuration and changed partner options using one action', async () => {
+    const configured = settings({ categoryId: 'cat-1', partners: [{ ...partner }] });
+    service.updateConfig.and.returnValue(of(configured));
+    service.updatePartner.and.returnValue(of({ ...partner, exclusiveChannelEnabled: true }));
+    service.syncPartner.and.returnValue(of({ ...partner, exclusiveChannelEnabled: true }));
+
+    component.onCategoryChanged('cat-1');
+    component.updateDraft(partner, { exclusiveChannelEnabled: true });
+    expect(component.canSaveAll).toBeTrue();
+    await component.saveAll();
+
+    expect(service.updateConfig).toHaveBeenCalledOnceWith({
+      categoryId: 'cat-1', threadParentChannelId: null
+    });
+    expect(service.updatePartner).toHaveBeenCalledOnceWith(31, {
+      exclusiveChannelEnabled: true, existingTextChannelId: null,
+      adoptExistingTextChannel: false
+    });
+    expect(service.syncPartner).toHaveBeenCalledOnceWith(31);
+    expect(component.dirty).toBeFalse();
+    expect(component.success).toContain('salvas');
+  });
+
+  it('preserves unsaved partner drafts when the destination was saved but a partner update fails', async () => {
+    service.updateConfig.and.returnValue(of(settings({ categoryId: 'cat-1' })));
+    service.updatePartner.and.returnValue(throwError(() => ({ error: { message: 'Sem permissão' } })));
+    component.onCategoryChanged('cat-1');
+    component.updateDraft(partner, { exclusiveChannelEnabled: true });
+
+    await component.saveAll();
+
+    expect(component.categoryId).toBe('cat-1');
+    expect(component.hasConfigChanges).toBeFalse();
+    expect(component.partnerDirty(partner)).toBeTrue();
+    expect(component.error).toContain('Sem permissão');
+    expect(component.canSaveAll).toBeTrue();
   });
 
   it('never syncs unconfigured destinations', () => {

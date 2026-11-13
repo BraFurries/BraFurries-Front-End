@@ -1,4 +1,4 @@
-<section class="partner-panel">
+<section class="partner-panel" [attr.inert]="saving || busyPartnerId !== null ? '' : null">
   <header class="card hero-card">
     <div>
       <p class="eyebrow">Coddy · Parcerias</p>
@@ -62,10 +62,6 @@
       <p class="help">Ao sincronizar, o Coddy ajusta as permissões de escrita do destino selecionado, preservando os demais acessos. O representante publica pelo site e não precisa gerenciar a thread manualmente.</p>
 
       <div class="actions">
-        <button type="button" (click)="saveConfig()" class="primary-button"
-          [disabled]="saving || busyPartnerId !== null || !hasConfigChanges">
-          {{ saving && hasConfigChanges ? 'Salvando…' : 'Salvar destino' }}
-        </button>
         <button type="button" (click)="syncAll()" class="secondary-button"
           [disabled]="saving || busyPartnerId !== null || dirty || !state.configured">
           Sincronizar todos os parceiros
@@ -166,11 +162,6 @@
             }
             <footer class="partner-footer">
               <div class="actions">
-                <button type="button" (click)="savePartner(item)"
-                  [disabled]="saving || busyPartnerId !== null || !state.configured || !drafts[item.partnerId] || !partnerDirty(item)"
-                  class="primary-button">
-                  {{ busyPartnerId === item.partnerId ? 'Sincronizando…' : 'Salvar e aplicar no Discord' }}
-                </button>
                 @if ((item.threadId || item.textChannelId || item.desiredRevision > 0) && withdrawalConfirmationId !== item.partnerId) {
                   <button type="button" (click)="requestWithdrawal(item.partnerId)"
                     [disabled]="saving || busyPartnerId !== null || dirty"

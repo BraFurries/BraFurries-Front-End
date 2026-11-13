@@ -45,6 +45,33 @@ describe('PortariaClarificationSettingsComponent', () => {
     expect(service.updatePortariaClarificationSettings).not.toHaveBeenCalled();
   });
 
+  it('keeps ticket changes in the Portaria-wide draft without its own save button', async () => {
+    expect(fixture.nativeElement.querySelector('button.primary-button')).toBeNull();
+    component.enabled = true;
+    component.categoryId = '987654321098765432';
+    component.onDraftChange();
+    expect(component.dirty).toBeTrue();
+
+    await component.savePending();
+
+    expect(service.updatePortariaClarificationSettings).toHaveBeenCalledOnceWith('123', {
+      enabled: true, categoryId: '987654321098765432'
+    });
+    expect(component.dirty).toBeFalse();
+  });
+
+  it('can discard ticket changes without writing anything to the API', () => {
+    component.enabled = true;
+    component.onDraftChange();
+    expect(component.dirty).toBeTrue();
+
+    component.discard();
+
+    expect(component.enabled).toBeFalse();
+    expect(component.dirty).toBeFalse();
+    expect(service.updatePortariaClarificationSettings).not.toHaveBeenCalled();
+  });
+
   it('requires a category before enabling', () => {
     component.enabled = true;
     component.save();
