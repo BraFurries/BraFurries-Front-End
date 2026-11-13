@@ -104,6 +104,29 @@ describe('PartnerDiscordPanelComponent', () => {
     expect(component.enabled).toBeTrue();
   });
 
+  it('supports first-time destination configuration through the unified save action', async () => {
+    const unconfigured = settings({
+      configured: false, categoryId: null, threadParentChannelId: null, partners: []
+    });
+    service.getSettings.and.returnValue(of(unconfigured));
+    service.updateConfig.and.returnValue(of(settings({
+      configured: true, categoryId: 'cat-first', partners: []
+    })));
+    component.load();
+    component.onCategoryChanged('cat-first');
+
+    expect(component.dirty).toBeTrue();
+    expect(component.canSaveAll).toBeTrue();
+
+    await component.saveAll();
+
+    expect(service.updateConfig).toHaveBeenCalledOnceWith({
+      categoryId: 'cat-first', threadParentChannelId: null
+    });
+    expect(component.dirty).toBeFalse();
+    expect(component.state?.configured).toBeTrue();
+  });
+
   it('saves configuration and changed partner options using one action', async () => {
     const configured = settings({ categoryId: 'cat-1', partners: [{ ...partner }] });
     service.updateConfig.and.returnValue(of(configured));
