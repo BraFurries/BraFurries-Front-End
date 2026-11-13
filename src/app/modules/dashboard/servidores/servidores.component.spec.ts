@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, flushMicrotasks, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
@@ -222,6 +222,110 @@ describe('ServidoresComponent', () => {
     expect(component.newFlowTargetChannelId).toBe('888888888888888888');
     expect(component.portaria?.questions[0].label).toBe('Como conheceu?');
   });
+
+  it('uses a single floating save action for Bump and saves only changed cards in order', fakeAsync(() => {
+    const serverReply = { ...bump, processing: { channelId: '2' } };
+    const completeReply = { ...serverReply, warning: { ...bump.warning, messages: ['novo aviso'] } };
+    const order: string[] = [];
+    service.updateBumpProcessing.and.callFake(() => {
+      order.push('processing'); return of(serverReply);
+    });
+    service.updateBumpWarning.and.callFake(() => {
+      order.push('warning'); return of(completeReply);
+    });
+
+    create();
+    component.activeSection = 'bump';
+    component.bumpDraft!.processing.channelId = '2';
+    component.bumpDraft!.warning.messages = ['novo aviso'];
+    fixture.detectChanges();
+
+    const footer = fixture.nativeElement.querySelector('.coddy-sticky-save') as HTMLElement;
+    expect(footer).not.toBeNull();
+    expect(footer.querySelectorAll('button.primary-button').length).toBe(1);
+    expect(footer.textContent).toContain('Alterações não salvas');
+    expect(fixture.nativeElement.querySelectorAll('button').length).toBeGreaterThan(0);
+
+    component.saveActiveSection();
+    flushMicrotasks();
+
+    expect(order).toEqual(['processing', 'warning']);
+    expect(service.updateBumpIndividualReward).not.toHaveBeenCalled();
+    expect(service.updateBumpMonthlyRanking).not.toHaveBeenCalled();
+    expect(component.unifiedDirty).toBeFalse();
+  }));
+
+  it('stages Portaria activation instead of applying it immediately', fakeAsync(() => {
+    create();
+    component.activeSection = 'portaria';
+    component.portaria!.config.enabled = false;
+    fixture.detectChanges();
+
+    expect(service.updatePortariaEnabled).not.toHaveBeenCalled();
+    expect(component.unifiedDirty).toBeTrue();
+    service.updatePortariaEnabled.and.returnValue(of({
+      ...portaria, config: { ...portaria.config, enabled: false }
+    }));
+
+    component.saveActiveSection();
+    flushMicrotasks();
+
+    expect(service.updatePortariaEnabled).toHaveBeenCalledOnceWith(resources.guildId, false);
+    expect(component.portariaEnabledDirty).toBeFalse();
+  }));
+
+  it('persists staff roles before collaborative moderation with one save action', fakeAsync(() => {
+    create();
+    component.activeSection = 'moderation-access';
+    component.staffRoleDraft.push('1');
+    component.collaborativeDraft!.enabled = true;
+    const updatedStaff = { roleIds: ['999999999999999999', '1'], roles: resources.roles };
+    const calls: string[] = [];
+    service.updateModerationStaffRoles.and.callFake(() => {
+      calls.push('staff');
+      return of({ ...moderationAccess, staffRoles: updatedStaff });
+    });
+    service.updateCollaborativeModeration.and.callFake(() => {
+      calls.push('collaborative');
+      return of({
+        ...moderationAccess, staffRoles: updatedStaff,
+        collaborativeModeration: { ...moderationAccess.collaborativeModeration, enabled: true }
+      });
+    });
+
+    component.saveActiveSection();
+    flushMicrotasks();
+
+    expect(calls).toEqual(['staff', 'collaborative']);
+    expect(component.unifiedDirty).toBeFalse();
+  }));
+
+  it('persists all changed log types from one floating save and keeps test-log action separate', fakeAsync(() => {
+    create();
+    component.activeSection = 'logs';
+    const destination = {
+      id: '888888888888888888', type: 'text' as const, name: 'fichas',
+      parentId: null, parentName: null, writable: true, missing: false
+    };
+    component.logDrafts['warn'] = {
+      enabled: true, targetId: destination.id, saving: false, testing: false, error: ''
+    };
+    service.updateLog.and.returnValue(of({
+      ...logs, logs: [{ ...logs.logs[0], enabled: true, target: destination }]
+    }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.coddy-sticky-save button.primary-button').length).toBe(1);
+    expect(fixture.nativeElement.textContent).toContain('Enviar log de teste');
+    component.saveActiveSection();
+    flushMicrotasks();
+
+    expect(service.updateLog).toHaveBeenCalledOnceWith(resources.guildId, 'warn', {
+      enabled: true, targetId: destination.id
+    });
+    expect(service.testLog).not.toHaveBeenCalled();
+    expect(component.unifiedDirty).toBeFalse();
+  }));
 
   it('loads Bump alongside configuration and ignores a stale guild response', () => {
     const delayed = new Subject<BumpConfigResponse>();
