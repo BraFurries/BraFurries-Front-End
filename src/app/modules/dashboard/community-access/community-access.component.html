@@ -1,14 +1,17 @@
-<section class="mx-auto max-w-6xl p-6 md:p-10">
+<section class="mx-auto max-w-6xl px-6 pb-28 pt-6 md:px-10 md:pb-28 md:pt-10">
   <div>
     <h1 class="font-amaranth text-3xl font-bold text-braDark">Acessos da Community</h1>
     <p class="mt-2 max-w-3xl text-gray-600">
-      Configure capabilities organizacionais sem depender das permissões do Discord.
+      Marque os acessos desejados e confirme todas as alterações no botão Salvar. Nada é aplicado ao marcar uma opção.
       O servidor e as integrações continuam sendo domínios separados.
     </p>
   </div>
 
-  <p *ngIf="errorMessage" class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+  <p *ngIf="errorMessage" role="alert" class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
     {{ errorMessage }}
+  </p>
+  <p *ngIf="successMessage" role="status" class="mt-5 rounded-xl bg-green-50 p-4 text-sm text-green-800">
+    {{ successMessage }}
   </p>
 
   <ng-container *ngIf="selectedCommunityId !== null && selectedAccess">
@@ -43,7 +46,7 @@
             class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2">
           <button
             type="submit"
-            [disabled]="!!savingKey"
+            [disabled]="saving"
             class="rounded-xl border border-gray-300 px-4 py-2 font-bold text-gray-700 disabled:opacity-50">
             Buscar
           </button>
@@ -58,7 +61,7 @@
             *ngFor="let member of members"
             type="button"
             (click)="selectMember(member)"
-            [disabled]="!!savingKey"
+            [disabled]="saving"
             class="w-full rounded-xl border p-3 text-left transition disabled:opacity-50"
             [ngClass]="selectedMember?.userId === member.userId ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 hover:border-braPurple/30'">
             <div class="flex items-center justify-between gap-3">
@@ -93,7 +96,7 @@
                 type="checkbox"
                 class="mt-1"
                 [checked]="hasDirect(definition.code)"
-                [disabled]="!!savingKey"
+                [disabled]="!canEditSelectedMember"
                 (change)="toggleDirect(definition)">
               <span>
                 <span class="block font-bold text-braDark">{{ capabilityLabel(definition.code) }}</span>
@@ -119,7 +122,7 @@
             *ngFor="let role of roles"
             type="button"
             (click)="selectRole(role)"
-            [disabled]="!!savingKey"
+            [disabled]="saving"
             class="w-full rounded-xl border p-3 text-left transition disabled:opacity-50"
             [ngClass]="selectedRole?.id === role.id ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 hover:border-braPurple/30'">
             <div class="flex items-center justify-between gap-3">
@@ -152,7 +155,7 @@
                 type="checkbox"
                 class="mt-1"
                 [checked]="hasRole(definition.code)"
-                [disabled]="!!savingKey"
+                [disabled]="!canEditSelectedRole"
                 (change)="toggleRole(definition)">
               <span>
                 <span class="block font-bold text-braDark">{{ capabilityLabel(definition.code) }}</span>
@@ -165,5 +168,32 @@
         </div>
       </section>
     </div>
+
+    <footer *ngIf="!loadingTargets" role="region" aria-label="Salvar permissões"
+      class="sticky bottom-4 z-30 mt-8 flex flex-col gap-4 rounded-2xl border border-braPurple/25 bg-white/95 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div>
+        <strong class="block font-amaranth text-lg text-braDark">
+          {{ dirty ? 'Alterações não salvas' : 'Permissões sincronizadas' }}
+        </strong>
+        <p class="mt-1 text-xs text-gray-600" aria-live="polite">
+          {{ dirty
+            ? pendingCount + (pendingCount === 1 ? ' alteração pendente' : ' alterações pendentes') + ' nesta Community. Clique em Salvar para confirmar.'
+            : 'Marque os acessos que deseja alterar e clique em Salvar para confirmar.' }}
+        </p>
+        <p class="mt-1 text-xs text-gray-500" *ngIf="dirty">
+          Alterações de membros e cargos são reunidas aqui; a API aplica cada concessão ou revogação sequencialmente.
+        </p>
+      </div>
+      <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+        <button type="button" (click)="discardChanges()" [disabled]="!dirty || saving"
+          class="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-gray-700 transition hover:border-braPurple disabled:cursor-not-allowed disabled:opacity-50">
+          Descartar
+        </button>
+        <button type="button" (click)="saveChanges()" [disabled]="!canSave"
+          class="rounded-xl bg-braPurple px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-braDark disabled:cursor-not-allowed disabled:opacity-50">
+          {{ saving ? 'Salvando…' : 'Salvar alterações' }}
+        </button>
+      </div>
+    </footer>
   </ng-container>
 </section>

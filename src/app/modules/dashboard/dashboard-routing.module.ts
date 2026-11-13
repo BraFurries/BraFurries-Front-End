@@ -41,7 +41,7 @@ const routes: Routes = [
           { path: 'recrutamento', component: RecrutamentoComponent, data: { communityFeature: 'recrutamento' } },
           { path: 'inscricoes', component: InscricoesComponent, data: { communityFeature: 'inscricoes' } },
           { path: 'triagem', component: TriagemComponent, data: { communityFeature: 'triagem' } },
-          { path: 'acessos', component: CommunityAccessComponent, data: { communityFeature: 'acessos' } },
+          { path: 'acessos', component: CommunityAccessComponent, canDeactivate: [(component: CommunityAccessComponent) => component.canDeactivate()], data: { communityFeature: 'acessos' } },
           { path: 'atividade', component: CommunityActivityComponent, data: { communityFeature: 'atividade' } },
           { path: 'coddy', component: ServidoresComponent, data: { communityFeature: 'coddy' } },
           { path: 'coddy/:guildId', component: ServidoresComponent, data: { communityFeature: 'coddy' } },
