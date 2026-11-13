@@ -1,9 +1,11 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { concatMap, forkJoin, Observable, of, Subscription } from 'rxjs';
+import { concatMap, firstValueFrom, forkJoin, Observable, of, Subscription } from 'rxjs';
 import { AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
+import { PartnerDiscordPanelComponent } from './partner-discord-panel.component';
+import { PortariaClarificationSettingsComponent } from './portaria-clarification-settings.component';
 
 type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -15,9 +17,22 @@ interface PrivateAreaDraft { privateCategoryName: string; privateChannelNames: s
 interface PortariaBypassDraft { type: 'invite' | 'account'; value: string; accessMode: 'provisorio' | 'completo'; requiresForm: boolean; active: boolean; expiresAt: string; }
 type PendingNavigation = { kind: 'route'; guildId: string; section: ServerSection } | { kind: 'flow'; flowId: number };
 const LOG_DISPLAY_ORDER = ['profile', 'message_edit', 'message_delete', 'call', 'mute', 'warn', 'ban'];
+const BUMP_CARDS: BumpCard[] = ['processing', 'warning', 'individual', 'monthly'];
+const PORTARIA_ENTRY_FIELDS = [
+  'aprovacaoAcessoProvisorioAtivo', 'aprovacaoAcessoProvisorioDuracaoDias',
+  'idadeMinimaContaFichaAtiva', 'idadeMinimaContaFichaDias',
+  'idadeMinimaContaAcessoProvisorioAtiva', 'idadeMinimaContaAcessoProvisorioDias',
+  'idadeMinimaEntradaServidorAtiva', 'idadeMinimaEntradaServidorAnos'
+] as const;
 
 @Component({ selector: 'app-servidores', standalone: false, templateUrl: './servidores.component.html', styleUrl: './servidores.component.scss' })
 export class ServidoresComponent implements OnInit, OnDestroy {
+  @ViewChild(PartnerDiscordPanelComponent) partnerPanel?: PartnerDiscordPanelComponent;
+  @ViewChild(PortariaClarificationSettingsComponent) clarificationPanel?: PortariaClarificationSettingsComponent;
+
+  unifiedSaving = false;
+  unifiedSaveError = '';
+  unifiedSaveMessage = '';
   servers: ManagedServer[] = [];
   readonly sections: ServerSectionLink[] = [
     { id: 'overview', label: 'Visão geral', icon: '✨' }, { id: 'vip', label: 'VIP', icon: '💎' }, { id: 'channels', label: 'Canais', icon: '#️⃣' }, { id: 'ai', label: 'IA', icon: '🤖' }, { id: 'bump', label: 'Bump', icon: '🚀' },
@@ -604,7 +619,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   }
 
   private save<T>(requestFactory: () => Observable<T>, success: (value: T) => void, retry?: () => void): void {
-    if (this.mutationInFlight) return;
+    if (this.mutationInFlight || this.unifiedSaving) return;
     const guildId = this.selectedServerId;
     this.lastSave = retry ?? (() => this.save(requestFactory, success));
     this.mutationInFlight = true; this.saveState = 'saving'; this.saveError = '';
@@ -661,7 +676,290 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   get channelsDirty(): boolean { return this.channelsBaseline !== undefined && this.channelsSnapshot() !== this.channelsBaseline; }
   get collaborativeDirty(): boolean { return !!this.collaborativeDraft && this.collaborativeBaseline !== undefined && JSON.stringify(this.collaborativeDraft) !== this.collaborativeBaseline; }
   get bypassDraftDirty(): boolean { return JSON.stringify(this.bypassDraft) !== this.bypassDraftBaseline; }
-  hasUnsavedChanges(): boolean { return this.xpDirty || this.aiDirty || this.vipDirty || this.backupDirty || this.themeDirty || this.partnerDiscordDirty || this.channelsDirty || this.staffRolesDirty || this.collaborativeDirty || this.bypassDraftDirty || this.portariaRolesDirty || this.portariaDirty || this.portariaWizardDirty || this.privateAreaDirty || this.publicationDraftDirty || (['processing', 'warning', 'individual', 'monthly'] as BumpCard[]).some(card => this.isBumpCardDirty(card)) || this.orderedLogs.some(log => this.isLogDirty(log)); }
+  hasUnsavedChanges(): boolean { return !!this.clarificationPanel?.dirty || this.xpDirty || this.aiDirty || this.vipDirty || this.backupDirty || this.themeDirty || this.partnerDiscordDirty || this.channelsDirty || this.staffRolesDirty || this.collaborativeDirty || this.bypassDraftDirty || this.portariaRolesDirty || this.portariaDirty || this.portariaWizardDirty || this.privateAreaDirty || this.publicationDraftDirty || (['processing', 'warning', 'individual', 'monthly'] as BumpCard[]).some(card => this.isBumpCardDirty(card)) || this.orderedLogs.some(log => this.isLogDirty(log)); }
+
+  get showUnifiedSaveBar(): boolean {
+    return (['bump', 'portaria', 'moderation-access', 'partners', 'logs'] as ServerSection[])
+      .includes(this.activeSection) && !this.configurationLoading && !this.configurationError
+      && (this.activeSection !== 'portaria' || !!this.portaria?.configured);
+  }
+
+  get unifiedDirty(): boolean {
+    switch (this.activeSection) {
+      case 'bump': return BUMP_CARDS.some(card => this.isBumpCardDirty(card));
+      case 'portaria':
+        return this.portariaRolesDirty || this.portariaEnabledDirty || this.portariaEntryDirty
+          || this.portariaFormDirty || this.portariaResultDirty || !!this.clarificationPanel?.dirty;
+      case 'moderation-access': return this.staffRolesDirty || this.collaborativeDirty;
+      case 'partners': return this.partnerDiscordDirty;
+      case 'logs': return this.orderedLogs.some(log => this.isLogDirty(log));
+      default: return false;
+    }
+  }
+
+  get unifiedBusy(): boolean {
+    return this.unifiedSaving || this.mutationInFlight || this.partnerDiscordSaving
+      || this.bumpMutationInFlight || !!this.clarificationPanel?.saving;
+  }
+
+  get unifiedCanSave(): boolean {
+    if (!this.showUnifiedSaveBar || !this.unifiedDirty || this.unifiedBusy) return false;
+    if (this.activeSection === 'portaria' && this.clarificationPanel?.dirty
+        && !this.clarificationPanel.canSave) return false;
+    if (this.activeSection === 'logs' && this.orderedLogs.some(log =>
+      this.isLogDirty(log) && this.logDrafts[log.type].enabled && !this.logDrafts[log.type].targetId)) return false;
+    if (this.activeSection === 'partners' && !this.partnerPanel?.canSaveAll) return false;
+    return true;
+  }
+
+  saveActiveSection(): void {
+    if (!this.unifiedCanSave) return;
+    switch (this.activeSection) {
+      case 'bump': void this.saveBumpTab(); break;
+      case 'portaria': void this.savePortariaTab(); break;
+      case 'moderation-access': void this.saveModerationTab(); break;
+      case 'logs': void this.saveLogsTab(); break;
+      case 'partners': void this.partnerPanel?.saveAll(); break;
+    }
+  }
+
+  discardActiveSection(): void {
+    if (!this.unifiedDirty || this.unifiedBusy) return;
+    this.unifiedSaveError = ''; this.unifiedSaveMessage = '';
+    switch (this.activeSection) {
+      case 'bump':
+        if (this.bumpPersisted) this.bumpDraft = structuredClone(this.bumpPersisted);
+        this.bumpSaveState = { processing: 'idle', warning: 'idle', individual: 'idle', monthly: 'idle' };
+        this.bumpSaveError = {};
+        break;
+      case 'portaria':
+        if (this.portariaBaseline) {
+          this.portaria = structuredClone(this.portariaBaseline);
+          this.portariaRoleDraft = this.portariaRoleIds(this.portariaBaseline.config);
+        }
+        this.clarificationPanel?.discard();
+        break;
+      case 'moderation-access':
+        this.staffRoleDraft = [...this.persistedStaffRoleIds];
+        if (this.moderationAccess) {
+          this.collaborativeDraft = structuredClone(this.moderationAccess.collaborativeModeration);
+          this.collaborativeBaseline = JSON.stringify(this.moderationAccess.collaborativeModeration);
+        }
+        break;
+      case 'logs':
+        for (const log of this.logs?.logs ?? []) {
+          this.logDrafts[log.type] = {
+            enabled: log.enabled, targetId: log.target?.id ?? null,
+            saving: false, testing: false, error: ''
+          };
+        }
+        break;
+      case 'partners': this.partnerPanel?.discard(); break;
+    }
+  }
+
+  private async persistUnified(label: string, actions: Array<() => Promise<void>>): Promise<void> {
+    if (this.unifiedBusy || !actions.length) return;
+    const guildId = this.selectedServerId;
+    this.unifiedSaving = true;
+    this.unifiedSaveError = '';
+    this.unifiedSaveMessage = '';
+    try {
+      for (const action of actions) {
+        if (guildId !== this.selectedServerId) return;
+        await action();
+      }
+      if (guildId === this.selectedServerId) this.unifiedSaveMessage = label + ' salvo com sucesso.';
+    } catch (failure: any) {
+      if (guildId === this.selectedServerId) {
+        this.unifiedSaveError = (failure?.error?.message || failure?.message
+          || 'Falha ao salvar uma configuração.')
+          + ' As alterações ainda pendentes foram preservadas. Tente salvar novamente.';
+      }
+    } finally {
+      this.unifiedSaving = false;
+    }
+  }
+
+  private async saveBumpTab(): Promise<void> {
+    const draft = this.bumpDraft ? structuredClone(this.bumpDraft) : undefined;
+    if (!draft) return;
+    const guild = this.selectedServerId;
+    const pending = BUMP_CARDS.filter(card => this.isBumpCardDirty(card));
+    const actions = pending.map(card => async () => {
+      let response: BumpConfigResponse;
+      switch (card) {
+        case 'processing':
+          response = await firstValueFrom(this.managedServersService.updateBumpProcessing(guild, draft.processing));
+          break;
+        case 'warning':
+          response = await firstValueFrom(this.managedServersService.updateBumpWarning(guild, {
+            enabled: draft.warning.enabled,
+            targetChannelId: draft.warning.targetChannelId,
+            messages: this.warningMessages(draft.warning.messages)
+          }));
+          break;
+        case 'individual':
+          response = await firstValueFrom(this.managedServersService.updateBumpIndividualReward(guild, draft.individualReward));
+          break;
+        case 'monthly':
+          response = await firstValueFrom(this.managedServersService.updateBumpMonthlyRanking(guild, draft.monthlyRanking));
+          break;
+      }
+      if (guild !== this.selectedServerId || !this.bumpDraft) return;
+      const dirtyBefore = new Map(BUMP_CARDS.map(item => [item, this.isBumpCardDirty(item)]));
+      this.bumpPersisted = structuredClone(response);
+      for (const item of BUMP_CARDS) {
+        if (item === card || !dirtyBefore.get(item)) this.replaceBumpCard(this.bumpDraft, response, item);
+      }
+    });
+    await this.persistUnified('Bump', actions);
+  }
+
+  private async saveModerationTab(): Promise<void> {
+    const guild = this.selectedServerId;
+    const staff = [...this.staffRoleDraft];
+    const collaborative = this.collaborativeDraft ? structuredClone(this.collaborativeDraft) : undefined;
+    const actions: Array<() => Promise<void>> = [];
+    if (this.staffRolesDirty) actions.push(async () => {
+      const response = await firstValueFrom(this.managedServersService.updateModerationStaffRoles(guild, staff));
+      if (guild !== this.selectedServerId) return;
+      this.moderationAccess = structuredClone(response);
+      this.staff = structuredClone(response.staffRoles);
+      this.staffRoleDraft = [...response.staffRoles.roleIds];
+      this.collaborativeBaseline = JSON.stringify(response.collaborativeModeration);
+    });
+    if (this.collaborativeDirty && collaborative) actions.push(async () => {
+      const response = await firstValueFrom(this.managedServersService.updateCollaborativeModeration(guild, {
+        enabled: collaborative.enabled,
+        emoji: collaborative.emoji?.trim() || null,
+        minReactions: Math.max(1, Number(collaborative.minReactions || 1))
+      }));
+      if (guild !== this.selectedServerId) return;
+      this.moderationAccess = structuredClone(response);
+      this.staff = structuredClone(response.staffRoles);
+      this.collaborativeDraft = structuredClone(response.collaborativeModeration);
+      this.collaborativeBaseline = JSON.stringify(response.collaborativeModeration);
+    });
+    await this.persistUnified('Moderação e acesso', actions);
+  }
+
+  private async saveLogsTab(): Promise<void> {
+    const guild = this.selectedServerId;
+    const pending = this.orderedLogs.filter(log => this.isLogDirty(log)).map(log => ({
+      type: log.type, enabled: this.logDrafts[log.type].enabled, targetId: this.logDrafts[log.type].targetId
+    }));
+    if (pending.some(log => log.enabled && !log.targetId)) return;
+    await this.persistUnified('Logs', pending.map(log => async () => {
+      const response = await firstValueFrom(this.managedServersService.updateLog(guild, log.type, {
+        enabled: log.enabled, targetId: log.targetId
+      }));
+      if (guild !== this.selectedServerId) return;
+      const saved = response.logs.find(item => item.type === log.type);
+      if (saved) {
+        this.logs = response;
+        this.logDrafts[log.type] = {
+          enabled: saved.enabled, targetId: saved.target?.id ?? null,
+          saving: false, testing: false, error: ''
+        };
+      }
+    }));
+  }
+
+  private portariaEntrySnapshot(config: PortariaConfig): string {
+    return JSON.stringify(PORTARIA_ENTRY_FIELDS.map(field => config[field]));
+  }
+  private portariaFormSnapshot(state: PortariaState): string {
+    return JSON.stringify([state.config.formularioPortariaAtivo, state.questions]);
+  }
+  private portariaResultSnapshot(state: PortariaState): string {
+    const flow = state.selectedFlow;
+    return JSON.stringify(flow ? [
+      flow.id, flow.targetChannelId, flow.approvedTargetChannelId ?? null,
+      flow.rejectedTargetChannelId ?? null, flow.rejectionFeedbackEnabled
+    ] : null);
+  }
+  get portariaEnabledDirty(): boolean {
+    return !!this.portaria && !!this.portariaBaseline
+      && this.portaria.config.enabled !== this.portariaBaseline.config.enabled;
+  }
+  get portariaEntryDirty(): boolean {
+    return !!this.portaria && !!this.portariaBaseline
+      && this.portariaEntrySnapshot(this.portaria.config) !== this.portariaEntrySnapshot(this.portariaBaseline.config);
+  }
+  get portariaFormDirty(): boolean {
+    return !!this.portaria && !!this.portariaBaseline && !!this.selectedFlow
+      && this.portariaFormSnapshot(this.portaria) !== this.portariaFormSnapshot(this.portariaBaseline);
+  }
+  get portariaResultDirty(): boolean {
+    return !!this.portaria && !!this.portariaBaseline && !!this.selectedFlow
+      && this.portariaResultSnapshot(this.portaria) !== this.portariaResultSnapshot(this.portariaBaseline);
+  }
+
+  private async savePortariaTab(): Promise<void> {
+    if (!this.portaria || !this.portariaBaseline || !this.portaria.configured) return;
+    const guild = this.selectedServerId;
+    const draft = structuredClone(this.portaria);
+    const roleIds = structuredClone(this.portariaRoleDraft);
+    const actions: Array<() => Promise<void>> = [];
+    if (this.portariaRolesDirty) actions.push(async () => {
+      const previousVisitor = this.portariaRoleIds(this.portariaBaseline!.config).visitanteRoleId;
+      const response = await firstValueFrom(this.managedServersService.updatePortariaRoles(guild, roleIds));
+      if (guild !== this.selectedServerId || !this.portaria || !this.portariaBaseline) return;
+      const fields = this.portariaRoleIds(response);
+      Object.assign(this.portaria.config, fields);
+      Object.assign(this.portariaBaseline.config, fields);
+      this.portariaRoleDraft = fields;
+      const removedVisitor = previousVisitor && previousVisitor !== fields.visitanteRoleId ? previousVisitor : undefined;
+      this.visitorAutoJoinCleanupRoleId = removedVisitor;
+      this.refreshAutoJoinRoles(removedVisitor);
+    });
+    if (this.portariaEntryDirty) actions.push(async () => {
+      const response = await firstValueFrom(this.managedServersService.updatePortariaEntry(
+        guild, draft.config, draft.selectedFlow?.id
+      ));
+      if (guild !== this.selectedServerId || !this.portaria || !this.portariaBaseline) return;
+      const saved = Object.fromEntries(PORTARIA_ENTRY_FIELDS.map(field => [field, response.config[field]]));
+      Object.assign(this.portaria.config, saved);
+      Object.assign(this.portariaBaseline.config, saved);
+    });
+    if (this.portariaFormDirty && draft.selectedFlow) actions.push(async () => {
+      const response = await firstValueFrom(this.managedServersService.updatePortariaForm(
+        guild, draft.selectedFlow!.id, draft.config.formularioPortariaAtivo, draft.questions
+      ));
+      if (guild !== this.selectedServerId || !this.portaria || !this.portariaBaseline) return;
+      this.portaria.config.formularioPortariaAtivo = response.config.formularioPortariaAtivo;
+      this.portariaBaseline.config.formularioPortariaAtivo = response.config.formularioPortariaAtivo;
+      this.portaria.questions = structuredClone(response.questions);
+      this.portariaBaseline.questions = structuredClone(response.questions);
+    });
+    if (this.portariaResultDirty && draft.selectedFlow) actions.push(async () => {
+      const response = await firstValueFrom(this.managedServersService.updatePortariaResult(
+        guild, draft.selectedFlow!.id, draft.selectedFlow!
+      ));
+      if (guild !== this.selectedServerId || !this.portaria || !this.portariaBaseline) return;
+      if (response.selectedFlow) {
+        this.portaria.selectedFlow = structuredClone(response.selectedFlow);
+        this.portariaBaseline.selectedFlow = structuredClone(response.selectedFlow);
+      }
+    });
+    if (this.clarificationPanel?.dirty) actions.push(async () => {
+      await this.clarificationPanel?.savePending();
+    });
+    // Enable last, after validating and persisting roles, entry rules and form.
+    if (this.portariaEnabledDirty) actions.push(async () => {
+      const response = await firstValueFrom(this.managedServersService.updatePortariaEnabled(guild, draft.config.enabled));
+      if (guild !== this.selectedServerId || !this.portaria || !this.portariaBaseline) return;
+      this.portaria.config.enabled = response.config.enabled;
+      this.portariaBaseline.config.enabled = response.config.enabled;
+      this.bypassPortariaEnabled = response.config.enabled;
+      this.portariaBypasses = this.portariaBypasses.map(bypass => ({
+        ...bypass, effective: response.config.enabled && bypass.active && !bypass.expired
+      }));
+    });
+    await this.persistUnified('Portaria', actions);
+  }
+
   get activeLogsCount(): number { return (this.logs?.logs ?? []).filter(log => log.enabled).length; }
   get logsHaveProblems(): boolean { return (this.logs?.logs ?? []).some(log => !!log.target && (log.target.missing || log.target.writable === false)); }
   get protectionStatus(): 'complete' | 'partial' | 'limited' | 'unknown' {
@@ -672,11 +970,12 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   requestOverviewSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
   continueEditing(): void { this.pendingNavigation = undefined; }
   discardAndNavigate(): void {
-    if (this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || this.partnerDiscordSaving) return;
+    if (this.unifiedSaving || this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || this.partnerDiscordSaving) return;
     const target = this.pendingNavigation;
     this.pendingNavigation = undefined;
     if (!target) return;
     this.staffRoleDraft = [...this.persistedStaffRoleIds];
+    this.clarificationPanel?.discard();
     if (this.moderationAccess) {
       this.collaborativeDraft = structuredClone(this.moderationAccess.collaborativeModeration);
       this.collaborativeBaseline = JSON.stringify(this.moderationAccess.collaborativeModeration);
@@ -753,6 +1052,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     this.resources = undefined; this.staff = undefined; this.moderationAccess = undefined; this.collaborativeDraft = undefined; this.collaborativeBaseline = undefined; this.portariaBypasses = []; this.bypassPortariaEnabled = true; this.bypassesLoading = false; this.bypassesError = ''; this.resetBypassDraft(); this.portaria = undefined; this.portariaBaseline = undefined; this.portariaWizardBaseline = undefined; this.privateAreaBaseline = undefined; this.autoJoinRoles = undefined; this.serverChannels = undefined; this.channelsBaseline = undefined; this.bumpPersisted = undefined; this.bumpDraft = undefined; this.bumpSaveState = { processing: 'idle', warning: 'idle', individual: 'idle', monthly: 'idle' }; this.bumpSaveError = {}; this.logs = undefined; this.logDrafts = {}; this.logsError = ''; this.autoJoinRoleId = ''; this.staffRoleDraft = []; this.portariaRoleDraft = { visitanteRoleId: null, acessoProvisorioRoleId: null, maior18RoleId: null, menor18RoleId: null }; this.resetPublicationDraft(); this.visitorAutoJoinCleanupRoleId = undefined;
     this.configurationLoading = false;
     this.configurationError = '';
+    this.unifiedSaving = false; this.unifiedSaveError = ''; this.unifiedSaveMessage = '';
     this.xpDirty = false; this.xpSaving = false; this.aiDirty = false; this.aiSaving = false; this.vipDirty = false; this.vipSaving = false; this.backupDirty = false; this.backupSaving = false; this.themeDirty = false; this.themeSaving = false; this.partnerDiscordDirty = false; this.partnerDiscordSaving = false;
     this.mutationInFlight = false; this.saveState = 'idle'; this.saveError = ''; this.lastSave = undefined;
   }
@@ -797,12 +1097,12 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     this.router.navigate(communityId == null ? ['/painel'] : ['/painel/comunidades', communityId, 'coddy']);
   }
   private requestNavigation(guildId: string, section: ServerSection): void {
-    if (this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || (guildId === this.selectedServerId && section === this.activeSection)) return;
+    if (this.unifiedSaving || this.partnerDiscordSaving || this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || (guildId === this.selectedServerId && section === this.activeSection)) return;
     if (this.hasUnsavedChanges()) { this.pendingNavigation = { kind: 'route', guildId, section }; return; }
     this.navigateTo(guildId, section);
   }
   private requestFlowChange(flowId: number): void {
-    if (this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || flowId === this.selectedFlow?.id) return;
+    if (this.unifiedSaving || this.partnerDiscordSaving || this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || flowId === this.selectedFlow?.id) return;
     if (this.hasUnsavedChanges()) { this.pendingNavigation = { kind: 'flow', flowId }; return; }
     this.loadConfiguration(flowId);
   }
