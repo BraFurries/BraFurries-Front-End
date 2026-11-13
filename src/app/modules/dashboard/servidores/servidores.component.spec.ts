@@ -274,6 +274,29 @@ describe('ServidoresComponent', () => {
     expect(component.portariaEnabledDirty).toBeFalse();
   }));
 
+  it('keeps newly selected Portaria roles when entry rules are saved in the same click', fakeAsync(() => {
+    create();
+    component.activeSection = 'portaria';
+    component.portariaRoleDraft.maior18RoleId = '1';
+    component.portaria!.config.idadeMinimaContaFichaDias = 7;
+    const updatedConfig = { ...portaria.config, maior18RoleId: '1' };
+    service.updatePortariaRoles.and.returnValue(of(updatedConfig));
+    service.updatePortariaEntry.and.returnValue(of({
+      ...portaria, config: { ...updatedConfig, idadeMinimaContaFichaDias: 7 }
+    }));
+
+    component.saveActiveSection();
+    flushMicrotasks();
+
+    expect(service.updatePortariaRoles).toHaveBeenCalledTimes(1);
+    expect(service.updatePortariaEntry).toHaveBeenCalledTimes(1);
+    const entryPayload = service.updatePortariaEntry.calls.mostRecent().args[1];
+    expect(entryPayload.maior18RoleId).toBe('1');
+    expect(entryPayload.idadeMinimaContaFichaDias).toBe(7);
+    expect(component.portariaRolesDirty).toBeFalse();
+    expect(component.portariaEntryDirty).toBeFalse();
+  }));
+
   it('persists staff roles before collaborative moderation with one save action', fakeAsync(() => {
     create();
     component.activeSection = 'moderation-access';
