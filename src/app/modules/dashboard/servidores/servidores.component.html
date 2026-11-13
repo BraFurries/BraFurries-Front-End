@@ -158,8 +158,6 @@
             <article class="card">
               <p class="eyebrow">DISBOARD</p><h3>Canal de Bump</h3><p class="help">Canal onde o Coddy reconhece bumps válidos do DISBOARD, atualiza o último bump, reinicia o timer e processa a recompensa individual.</p>
               <label><span class="field-label">Canal</span><select class="field-control" [(ngModel)]="bumpDraft.processing.channelId"><option [ngValue]="null">Nenhum canal</option>@for (option of bumpChannelOptions(bumpDraft.processing.channelId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label>
-              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpProcessing()">{{ bumpSaveState.processing === 'saving' ? 'Salvando…' : 'Salvar Canal de Bump' }}</button>
-              @if (bumpSaveState.processing === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.processing === 'error') { <p class="error-message">{{ bumpSaveError.processing }}</p> }
             </article>
             <article class="card">
               <p class="eyebrow">Alertas</p><h3>Aviso de próximo bump</h3>
@@ -168,8 +166,6 @@
               <label><span class="field-label">Canal do aviso</span><select class="field-control" [(ngModel)]="bumpDraft.warning.targetChannelId"><option [ngValue]="null">Nenhum canal</option>@for (option of bumpChannelOptions(bumpDraft.warning.targetChannelId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label>
               <label class="mt-4 block"><span class="field-label">Mensagens (uma por linha)</span><textarea class="field-control" rows="4" [ngModel]="warningMessagesText()" (ngModelChange)="updateWarningMessages($event)"></textarea></label>
               <div class="flex flex-wrap gap-x-5 gap-y-3 mt-4 p-3 rounded-xl text-gray-600 bg-gray-50 text-sm"><span>Próximo aviso: <strong>{{ warningTimestamp(bumpDraft.operational.warningNextAt) }}</strong></span><span>Último bump: <strong>{{ warningTimestamp(bumpDraft.operational.warningLastBumpAt) }}</strong></span></div>
-              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpWarning()">{{ bumpSaveState.warning === 'saving' ? 'Salvando…' : 'Salvar avisos' }}</button>
-              @if (bumpSaveState.warning === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.warning === 'error') { <p class="error-message">{{ bumpSaveError.warning }}</p> }
             </article>
             <article class="card">
               <p class="eyebrow">Recompensa individual</p><h3>Cargo e moedas</h3><p class="help">As duas recompensas são independentes e são enviadas juntas somente nesta configuração.</p>
@@ -178,16 +174,12 @@
               <label class="mt-4 block"><span class="field-label">Mensagem</span><textarea class="field-control" rows="3" [(ngModel)]="bumpDraft.individualReward.role.message"></textarea></label>
               <label class="toggle-row"><input type="checkbox" [(ngModel)]="bumpDraft.individualReward.coins.enabled"> Conceder moedas</label>
               <label class="mt-3 block"><span class="field-label">Quantidade de moedas</span><input class="field-control" type="number" min="0" [(ngModel)]="bumpDraft.individualReward.coins.amount"></label>
-              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpIndividualReward()">{{ bumpSaveState.individual === 'saving' ? 'Salvando…' : 'Salvar recompensa individual' }}</button>
-              @if (bumpSaveState.individual === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.individual === 'error') { <p class="error-message">{{ bumpSaveError.individual }}</p> }
             </article>
             <article class="card">
               <p class="eyebrow">Ranking mensal</p><h3>Recompensas por posição</h3><p class="help">O ranking mensal possui canal de origem independente do Canal de Bump.</p>
               <label class="toggle-row"><input type="checkbox" [(ngModel)]="bumpDraft.monthlyRanking.enabled"> Ativar ranking mensal</label>
               <div class="form-grid"><label><span class="field-label">Canal de origem</span><select class="field-control" [(ngModel)]="bumpDraft.monthlyRanking.sourceChannelId"><option [ngValue]="null">Nenhum canal</option>@for (option of bumpChannelOptions(bumpDraft.monthlyRanking.sourceChannelId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label><label><span class="field-label">Cargo compartilhado</span><select class="field-control" [(ngModel)]="bumpDraft.monthlyRanking.roleId"><option [ngValue]="null">Nenhum cargo</option>@for (option of bumpRoleOptionsFor(bumpDraft.monthlyRanking.roleId); track option.id) { <option [value]="option.id" [disabled]="option.disabled">{{ option.label }}</option> }</select></label></div>
               <div class="grid gap-3 mt-4 md:grid-cols-3">@for (tier of monthlyTiers; track tier.position) { <div class="grid gap-2 p-3 border border-gray-200 rounded-xl bg-gray-50"><strong>{{ tier.position }}º lugar</strong><label class="grid gap-1"><span class="field-label">Dias de cargo</span><input class="field-control" type="number" min="0" [(ngModel)]="tier.roleDurationDays"></label><label class="grid gap-1"><span class="field-label">Moedas</span><input class="field-control" type="number" min="0" [(ngModel)]="tier.coins"></label></div> }</div>
-              <button type="button" class="primary-button mt-4" [disabled]="bumpMutationInFlight" (click)="saveBumpMonthlyRanking()">{{ bumpSaveState.monthly === 'saving' ? 'Salvando…' : 'Salvar ranking mensal' }}</button>
-              @if (bumpSaveState.monthly === 'saved') { <p class="save-status success">Salvo.</p> } @if (bumpSaveState.monthly === 'error') { <p class="error-message">{{ bumpSaveError.monthly }}</p> }
             </article>
           </section>
         } @else if (activeSection === "moderation-access" && moderationAccess && collaborativeDraft) {
@@ -215,10 +207,6 @@
                   }
                 </div>
               }
-              <button type="button" class="primary-button mt-5"
-                [disabled]="mutationInFlight || !staffRolesDirty"
-                (click)="saveStaffRoles()">Salvar cargos da staff</button>
-              @if (!staffRolesDirty && !mutationInFlight) { <p class="save-hint">Nenhuma alteração pendente.</p> }
             </article>
 
             <article class="card">
@@ -243,9 +231,6 @@
                 <strong>Quem pode participar</strong>
                 <p class="help mt-1">Todos os membros da guild, exceto bots. Esta regra vem do runtime atual e não é uma whitelist configurável nesta entrega.</p>
               </div>
-              <button type="button" class="primary-button mt-4"
-                [disabled]="mutationInFlight || !collaborativeDirty"
-                (click)="saveCollaborativeModeration()">Salvar moderação colaborativa</button>
             </article>
 
             <article class="card">
@@ -370,8 +355,8 @@
                     <input
                       type="checkbox"
                       [checked]="portaria.config.enabled"
-                      [disabled]="mutationInFlight"
-                      (change)="updatePortariaEnabled($any($event.target).checked)" />
+                      [disabled]="unifiedBusy"
+                      (change)="portaria.config.enabled = $any($event.target).checked" />
                     Portaria ativa
                   </label>
                 </div>
@@ -406,8 +391,6 @@
                   </label>
                 }
               </div>
-              <button type="button" class="primary-button mt-5" [disabled]="mutationInFlight || !portariaRolesDirty"
-                (click)="savePortariaRoles()">Salvar cargos da Portaria</button>
               @if (visitorAutoJoinCleanupRoleId) {
                 <div class="warning mt-5">
                   <strong>Decida o que fazer com o Visitante anterior</strong>
@@ -566,15 +549,6 @@
                       "
                    [disabled]="!portaria.config.idadeMinimaEntradaServidorAtiva" /></label>
                 </div></section>
-                <button
-                  type="button"
-                  (click)="saveEntry()"
-                  [disabled]="mutationInFlight"
-                  [disabled]="mutationInFlight"
-                  class="primary-button mt-5"
-                >
-                  Salvar entrada
-                </button>
               </article>
               <article class="card">
                 <p class="eyebrow">Formulário</p>
@@ -622,15 +596,6 @@
                     </button>
                   </div>
                 }
-                <button
-                  type="button"
-                  (click)="saveForm()"
-                  [disabled]="mutationInFlight"
-                  [disabled]="mutationInFlight"
-                  class="primary-button mt-5"
-                >
-                  Salvar formulário
-                </button>
               </article>
               <article class="card">
                 <p class="eyebrow">Publicação</p>
@@ -729,15 +694,7 @@
                     [(ngModel)]="$any(selectedFlow).rejectionFeedbackEnabled"
                   />
                   Solicitar motivo ao reprovar</label
-                ><button
-                  type="button"
-                  (click)="saveResult()"
-                  [disabled]="mutationInFlight"
-                  [disabled]="mutationInFlight"
-                  class="primary-button mt-5"
                 >
-                  Salvar resultado
-                </button>
             <app-portaria-clarification-settings
               [guildId]="selectedServerId"
               [categories]="resources?.categories ?? []"
@@ -767,7 +724,7 @@
                 <label class="block mt-4"><span class="field-label">Destino</span><select class="field-control" [ngModel]="logDrafts[log.type].targetId" (ngModelChange)="updateLogTarget(log, $event)"><option [ngValue]="null" disabled>Sem destino configurado</option>@for (target of logOptions(log); track target.id) { <option [ngValue]="target.id" [disabled]="target.disabled">{{ target.label }}</option> }</select></label>
                 @if (isLogDirty(log)) { <p class="help mt-3">Alterações não salvas</p> }
                 @if (logDrafts[log.type].error) { <p class="error-message mt-3">{{ logDrafts[log.type].error }}</p> }
-                <div class="flex flex-wrap gap-3 mt-4"><button type="button" class="primary-button" [disabled]="!isLogDirty(log) || logDrafts[log.type].saving || (logDrafts[log.type].enabled && !logDrafts[log.type].targetId)" (click)="saveLog(log)">{{ logDrafts[log.type].saving ? 'Salvando…' : 'Salvar alterações' }}</button><button type="button" class="secondary-button" [disabled]="!logDrafts[log.type].targetId || logDrafts[log.type].testing" (click)="testLog(log)">{{ logDrafts[log.type].testing ? 'Enviando…' : 'Enviar log de teste' }}</button></div>
+                <div class="flex flex-wrap gap-3 mt-4"><button type="button" class="secondary-button" [disabled]="unifiedBusy || !logDrafts[log.type].targetId || logDrafts[log.type].testing" (click)="testLog(log)">{{ logDrafts[log.type].testing ? 'Enviando…' : 'Enviar log de teste' }}</button></div>
               </article>
             }
           </section>
@@ -858,6 +815,23 @@
           <app-operation-modal [state]="operationModal.state" [title]="operationModal.title" [message]="operationModal.message" [details]="operationModal.details" (close)="closeOperationModal()"></app-operation-modal>
         }
         @if (pendingNavigation) { <section class="navigation-confirmation" role="dialog" aria-modal="true" aria-label="Alterações não salvas"><h3>Você possui alterações não salvas.</h3><p>Escolha continuar editando ou descartar as alterações antes de navegar.</p><div><button type="button" class="secondary-button" [disabled]="mutationInFlight || bumpMutationInFlight || xpSaving || aiSaving || vipSaving || backupSaving" (click)="continueEditing()">Continuar editando</button><button type="button" class="primary-button" [disabled]="mutationInFlight || bumpMutationInFlight || xpSaving || aiSaving || vipSaving || backupSaving" (click)="discardAndNavigate()">Descartar alterações</button></div></section> }
+      }
+      @if (showUnifiedSaveBar) {
+        <footer class="coddy-sticky-save" aria-label="Salvar configurações da aba">
+          <div class="min-w-0">
+            <strong>{{ unifiedDirty ? 'Alterações não salvas' : 'Configuração sincronizada' }}</strong>
+            <p class="help mt-1">As configurações são gravadas na sequência. Ações como publicar, reparar, testar logs e gerenciar bypasses continuam separadas.</p>
+            @if (unifiedSaveError) { <p class="error-message mt-2" role="alert">{{ unifiedSaveError }}</p> }
+            @if (activeSection === 'partners' && partnerPanel?.error) { <p class="error-message mt-2" role="alert">{{ partnerPanel?.error }}</p> }
+            @if (unifiedSaveMessage && !unifiedDirty) { <p class="save-status success mt-2" role="status">{{ unifiedSaveMessage }}</p> }
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="secondary-button" [disabled]="!unifiedDirty || unifiedBusy" (click)="discardActiveSection()">Descartar</button>
+            <button type="button" class="primary-button" [disabled]="!unifiedCanSave" (click)="saveActiveSection()">
+              {{ unifiedBusy ? 'Salvando…' : 'Salvar alterações' }}
+            </button>
+          </div>
+        </footer>
       }
       <ng-template #previewTemplate let-preview>
         @if (preview) {
