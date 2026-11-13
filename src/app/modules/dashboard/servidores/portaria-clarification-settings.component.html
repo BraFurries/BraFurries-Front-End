@@ -10,14 +10,14 @@
   } @else {
     <label class="toggle-row mt-4" for="portaria-clarification-enabled">
       <input id="portaria-clarification-enabled" type="checkbox"
-        [(ngModel)]="enabled" [disabled]="saving" />
+        [(ngModel)]="enabled" (ngModelChange)="onDraftChange()" [disabled]="saving" />
       Permitir tickets de esclarecimento
     </label>
     <label class="block mt-4" for="portaria-clarification-category">
       <span class="field-label">Categoria dos canais privados</span>
     </label>
     <select id="portaria-clarification-category" class="field-control"
-      [(ngModel)]="categoryId" [disabled]="saving">
+      [(ngModel)]="categoryId" (ngModelChange)="onDraftChange()" [disabled]="saving">
       <option [ngValue]="null">Selecione uma categoria</option>
       @for (category of categories; track category.id) {
         <option [ngValue]="category.id">{{ category.name }}</option>
@@ -31,9 +31,6 @@
     }
     @if (error) { <p role="alert" class="warning mt-2">{{ error }}</p> }
     @if (success) { <p role="status" class="help mt-2">{{ success }}</p> }
-    <button type="button" class="primary-button mt-4" (click)="save()"
-      [disabled]="saving || (enabled && (!categoryId || !canManageChannels))">
-      {{ saving ? 'Salvando...' : 'Salvar configuração' }}
-    </button>
+    @if (dirty) { <p class="help mt-3">Alterações pendentes — use Salvar alterações no rodapé da aba.</p> }
   }
 </section>
