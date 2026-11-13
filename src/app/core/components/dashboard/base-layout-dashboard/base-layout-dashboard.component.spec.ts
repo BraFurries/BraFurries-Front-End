@@ -235,6 +235,21 @@ describe('BaseLayoutDashboardComponent', () => {
     expect(component.activeCommunity?.communityId).toBe(1);
   });
 
+  it('offers Gerenciar Communities only in the Community dropdown, not in the sidebar links', () => {
+    const navigation = fixture.nativeElement.querySelector('.dashboard-nav') as HTMLElement;
+    expect(navigation.querySelector('a[href="/painel/comunidades"]')).toBeNull();
+
+    component.toggleCommunityMenu();
+    fixture.detectChanges();
+
+    const manageButton = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((button: Element) => button.textContent?.includes('Gerenciar Communities')) as HTMLButtonElement | undefined;
+    expect(manageButton).toBeTruthy();
+    const navigate = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    manageButton!.click();
+    expect(navigate).toHaveBeenCalledOnceWith(['/painel/comunidades']);
+  });
+
   it('highlights the active Community row with an explicit current badge and no checkmark', () => {
     context$.next({
       ...baseState,
