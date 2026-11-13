@@ -1,5 +1,5 @@
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
-import { EMPTY, Observable, Subject, concatMap, finalize, from, takeUntil, tap } from 'rxjs';
+import { EMPTY, Observable, Subject, concatMap, finalize, forkJoin, from, takeUntil, tap } from 'rxjs';
 
 import { CommunityAccess } from '../../../core/services/community-access.service';
 import {
@@ -51,6 +51,7 @@ export class CommunityAccessComponent implements OnInit, OnDestroy {
   successMessage = '';
   saving = false;
 
+  private destroyed = false;
   private readonly destroy$ = new Subject<void>();
   private readonly communityChanged$ = new Subject<void>();
   private readonly memberDrafts = new Map<number, CapabilityDraft>();
@@ -110,6 +111,7 @@ export class CommunityAccessComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.communityChanged$.next();
     this.destroy$.next();
     this.destroy$.complete();
@@ -165,7 +167,7 @@ export class CommunityAccessComponent implements OnInit, OnDestroy {
   }
 
   private isCurrentCommunity(communityId: number | null): communityId is number {
-    return communityId !== null && communityId === this.activeCommunityId
+    return !this.destroyed && communityId !== null && communityId === this.activeCommunityId
       && communityId === this.selectedCommunityId;
   }
 
