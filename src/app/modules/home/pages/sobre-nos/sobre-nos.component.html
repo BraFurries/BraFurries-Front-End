@@ -1,16 +1,193 @@
 <app-external-header></app-external-header>
-<main class="bg-gray-50 pt-28 text-gray-800">
-  <section class="max-w-5xl mx-auto px-6 py-16 text-center">
-    <p class="text-braMagenta font-bold uppercase tracking-widest text-xs mb-4">BraFurries</p>
-    <h1 class="text-5xl md:text-6xl font-amaranth font-bold text-braDark">Sobre a BraFurries</h1>
-    <p class="mt-6 text-lg text-gray-600 max-w-3xl mx-auto">Um ponto de encontro para pessoas furry no Brasil criarem conexões, compartilharem interesses e participarem da comunidade.</p>
+
+<main class="overflow-hidden bg-[#f7f7fb] font-archivo text-braDark">
+  <!-- Abertura editorial -->
+  <section class="relative isolate overflow-hidden bg-braDark pt-40 pb-24 text-white lg:pt-48 lg:pb-32" aria-labelledby="sobre-titulo">
+    <div aria-hidden="true" class="pointer-events-none absolute -right-36 top-10 h-[32rem] w-[32rem] rounded-full bg-braPurple/40 blur-[110px]"></div>
+    <div aria-hidden="true" class="pointer-events-none absolute -bottom-40 left-[-8rem] h-[28rem] w-[28rem] rounded-full bg-braCyan/20 blur-[110px]"></div>
+    <div class="relative mx-auto grid max-w-7xl items-center gap-14 px-6 lg:grid-cols-[1.15fr_.85fr]">
+      <div>
+        <p class="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[.2em] text-braCyan">Nossa história <span aria-hidden="true">✦</span> Desde 2018</p>
+        <h1 id="sobre-titulo" class="max-w-3xl font-amaranth text-5xl font-bold leading-[1.08] tracking-tight sm:text-6xl lg:text-7xl">Toda grande amizade <span class="text-braYellow">começa com um encontro.</span></h1>
+        <p class="mt-8 max-w-2xl text-lg leading-relaxed text-gray-200">A BraFurries nasceu da vontade de aproximar pessoas que compartilhavam o amor pela cultura furry. O que começou como um grupo se transformou em uma comunidade de histórias, encontros, criações e amizades.</p>
+        <div class="mt-10 flex flex-wrap gap-4">
+          <a href="#nossa-trajetoria" class="inline-flex items-center justify-center rounded-2xl bg-braCyan px-7 py-4 font-bold text-braDark no-underline transition hover:-translate-y-1 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Conheça nossa trajetória <span class="ml-3" aria-hidden="true">↓</span></a>
+          <a routerLink="/comunidade" class="inline-flex items-center justify-center rounded-2xl border border-white/40 px-7 py-4 font-bold text-white no-underline transition hover:border-braYellow hover:text-braYellow">Faça parte dessa história</a>
+        </div>
+      </div>
+      <div class="relative mx-auto w-full max-w-md">
+        <div aria-hidden="true" class="absolute -inset-6 rotate-6 rounded-[3rem] border border-white/15"></div>
+        <div class="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-gradient-to-br from-braPurple/40 via-white/10 to-braCyan/20 p-9 text-center shadow-2xl backdrop-blur">
+          <img src="assets/images/logo-Brafurries/brafurries-principal-hdres.avif" width="290" height="290" alt="Identidade visual da BraFurries" class="mx-auto h-56 w-full object-contain drop-shadow-2xl sm:h-64" fetchpriority="high">
+          <div class="mt-8 border-t border-white/20 pt-6">
+            <span class="block font-amaranth text-6xl font-bold text-braYellow">2018</span>
+            <span class="mt-2 block text-sm font-semibold uppercase tracking-widest text-gray-200">O início de tudo</span>
+          </div>
+        </div>
+        <span aria-hidden="true" class="absolute -bottom-5 -left-5 rounded-2xl bg-braYellow px-5 py-3 font-amaranth text-lg font-bold text-braDark shadow-xl">Desde 10 de outubro 🐾</span>
+      </div>
+    </div>
   </section>
-  <section class="max-w-6xl mx-auto px-6 pb-20 grid md:grid-cols-2 gap-8">
-    <article class="bg-white rounded-3xl p-8 shadow-sm border-t-4 border-braPurple"><h2 class="text-3xl font-amaranth font-bold text-braDark mb-4">Quem somos</h2><p class="text-gray-600 leading-relaxed">A BraFurries reúne pessoas interessadas no fandom furry em um ambiente voltado à convivência, amizade e criatividade.</p></article>
-    <article class="bg-white rounded-3xl p-8 shadow-sm border-t-4 border-braCyan"><h2 class="text-3xl font-amaranth font-bold text-braDark mb-4">Nossa proposta</h2><p class="text-gray-600 leading-relaxed">Criar espaços de participação onde cada pessoa possa se expressar, descobrir atividades e construir boas relações com respeito.</p></article>
-    <article class="bg-white rounded-3xl p-8 shadow-sm border-t-4 border-braYellow"><h2 class="text-3xl font-amaranth font-bold text-braDark mb-4">Nossa história</h2><p class="text-gray-600 leading-relaxed">A comunidade segue sendo construída por quem participa dela: nas conversas, projetos, encontros e iniciativas compartilhadas ao longo do caminho.</p></article>
-    <article class="bg-white rounded-3xl p-8 shadow-sm border-t-4 border-braMagenta"><h2 class="text-3xl font-amaranth font-bold text-braDark mb-4">Valores da comunidade</h2><p class="text-gray-600 leading-relaxed">Acolhimento, respeito, responsabilidade e criatividade orientam a convivência e ajudam a manter o espaço saudável para todos.</p></article>
+
+  <!-- Manifesto e começo da história -->
+  <section class="relative mx-auto grid max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[.7fr_1.3fr] lg:gap-24" aria-labelledby="origem-titulo">
+    <div>
+      <p class="mb-3 text-xs font-bold uppercase tracking-[.2em] text-braMagenta">Mais que um servidor</p>
+      <h2 id="origem-titulo" class="font-amaranth text-4xl font-bold leading-tight sm:text-5xl">Um lugar para <span class="text-braPurple">pertencer.</span></h2>
+      <div class="mt-8 h-2 w-24 rounded-full bg-braYellow"></div>
+    </div>
+    <div class="space-y-6 text-lg leading-relaxed text-gray-600">
+      <p>Em <strong class="text-braDark">10 de outubro de 2018</strong>, Nick Mackinlane criou a BraFurries no Facebook com uma ideia simples: reunir furries brasileiros, incentivar novas amizades e oferecer um espaço em que as pessoas pudessem se sentir acolhidas.</p>
+      <p>A inspiração veio do acolhimento que ele próprio encontrou no fandom. Essa vontade de retribuir se tornou parte da identidade da comunidade: cada pessoa que chega traz sua própria história, e cada encontro pode ser o começo de uma nova conexão.</p>
+      <p>De lá para cá, os espaços mudaram e os projetos cresceram, mas a essência continua a mesma: <strong class="text-braDark">amizade, respeito, criatividade e colaboração.</strong></p>
+    </div>
   </section>
-  <section class="bg-braDark text-white py-16"><div class="max-w-5xl mx-auto px-6 text-center"><h2 class="text-4xl font-amaranth font-bold">Um ecossistema feito em comunidade</h2><p class="text-gray-300 mt-4 max-w-2xl mx-auto">Discord, atividades e o Coddy fazem parte das formas de conectar pessoas e apoiar a gestão das comunidades.</p><a routerLink="/comunidade" class="inline-flex mt-8 bg-braCyan text-braDark font-bold px-6 py-3 rounded-xl no-underline">Conheça a comunidade</a></div></section>
+
+  <!-- Linha do tempo: poucos marcos, datas verificadas e fotografia do primeiro meet -->
+  <section id="nossa-trajetoria" class="bg-white py-24" aria-labelledby="trajetoria-titulo">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-16 max-w-3xl">
+        <p class="mb-3 text-xs font-bold uppercase tracking-[.2em] text-braPurple">Nossa trajetória</p>
+        <h2 id="trajetoria-titulo" class="font-amaranth text-4xl font-bold sm:text-5xl">De um grupo a um <span class="text-braMagenta">universo de possibilidades.</span></h2>
+        <p class="mt-5 text-lg leading-relaxed text-gray-600">Os encontros que marcaram nossa história — desde o primeiro grupo até o primeiro abraço fora das telas.</p>
+      </div>
+
+      <ol class="relative space-y-10 border-l-2 border-braPurple/20 pl-8 sm:ml-6 sm:pl-12">
+        <li class="relative">
+          <span aria-hidden="true" class="absolute -left-[42px] top-3 flex h-5 w-5 items-center justify-center rounded-full border-4 border-white bg-braMagenta shadow-[0_0_0_3px_#ee4092] sm:-left-[58px]"></span>
+          <article class="grid gap-5 rounded-[2rem] border border-gray-100 bg-[#faf7fc] p-7 shadow-sm sm:grid-cols-[115px_1fr] sm:p-9">
+            <span class="font-amaranth text-4xl font-bold text-braPurple">2018</span>
+            <div>
+              <time datetime="2018-10-10" class="text-xs font-bold uppercase tracking-widest text-braMagenta">10 de outubro de 2018</time>
+              <h3 class="mt-2 font-amaranth text-2xl font-bold">O nascimento da BraFurries</h3>
+              <p class="mt-3 leading-relaxed text-gray-600">Nossa história começa no Facebook, com a vontade de reunir furries brasileiros, incentivar amizades e criar um espaço de acolhimento e respeito.</p>
+            </div>
+          </article>
+        </li>
+
+        <li class="relative">
+          <span aria-hidden="true" class="absolute -left-[42px] top-3 h-5 w-5 rounded-full border-4 border-white bg-braCyan shadow-[0_0_0_3px_#45bced] sm:-left-[58px]"></span>
+          <article class="grid gap-5 rounded-[2rem] border border-gray-100 bg-[#f4fbff] p-7 shadow-sm sm:grid-cols-[115px_1fr] sm:p-9">
+            <span class="font-amaranth text-4xl font-bold text-braCyan">2020</span>
+            <div>
+              <h3 class="font-amaranth text-2xl font-bold">Novas redes, novas amizades</h3>
+              <div class="mt-6 space-y-6">
+                <div class="border-l-4 border-braCyan pl-5">
+                  <time datetime="2020-08-20" class="text-xs font-bold uppercase tracking-widest text-braPurple">20 de agosto de 2020</time>
+                  <h4 class="mt-1 font-amaranth text-xl font-bold">Chegamos ao Telegram</h4>
+                  <p class="mt-2 leading-relaxed text-gray-600">Criamos nosso grupo no Telegram, abrindo mais um lugar para conversar e fortalecer conexões.</p>
+                </div>
+                <div class="border-l-4 border-braPurple pl-5">
+                  <time datetime="2020-09-09" class="text-xs font-bold uppercase tracking-widest text-braPurple">9 de setembro de 2020</time>
+                  <h4 class="mt-1 font-amaranth text-xl font-bold">Nasce nosso servidor do Discord</h4>
+                  <p class="mt-2 leading-relaxed text-gray-600">O Discord passa a fazer parte da nossa história e se torna um espaço central de convivência e atividades.</p>
+                </div>
+              </div>
+            </div>
+          </article>
+        </li>
+
+        <li class="relative">
+          <span aria-hidden="true" class="absolute -left-[42px] top-3 h-5 w-5 rounded-full border-4 border-white bg-braYellow shadow-[0_0_0_3px_#febf10] sm:-left-[58px]"></span>
+          <article class="overflow-hidden rounded-[2rem] border border-braYellow/30 bg-[#fffaf0] shadow-lg">
+            <div class="grid gap-5 p-7 sm:grid-cols-[115px_1fr] sm:p-9">
+              <span class="font-amaranth text-4xl font-bold text-[#b47b00]">2026</span>
+              <div class="grid min-w-0 items-center gap-7 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div>
+                  <time datetime="2026-08-08" class="text-xs font-bold uppercase tracking-widest text-[#996500]">8 de agosto de 2026</time>
+                  <h3 class="mt-2 font-amaranth text-3xl font-bold">Nosso primeiro meet oficial! 💛</h3>
+                  <p class="mt-4 leading-relaxed text-gray-600">Depois de anos conectando pessoas pela internet, celebramos nosso primeiro encontro presencial oficial. Um dia para transformar conversas em abraços e criar memórias para guardar.</p>
+                </div>
+                <figure class="mx-auto w-full max-w-sm rounded-2xl border border-braYellow/20 bg-white p-3 shadow-sm lg:max-w-none">
+                  <button #meetTrigger
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-controls="meet-photo-dialog"
+                    aria-label="Ampliar fotografia oficial do primeiro meet da BraFurries"
+                    (click)="openMeetPhoto()"
+                    class="group relative block w-full cursor-zoom-in overflow-hidden rounded-xl focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-braPurple">
+                    <img
+                      src="assets/images/historia/primeiro-meet-brafurries-2026-preview.webp"
+                      alt="Participantes do primeiro meet oficial da BraFurries reunidos ao ar livre, incluindo pessoas com fursuits."
+                      width="800"
+                      height="600"
+                      loading="lazy"
+                      decoding="async"
+                      class="block h-auto w-full object-contain transition-transform duration-300 group-hover:scale-[1.025]">
+                    <span class="absolute bottom-2 right-2 inline-flex items-center gap-2 rounded-lg bg-braDark/90 px-3 py-2 text-xs font-bold text-white shadow-sm" aria-hidden="true">⌕ Ampliar foto</span>
+                  </button>
+                  <figcaption class="px-2 pt-3 text-center text-xs font-medium text-gray-600">Primeiro meet oficial · 08/08/2026</figcaption>
+                </figure>
+              </div>
+            </div>
+          </article>
+        </li>
+
+        <li class="relative">
+          <span aria-hidden="true" class="absolute -left-[42px] top-3 h-5 w-5 rounded-full border-4 border-white bg-braPurple shadow-[0_0_0_3px_#8a3594] sm:-left-[58px]"></span>
+          <article class="grid gap-5 rounded-[2rem] border border-gray-100 bg-[#f7f5fb] p-7 shadow-sm sm:grid-cols-[115px_1fr] sm:p-9">
+            <span class="font-amaranth text-4xl font-bold text-braPurple">Hoje</span>
+            <div>
+              <h3 class="font-amaranth text-2xl font-bold">A história continua com a comunidade</h3>
+              <p class="mt-3 leading-relaxed text-gray-600">Com o Discord, o Coddy, projetos e parcerias, seguimos criando novas formas de conectar pessoas. O próximo capítulo é escrito por quem participa.</p>
+            </div>
+          </article>
+        </li>
+      </ol>
+      <p class="mt-10 text-sm leading-relaxed text-gray-500">Nossa história vai muito além dessas datas. Cada conversa, criação e amizade também faz parte dela.</p>
+    </div>
+  </section>
+
+  <!-- Valores -->
+  <section class="py-24" aria-labelledby="valores-titulo">
+    <div class="mx-auto max-w-7xl px-6">
+      <div class="mb-12 max-w-2xl">
+        <p class="mb-3 text-xs font-bold uppercase tracking-[.2em] text-braMagenta">O que nos move</p>
+        <h2 id="valores-titulo" class="font-amaranth text-4xl font-bold sm:text-5xl">A comunidade é feita <span class="text-braPurple">de pessoas.</span></h2>
+      </div>
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <article class="rounded-[2rem] border border-gray-100 bg-white p-8 shadow-sm"><span class="text-4xl" aria-hidden="true">💛</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Acolhimento</h3><p class="mt-3 leading-relaxed text-gray-600">Receber bem quem chega e cultivar espaços em que as pessoas se sintam respeitadas.</p></article>
+        <article class="rounded-[2rem] border border-gray-100 bg-white p-8 shadow-sm"><span class="text-4xl" aria-hidden="true">🤝</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Amizade</h3><p class="mt-3 leading-relaxed text-gray-600">Construir conexões sinceras, trocar experiências e criar boas lembranças.</p></article>
+        <article class="rounded-[2rem] border border-gray-100 bg-white p-8 shadow-sm"><span class="text-4xl" aria-hidden="true">🎨</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Criatividade</h3><p class="mt-3 leading-relaxed text-gray-600">Valorizar a arte, a expressão individual e a diversidade de talentos do fandom.</p></article>
+        <article class="rounded-[2rem] border border-gray-100 bg-white p-8 shadow-sm"><span class="text-4xl" aria-hidden="true">🌱</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Responsabilidade</h3><p class="mt-3 leading-relaxed text-gray-600">Cuidar da convivência com diálogo, regras claras e respeito aos limites de cada pessoa.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Projetos e futuro -->
+  <section class="relative overflow-hidden bg-braDark py-24 text-white" aria-labelledby="futuro-titulo">
+    <div aria-hidden="true" class="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-braMagenta/20 blur-3xl"></div>
+    <div class="relative mx-auto grid max-w-7xl items-center gap-12 px-6 lg:grid-cols-2">
+      <div><p class="mb-3 text-xs font-bold uppercase tracking-[.2em] text-braCyan">O próximo capítulo</p><h2 id="futuro-titulo" class="font-amaranth text-4xl font-bold leading-tight sm:text-5xl">A história continua <span class="text-braYellow">com você.</span></h2><p class="mt-6 text-lg leading-relaxed text-gray-300">Queremos continuar criando oportunidades de conexão, apoiando talentos e desenvolvendo iniciativas que façam diferença para o fandom. Nosso futuro é construído junto da comunidade, passo a passo.</p><a routerLink="/comunidade" class="mt-8 inline-flex rounded-2xl bg-braYellow px-7 py-4 font-bold text-braDark no-underline transition hover:-translate-y-1 hover:bg-white">Venha fazer parte <span aria-hidden="true" class="ml-3">↗</span></a></div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <a routerLink="/comunidade" class="rounded-3xl border border-white/15 bg-white/10 p-7 text-white no-underline transition hover:-translate-y-1 hover:border-braCyan"><span class="text-3xl" aria-hidden="true">💬</span><h3 class="mt-5 font-amaranth text-2xl font-bold">Comunidade</h3><p class="mt-2 text-sm leading-relaxed text-gray-300">Conexões, atividades e espaços para pertencer.</p></a>
+        <a routerLink="/coddy" class="rounded-3xl border border-white/15 bg-white/10 p-7 text-white no-underline transition hover:-translate-y-1 hover:border-braCyan"><span class="text-3xl" aria-hidden="true">🤖</span><h3 class="mt-5 font-amaranth text-2xl font-bold">Coddy</h3><p class="mt-2 text-sm leading-relaxed text-gray-300">Tecnologia criada para apoiar comunidades.</p></a>
+        <div class="rounded-3xl border border-white/15 bg-white/10 p-7 sm:col-span-2"><span class="text-3xl" aria-hidden="true">✨</span><h3 class="mt-4 font-amaranth text-2xl font-bold">Projetos e parcerias</h3><p class="mt-2 text-sm leading-relaxed text-gray-300">Iniciativas que aproximam artistas, criadores, organizações e pessoas.</p></div>
+      </div>
+    </div>
+  </section>
+  <!-- Dialog nativo: foco contido, Esc para fechar e retorno ao botão após fechamento. -->
+  <dialog #meetDialog
+    id="meet-photo-dialog"
+    aria-labelledby="meet-dialog-title"
+    aria-modal="true"
+    (close)="onMeetDialogClosed()"
+    (click)="onMeetDialogClick($event)"
+    class="m-auto max-h-[95vh] w-[calc(100vw-2rem)] max-w-6xl overflow-auto rounded-3xl border border-white/20 bg-braDark p-3 text-white shadow-2xl backdrop:bg-black/85 sm:p-5">
+    <div class="mb-4 flex items-center justify-between gap-4 px-1">
+      <h2 id="meet-dialog-title" class="font-amaranth text-lg font-bold sm:text-2xl">Primeiro meet oficial da BraFurries</h2>
+      <button type="button" (click)="closeMeetPhoto()" aria-label="Fechar fotografia ampliada" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-3xl text-white transition hover:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-braCyan"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <img
+      src="assets/images/historia/primeiro-meet-brafurries-2026-full.webp"
+      width="2048"
+      height="1536"
+      alt="Fotografia oficial do primeiro meet da BraFurries com participantes reunidos ao ar livre, incluindo pessoas com fursuits."
+      loading="lazy"
+      decoding="async"
+      class="mx-auto block h-auto max-h-[72vh] w-auto max-w-full rounded-xl object-contain">
+    <p class="mt-4 text-center text-sm font-medium text-gray-300">08 de agosto de 2026 · Clique fora ou pressione Esc para fechar</p>
+  </dialog>
 </main>
+
 <app-external-footer></app-external-footer>
