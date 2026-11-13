@@ -915,8 +915,18 @@ export class ServidoresComponent implements OnInit, OnDestroy {
       this.refreshAutoJoinRoles(removedVisitor);
     });
     if (this.portariaEntryDirty) actions.push(async () => {
+      // The existing /portaria/entry endpoint also persists all four role IDs.
+      // Combine the latest roles staged in this click so Entry never undoes the
+      // preceding /portaria/roles write.
+      const entryRequest: PortariaConfig = {
+        ...draft.config,
+        visitanteRoleId: roleIds.visitanteRoleId ?? undefined,
+        acessoProvisorioRoleId: roleIds.acessoProvisorioRoleId ?? undefined,
+        maior18RoleId: roleIds.maior18RoleId ?? undefined,
+        menor18RoleId: roleIds.menor18RoleId ?? undefined
+      };
       const response = await firstValueFrom(this.managedServersService.updatePortariaEntry(
-        guild, draft.config, draft.selectedFlow?.id
+        guild, entryRequest, draft.selectedFlow?.id
       ));
       if (guild !== this.selectedServerId || !this.portaria || !this.portariaBaseline) return;
       const saved = Object.fromEntries(PORTARIA_ENTRY_FIELDS.map(field => [field, response.config[field]]));
