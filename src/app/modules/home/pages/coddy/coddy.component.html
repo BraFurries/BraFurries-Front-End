@@ -1,3 +1,70 @@
 <app-external-header></app-external-header>
-<main class="bg-gray-50 pt-28 text-gray-800"><section class="bg-braDark text-white py-20"><div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-10 items-center"><div><p class="text-braCyan uppercase tracking-widest text-xs font-bold mb-4">Bot para Discord</p><h1 class="text-6xl font-amaranth font-bold">Coddy</h1><p class="text-2xl font-amaranth mt-3 text-braYellow">Gerencie sua comunidade em um só lugar.</p><p class="text-gray-300 mt-6 leading-relaxed">O Coddy é o bot da BraFurries para apoiar a gestão de comunidades no Discord, com ferramentas para rotina, segurança e participação.</p><div class="flex flex-wrap gap-4 mt-8"><a routerLink="/coddy/docs" class="bg-braCyan text-braDark font-bold px-6 py-3 rounded-xl no-underline">Ver documentação</a><a href="https://discord.com/oauth2/authorize?client_id=1106756281420759051" class="border border-braCyan text-braCyan font-bold px-6 py-3 rounded-xl no-underline">Adicionar ao Discord</a></div></div><div class="bg-white/10 rounded-3xl p-8 border border-white/10"><p class="font-amaranth text-2xl font-bold">Feito para comunidades</p><p class="text-gray-300 mt-3">Configurações e comandos para acompanhar diferentes aspectos do servidor sem perder a identidade de cada comunidade.</p></div></div></section><section class="max-w-6xl mx-auto px-6 py-20"><h2 class="text-4xl font-amaranth font-bold text-braDark text-center mb-10">Recursos documentados</h2><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"><article class="bg-white p-7 rounded-3xl border-t-4 border-braPurple"><h3 class="font-amaranth text-2xl font-bold">Moderação e segurança</h3><p class="text-gray-600 mt-3">Ferramentas de moderação, portaria, incidentes e logs.</p></article><article class="bg-white p-7 rounded-3xl border-t-4 border-braCyan"><h3 class="font-amaranth text-2xl font-bold">Leveling e economia</h3><p class="text-gray-600 mt-3">Recursos de progressão, rankings e economia para os membros.</p></article><article class="bg-white p-7 rounded-3xl border-t-4 border-braYellow"><h3 class="font-amaranth text-2xl font-bold">Formulários e gestão</h3><p class="text-gray-600 mt-3">Formulários, relatórios, configurações e utilitários para a staff.</p></article><article class="bg-white p-7 rounded-3xl border-t-4 border-braMagenta"><h3 class="font-amaranth text-2xl font-bold">Backup</h3><p class="text-gray-600 mt-3">Comandos documentados para backup, restauração e migração.</p></article></div></section></main>
+
+<main class="overflow-hidden bg-[#f7f7fb] font-archivo text-braDark">
+  <section class="relative isolate overflow-hidden bg-braDark pt-40 pb-24 text-white lg:pt-48 lg:pb-32" aria-labelledby="coddy-titulo">
+    <div aria-hidden="true" class="pointer-events-none absolute -right-40 -top-32 h-[38rem] w-[38rem] rounded-full bg-braPurple/40 blur-[110px]"></div>
+    <div aria-hidden="true" class="pointer-events-none absolute -bottom-48 left-1/4 h-96 w-96 rounded-full bg-braCyan/20 blur-[100px]"></div>
+    <div class="relative mx-auto grid max-w-7xl items-center gap-14 px-6 lg:grid-cols-[1.05fr_.95fr]">
+      <div>
+        <p class="mb-6 inline-flex items-center gap-2 rounded-full border border-braCyan/40 bg-braCyan/10 px-4 py-2 text-xs font-bold uppercase tracking-[.2em] text-braCyan">Conheça o Coddy <span aria-hidden="true">✦</span> Bot para Discord</p>
+        <h1 id="coddy-titulo" class="font-amaranth text-5xl font-bold leading-[1.08] sm:text-6xl lg:text-7xl">Sua comunidade merece <span class="text-braYellow">mais possibilidades.</span></h1>
+        <p class="mt-8 max-w-xl text-lg leading-relaxed text-gray-200">O Coddy é a tecnologia da BraFurries para ajudar na organização, proteção e participação das comunidades no Discord. Menos trabalho repetitivo para a equipe. Mais espaço para as pessoas.</p>
+        <div class="mt-10 flex flex-wrap gap-4">
+          <a href="https://discord.com/oauth2/authorize?client_id=1106756281420759051" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-2xl bg-braCyan px-7 py-4 font-bold text-braDark no-underline transition hover:-translate-y-1 hover:bg-white">Adicionar ao Discord <span class="ml-3" aria-hidden="true">↗</span></a>
+          <a routerLink="/coddy/docs" class="inline-flex items-center justify-center rounded-2xl border border-white/40 px-7 py-4 font-bold text-white no-underline transition hover:border-braYellow hover:text-braYellow">Explorar documentação</a>
+        </div>
+      </div>
+      <!-- Composição ilustrativa: não representa dados reais de um servidor -->
+      <div class="relative w-full" aria-label="Ilustração dos recursos de gestão do Coddy">
+        <div aria-hidden="true" class="absolute -inset-5 rotate-3 rounded-[3rem] border border-white/15"></div>
+        <div class="relative rounded-[2.5rem] border border-white/20 bg-[#32313b] p-5 shadow-2xl sm:p-8">
+          <div class="flex items-center justify-between border-b border-white/10 pb-5">
+            <div class="flex items-center gap-3"><div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-braPurple text-2xl">🤖</div><div><p class="font-amaranth text-xl font-bold">Coddy</p><p class="text-xs text-gray-400">Recursos para sua comunidade</p></div></div>
+            <span class="rounded-full bg-braCyan/15 px-3 py-1 text-xs font-bold text-braCyan">Discord</span>
+          </div>
+          <div class="mt-6 grid grid-cols-2 gap-3">
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><span class="text-2xl" aria-hidden="true">🛡️</span><p class="mt-3 font-amaranth text-xl font-bold">Proteção</p><p class="mt-1 text-xs text-gray-400">Portaria e moderação</p></div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><span class="text-2xl" aria-hidden="true">⭐</span><p class="mt-3 font-amaranth text-xl font-bold">Evolução</p><p class="mt-1 text-xs text-gray-400">XP e níveis</p></div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><span class="text-2xl" aria-hidden="true">🎛️</span><p class="mt-3 font-amaranth text-xl font-bold">Controle</p><p class="mt-1 text-xs text-gray-400">Configurações e gestão</p></div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><span class="text-2xl" aria-hidden="true">📋</span><p class="mt-3 font-amaranth text-xl font-bold">Organização</p><p class="mt-1 text-xs text-gray-400">Registros e logs</p></div>
+          </div>
+          <div class="mt-4 flex items-center gap-3 rounded-2xl border border-braCyan/20 bg-braCyan/10 p-4"><span class="text-xl" aria-hidden="true">✨</span><p class="text-sm text-gray-200">Uma plataforma para acompanhar o que importa.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-7xl px-6 py-24" aria-labelledby="recursos-titulo">
+    <div class="max-w-3xl"><p class="mb-3 text-xs font-bold uppercase tracking-[.2em] text-braMagenta">Muito além de comandos</p><h2 id="recursos-titulo" class="font-amaranth text-4xl font-bold sm:text-5xl">Ferramentas para cada parte da <span class="text-braPurple">vida do servidor.</span></h2><p class="mt-5 text-lg leading-relaxed text-gray-600">Desde dar boas-vindas até ajudar a equipe a acompanhar o dia a dia, o Coddy reúne recursos para diferentes necessidades.</p></div>
+    <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <article class="rounded-[2rem] border border-gray-100 bg-white p-9 shadow-sm"><span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-braPurple/10 text-3xl" aria-hidden="true">🛡️</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Moderação e portaria</h3><p class="mt-3 leading-relaxed text-gray-600">Recursos de acesso, moderação e registros para apoiar o trabalho da equipe.</p></article>
+      <article class="rounded-[2rem] border border-gray-100 bg-white p-9 shadow-sm"><span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-braCyan/15 text-3xl" aria-hidden="true">⭐</span><h3 class="mt-6 font-amaranth text-2xl font-bold">XP e níveis</h3><p class="mt-3 leading-relaxed text-gray-600">Progressão e reconhecimento de participação com configurações ajustáveis.</p></article>
+      <article class="rounded-[2rem] border border-gray-100 bg-white p-9 shadow-sm"><span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-braYellow/20 text-3xl" aria-hidden="true">💎</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Experiências e VIP</h3><p class="mt-3 leading-relaxed text-gray-600">Recursos para personalizar a experiência dos membros e acompanhar benefícios.</p></article>
+      <article class="rounded-[2rem] border border-gray-100 bg-white p-9 shadow-sm"><span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-braMagenta/10 text-3xl" aria-hidden="true">📝</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Formulários e processos</h3><p class="mt-3 leading-relaxed text-gray-600">Apoio à organização de atividades, inscrições e fluxos da comunidade.</p></article>
+      <article class="rounded-[2rem] border border-gray-100 bg-white p-9 shadow-sm"><span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-braPurple/10 text-3xl" aria-hidden="true">📊</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Painel e registros</h3><p class="mt-3 leading-relaxed text-gray-600">Configurações e informações organizadas para tomar decisões com mais contexto.</p></article>
+      <article class="rounded-[2rem] border border-gray-100 bg-white p-9 shadow-sm"><span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-braCyan/15 text-3xl" aria-hidden="true">🗂️</span><h3 class="mt-6 font-amaranth text-2xl font-bold">Backups e utilitários</h3><p class="mt-3 leading-relaxed text-gray-600">Ferramentas de manutenção e recuperação para rotinas importantes do servidor.</p></article>
+    </div>
+  </section>
+
+  <section class="bg-white py-24" aria-labelledby="diferencial-titulo">
+    <div class="mx-auto grid max-w-7xl items-center gap-14 px-6 lg:grid-cols-2">
+      <div class="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-braPurple to-[#512f80] p-9 text-white sm:p-12">
+        <div aria-hidden="true" class="absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-braCyan/30 blur-3xl"></div>
+        <p class="relative text-xs font-bold uppercase tracking-[.2em] text-braYellow">Tecnologia com propósito</p>
+        <p class="relative mt-8 font-amaranth text-4xl font-bold leading-tight sm:text-5xl">O foco é a sua <span class="text-braYellow">comunidade.</span></p>
+        <div class="relative mt-12 space-y-4">
+          <div class="rounded-2xl border border-white/20 bg-white/10 p-5"><span class="font-bold">01 · Personalização</span><p class="mt-2 text-sm text-white/80">Cada servidor pode ter seu próprio jeito de funcionar.</p></div>
+          <div class="rounded-2xl border border-white/20 bg-white/10 p-5"><span class="font-bold">02 · Organização</span><p class="mt-2 text-sm text-white/80">Recursos de gestão reunidos em uma experiência mais integrada.</p></div>
+          <div class="rounded-2xl border border-white/20 bg-white/10 p-5"><span class="font-bold">03 · Evolução</span><p class="mt-2 text-sm text-white/80">Um projeto que se desenvolve junto das necessidades das comunidades.</p></div>
+        </div>
+      </div>
+      <div><p class="mb-3 text-xs font-bold uppercase tracking-[.2em] text-braMagenta">Feito pela BraFurries</p><h2 id="diferencial-titulo" class="font-amaranth text-4xl font-bold sm:text-5xl">Criado por quem entende a rotina <span class="text-braPurple">de uma comunidade.</span></h2><p class="mt-6 text-lg leading-relaxed text-gray-600">O Coddy nasceu da experiência da BraFurries com a administração de espaços de convivência. Por isso, pensamos em recursos que atendem necessidades reais de organização e participação.</p><p class="mt-5 leading-relaxed text-gray-600">Saiba o que cada função oferece, consulte os comandos e configure os recursos disponíveis para o seu servidor.</p><div class="mt-8 flex flex-wrap gap-4"><a routerLink="/coddy/docs" class="inline-flex rounded-2xl bg-braPurple px-7 py-4 font-bold text-white no-underline transition hover:bg-braDark">Abrir documentação <span class="ml-3" aria-hidden="true">↗</span></a><a routerLink="/sobre" class="inline-flex rounded-2xl border-2 border-braPurple/20 px-7 py-4 font-bold text-braPurple no-underline transition hover:border-braPurple">Nossa história</a></div></div>
+    </div>
+  </section>
+
+  <section class="bg-braDark py-24 text-white" aria-labelledby="comecar-titulo">
+    <div class="mx-auto max-w-4xl px-6 text-center"><span class="text-4xl" aria-hidden="true">🤖</span><h2 id="comecar-titulo" class="mt-5 font-amaranth text-4xl font-bold sm:text-5xl">Pronto para conhecer o <span class="text-braCyan">Coddy?</span></h2><p class="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-gray-300">Explore as funcionalidades e veja como ele pode apoiar o seu servidor.</p><div class="mt-9 flex flex-wrap justify-center gap-4"><a href="https://discord.com/oauth2/authorize?client_id=1106756281420759051" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-2xl bg-braCyan px-7 py-4 font-bold text-braDark no-underline transition hover:bg-white">Adicionar ao servidor <span class="ml-3" aria-hidden="true">↗</span></a><a routerLink="/login" class="inline-flex rounded-2xl border border-white/40 px-7 py-4 font-bold text-white no-underline transition hover:border-braYellow hover:text-braYellow">Acessar o painel</a></div></div>
+  </section>
+</main>
+
 <app-external-footer></app-external-footer>

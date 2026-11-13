@@ -24,4 +24,16 @@ describe('SobreNosComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should present the foundation date and the expansion milestone', () => {
+    const content = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(content).toContain('10 de outubro de 2018');
+    expect(content).toContain('2020');
+    expect(content).toContain('Facebook');
+    expect(content).toContain('Discord');
+  });
+  it('should offer a way to participate', () => {
+    const content = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(content).toContain('Faça parte dessa história');
+  });
 });

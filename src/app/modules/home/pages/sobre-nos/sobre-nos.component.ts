@@ -13,7 +13,7 @@ export class SobreNosComponent implements OnInit {
   ngOnInit(): void {
     this.seoService.updateMetaTags(
       'Sobre a BraFurries — Nossa história e comunidade',
-      'Saiba mais sobre a BraFurries, a comunidade furry brasileira, sua historia, proposito e espacos para o fandom no Brasil.'
+      'Saiba mais sobre a BraFurries, a comunidade furry brasileira, fundada em 10 de outubro de 2018, e conheça nossa trajetória, valores e projetos.'
     );
   }
 }
