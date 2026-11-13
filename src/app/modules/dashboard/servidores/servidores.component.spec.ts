@@ -323,6 +323,29 @@ describe('ServidoresComponent', () => {
     expect(component.unifiedDirty).toBeFalse();
   }));
 
+  it('does not leave a phantom collaborative draft when only staff roles changed', fakeAsync(() => {
+    create();
+    component.activeSection = 'moderation-access';
+    component.staffRoleDraft.push('1');
+    service.updateModerationStaffRoles.and.returnValue(of({
+      ...moderationAccess,
+      staffRoles: { roleIds: ['999999999999999999', '1'], roles: resources.roles },
+      collaborativeModeration: {
+        ...moderationAccess.collaborativeModeration,
+        protectedStaffRoleIds: ['999999999999999999', '1']
+      }
+    }));
+
+    component.saveActiveSection();
+    flushMicrotasks();
+
+    expect(service.updateModerationStaffRoles).toHaveBeenCalledTimes(1);
+    expect(service.updateCollaborativeModeration).not.toHaveBeenCalled();
+    expect(component.staffRolesDirty).toBeFalse();
+    expect(component.collaborativeDirty).toBeFalse();
+    expect(component.unifiedDirty).toBeFalse();
+  }));
+
   it('persists all changed log types from one floating save and keeps test-log action separate', fakeAsync(() => {
     create();
     component.activeSection = 'logs';
