@@ -130,6 +130,38 @@ export interface AdminCoddyPresenceResponse {
   pagination: Pagination;
 }
 
+/** Canonical, measured metrics. Null means not observed, not zero. */
+export interface AdminCanonicalMetrics {
+  period: AdminMetricsPeriod;
+  startDate: string;
+  endDate: string;
+  commandTrackingSince: string | null;
+  snapshotTrackingSince: string | null;
+  lastSnapshotAt: string | null;
+  summary: {
+    brafurriesMembers: number | null;
+    brafurriesDelta: number | null;
+    coddyReach: number | null;
+    coddyReachDelta: number | null;
+    reconciledServers: number;
+    activeServers: number;
+    commandsExecuted: number | null;
+    commandCoverageComplete: boolean;
+    previousCommandsExecuted: number | null;
+    commandsGrowthPercent: number | null;
+  };
+  dailySnapshots: {
+    date: string;
+    brafurriesMembers: number | null;
+    coddyReach: number | null;
+    reconciledServers: number | null;
+    activeServers: number | null;
+    sampledAt: string | null;
+  }[];
+  commandUsage: { date: string; executions: number | null }[];
+  topCommands: { command: string; executions: number }[];
+}
+
 export interface AdminMetrics {
   summary: {
     commandsExecuted: number;
