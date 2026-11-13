@@ -20,3 +20,25 @@
 .save-hint { margin-top: .7rem; color: #6b7280; font-size: .8rem; }.pending-changes { display: grid; gap: .4rem; margin-top: 1rem; padding: .85rem 1rem; border-left: 3px solid #d97706; border-radius: .7rem; color: #78350f; background: #fffbeb; font-size: .82rem; }.pending-changes span { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }.pending-changes button { color: #8a3594; font-weight: 800; text-decoration: underline; }
 .preview-badge { height: fit-content; padding: .3rem .55rem; border-radius: 999px; color: #8a3594; background: rgba(138,53,148,.1); font-size: .65rem; font-weight: 800; }
 .preview-card { border-color: rgba(138,53,148,.22); background: linear-gradient(135deg,#fff 0%,#fcf8fd 100%); }.plan-tree { margin-top: 1rem; padding: .85rem 1rem; border-radius: .85rem; color: #374151; background: rgba(255,255,255,.7); font-family: ui-monospace, monospace; line-height: 1.8; }.permission-list { display: grid; gap: .45rem; margin-top: .75rem; }.permission-list li { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; padding: .55rem .65rem; border-radius: .65rem; background: #fff; font-size: .8rem; }.permission-chip { padding: .14rem .38rem; border-radius: 999px; color: #991b1b; background: #fee2e2; font-size: .68rem; font-weight: 800; }.permission-chip.allow { color: #065f46; background: #d1fae5; }
+
+
+/* Matches the sticky save surface used by VIP, IA and XP. */
+.coddy-sticky-save {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+  backdrop-filter: blur(8px);
+}
+.coddy-sticky-save > div:first-child { flex: 1 1 18rem; }
+.coddy-sticky-save .help { margin-top: .25rem; }
