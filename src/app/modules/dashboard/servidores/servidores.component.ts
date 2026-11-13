@@ -822,11 +822,18 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     const collaborative = this.collaborativeDraft ? structuredClone(this.collaborativeDraft) : undefined;
     const actions: Array<() => Promise<void>> = [];
     if (this.staffRolesDirty) actions.push(async () => {
+      const collaborativeWasEdited = this.collaborativeDirty;
       const response = await firstValueFrom(this.managedServersService.updateModerationStaffRoles(guild, staff));
       if (guild !== this.selectedServerId) return;
       this.moderationAccess = structuredClone(response);
       this.staff = structuredClone(response.staffRoles);
       this.staffRoleDraft = [...response.staffRoles.roleIds];
+      // Staff roles are also the protected staff role IDs returned inside the
+      // collaborative config. Refresh an untouched draft so changing staff alone
+      // doesn't leave a phantom "unsaved change".
+      if (!collaborativeWasEdited) {
+        this.collaborativeDraft = structuredClone(response.collaborativeModeration);
+      }
       this.collaborativeBaseline = JSON.stringify(response.collaborativeModeration);
     });
     if (this.collaborativeDirty && collaborative) actions.push(async () => {
