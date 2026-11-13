@@ -49,6 +49,22 @@ describe('TemporaryRolesPanelComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Eventos');
   });
 
+  it('renders the temporary role grant form in its own card without changing the applied grants list', () => {
+    const cards = fixture.nativeElement.querySelectorAll('article.card') as NodeListOf<HTMLElement>;
+    expect(cards.length).toBe(2);
+
+    const [grantForm, recentGrants] = Array.from(cards);
+    expect(grantForm.classList.contains('bg-white')).toBeTrue();
+    expect(grantForm.classList.contains('rounded-3xl')).toBeTrue();
+    expect(grantForm.textContent).toContain('Conceder cargo temporário');
+    expect(grantForm.querySelector('button.primary-button')?.textContent)
+      .toContain('Conceder cargo temporário');
+
+    expect(recentGrants.classList.contains('bg-white')).toBeFalse();
+    expect(recentGrants.textContent).toContain('Concessões recentes');
+    expect(recentGrants.textContent).toContain('Sincronizado');
+  });
+
   it('does not allow grants when bot cannot manage roles', () => {
     component.canManageRoles = false;
     component.discordUserId = '700';
