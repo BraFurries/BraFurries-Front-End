@@ -47,6 +47,11 @@
         <span>🤖</span> Coddy Bot
       </a>
       
+      <a *ngIf="isGlobalAdmin" routerLink="recordes" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
+         class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
+        <span>🎮</span> Recordes
+      </a>
+
       <a *ngIf="isGlobalAdmin" routerLink="metricas" routerLinkActive="bg-braPurple text-white shadow-md shadow-braPurple/30"
          class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 hover:text-gray-800 flex items-center gap-2">
         <span>📈</span> Métricas
