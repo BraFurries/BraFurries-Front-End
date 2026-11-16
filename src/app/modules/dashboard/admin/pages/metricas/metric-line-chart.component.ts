@@ -40,6 +40,10 @@ export class AdminMetricLineChartComponent implements OnChanges {
     return day + '/' + month + '/' + year;
   }
 
+  formatValue(value: number): string {
+    return Math.round(value).toLocaleString('pt-BR');
+  }
+
   onMouseMove(event: MouseEvent): void {
     if (!this.chart?.markers.length) return;
     const bounds=(event.currentTarget as SVGSVGElement).getBoundingClientRect();

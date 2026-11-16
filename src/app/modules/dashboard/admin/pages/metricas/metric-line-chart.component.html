@@ -5,7 +5,7 @@
     <line x1="78" [attr.y1]="tick.y" x2="620" [attr.y2]="tick.y"
           stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4 4"/>
     <text x="69" [attr.y]="tick.y + 4" text-anchor="end"
-          font-size="11" fill="#6b7280">{{ tick.value | number:'1.0-0' }}</text>
+          font-size="11" fill="#6b7280">{{ formatValue(tick.value) }}</text>
   </g>
   <polyline *ngFor="let segment of chart.segments"
     [attr.points]="segment.points" fill="none" [attr.stroke]="lineColor"
@@ -14,7 +14,7 @@
     [attr.cx]="point.x" [attr.cy]="point.y" r="4" [attr.fill]="lineColor"
     stroke="white" stroke-width="1.5"
     tabindex="0" role="img"
-    [attr.aria-label]="dateLabel(point.date) + ' UTC: ' + point.value + ' ' + unit"
+    [attr.aria-label]="dateLabel(point.date) + ' UTC: ' + formatValue(point.value) + ' ' + unit"
     (focus)="activePoint = point" (blur)="activePoint = null"/>
   <g *ngIf="activePoint as point" class="metric-tooltip" aria-hidden="true" pointer-events="none">
     <line class="metric-crosshair" [attr.x1]="point.x" y1="22"
@@ -31,7 +31,7 @@
           font-size="12" fill="#d1d5db">{{ dateLabel(point.date) }} (UTC)</text>
     <text [attr.x]="tooltipX(point) + 12" [attr.y]="tooltipY(point) + 38"
           font-size="14" font-weight="bold" fill="white">
-      {{ point.value | number:'1.0-0' }} {{ unit }}
+      {{ formatValue(point.value) }} {{ unit }}
     </text>
   </g>
 </svg>
