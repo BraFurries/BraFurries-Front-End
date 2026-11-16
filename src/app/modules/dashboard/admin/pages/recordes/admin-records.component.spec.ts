@@ -5,78 +5,61 @@ import { of, Subject } from 'rxjs';
 import { AdminService } from '../../../../../core/services/admin.service';
 import { AdminRecordsComponent } from './admin-records.component';
 
-describe('AdminRecordsComponent', () => {
+describe('AdminRecordsComponent: global Coddy record policy', () => {
   let api: jasmine.SpyObj<AdminService>;
-  const guilds = [
-    { communityId: 7, communityName: 'Comunidade A', guildId: '123456789012345678', guildName: 'Servidor A' },
-    { communityId: 8, communityName: 'Comunidade B', guildId: '987654321012345678', guildName: 'Servidor B' }
-  ];
+
   beforeEach(async () => {
     api = jasmine.createSpyObj('AdminService', [
-      'getRecordGuilds', 'getRecordBlacklist', 'addRecordBlacklist', 'removeRecordBlacklist'
+      'getRecordBlacklist', 'addRecordBlacklist', 'removeRecordBlacklist'
     ]);
-    api.getRecordGuilds.and.returnValue(of(guilds));
-    api.getRecordBlacklist.and.returnValue(of({games: [{id: 5,name:'Antigo'}]}));
-    api.addRecordBlacklist.and.returnValue(of({games: [{id: 5,name:'Antigo'}, {id: 6,name:'Novo'}]}));
-    api.removeRecordBlacklist.and.returnValue(of({games: []}));
+    api.getRecordBlacklist.and.returnValue(of({games: [{id:5,name:'Antigo'}]}));
+    api.addRecordBlacklist.and.returnValue(of({games:[{id:5,name:'Antigo'},{id:6,name:'Novo'}]}));
+    api.removeRecordBlacklist.and.returnValue(of({games:[]}));
     await TestBed.configureTestingModule({
-      imports: [CommonModule, FormsModule],
-      declarations: [AdminRecordsComponent],
-      providers: [{provide: AdminService, useValue: api}]
+      imports:[CommonModule,FormsModule],
+      declarations:[AdminRecordsComponent],
+      providers:[{provide:AdminService,useValue:api}]
     }).compileComponents();
   });
 
-  it('requires explicit tenant and guild selection and scopes all operations', () => {
+  it('shows one global list without a guild selector', () => {
+    const fixture = TestBed.createComponent(AdminRecordsComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('todos os servidores');
+    expect(el.textContent).toContain('Antigo');
+    expect(el.querySelector('select')).toBeNull();
+    expect(api.getRecordBlacklist).toHaveBeenCalledTimes(1);
+    fixture.destroy();
+  });
+
+  it('adds and removes globally with a confirmation', () => {
     const fixture = TestBed.createComponent(AdminRecordsComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    expect(component.selectedGuild).toBeNull();
-    expect(api.getRecordBlacklist).not.toHaveBeenCalled();
-    component.selectedKey = '8:987654321012345678';
-    component.selectGuild();
-    fixture.detectChanges();
-    expect(api.getRecordBlacklist).toHaveBeenCalledOnceWith(8, '987654321012345678');
     component.nameInput = ' Novo ';
     component.add();
-    expect(api.addRecordBlacklist).toHaveBeenCalledOnceWith(8, '987654321012345678', 'Novo');
-    expect(component.games.map(g => g.name)).toContain('Novo');
+    expect(api.addRecordBlacklist).toHaveBeenCalledOnceWith('Novo');
+    expect(component.games.some(g => g.name === 'Novo')).toBeTrue();
+    component.remove(6);
+    expect(api.removeRecordBlacklist).not.toHaveBeenCalled();
     component.removingId = 6;
     component.remove(6);
-    expect(api.removeRecordBlacklist).toHaveBeenCalledOnceWith(8, '987654321012345678', 6);
+    expect(api.removeRecordBlacklist).toHaveBeenCalledOnceWith(6);
     fixture.destroy();
   });
 
-  it('discards an outdated response when switching Communities', () => {
+  it('does not mutate when loading or pending', () => {
     const pending = new Subject<{games:{id:number;name:string}[]}>();
-    api.getRecordBlacklist.and.returnValues(pending.asObservable(), of({games:[{id:2,name:'B'}]}));
+    api.getRecordBlacklist.and.returnValue(pending);
     const fixture = TestBed.createComponent(AdminRecordsComponent);
     fixture.detectChanges();
-    const component = fixture.componentInstance;
-    component.selectedKey = '7:123456789012345678';
-    component.selectGuild();
-    component.selectedKey = '8:987654321012345678';
-    component.selectGuild();
-    pending.next({games:[{id:1,name:'A'}]});
-    expect(component.games).toEqual([{id:2,name:'B'}]);
-    fixture.destroy();
-  });
-
-  it('requires a second explicit click before removing an entry', () => {
-    const fixture = TestBed.createComponent(AdminRecordsComponent);
-    fixture.detectChanges();
-    const component = fixture.componentInstance;
-    component.selectedKey = '7:123456789012345678';
-    component.selectGuild();
-    fixture.detectChanges();
-    expect(api.removeRecordBlacklist).not.toHaveBeenCalled();
-    const remove = (fixture.nativeElement as HTMLElement).querySelector('button') as HTMLButtonElement;
-    expect(component.games.length).toBe(1);
-    component.removingId = 5;
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Confirmar exclusão?');
-    component.removingId = null;
-    fixture.detectChanges();
-    expect(api.removeRecordBlacklist).not.toHaveBeenCalled();
+    fixture.componentInstance.nameInput='Teste';
+    fixture.componentInstance.add();
+    expect(api.addRecordBlacklist).not.toHaveBeenCalled();
+    pending.next({games:[]});
+    fixture.componentInstance.add();
+    expect(api.addRecordBlacklist).toHaveBeenCalledOnceWith('Teste');
     fixture.destroy();
   });
 });
