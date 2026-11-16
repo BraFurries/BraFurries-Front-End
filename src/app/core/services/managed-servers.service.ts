@@ -547,6 +547,11 @@ export class ManagedServersService {
       { headers: { 'Idempotency-Key': key } }
     );
   }
+  cancelPendingRoleTool(guildId: string, operationId: number): Observable<RoleToolOperation> {
+    return this.http.post<RoleToolOperation>(
+      this.guildUrl(guildId, `role-tools/operations/${operationId}/cancel`), {}
+    );
+  }
   getRoleToolOperation(guildId: string, operationId: number): Observable<RoleToolOperation> {
     return this.http.get<RoleToolOperation>(this.guildUrl(guildId, `role-tools/operations/${operationId}`));
   }
