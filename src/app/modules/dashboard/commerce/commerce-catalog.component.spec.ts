@@ -402,6 +402,31 @@ describe('CommerceCatalogComponent', () => {
       .toContain('12 un.');
   });
 
+  it('renders readable artwork status using the same visual badge pattern as contract models', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const root = fixture.nativeElement as HTMLElement;
+    const card = root.querySelector('button[aria-controls="commerce-artwork-details-12"]')
+      ?.closest('div.rounded-xl.border') as HTMLElement;
+
+    expect(card).toBeTruthy();
+    const active = card.querySelector('[aria-label="Arte ativa"]') as HTMLElement;
+    expect(active).toBeTruthy();
+    expect(active.textContent?.trim()).toBe('Ativo');
+    expect(active.classList.contains('bg-emerald-50')).toBeTrue();
+    expect(active.classList.contains('rounded-full')).toBeTrue();
+    expect(card.textContent).not.toContain('ACTIVE');
+
+    component.artworks[0].status = 'ARCHIVED';
+    fixture.detectChanges();
+
+    const archived = card.querySelector('[aria-label="Arte arquivada"]') as HTMLElement;
+    expect(archived).toBeTruthy();
+    expect(archived.textContent?.trim()).toBe('Arquivado');
+    expect(archived.classList.contains('bg-amber-50')).toBeTrue();
+    expect(archived.classList.contains('rounded-full')).toBeTrue();
+    expect(card.textContent).not.toContain('ARCHIVED');
+  });
+
   it('keeps artwork browsing and editing on different screens', async () => {
     await create(['ARTWORKS_MANAGE']);
     expect(fixture.nativeElement.textContent).toContain('Artes cadastradas');
