@@ -275,9 +275,13 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   selectSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
   selectToolTab(tab: ToolTab): void {
     if (this.activeSection !== 'tools' || ![...this.toolTabs, ...this.roleToolTabs].some(item => item.id === tab)
-      || tab === this.activeToolTab || this.unifiedBusy || this.channelCopyApplying
+      || this.unifiedBusy || this.channelCopyApplying
       || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving
       || this.themeSaving) return;
+    if (tab === this.activeToolTab) {
+      this.roleToolsDropdownOpen = false;
+      return;
+    }
     if (this.hasUnsavedChanges()) {
       this.pendingNavigation = { kind: 'tool', tab };
       return;
@@ -291,6 +295,9 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   }
   get roleToolGroupActive(): boolean {
     return this.roleToolTabs.some(tab => tab.id === this.activeToolTab);
+  }
+  get selectedRoleToolLabel(): string {
+    return this.roleToolTabs.find(tab => tab.id === this.activeToolTab)?.label ?? '';
   }
 
   get channelCopyOptions(): { id: string; label: string }[] {
@@ -1561,7 +1568,10 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     const changedGuild = this.selectedServerId !== guildId;
     const changedSection = this.activeSection !== section;
     this.selectedServerId = guildId; this.activeSection = section;
-    if (section === 'tools' && (changedGuild || changedSection)) this.activeToolTab = 'private-area';
+    if (section === 'tools' && (changedGuild || changedSection)) {
+      this.activeToolTab = 'private-area';
+      this.roleToolsDropdownOpen = false;
+    }
     if (changedGuild) {
       this.clearConfiguration();
       if (section !== 'backups' && section !== 'themes') {
