@@ -518,12 +518,72 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Artes cadastradas');
   });
 
+  it('starts product artwork links collapsed even when a product is selected', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    const root = fixture.nativeElement as HTMLElement;
+    const toggle = root.querySelector('button[aria-controls="commerce-product-artworks-3"]') as HTMLButtonElement;
+
+    expect(component.selectedProductId).toBe(3);
+    expect(component.expandedProductId).toBeNull();
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.textContent).toContain('Ver artes utilizadas neste produto');
+    expect(root.querySelector('#commerce-product-artworks-3')).toBeNull();
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('#commerce-product-artworks-3')).toBeTruthy();
+    expect(component.selectedProductId).toBe(3);
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('#commerce-product-artworks-3')).toBeNull();
+    expect(component.selectedProductId).toBe(3);
+  });
+
+  it('expands only one product artwork listing and collapses on tab re-entry', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    component.products.push({
+      ...component.products[0], id: 4, name: 'Produto adicional', sku: 'SKU-4'
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const first = root.querySelector('button[aria-controls="commerce-product-artworks-3"]') as HTMLButtonElement;
+    const second = root.querySelector('button[aria-controls="commerce-product-artworks-4"]') as HTMLButtonElement;
+    expect(first.getAttribute('aria-expanded')).toBe('false');
+    expect(second.getAttribute('aria-expanded')).toBe('false');
+
+    first.click();
+    fixture.detectChanges();
+    expect(root.querySelector('#commerce-product-artworks-3')).toBeTruthy();
+
+    second.click();
+    fixture.detectChanges();
+    expect(root.querySelector('#commerce-product-artworks-3')).toBeNull();
+    expect(root.querySelector('#commerce-product-artworks-4')).toBeTruthy();
+    expect(component.selectedProductId).toBe(4);
+
+    component.selectTab('products');
+    fixture.detectChanges();
+    expect(component.expandedProductId).toBeNull();
+    expect(root.querySelector('#commerce-product-artworks-4')).toBeNull();
+    expect(component.selectedProductId).toBe(4);
+  });
+
   it('shows linked artwork names in product details without requiring contract management to view', async () => {
     await create(['PRODUCTS_MANAGE']);
     catalog.productArtworks.and.returnValue(of([{
       artworkId: 12, title: 'Arte do mascote', royaltyAllocationPercent: 50
     }]));
     component.reloadLinks();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Arte do mascote');
+    const toggle = (fixture.nativeElement as HTMLElement)
+      .querySelector('button[aria-controls="commerce-product-artworks-3"]') as HTMLButtonElement;
+    toggle.click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Arte do mascote');
     expect(fixture.nativeElement.textContent).not.toContain('+ Vincular arte');
