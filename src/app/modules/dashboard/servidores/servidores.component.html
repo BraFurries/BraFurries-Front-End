@@ -730,8 +730,27 @@
               </article>
             }
           </section>
-        } @else if (activeSection === "private-area") {
-          <section class="space-y-5">
+        } @else if (activeSection === "tools") {
+          <section class="space-y-5" aria-label="Ferramentas do Coddy">
+            <article class="card">
+              <p class="eyebrow">Ferramentas</p>
+              <h3>Ferramentas do servidor</h3>
+              <p class="help">Selecione uma ferramenta para configurar ou executar ações neste servidor.</p>
+              <nav class="tool-tabs" role="tablist" aria-label="Ferramentas disponíveis">
+                @for (tool of toolTabs; track tool.id) {
+                  <button type="button" role="tab" [id]="'coddy-tool-tab-' + tool.id"
+                    [attr.aria-selected]="activeToolTab === tool.id"
+                    [attr.aria-controls]="'coddy-tool-panel-' + tool.id"
+                    [class.active]="activeToolTab === tool.id"
+                    (click)="selectToolTab(tool.id)">
+                    <span aria-hidden="true">{{ tool.icon }}</span>{{ tool.label }}
+                  </button>
+                }
+              </nav>
+            </article>
+            @if (activeToolTab === 'private-area') {
+              <div role="tabpanel" id="coddy-tool-panel-private-area"
+                aria-labelledby="coddy-tool-tab-private-area" class="space-y-5">
             <article class="card">
               <p class="eyebrow">Preview reutilizável</p>
               <h3>Área exclusiva para cargos</h3>
@@ -762,7 +781,9 @@
                 {{ mutationInFlight ? 'Criando área…' : 'Criar área privada' }}
               </button>
             </article>
-            <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
+                <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
+              </div>
+            }
           </section>
         } @else if (activeSection === 'cargos-temporarios') {
           <app-temporary-roles-panel

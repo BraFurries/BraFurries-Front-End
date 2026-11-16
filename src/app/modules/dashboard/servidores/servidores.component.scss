@@ -21,3 +21,28 @@
 .preview-badge { height: fit-content; padding: .3rem .55rem; border-radius: 999px; color: #8a3594; background: rgba(138,53,148,.1); font-size: .65rem; font-weight: 800; }
 .preview-card { border-color: rgba(138,53,148,.22); background: linear-gradient(135deg,#fff 0%,#fcf8fd 100%); }.plan-tree { margin-top: 1rem; padding: .85rem 1rem; border-radius: .85rem; color: #374151; background: rgba(255,255,255,.7); font-family: ui-monospace, monospace; line-height: 1.8; }.permission-list { display: grid; gap: .45rem; margin-top: .75rem; }.permission-list li { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; padding: .55rem .65rem; border-radius: .65rem; background: #fff; font-size: .8rem; }.permission-chip { padding: .14rem .38rem; border-radius: 999px; color: #991b1b; background: #fee2e2; font-size: .68rem; font-weight: 800; }.permission-chip.allow { color: #065f46; background: #d1fae5; }
 
+
+/* Second-level navigation within Ferramentas (not another top-level menu). */
+.tool-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: 1.25rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid #e5e7eb;
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .65rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: .8rem;
+    background: #fff;
+    color: #6b7280;
+    font-size: .875rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button.active { border-color: rgba(138,53,148,.35); background: #f8eff9; color: #8a3594; }
+  button:focus-visible { outline: 2px solid #8a3594; outline-offset: 2px; }
+}
