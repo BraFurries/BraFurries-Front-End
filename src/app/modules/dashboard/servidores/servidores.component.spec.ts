@@ -185,7 +185,7 @@ describe('ServidoresComponent', () => {
         of({ kind: 'ready', state: contextState$.value })
       )
     };
-    service = jasmine.createSpyObj('ManagedServersService', ['getManagedServers','getResources','previewChannelPermissionCopy','applyChannelPermissionCopy','getServerChannels','getBump','getStaffRoles','getModerationAccess','getPortariaBypasses','getVipRoles','getPortaria','getAutoJoinRoles','getLogs','updateLog','testLog','addAutoJoinRole','removeAutoJoinRole','updateAutoJoinEnabled','updateStaffRoles','updateModerationStaffRoles','updateCollaborativeModeration','createPortariaBypass','updatePortariaBypass','removePortariaBypass','updateVipRoles','updateBirthdayChannel','updatePortariaRoles','updatePortariaEnabled','updatePortariaEntry','updatePortariaForm','updatePortariaResult','createPortariaFlow','publishPortariaFlow','updateBumpProcessing','updateBumpWarning','updateBumpIndividualReward','updateBumpMonthlyRanking']);
+    service = jasmine.createSpyObj('ManagedServersService', ['getManagedServers','getResources','previewChannelPermissionCopy','applyChannelPermissionCopy','getServerChannels','getBump','getStaffRoles','getModerationAccess','getPortariaBypasses','getVipRoles','getPortaria','getAutoJoinRoles','getLogs','updateLog','testLog','addAutoJoinRole','removeAutoJoinRole','updateAutoJoinEnabled','updateStaffRoles','updateModerationStaffRoles','updateCollaborativeModeration','createPortariaBypass','updatePortariaBypass','removePortariaBypass','updateVipRoles','updateBirthdayChannel','updatePortariaRoles','updatePortariaEnabled','updatePortariaEntry','updatePortariaForm','updatePortariaResult','createPortariaFlow','publishPortariaFlow','updateBumpProcessing','updateBumpWarning','updateBumpIndividualReward','updateBumpMonthlyRanking','previewBulkRole','startBulkRole','scanRecoveryRoles','applyRecoveryRole','getRoleToolOperation','listRoleToolOperations']);
     service.getManagedServers.and.returnValue(of(servers)); service.getResources.and.returnValue(of(resources)); service.getServerChannels.and.returnValue(of(serverChannels)); service.getBump.and.returnValue(of(bump)); service.getStaffRoles.and.returnValue(of(staff)); service.getModerationAccess.and.returnValue(of(moderationAccess)); service.getPortariaBypasses.and.returnValue(of({ portariaEnabled: true, bypasses: [] })); service.getVipRoles.and.returnValue(of({ roleIds: ['1'], roles: [resources.roles[0]] })); service.getPortaria.and.returnValue(of(portaria)); service.getAutoJoinRoles.and.returnValue(of(autoJoinRoles));
     service.addAutoJoinRole.and.returnValue(of(autoJoinRoles)); service.removeAutoJoinRole.and.returnValue(of(autoJoinRoles)); service.updateAutoJoinEnabled.and.returnValue(of(autoJoinRoles)); service.updateModerationStaffRoles.and.returnValue(of(moderationAccess)); service.updateCollaborativeModeration.and.returnValue(of(moderationAccess)); service.updatePortariaEntry.and.returnValue(of(portaria)); service.updatePortariaForm.and.returnValue(of(portaria)); service.updatePortariaResult.and.returnValue(of(portaria)); service.createPortariaFlow.and.returnValue(of(portaria));
     service.updateVipRoles.and.returnValue(of({ roleIds: ['1'], roles: [resources.roles[0]] }));
@@ -193,6 +193,7 @@ describe('ServidoresComponent', () => {
     service.updatePortariaRoles.and.returnValue(of(portaria.config));
     service.updatePortariaEnabled.and.returnValue(of(portaria));
     service.publishPortariaFlow.and.returnValue(of({ flowId: 1, channelId: '888888888888888888', messageId: '123456789012345678', created: true, reused: false, updated: false }));
+    service.listRoleToolOperations.and.returnValue(of([]));
     service.getLogs.and.returnValue(of(logs)); service.updateLog.and.returnValue(of(logs)); service.testLog.and.returnValue(of(void 0));
     await TestBed.configureTestingModule({ declarations: [ServidoresComponent, RoleSelectionComponent, MockPortariaClarificationSettingsComponent, MockXpLevelingPanelComponent, MockAiConfigurationPanelComponent, MockVipConfigurationPanelComponent, MockBackupManagementPanelComponent, MockThemeManagementPanelComponent], imports: [FormsModule], providers: [provideRouter([]), { provide: ActivatedRoute, useValue: route }, { provide: ManagedServersService, useValue: service }, { provide: CommunityContextService, useValue: communityContext }, { provide: PartnerDiscordService, useValue: { getSettings: () => throwError(() => new Error('not a partner manager')) } }] }).compileComponents();
     router = TestBed.inject(Router);
@@ -882,7 +883,7 @@ describe('ServidoresComponent', () => {
   it('offers permission copying only under Ferramentas and requires explicit preview and confirmation', () => {
     create();
     setRoute({ guildId: resources.guildId, section: 'tools' });
-    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions']);
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions', 'bulk-roles', 'recovery']);
     component.selectToolTab('channel-permissions');
     fixture.detectChanges();
 
@@ -1000,7 +1001,7 @@ describe('ServidoresComponent', () => {
     create();
     expect(component.sections.some(section => section.id === 'tools' && section.label === 'Ferramentas')).toBeTrue();
     expect(component.sections.some(section => section.id === ('private-area' as any))).toBeFalse();
-    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions']);
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions', 'bulk-roles', 'recovery']);
 
     setRoute({ guildId: resources.guildId, section: 'tools' });
     expect(component.activeSection).toBe('tools');
