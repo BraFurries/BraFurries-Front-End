@@ -1,25 +1,32 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { UserService } from '../../../core/services/user.service';
 import { ApiErrorResponse } from '../../../shared/models/api/errors/error';
 import { getSocialAuthErrorMessage } from '../../../shared/utils/social-auth-error-message';
+import { LoginStatus, LoginStatusOverlayComponent } from '../components/login-status-overlay/login-status-overlay.component';
 
 @Component({
   selector: 'app-auth',
   templateUrl: './auth.component.html',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, LoginStatusOverlayComponent],
   styleUrl: './auth.component.scss'
 })
-export class AuthComponent implements OnInit {
+export class AuthComponent implements OnInit, OnDestroy {
   errorMessage = '';
+  loginState: LoginStatus = 'authenticating';
+  private successTimeout?: ReturnType<typeof setTimeout>;
 
   constructor(
     private userService: UserService,
     private router: Router
   ) { }
+
+  ngOnDestroy(): void {
+    if (this.successTimeout) clearTimeout(this.successTimeout);
+  }
 
   ngOnInit(): void {
     const params = this.getCallbackParams();
@@ -49,7 +56,10 @@ export class AuthComponent implements OnInit {
     }
 
     this.userService.completeSocialLoginFromCallback(params).subscribe({
-      next: () => this.router.navigateByUrl(returnUrl),
+      next: () => {
+        this.loginState = 'success';
+        this.successTimeout = setTimeout(() => this.router.navigateByUrl(returnUrl), 1500);
+      },
       error: (err: HttpErrorResponse | Error) => {
         const apiError = 'error' in err ? err.error as ApiErrorResponse : null;
 

@@ -1,4 +1,7 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { Router } from '@angular/router';
+import { Subject } from 'rxjs';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
@@ -49,4 +52,40 @@ describe('LoginComponent account consolidation recovery', () => {
     expect(component.isLoggingIn).toBeFalse();
     expect(component.returnUrl).toBe('/painel');
   });
+  it('shows the shared login animation with correct authentication states', fakeAsync(() => {
+    const loginReply = new Subject<any>();
+    (TestBed.inject(UserService).login as jasmine.Spy).and.returnValue(loginReply.asObservable());
+    const navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+    component.loginForm.setValue({ email: 'member@example.com', password: 'example-password', rememberMe: false });
+
+    component.login();
+    fixture.detectChanges();
+    let overlay: HTMLElement = fixture.nativeElement.querySelector('app-login-status-overlay');
+    expect(overlay.textContent).toContain('Autenticando...');
+    expect(overlay.textContent).not.toContain('Acesso Liberado!');
+
+    loginReply.next({}); loginReply.complete();
+    fixture.detectChanges();
+    overlay = fixture.nativeElement.querySelector('app-login-status-overlay');
+    expect(overlay.textContent).toContain('Acesso Liberado!');
+    expect(overlay.textContent).toContain('Preparando seu painel...');
+    tick(1500);
+    expect(navigate).toHaveBeenCalledOnceWith('/painel');
+  }));
+
+  it('removes the overlay after an invalid password response', () => {
+    const loginReply = new Subject<any>();
+    (TestBed.inject(UserService).login as jasmine.Spy).and.returnValue(loginReply.asObservable());
+    component.loginForm.setValue({ email: 'member@example.com', password: 'invalid', rememberMe: false });
+    component.login();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-login-status-overlay')).not.toBeNull();
+
+    loginReply.error(new HttpErrorResponse({ status: 401, error: { message: 'Credenciais inválidas' } }));
+    fixture.detectChanges();
+    expect(component.isSubmitting).toBeFalse();
+    expect(fixture.nativeElement.querySelector('app-login-status-overlay')).toBeNull();
+    expect(component.errorMessage).toContain('Credenciais inválidas');
+  });
+
 });

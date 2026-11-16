@@ -127,6 +127,8 @@ jobs:
           --include=**/perfil.component.spec.ts
           --include=**/social-auth-error-message.spec.ts
           --include=**/login.component.spec.ts
+          --include=**/auth.component.spec.ts
+          --include=**/login-status-overlay.component.spec.ts
           --include=**/social-register.component.spec.ts
           --include=**/sobre-nos.component.spec.ts
 
