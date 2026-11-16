@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
-import { AutoJoinRolesState, BumpConfigResponse, GuildResources, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PortariaBypass, PortariaBypassesState, PortariaState, ServerChannelsConfig, StaffRoles } from '../../../core/services/managed-servers.service';
+import { AutoJoinRolesState, BumpConfigResponse, GuildResources, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PortariaBypass, PortariaBypassesState, PortariaState, RoleToolOperation, ServerChannelsConfig, StaffRoles } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
 import { RoleSelectionComponent } from './role-selection.component';
@@ -1635,6 +1635,80 @@ describe('ServidoresComponent', () => {
     component.removePortariaBypass(invite);
 
     expect(component.portariaBypasses).toEqual([account]);
+  });
+
+  it('shows bulk-role preview and requires explicit confirmation before submitting the job', () => {
+    const fingerprint = 'a'.repeat(64);
+    service.previewBulkRole.and.returnValue(of({
+      guildId: resources.guildId, roleId: '1', roleName: 'Cargo baixo',
+      humanMembers: 10, eligible: 7, alreadyAssigned: 3, excludedBots: 2, fingerprint
+    }));
+    const completed: RoleToolOperation = {
+      id: 55, type: 'BULK_ADD', status: 'SUCCEEDED', roleId: '1',
+      sourceOperationId: null, sourceBot: null, channelId: null, roleKey: null,
+      expectedCount: 7, progressCurrent: 7, progressTotal: 7,
+      addedCount: 7, skippedCount: 0, failedCount: 0, scannedCount: 0,
+      errorCode: null, roles: []
+    };
+    service.startBulkRole.and.returnValue(of(completed));
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    component.selectToolTab('bulk-roles');
+    component.bulkRoleId = '1';
+    component.previewBulkRole();
+    fixture.detectChanges();
+
+    expect(component.bulkRolePreview?.eligible).toBe(7);
+    expect(fixture.nativeElement.querySelector('#coddy-tool-panel-bulk-roles')).not.toBeNull();
+    component.startBulkRole();
+    expect(service.startBulkRole).not.toHaveBeenCalled();
+
+    component.bulkRoleConfirmed = true;
+    component.startBulkRole();
+    expect(service.startBulkRole).toHaveBeenCalledOnceWith(
+      resources.guildId, '1', fingerprint, jasmine.any(String));
+    expect(component.roleToolOperation?.status).toBe('SUCCEEDED');
+    expect(component.bulkRolePreview).toBeNull();
+  });
+
+  it('analyzes recovery logs without modifying roles and requires an explicit mapping', () => {
+    const scan: RoleToolOperation = {
+      id: 77, type: 'RECOVERY_SCAN', status: 'READY', roleId: null,
+      sourceOperationId: null, sourceBot: 'Dyno', channelId: '888888888888888888',
+      roleKey: null, expectedCount: 0, progressCurrent: 100, progressTotal: 100,
+      addedCount: 0, skippedCount: 0, failedCount: 0, scannedCount: 100,
+      errorCode: null, roles: [
+        { key: 'name:old-role', name: 'Cargo antigo', foundRoleId: null, memberCount: 7, ambiguous: false }
+      ]
+    };
+    const recovery: RoleToolOperation = {
+      ...scan, id: 78, type: 'RECOVERY_APPLY', status: 'SUCCEEDED',
+      sourceOperationId: 77, roleId: '1', roleKey: 'name:old-role',
+      progressCurrent: 7, progressTotal: 7, addedCount: 5, skippedCount: 2, scannedCount: 0, roles: []
+    };
+    service.scanRecoveryRoles.and.returnValue(of(scan));
+    service.applyRecoveryRole.and.returnValue(of(recovery));
+
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    component.selectToolTab('recovery');
+    component.recoveryChannelId = '888888888888888888';
+    component.startRecoveryScan();
+    expect(service.scanRecoveryRoles).toHaveBeenCalledWith(
+      resources.guildId, '888888888888888888', 'Dyno', jasmine.any(String));
+    expect(service.applyRecoveryRole).not.toHaveBeenCalled();
+
+    component.recoveryRoleKey = 'name:old-role';
+    component.onRecoveryRoleChange();
+    expect(component.recoveryTargetRoleId).toBe('');
+    component.recoveryTargetRoleId = '1';
+    component.applyRecoveryRole();
+    expect(service.applyRecoveryRole).not.toHaveBeenCalled();
+
+    component.recoveryConfirmed = true;
+    component.applyRecoveryRole();
+    expect(service.applyRecoveryRole).toHaveBeenCalledOnceWith(
+      resources.guildId, 77, 'name:old-role', '1', jasmine.any(String));
   });
 
 });
