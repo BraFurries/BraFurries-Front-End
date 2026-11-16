@@ -7,6 +7,7 @@ import { AdminAnnouncementsComponent } from './pages/avisos/avisos.component';
 import { AdminBotComponent } from './pages/bot-coddy/bot-coddy.component';
 import { AdminBotDetailsComponent } from './pages/bot-coddy-details/bot-coddy-details.component';
 import { AdminMetricsComponent } from './pages/metricas/metricas.component';
+import { AdminRecordsComponent } from './pages/recordes/admin-records.component';
 import { AdminPartnersComponent } from './pages/parceiros/parceiros.component';
 import { EditarParceiroComponent } from './pages/parceiros/editar/editar-parceiro.component';
 import { NovoParceiroComponent } from './pages/parceiros/novo/novo-parceiro.component';
@@ -33,6 +34,7 @@ const routes: Routes = [
       { path: 'presenca-coddy', component: AdminCoddyPresenceComponent },
       { path: 'bot-coddy/detalhes', component: AdminBotDetailsComponent },
       { path: 'metricas', component: AdminMetricsComponent },
+      { path: 'recordes', component: AdminRecordsComponent },
       { path: 'avisos', component: AdminAnnouncementsComponent }
     ]
   }

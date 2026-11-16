@@ -44,6 +44,15 @@ import {
   UserIdentityLinkView
 } from '../../shared/models/api/admin/admin';
 
+export interface AdminRecordGuild {
+  communityId: number;
+  communityName: string;
+  guildId: string;
+  guildName: string;
+}
+export interface AdminRecordGame { id: number; name: string; }
+export interface AdminRecordBlacklist { games: AdminRecordGame[]; }
+
 export interface AdminCoddyPresenceFilters {
   page?: number;
   pageSize?: number;
@@ -79,6 +88,23 @@ export class AdminService {
 
   getOverview(): Observable<AdminOverview> {
     return this.http.get<AdminOverview>(`${this.baseUrl}/overview`);
+  }
+
+  getRecordGuilds(): Observable<AdminRecordGuild[]> {
+    return this.http.get<AdminRecordGuild[]>(this.baseUrl + '/records/guilds');
+  }
+  getRecordBlacklist(communityId: number, guildId: string): Observable<AdminRecordBlacklist> {
+    return this.http.get<AdminRecordBlacklist>(
+      this.baseUrl + '/records/communities/' + communityId + '/guilds/' + encodeURIComponent(guildId) + '/blacklist');
+  }
+  addRecordBlacklist(communityId: number, guildId: string, name: string): Observable<AdminRecordBlacklist> {
+    return this.http.post<AdminRecordBlacklist>(
+      this.baseUrl + '/records/communities/' + communityId + '/guilds/' + encodeURIComponent(guildId) + '/blacklist',
+      { name });
+  }
+  removeRecordBlacklist(communityId: number, guildId: string, gameId: number): Observable<AdminRecordBlacklist> {
+    return this.http.delete<AdminRecordBlacklist>(
+      this.baseUrl + '/records/communities/' + communityId + '/guilds/' + encodeURIComponent(guildId) + '/blacklist/' + gameId);
   }
 
   getCoddyPresence(filters: AdminCoddyPresenceFilters = {}): Observable<AdminCoddyPresenceResponse> {

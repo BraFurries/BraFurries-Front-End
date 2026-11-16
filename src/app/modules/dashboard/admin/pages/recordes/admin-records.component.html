@@ -1,0 +1,69 @@
+<div class="space-y-6">
+  <section class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
+    <h2 class="text-xl font-bold text-gray-800">Recordes · Blacklist de jogos</h2>
+    <p class="mt-2 text-sm text-gray-500">Gerencie quais jogos não entram no ranking de recordes do Coddy. A lista é independente para cada rede Discord.</p>
+    <label class="mt-6 block max-w-2xl">
+      <span class="mb-2 block text-sm font-semibold text-gray-700">Community e servidor Discord</span>
+      <select class="w-full rounded-xl border border-gray-200 bg-white p-3 text-sm"
+        [(ngModel)]="selectedKey" (ngModelChange)="selectGuild()" [disabled]="loadingGuilds || saving"
+        aria-label="Selecionar Community e servidor Discord">
+        <option value="">Selecione o servidor</option>
+        @for (guild of guilds; track toKey(guild)) {
+          <option [value]="toKey(guild)">{{ guild.communityName }} · {{ guild.guildName }} ({{ guild.guildId }})</option>
+        }
+      </select>
+    </label>
+    @if (loadingGuilds) { <p class="mt-4 text-sm text-gray-500" role="status">Carregando servidores...</p> }
+    @if (!loadingGuilds && guilds.length === 0) {
+      <p class="mt-4 text-sm text-gray-500">Nenhuma rede Discord ativa encontrada.</p>
+    }
+  </section>
+
+  @if (selectedGuild) {
+    <section class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
+      <h3 class="font-bold text-gray-800">Jogos bloqueados · {{ selectedGuild.guildName }}</h3>
+      <p class="mt-1 text-xs text-gray-500">Community: {{ selectedGuild.communityName }} · Rede: {{ selectedGuild.guildId }}</p>
+      <p class="mt-3 text-sm text-gray-500">Os jogos bloqueados ficam fora dos recordes. A alteração chega ao Coddy em até 10 segundos.</p>
+
+      <div class="mt-5 flex flex-wrap items-end gap-3">
+        <label class="min-w-52 flex-1">
+          <span class="mb-2 block text-sm font-semibold text-gray-700">Nome exato do jogo</span>
+          <input class="w-full rounded-xl border border-gray-200 p-3 text-sm" type="text" maxlength="50"
+            [(ngModel)]="nameInput" [disabled]="saving || loadingGames"
+            placeholder="Ex.: Jogo que não deve pontuar" />
+        </label>
+        <button type="button" class="rounded-xl bg-braPurple px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+          [disabled]="saving || loadingGames || !nameInput.trim() || nameInput.trim().length > 50"
+          (click)="add()">{{ saving ? 'Salvando...' : 'Adicionar jogo' }}</button>
+      </div>
+
+      @if (loadingGames) { <p class="mt-5 text-sm text-gray-500" role="status">Consultando blacklist...</p> }
+      @if (error) { <p class="mt-4 text-sm font-semibold text-red-700" role="alert">{{ error }}</p> }
+      @if (success) { <p class="mt-4 text-sm font-semibold text-green-700" role="status">{{ success }}</p> }
+
+      @if (!loadingGames) {
+        <div class="mt-5 divide-y divide-gray-100 rounded-xl border border-gray-100">
+          @for (game of games; track game.id) {
+            <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <span class="min-w-0 break-words font-semibold text-gray-800">{{ game.name }}</span>
+              @if (removingId === game.id) {
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-amber-700">Confirmar exclusão?</span>
+                  <button type="button" class="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-700"
+                    [disabled]="saving" (click)="remove(game.id)">Sim, remover</button>
+                  <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    [disabled]="saving" (click)="removingId = null">Cancelar</button>
+                </div>
+              } @else {
+                <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-700"
+                  [disabled]="saving" (click)="removingId = game.id">Remover</button>
+              }
+            </div>
+          } @empty {
+            <p class="px-4 py-5 text-sm text-gray-500">Nenhum jogo bloqueado neste servidor.</p>
+          }
+        </div>
+      }
+    </section>
+  }
+</div>
