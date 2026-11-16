@@ -1009,6 +1009,12 @@
                   @if (operation.errorCode) {
                     <p class="warning mt-3" role="alert">Código da ocorrência: {{ operation.errorCode }}</p>
                   }
+                  @if (operation.status === 'PENDING') {
+                    <button type="button" class="secondary-button mt-4"
+                            (click)="cancelPendingRoleTool()" [disabled]="roleToolBusy">
+                      Cancelar operação pendente
+                    </button>
+                  }
                 </article>
               }
               @if (roleToolHistory.length) {
