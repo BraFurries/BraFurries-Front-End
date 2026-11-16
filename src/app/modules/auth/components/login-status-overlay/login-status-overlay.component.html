@@ -1,0 +1,14 @@
+<div class="login-overlay fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-braDark/90 backdrop-blur-sm"
+     role="status" aria-live="polite" aria-atomic="true">
+    <div class="relative">
+        <div class="absolute inset-0 bg-braCyan/20 blur-xl rounded-full animate-pulse"></div>
+        <img src="/assets/images/logo-Brafurries/brafurries-sticker-low.avif" alt="Logo BraFurries"
+            class="relative w-36 h-36 login-logo mb-6 drop-shadow-[0_0_15px_#45bced90]">
+    </div>
+    <h2 class="text-white font-amaranth text-4xl font-bold login-text tracking-wide">
+        {{ state === 'success' ? 'Acesso Liberado!' : 'Autenticando...' }}
+    </h2>
+    <p class="text-braCyan font-archivo mt-3 login-subtext text-lg">
+        {{ state === 'success' ? 'Preparando seu painel...' : 'Verificando suas credenciais com segurança.' }}
+    </p>
+</div>

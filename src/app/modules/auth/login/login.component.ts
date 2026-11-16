@@ -8,13 +8,14 @@ import { ApiErrorResponse } from '../../../shared/models/api/errors/error';
 import { getSocialAuthErrorMessage } from '../../../shared/utils/social-auth-error-message';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { SharedModule } from '../../../shared/shared.module';
+import { LoginStatusOverlayComponent } from '../components/login-status-overlay/login-status-overlay.component';
 import { WidgetsModule } from '../../../widgets/widgets.module';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   standalone: true,
-  imports: [CommonModule, SharedModule, WidgetsModule],
+  imports: [CommonModule, SharedModule, WidgetsModule, LoginStatusOverlayComponent],
   styleUrl: './login.component.scss'
 })
 export class LoginComponent implements OnDestroy {
@@ -25,6 +26,7 @@ export class LoginComponent implements OnDestroy {
   pendingEmailConfirmation = false;
   confirmationResent = false;
   private errorTimeout: any;
+  private successTimeout?: ReturnType<typeof setTimeout>;
 
   returnUrl: string = '/painel';
   accountConsolidated = false;
@@ -62,6 +64,9 @@ export class LoginComponent implements OnDestroy {
     if (this.errorTimeout) {
       clearTimeout(this.errorTimeout);
     }
+    if (this.successTimeout) {
+      clearTimeout(this.successTimeout);
+    }
   }
 
   private showError(message: string): void {
@@ -91,6 +96,7 @@ export class LoginComponent implements OnDestroy {
     }
 
     this.isSubmitting = true;
+    this.isLoggingIn = false;
     this.errorMessage = '';
     this.pendingEmailConfirmation = false;
     this.confirmationResent = false;
@@ -101,7 +107,7 @@ export class LoginComponent implements OnDestroy {
     this.userService.login(email, password, Boolean(rememberMe)).subscribe({
       next: () => {
         this.isLoggingIn = true;
-        setTimeout(() => {
+        this.successTimeout = setTimeout(() => {
           this.isSubmitting = false;
           this.router.navigateByUrl(this.returnUrl);
         }, 1500);
