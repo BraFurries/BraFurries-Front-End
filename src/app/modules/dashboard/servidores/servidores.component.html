@@ -788,6 +788,134 @@
                 <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
               </div>
             }
+            @if (activeToolTab === 'bulk-roles') {
+              <div role="tabpanel" id="coddy-tool-panel-bulk-roles"
+                   aria-labelledby="coddy-tool-tab-bulk-roles" class="space-y-5">
+                <article class="card">
+                  <p class="eyebrow">Distribuição em massa</p>
+                  <h3>Adicionar cargo a todos os membros</h3>
+                  <p class="help">A operação adiciona o cargo apenas a pessoas que ainda não o possuem. Bots são ignorados. Somente administradores do servidor podem executar.</p>
+                  <label class="block mt-4">
+                    <span class="field-label">Cargo de destino</span>
+                    <select class="field-control" [(ngModel)]="bulkRoleId"
+                            (ngModelChange)="invalidateBulkPreview()" [disabled]="roleToolBusy || roleToolActive">
+                      <option value="">Selecione um cargo que o Coddy pode atribuir</option>
+                      @for (role of roleToolAssignableRoles; track role.id) {
+                        <option [value]="role.id">{{ role.name }}</option>
+                      }
+                    </select>
+                  </label>
+                  @if (!resources.botCapabilities.canManageRoles) {
+                    <p class="warning mt-4" role="alert">O Coddy precisa de Gerenciar cargos para executar esta ferramenta.</p>
+                  }
+                  <button type="button" class="secondary-button mt-5"
+                          [disabled]="!bulkRoleId || roleToolBusy || roleToolActive"
+                          (click)="previewBulkRole()">
+                    {{ roleToolBusy ? 'Analisando…' : 'Visualizar membros elegíveis' }}
+                  </button>
+                </article>
+                @if (bulkRolePreview; as preview) {
+                  <article class="card">
+                    <p class="eyebrow">Prévia do servidor</p>
+                    <h3>{{ preview.roleName }}</h3>
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Pessoas analisadas</p><strong>{{ preview.humanMembers }}</strong></div>
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Receberão cargo</p><strong>{{ preview.eligible }}</strong></div>
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Já possuem</p><strong>{{ preview.alreadyAssigned }}</strong></div>
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Bots ignorados</p><strong>{{ preview.excludedBots }}</strong></div>
+                    </div>
+                    <p class="help mt-4">O Coddy validará novamente a quantidade de membros, a hierarquia e as permissões no momento da execução. Caso os dados mudem, será necessária uma nova prévia.</p>
+                    <label class="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                      <input type="checkbox" class="mt-1" [(ngModel)]="bulkRoleConfirmed" />
+                      <span>Confirmo atribuir <strong>{{ preview.roleName }}</strong> aos {{ preview.eligible }} membros elegíveis deste servidor.</span>
+                    </label>
+                    <button type="button" class="primary-button mt-4" (click)="startBulkRole()"
+                            [disabled]="!bulkRoleConfirmed || roleToolBusy || roleToolActive">
+                      {{ roleToolBusy ? 'Iniciando…' : 'Confirmar distribuição de cargos' }}
+                    </button>
+                  </article>
+                }
+              </div>
+            }
+            @if (activeToolTab === 'recovery') {
+              <div role="tabpanel" id="coddy-tool-panel-recovery"
+                   aria-labelledby="coddy-tool-tab-recovery" class="space-y-5">
+                <article class="card">
+                  <p class="eyebrow">Recuperação por logs</p>
+                  <h3>Restaurar cargos a partir do último estado registrado</h3>
+                  <p class="help">Analise o histórico de um canal do Dyno, Loritta ou MEE6. A análise não modifica cargos. Depois, escolha individualmente qual cargo e quais pessoas devem ser restaurados.</p>
+                  <div class="form-grid mt-4">
+                    <label><span class="field-label">Canal de logs</span>
+                      <select class="field-control" [(ngModel)]="recoveryChannelId"
+                              [disabled]="roleToolBusy || roleToolActive">
+                        <option value="">Selecione o canal</option>
+                        @for (channel of recoveryLogChannels; track channel.id) {
+                          <option [value]="channel.id"># {{ channel.name }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label><span class="field-label">Bot responsável pelos logs</span>
+                      <select class="field-control" [(ngModel)]="recoverySourceBot"
+                              [disabled]="roleToolBusy || roleToolActive">
+                        <option value="Dyno">Dyno</option>
+                        <option value="Loritta">Loritta</option>
+                        <option value="mee6">MEE6</option>
+                      </select>
+                    </label>
+                  </div>
+                  <button type="button" class="secondary-button mt-5"
+                          [disabled]="!recoveryChannelId || roleToolBusy || roleToolActive"
+                          (click)="startRecoveryScan()">
+                    {{ roleToolBusy ? 'Iniciando…' : 'Analisar histórico de cargos' }}
+                  </button>
+                </article>
+                @if (recoveryScan; as scan) {
+                  <article class="card">
+                    <p class="eyebrow">Análise concluída · {{ scan.sourceBot }}</p>
+                    <h3>Cargos encontrados nos logs</h3>
+                    <p class="help">Mensagens verificadas: {{ scan.scannedCount }}. Escolha um cargo da análise e o cargo atual equivalente neste servidor.</p>
+                    <div class="form-grid mt-4">
+                      <label><span class="field-label">Cargo de origem nos logs</span>
+                        <select class="field-control" [(ngModel)]="recoveryRoleKey"
+                                (ngModelChange)="onRecoveryRoleChange()" [disabled]="roleToolBusy || roleToolActive">
+                          <option value="">Selecione um cargo encontrado</option>
+                          @for (entry of scan.roles; track entry.key) {
+                            <option [value]="entry.key">
+                              {{ entry.name }} · {{ entry.memberCount }} membros · {{ entry.foundRoleId ? 'cargo disponível' : 'associação necessária' }}
+                            </option>
+                          }
+                        </select>
+                      </label>
+                      <label><span class="field-label">Cargo atual de destino</span>
+                        <select class="field-control" [(ngModel)]="recoveryTargetRoleId"
+                                (ngModelChange)="recoveryConfirmed = false" [disabled]="roleToolBusy || roleToolActive">
+                          <option value="">Selecione o cargo equivalente</option>
+                          @for (role of roleToolAssignableRoles; track role.id) {
+                            <option [value]="role.id">{{ role.name }}</option>
+                          }
+                        </select>
+                      </label>
+                    </div>
+                    @if (selectedRecoveryRole; as selected) {
+                      <p class="help mt-4">Membros previstos para a recuperação: <strong>{{ selected.memberCount }}</strong>.
+                        @if (!selected.foundRoleId || selected.ambiguous) {
+                          O cargo original não foi identificado unicamente; confira a associação manualmente.
+                        }
+                      </p>
+                      <label class="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                        <input type="checkbox" [(ngModel)]="recoveryConfirmed" class="mt-1"
+                               [disabled]="!recoveryTargetRoleId || roleToolActive"/>
+                        <span>Confirmo aplicar o cargo <strong>{{ roleName(recoveryTargetRoleId) }}</strong> a até {{ selected.memberCount }} membros identificados nos logs, sem remover outros cargos.</span>
+                      </label>
+                      <button type="button" class="primary-button mt-4" (click)="applyRecoveryRole()"
+                              [disabled]="!recoveryConfirmed || !recoveryTargetRoleId || roleToolBusy || roleToolActive">
+                        {{ roleToolBusy ? 'Iniciando…' : 'Confirmar recuperação deste cargo' }}
+                      </button>
+                    }
+                  </article>
+                }
+              </div>
+            }
             @if (activeToolTab === 'channel-permissions') {
               <div role="tabpanel" id="coddy-tool-panel-channel-permissions"
                 aria-labelledby="coddy-tool-tab-channel-permissions" class="space-y-5">
@@ -862,6 +990,45 @@
                   </article>
                 }
               </div>
+            }
+            @if (activeToolTab === 'bulk-roles' || activeToolTab === 'recovery') {
+              @if (roleToolError) {
+                <p class="error-message" role="alert">{{ roleToolError }}</p>
+              }
+              @if (roleToolOperation; as operation) {
+                <article class="card" aria-live="polite">
+                  <p class="eyebrow">Operação #{{ operation.id }}</p>
+                  <h3>{{ roleToolStatusLabel(operation.status) }}</h3>
+                  <p class="help mt-2">Tipo: {{ operation.type === 'BULK_ADD' ? 'Distribuição de cargo' : operation.type === 'RECOVERY_SCAN' ? 'Análise de logs' : 'Recuperação de cargo' }}</p>
+                  <p class="mt-3 text-sm">
+                    Progresso: <strong>{{ operation.progressCurrent }}</strong> / {{ operation.progressTotal }}
+                    · Adicionados: <strong>{{ operation.addedCount }}</strong>
+                    · Ignorados: {{ operation.skippedCount }}
+                    · Falhas: {{ operation.failedCount }}
+                  </p>
+                  @if (operation.errorCode) {
+                    <p class="warning mt-3" role="alert">Código da ocorrência: {{ operation.errorCode }}</p>
+                  }
+                </article>
+              }
+              @if (roleToolHistory.length) {
+                <article class="card">
+                  <h3>Últimas operações</h3>
+                  <div class="mt-4 space-y-2">
+                    @for (operation of roleToolHistory; track operation.id) {
+                      <button type="button" class="w-full rounded-xl border border-gray-200 p-3 text-left text-sm hover:bg-gray-50"
+                              [disabled]="roleToolActive && roleToolOperation?.id !== operation.id"
+                              (click)="selectRoleToolHistory(operation)">
+                        <strong>#{{ operation.id }}</strong> · {{ roleToolStatusLabel(operation.status) }}
+                        · {{ operation.type === 'RECOVERY_SCAN' ? 'Análise' : operation.type === 'BULK_ADD' ? 'Distribuição' : 'Recuperação' }}
+                        @if (operation.type === 'RECOVERY_SCAN' && operation.status === 'READY') {
+                          · Ver cargos encontrados
+                        }
+                      </button>
+                    }
+                  </div>
+                </article>
+              }
             }
           </section>
         } @else if (activeSection === 'cargos-temporarios') {
