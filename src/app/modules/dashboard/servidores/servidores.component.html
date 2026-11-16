@@ -750,6 +750,35 @@
                     <span aria-hidden="true">{{ tool.icon }}</span>{{ tool.label }}
                   </button>
                 }
+                <div class="relative">
+                  <button type="button" id="coddy-role-tool-dropdown"
+                    [attr.aria-expanded]="roleToolsDropdownOpen"
+                    aria-haspopup="true" aria-controls="coddy-role-tool-options"
+                    class="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-braPurple"
+                    [ngClass]="roleToolGroupActive
+                      ? 'border-purple-300 bg-purple-50 text-braPurple'
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'"
+                    (click)="toggleRoleToolsDropdown()">
+                    <span aria-hidden="true">👥</span>
+                    Cargos
+                    <span aria-hidden="true">{{ roleToolsDropdownOpen ? '▴' : '▾' }}</span>
+                  </button>
+                  @if (roleToolsDropdownOpen) {
+                    <div id="coddy-role-tool-options" role="group" aria-label="Ferramentas de cargos"
+                      class="absolute left-0 top-full z-30 mt-2 min-w-56 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                      @for (tool of roleToolTabs; track tool.id) {
+                        <button type="button" role="tab" [id]="'coddy-tool-tab-' + tool.id"
+                          [attr.aria-selected]="activeToolTab === tool.id"
+                          [attr.aria-controls]="'coddy-tool-panel-' + tool.id"
+                          [ngClass]="activeToolTab === tool.id ? 'bg-purple-50 text-braPurple' : 'text-gray-600 hover:bg-gray-50'"
+                          class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold"
+                          (click)="selectToolTab(tool.id)">
+                          <span aria-hidden="true">{{ tool.icon }}</span>{{ tool.label }}
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
               </nav>
             </article>
             @if (activeToolTab === 'private-area') {
@@ -833,6 +862,73 @@
                             [disabled]="!bulkRoleConfirmed || roleToolBusy || roleToolActive">
                       {{ roleToolBusy ? 'Iniciando…' : 'Confirmar distribuição de cargos' }}
                     </button>
+                  </article>
+                }
+              </div>
+            }
+            @if (activeToolTab === 'role-migrate') {
+              <div role="tabpanel" id="coddy-tool-panel-role-migrate"
+                   aria-labelledby="coddy-role-tool-dropdown" class="space-y-5">
+                <article class="card">
+                  <p class="eyebrow">Ferramentas · Cargos</p>
+                  <h3>Migrar membros entre cargos</h3>
+                  <p class="help">Transfira os membros de um cargo para outro. Para cada pessoa, o Coddy atribui primeiro o cargo novo e, somente após isso, remove o antigo. Bots são ignorados.</p>
+                  <div class="form-grid mt-4">
+                    <label>
+                      <span class="field-label">Cargo de origem (será removido)</span>
+                      <select class="field-control" [(ngModel)]="migrationSourceRoleId"
+                              (ngModelChange)="invalidateMigrationPreview()"
+                              [disabled]="roleToolBusy || roleToolActive">
+                        <option value="">Selecione o cargo atual</option>
+                        @for (role of roleToolAssignableRoles; track role.id) {
+                          <option [value]="role.id">{{ role.name }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>
+                      <span class="field-label">Cargo de destino (será adicionado)</span>
+                      <select class="field-control" [(ngModel)]="migrationTargetRoleId"
+                              (ngModelChange)="invalidateMigrationPreview()"
+                              [disabled]="roleToolBusy || roleToolActive">
+                        <option value="">Selecione o cargo novo</option>
+                        @for (role of roleToolAssignableRoles; track role.id) {
+                          <option [value]="role.id">{{ role.name }}</option>
+                        }
+                      </select>
+                    </label>
+                  </div>
+                  @if (migrationSourceRoleId && migrationTargetRoleId && migrationSourceRoleId === migrationTargetRoleId) {
+                    <p role="alert" class="warning mt-3">Escolha cargos diferentes para origem e destino.</p>
+                  }
+                  <button type="button" class="secondary-button mt-5" (click)="previewRoleMigration()"
+                          [disabled]="!migrationSourceRoleId || !migrationTargetRoleId || migrationSourceRoleId === migrationTargetRoleId || roleToolBusy || roleToolActive">
+                    {{ roleToolBusy ? 'Analisando membros…' : 'Visualizar prévia da migração' }}
+                  </button>
+                </article>
+                @if (migrationPreview; as preview) {
+                  <article class="card">
+                    <p class="eyebrow">Prévia · Nenhum cargo modificado ainda</p>
+                    <h3>{{ preview.sourceRoleName }} → {{ preview.targetRoleName }}</h3>
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Pessoas a migrar</p><strong>{{ preview.sourceMembers }}</strong></div>
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Receberão destino</p><strong>{{ preview.needsAddition }}</strong></div>
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Já possuem destino</p><strong>{{ preview.alreadyHasDestination }}</strong></div>
+                      <div class="rounded-xl bg-gray-50 p-4"><p class="help">Bots ignorados</p><strong>{{ preview.excludedBots }}</strong></div>
+                    </div>
+                    <p class="help mt-4">Os {{ preview.sourceMembers }} membros perderão o cargo de origem após a atribuição do destino. Quem já possui o destino terá apenas o cargo antigo removido. O Coddy verificará os membros e permissões novamente antes de começar.</p>
+                    @if (preview.sourceMembers === 0) {
+                      <p class="help mt-4">Nenhuma pessoa encontrada com o cargo de origem. Nada será alterado.</p>
+                    } @else {
+                      <label class="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                        <input type="checkbox" class="mt-1" [(ngModel)]="migrationConfirmed"
+                               [disabled]="roleToolBusy || roleToolActive"/>
+                        <span>Confirmo migrar {{ preview.sourceMembers }} membros de <strong>{{ preview.sourceRoleName }}</strong> para <strong>{{ preview.targetRoleName }}</strong>, removendo o cargo original de cada membro após conceder o destino.</span>
+                      </label>
+                      <button type="button" class="primary-button mt-4" (click)="startRoleMigration()"
+                              [disabled]="!migrationConfirmed || roleToolBusy || roleToolActive">
+                        {{ roleToolBusy ? 'Iniciando…' : 'Confirmar migração de membros' }}
+                      </button>
+                    }
                   </article>
                 }
               </div>
@@ -991,7 +1087,7 @@
                 }
               </div>
             }
-            @if (activeToolTab === 'bulk-roles' || activeToolTab === 'recovery') {
+            @if (activeToolTab === 'bulk-roles' || activeToolTab === 'role-migrate' || activeToolTab === 'recovery') {
               @if (roleToolError) {
                 <p class="error-message" role="alert">{{ roleToolError }}</p>
               }
@@ -999,10 +1095,13 @@
                 <article class="card" aria-live="polite">
                   <p class="eyebrow">Operação #{{ operation.id }}</p>
                   <h3>{{ roleToolStatusLabel(operation.status) }}</h3>
-                  <p class="help mt-2">Tipo: {{ operation.type === 'BULK_ADD' ? 'Distribuição de cargo' : operation.type === 'RECOVERY_SCAN' ? 'Análise de logs' : 'Recuperação de cargo' }}</p>
+                  <p class="help mt-2">Tipo: {{ operation.type === 'BULK_ADD' ? 'Distribuição de cargo' : operation.type === 'ROLE_MIGRATE' ? 'Migração de membros' : operation.type === 'RECOVERY_SCAN' ? 'Análise de logs' : 'Recuperação de cargo' }}</p>
                   <p class="mt-3 text-sm">
                     Progresso: <strong>{{ operation.progressCurrent }}</strong> / {{ operation.progressTotal }}
                     · Adicionados: <strong>{{ operation.addedCount }}</strong>
+                    @if (operation.type === 'ROLE_MIGRATE') {
+                      · Cargos antigos removidos: <strong>{{ operation.removedCount ?? 0 }}</strong>
+                    }
                     · Ignorados: {{ operation.skippedCount }}
                     · Falhas: {{ operation.failedCount }}
                   </p>
@@ -1026,7 +1125,7 @@
                               [disabled]="roleToolActive && roleToolOperation?.id !== operation.id"
                               (click)="selectRoleToolHistory(operation)">
                         <strong>#{{ operation.id }}</strong> · {{ roleToolStatusLabel(operation.status) }}
-                        · {{ operation.type === 'RECOVERY_SCAN' ? 'Análise' : operation.type === 'BULK_ADD' ? 'Distribuição' : 'Recuperação' }}
+                        · {{ operation.type === 'RECOVERY_SCAN' ? 'Análise' : operation.type === 'BULK_ADD' ? 'Distribuição' : operation.type === 'ROLE_MIGRATE' ? 'Migração de membros' : 'Recuperação' }}
                         @if (operation.type === 'RECOVERY_SCAN' && operation.status === 'READY') {
                           · Ver cargos encontrados
                         }
