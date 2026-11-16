@@ -1,8 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { Subject } from 'rxjs';
-import { ActivatedRoute, provideRouter } from '@angular/router';
 import { UserService } from '../../../core/services/user.service';
 import { SeoService } from '../../../core/services/seo-service.service';
 import { LoginComponent } from './login.component';
@@ -52,6 +51,7 @@ describe('LoginComponent account consolidation recovery', () => {
     expect(component.isLoggingIn).toBeFalse();
     expect(component.returnUrl).toBe('/painel');
   });
+
   it('shows the shared login animation with correct authentication states', fakeAsync(() => {
     const loginReply = new Subject<any>();
     (TestBed.inject(UserService).login as jasmine.Spy).and.returnValue(loginReply.asObservable());
@@ -87,5 +87,4 @@ describe('LoginComponent account consolidation recovery', () => {
     expect(fixture.nativeElement.querySelector('app-login-status-overlay')).toBeNull();
     expect(component.errorMessage).toContain('Credenciais inválidas');
   });
-
 });
