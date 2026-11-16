@@ -90,6 +90,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   };
   artistSearch = '';
   selectedArtworkId: number | null = null;
+  // UI expansion is independent of the artwork selected for file/contract operations.
+  expandedArtworkId: number | null = null;
   selectedProductId: number | null = null;
   linkedArtworkId: number | null = null;
   allocation: number | null = null;
@@ -168,7 +170,10 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
     if (tab === 'contracts') this.reloadContracts();
-    if (tab === 'artworks') this.reloadFiles();
+    if (tab === 'artworks') {
+      this.expandedArtworkId = null;
+      this.reloadFiles();
+    }
     if (tab === 'products') this.reloadLinks();
   }
 
@@ -250,7 +255,12 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   }
 
   selectArtwork(id: number): void {
-    this.selectedArtworkId = this.selectedArtworkId === id ? null : id;
+    if (this.expandedArtworkId === id) {
+      this.expandedArtworkId = null;
+      return;
+    }
+    this.expandedArtworkId = id;
+    this.selectedArtworkId = id;
     this.reloadFiles();
     if (this.can('CONTRACTS_MANAGE')) this.reloadContracts();
   }
@@ -301,6 +311,9 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       this.loading = false;
       if (!this.artworks.some(a => a.id === this.selectedArtworkId)) {
         this.selectedArtworkId = this.artworks[0]?.id ?? null;
+      }
+      if (this.expandedArtworkId !== this.selectedArtworkId) {
+        this.expandedArtworkId = null;
       }
       if (!this.products.some(p => p.id === this.selectedProductId)) {
         this.selectedProductId = this.products[0]?.id ?? null;
