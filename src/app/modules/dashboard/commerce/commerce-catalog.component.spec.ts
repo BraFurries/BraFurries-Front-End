@@ -132,6 +132,63 @@ describe('CommerceCatalogComponent', () => {
     expect(component.loadErrorMessage).toContain('Modelos de contratos (HTTP 500)');
   });
 
+  it('highlights contract-template status separately from the model details', async () => {
+    await create(['CONTRACTS_MANAGE']);
+    component.selectTab('templates');
+    fixture.detectChanges();
+
+    const article = fixture.nativeElement.querySelector('section article') as HTMLElement;
+    const activeBadge = article.querySelector('[aria-label="Modelo ativo"]') as HTMLElement;
+    expect(activeBadge).toBeTruthy();
+    expect(activeBadge.textContent).toContain('Ativo');
+    expect(activeBadge.classList.contains('bg-emerald-50')).toBeTrue();
+
+    component.templates[0].active = false;
+    fixture.detectChanges();
+
+    const inactiveBadge = article.querySelector('[aria-label="Modelo desativado"]') as HTMLElement;
+    expect(inactiveBadge).toBeTruthy();
+    expect(inactiveBadge.textContent).toContain('Desativado');
+    expect(inactiveBadge.classList.contains('bg-amber-50')).toBeTrue();
+    expect(article.querySelectorAll('[aria-label^="Modelo "]').length).toBe(1);
+  });
+
+  it('keeps the contract full text collapsed until the individual model is expanded', async () => {
+    await create(['CONTRACTS_MANAGE'], false, true, () => {
+      catalog.templates.and.returnValue(of([
+        { id: 13, name: 'Modelo A', fullText: 'Cláusulas do modelo A.',
+          modality: 'ROYALTY', royaltyMethod: 'PERCENT_GROSS',
+          royaltyPercent: 10, royaltyFixedAmount: null, active: true, description: null },
+        { id: 14, name: 'Modelo B', fullText: 'Cláusulas do modelo B.',
+          modality: 'ROYALTY', royaltyMethod: 'PERCENT_GROSS',
+          royaltyPercent: 15, royaltyFixedAmount: null, active: false, description: null }
+      ]));
+    });
+    component.selectTab('templates');
+    fixture.detectChanges();
+
+    const articles = Array.from((fixture.nativeElement as HTMLElement)
+      .querySelectorAll('section article')) as HTMLElement[];
+    const first = articles[0].querySelector('details') as HTMLDetailsElement;
+    const second = articles[1].querySelector('details') as HTMLDetailsElement;
+
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(first.open).toBeFalse();
+    expect(second.open).toBeFalse();
+    expect(first.querySelector('summary')?.textContent).toContain('Texto integral do contrato');
+    expect(first.querySelector('p.whitespace-pre-wrap')?.textContent).toContain('Cláusulas do modelo A.');
+
+    (first.querySelector('summary') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(first.open).toBeTrue();
+    expect(second.open).toBeFalse();
+
+    (first.querySelector('summary') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(first.open).toBeFalse();
+  });
+
   it('continues to display legacy templates without full text', async () => {
     await create(['CONTRACTS_MANAGE'],false,true,() => {
       catalog.templates.and.returnValue(of([{
@@ -144,6 +201,7 @@ describe('CommerceCatalogComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Modelo antigo');
     expect(fixture.nativeElement.textContent).toContain('Modelo antigo sem texto integral');
+    expect((fixture.nativeElement as HTMLElement).querySelector('section article details')).toBeNull();
   });
 
   it('lets artist managers search real users and register artwork', async () => {

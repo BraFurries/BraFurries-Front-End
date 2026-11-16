@@ -382,7 +382,17 @@
         <h2 class="font-amaranth text-xl font-bold">Modelos cadastrados</h2>
         <p *ngIf="!templates.length" class="text-sm text-gray-500">Nenhum modelo cadastrado.</p>
         <article *ngFor="let model of templates" class="rounded-xl border p-4">
-          <h3 class="font-bold">{{ model.name }}</h3>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <h3 class="font-bold text-braDark">{{ model.name }}</h3>
+            <span [attr.aria-label]="model.active ? 'Modelo ativo' : 'Modelo desativado'"
+              [ngClass]="model.active
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800'"
+              class="inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold">
+              <span aria-hidden="true" class="h-2 w-2 rounded-full bg-current"></span>
+              {{ model.active ? 'Ativo' : 'Desativado' }}
+            </span>
+          </div>
           <div class="mt-2 flex flex-wrap gap-2 text-sm">
             <span class="rounded-lg bg-purple-50 px-3 py-2 text-braDark">
               <span class="font-semibold">Tipo:</span> {{ modalityDetails(model.modality).label }}
@@ -398,11 +408,17 @@
           <p *ngIf="model.royaltyFixedAmount != null" class="mt-1 text-sm">
             Valor do repasse: {{ model.royaltyFixedAmount | currency:'BRL' }}
           </p>
-          <p class="mt-1 text-xs text-gray-500">{{ model.active ? 'Ativo' : 'Desativado' }}</p>
-          <div *ngIf="model.fullText; else legacyContract" class="mt-3 rounded-lg border bg-gray-50 p-3">
-            <p class="mb-2 text-xs font-bold text-braDark">Cláusulas e concessões cadastradas</p>
-            <p class="max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700">{{ model.fullText }}</p>
-          </div>
+          <details *ngIf="model.fullText; else legacyContract"
+            class="mt-3 overflow-hidden rounded-lg border border-purple-100 bg-gray-50">
+            <summary [attr.aria-label]="'Ver texto integral do modelo ' + model.name"
+              class="cursor-pointer px-3 py-2 text-sm font-bold text-braPurple hover:bg-purple-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-braPurple">
+              Texto integral do contrato
+            </summary>
+            <div class="border-t border-purple-100 p-3">
+              <p class="mb-2 text-xs font-bold text-braDark">Cláusulas e concessões cadastradas</p>
+              <p class="max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700">{{ model.fullText }}</p>
+            </div>
+          </details>
           <ng-template #legacyContract>
             <p class="mt-2 text-xs font-semibold text-amber-800">
               Modelo antigo sem texto integral — edite antes de gerar contratos.
