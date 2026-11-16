@@ -185,7 +185,7 @@ describe('ServidoresComponent', () => {
         of({ kind: 'ready', state: contextState$.value })
       )
     };
-    service = jasmine.createSpyObj('ManagedServersService', ['getManagedServers','getResources','getServerChannels','getBump','getStaffRoles','getModerationAccess','getPortariaBypasses','getVipRoles','getPortaria','getAutoJoinRoles','getLogs','updateLog','testLog','addAutoJoinRole','removeAutoJoinRole','updateAutoJoinEnabled','updateStaffRoles','updateModerationStaffRoles','updateCollaborativeModeration','createPortariaBypass','updatePortariaBypass','removePortariaBypass','updateVipRoles','updateBirthdayChannel','updatePortariaRoles','updatePortariaEnabled','updatePortariaEntry','updatePortariaForm','updatePortariaResult','createPortariaFlow','publishPortariaFlow','updateBumpProcessing','updateBumpWarning','updateBumpIndividualReward','updateBumpMonthlyRanking']);
+    service = jasmine.createSpyObj('ManagedServersService', ['getManagedServers','getResources','previewChannelPermissionCopy','applyChannelPermissionCopy','getServerChannels','getBump','getStaffRoles','getModerationAccess','getPortariaBypasses','getVipRoles','getPortaria','getAutoJoinRoles','getLogs','updateLog','testLog','addAutoJoinRole','removeAutoJoinRole','updateAutoJoinEnabled','updateStaffRoles','updateModerationStaffRoles','updateCollaborativeModeration','createPortariaBypass','updatePortariaBypass','removePortariaBypass','updateVipRoles','updateBirthdayChannel','updatePortariaRoles','updatePortariaEnabled','updatePortariaEntry','updatePortariaForm','updatePortariaResult','createPortariaFlow','publishPortariaFlow','updateBumpProcessing','updateBumpWarning','updateBumpIndividualReward','updateBumpMonthlyRanking']);
     service.getManagedServers.and.returnValue(of(servers)); service.getResources.and.returnValue(of(resources)); service.getServerChannels.and.returnValue(of(serverChannels)); service.getBump.and.returnValue(of(bump)); service.getStaffRoles.and.returnValue(of(staff)); service.getModerationAccess.and.returnValue(of(moderationAccess)); service.getPortariaBypasses.and.returnValue(of({ portariaEnabled: true, bypasses: [] })); service.getVipRoles.and.returnValue(of({ roleIds: ['1'], roles: [resources.roles[0]] })); service.getPortaria.and.returnValue(of(portaria)); service.getAutoJoinRoles.and.returnValue(of(autoJoinRoles));
     service.addAutoJoinRole.and.returnValue(of(autoJoinRoles)); service.removeAutoJoinRole.and.returnValue(of(autoJoinRoles)); service.updateAutoJoinEnabled.and.returnValue(of(autoJoinRoles)); service.updateModerationStaffRoles.and.returnValue(of(moderationAccess)); service.updateCollaborativeModeration.and.returnValue(of(moderationAccess)); service.updatePortariaEntry.and.returnValue(of(portaria)); service.updatePortariaForm.and.returnValue(of(portaria)); service.updatePortariaResult.and.returnValue(of(portaria)); service.createPortariaFlow.and.returnValue(of(portaria));
     service.updateVipRoles.and.returnValue(of({ roleIds: ['1'], roles: [resources.roles[0]] }));
@@ -879,11 +879,96 @@ describe('ServidoresComponent', () => {
     expect(component.operationModal?.message).toBe('Mensagem de acesso publicada com sucesso.');
   });
 
+  it('offers permission copying only under Ferramentas and requires explicit preview and confirmation', () => {
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions']);
+    component.selectToolTab('channel-permissions');
+    fixture.detectChanges();
+
+    const panel = fixture.nativeElement.querySelector('#coddy-tool-panel-channel-permissions') as HTMLElement;
+    expect(panel).toBeTruthy();
+    expect(panel.textContent).toContain('Copiar permissões de canais');
+    expect(panel.querySelectorAll('select').length).toBe(2);
+    expect(service.applyChannelPermissionCopy).not.toHaveBeenCalled();
+
+    const preview = {
+      source: { id: '888888888888888888', name: 'fichas', type: 'text' },
+      target: { id: '2', name: 'geral', type: 'news' },
+      sourceOverwrites: [{ id: '1', name: 'Moderador', type: 'role' as const, allow: '16', deny: '0' }],
+      targetOverwrites: [],
+      appliedCount: 1, replacedCount: 0, changed: true, fingerprint: 'a'.repeat(64),
+      warning: 'As permissões específicas atuais do destino serão substituídas integralmente.'
+    };
+    service.previewChannelPermissionCopy.and.returnValue(of(preview));
+    service.applyChannelPermissionCopy.and.returnValue(of({
+      source: preview.source, target: preview.target, changed: true,
+      appliedCount: 1, replacedCount: 0
+    }));
+    component.channelCopySourceId = preview.source.id;
+    component.channelCopyTargetId = preview.target.id;
+    component.previewChannelPermissionCopy();
+    fixture.detectChanges();
+    expect(service.previewChannelPermissionCopy).toHaveBeenCalledOnceWith(
+      resources.guildId, {sourceChannelId: preview.source.id, targetChannelId: preview.target.id});
+    expect(panel.textContent).toContain('Prévia antes da aplicação');
+    component.applyChannelPermissionCopy();
+    expect(service.applyChannelPermissionCopy).not.toHaveBeenCalled();
+    component.channelCopyConfirmed = true;
+    component.applyChannelPermissionCopy();
+    expect(service.applyChannelPermissionCopy).toHaveBeenCalledOnceWith(resources.guildId, {
+      sourceChannelId: preview.source.id, targetChannelId: preview.target.id,
+      fingerprint: preview.fingerprint
+    });
+    expect(component.channelCopyPreview).toBeNull();
+    expect(component.channelCopyResult?.changed).toBeTrue();
+  });
+
+  it('invalidates the permission preview and confirmation when channel selection changes', () => {
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    component.selectToolTab('channel-permissions');
+    component.channelCopySourceId = '888888888888888888';
+    component.channelCopyTargetId = '2';
+    component.channelCopyPreview = {
+      source: {id: '888888888888888888',name:'fichas',type:'text'},
+      target:{id:'2',name:'geral',type:'news'},sourceOverwrites:[],
+      targetOverwrites:[],appliedCount:0,replacedCount:0,changed:false,
+      fingerprint:'b'.repeat(64),warning:''
+    };
+    component.channelCopyConfirmed = true;
+    component.invalidateChannelCopyPreview();
+    expect(component.channelCopyConfirmed).toBeFalse();
+    expect(component.channelCopyPreview).toBeNull();
+    component.applyChannelPermissionCopy();
+    expect(service.applyChannelPermissionCopy).not.toHaveBeenCalled();
+  });
+
+  it('does not apply an expired permission preview after a 409 conflict', () => {
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    component.selectToolTab('channel-permissions');
+    component.channelCopySourceId = '888888888888888888';
+    component.channelCopyTargetId = '2';
+    component.channelCopyPreview = {
+      source: {id:'888888888888888888',name:'fichas',type:'text'},
+      target:{id:'2',name:'geral',type:'news'},sourceOverwrites:[],
+      targetOverwrites:[],appliedCount:0,replacedCount:0,changed:false,
+      fingerprint:'c'.repeat(64),warning:''
+    };
+    component.channelCopyConfirmed = true;
+    service.applyChannelPermissionCopy.and.returnValue(throwError(() => ({status:409})));
+    component.applyChannelPermissionCopy();
+    expect(component.channelCopyError).toContain('mudaram desde a prévia');
+    expect(component.channelCopyConfirmed).toBeFalse();
+    expect(component.channelCopyPreview).toBeNull();
+  });
+
   it('groups the existing private area under Ferramentas with a reusable sub-tab list', () => {
     create();
     expect(component.sections.some(section => section.id === 'tools' && section.label === 'Ferramentas')).toBeTrue();
     expect(component.sections.some(section => section.id === ('private-area' as any))).toBeFalse();
-    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area']);
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions']);
 
     setRoute({ guildId: resources.guildId, section: 'tools' });
     expect(component.activeSection).toBe('tools');
