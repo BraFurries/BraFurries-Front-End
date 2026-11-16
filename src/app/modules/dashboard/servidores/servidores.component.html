@@ -761,6 +761,9 @@
                     (click)="toggleRoleToolsDropdown()">
                     <span aria-hidden="true">👥</span>
                     Cargos
+                    @if (roleToolGroupActive) {
+                      <span class="font-normal text-xs">· {{ selectedRoleToolLabel }}</span>
+                    }
                     <span aria-hidden="true">{{ roleToolsDropdownOpen ? '▴' : '▾' }}</span>
                   </button>
                   @if (roleToolsDropdownOpen) {
