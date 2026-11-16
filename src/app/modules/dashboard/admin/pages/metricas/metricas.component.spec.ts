@@ -80,6 +80,11 @@ describe('AdminMetricsComponent: canonical analytics', () => {
     const graphs=fixture.nativeElement.querySelectorAll('app-admin-metric-line-chart svg');
     expect(graphs.length).toBe(3);
     for(const svg of Array.from(graphs) as SVGElement[]){
+      expect(svg.getAttribute('viewBox')).toBe('0 0 640 200');
+      expect(svg.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
+      expect(svg.classList.contains('w-full')).toBeTrue();
+      expect(svg.classList.contains('h-auto')).toBeTrue();
+      expect(svg.classList.contains('h-48')).toBeFalse();
       const guides=svg.querySelectorAll('.metric-grid-tick line');
       const labels=svg.querySelectorAll('.metric-grid-tick text');
       expect(guides.length).toBeGreaterThanOrEqual(4);
@@ -108,7 +113,11 @@ describe('AdminMetricsComponent: canonical analytics', () => {
     expect(tip).toBeTruthy();
     expect(tip.textContent).toContain('02/11/2026 (UTC)');
     expect(tip.textContent).toContain('0 execuções');
-    expect(svg.querySelectorAll('.metric-crosshair').length).toBe(2);
+    const crosshairs=svg.querySelectorAll('.metric-crosshair');
+    expect(crosshairs.length).toBe(1);
+    expect(crosshairs[0].getAttribute('x1')).toBe(crosshairs[0].getAttribute('x2'));
+    // Horizontal reference grid lines remain visible independently of the hover guide.
+    expect(svg.querySelectorAll('.metric-grid-tick line').length).toBeGreaterThan(0);
 
     svg.dispatchEvent(new MouseEvent('mouseleave'));
     fixture.detectChanges();

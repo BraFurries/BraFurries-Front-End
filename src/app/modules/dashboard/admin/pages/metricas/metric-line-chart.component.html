@@ -1,4 +1,4 @@
-<svg class="block h-48 w-full" viewBox="0 0 640 200" preserveAspectRatio="none"
+<svg class="block h-auto w-full" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet"
      role="group" [attr.aria-label]="label"
      (mousemove)="onMouseMove($event)" (mouseleave)="activePoint = null">
   <g *ngFor="let tick of chart.ticks" class="metric-grid-tick">
@@ -19,9 +19,6 @@
   <g *ngIf="activePoint as point" class="metric-tooltip" aria-hidden="true" pointer-events="none">
     <line class="metric-crosshair" [attr.x1]="point.x" y1="22"
           [attr.x2]="point.x" y2="170" stroke="#9ca3af"
-          stroke-width="1" stroke-dasharray="4 4"/>
-    <line class="metric-crosshair" x1="78" [attr.y1]="point.y"
-          x2="620" [attr.y2]="point.y" stroke="#9ca3af"
           stroke-width="1" stroke-dasharray="4 4"/>
     <circle [attr.cx]="point.x" [attr.cy]="point.y"
             r="6" fill="white" [attr.stroke]="lineColor" stroke-width="2"/>
