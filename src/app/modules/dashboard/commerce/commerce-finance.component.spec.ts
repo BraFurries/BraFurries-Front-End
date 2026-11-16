@@ -479,6 +479,24 @@ describe('CommerceFinanceComponent', () => {
     expect(finance.correctArtistPaymentMetadata).not.toHaveBeenCalled();
   });
 
+  it('displays refresh as a distinct action outside financial navigation', async () => {
+    await init(['SALES_MANAGE']);
+    const root = fixture.nativeElement as HTMLElement;
+    const nav = root.querySelector('nav[aria-label="Seções financeiras"]') as HTMLElement;
+    const refresh = root.querySelector('button[aria-label="Atualizar dados financeiros"]') as HTMLButtonElement;
+
+    expect(nav).toBeTruthy();
+    expect(refresh).toBeTruthy();
+    expect(nav.contains(refresh)).toBeFalse();
+    expect(nav.querySelectorAll('button').length).toBe(component.visibleTabs().length);
+    expect(refresh.textContent).toContain('Atualizar dados');
+    expect(refresh.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+
+    const reload = spyOn(component, 'reload');
+    refresh.click();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the same stable commercial navigation labels and URL base', async () => {
     await init(['SALES_MANAGE']);
     const nav = fixture.nativeElement.querySelector('nav[aria-label="Áreas da Gestão Comercial"]') as HTMLElement;

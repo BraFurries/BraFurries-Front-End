@@ -427,6 +427,24 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Gerar PDF para assinatura');
   });
 
+  it('separates the catalog refresh action from navigation between sections', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    const root = fixture.nativeElement as HTMLElement;
+    const nav = root.querySelector('nav[aria-label="Seções do catálogo"]') as HTMLElement;
+    const refresh = root.querySelector('button[aria-label="Atualizar dados do catálogo"]') as HTMLButtonElement;
+
+    expect(nav).toBeTruthy();
+    expect(refresh).toBeTruthy();
+    expect(nav.contains(refresh)).toBeFalse();
+    expect(nav.querySelectorAll('button').length).toBe(component.visibleTabs().length);
+    expect(refresh.textContent).toContain('Atualizar dados');
+    expect(refresh.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+
+    const reload = spyOn(component, 'reload');
+    refresh.click();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the same fixed navigation base and link order as Financeiro', async () => {
     await create(['ARTWORKS_MANAGE']);
     const nav = fixture.nativeElement.querySelector('nav[aria-label="Áreas da Gestão Comercial"]') as HTMLElement;
