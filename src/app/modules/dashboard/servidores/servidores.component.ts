@@ -7,15 +7,17 @@ import { PartnerDiscordService } from '../../../core/services/partner-discord.se
 import { PartnerDiscordPanelComponent } from './partner-discord-panel.component';
 import { PortariaClarificationSettingsComponent } from './portaria-clarification-settings.component';
 
-type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'private-area' | 'logs' | 'leveling' | 'economy' | 'tickets';
+type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'tools' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
 interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
+type ToolTab = 'private-area';
+interface ToolTabLink { id: ToolTab; label: string; icon: string; }
 interface LogDraft { enabled: boolean; targetId: string | null; saving: boolean; testing: boolean; error: string; }
 interface PortariaWizardDraft { newFlowName: string; newFlowTargetChannelId: string; isolateVisitors: boolean; visitorRoleName: string; portariaCategoryName: string; portariaStaffRoleIds: string[]; portariaCreationMode: 'template' | 'manual'; createApproved: boolean; createRejected: boolean; manualVisitorRoleId: string; manualWelcomeChannelId: string; manualTargetChannelId: string; manualApprovedChannelId?: string; manualRejectedChannelId?: string; }
 interface PrivateAreaDraft { privateCategoryName: string; privateChannelNames: string; privateAllowedRoleIds: string[]; }
 interface PortariaBypassDraft { type: 'invite' | 'account'; value: string; accessMode: 'provisorio' | 'completo'; requiresForm: boolean; active: boolean; expiresAt: string; }
-type PendingNavigation = { kind: 'route'; guildId: string; section: ServerSection } | { kind: 'flow'; flowId: number };
+type PendingNavigation = { kind: 'route'; guildId: string; section: ServerSection } | { kind: 'flow'; flowId: number } | { kind: 'tool'; tab: ToolTab };
 const LOG_DISPLAY_ORDER = ['profile', 'message_edit', 'message_delete', 'call', 'mute', 'warn', 'ban'];
 const BUMP_CARDS: BumpCard[] = ['processing', 'warning', 'individual', 'monthly'];
 const PORTARIA_ENTRY_FIELDS = [
@@ -36,11 +38,16 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   servers: ManagedServer[] = [];
   readonly sections: ServerSectionLink[] = [
     { id: 'overview', label: 'Visão geral', icon: '✨' }, { id: 'vip', label: 'VIP', icon: '💎' }, { id: 'channels', label: 'Canais', icon: '#️⃣' }, { id: 'ai', label: 'IA', icon: '🤖' }, { id: 'bump', label: 'Bump', icon: '🚀' },
-    { id: 'portaria', label: 'Portaria', icon: '🚪' }, { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️' }, { id: 'backups', label: 'Backups', icon: '💾' }, { id: 'themes', label: 'Temas', icon: '🎨' }, { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️' }, { id: 'cargos-temporarios', label: 'Cargos temporários', icon: '⏳' }, { id: 'private-area', label: 'Área privada', icon: '🔐' },
+    { id: 'portaria', label: 'Portaria', icon: '🚪' }, { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️' }, { id: 'backups', label: 'Backups', icon: '💾' }, { id: 'themes', label: 'Temas', icon: '🎨' }, { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️' }, { id: 'cargos-temporarios', label: 'Cargos temporários', icon: '⏳' }, { id: 'tools', label: 'Ferramentas', icon: '🧰' },
     { id: 'partners', label: 'Parceiros', icon: '🤝' },
     { id: 'logs', label: 'Logs', icon: '📜' }, { id: 'leveling', label: 'XP & Leveling', icon: '🏆' },
     { id: 'economy', label: 'Economia', icon: '💰', status: 'coming-soon' }, { id: 'tickets', label: 'Tickets', icon: '🎫', status: 'coming-soon' }
   ];
+  // Sub-abas da seção Ferramentas: para adicionar outra, estenda ToolTab e esta lista.
+  readonly toolTabs: ToolTabLink[] = [
+    { id: 'private-area', label: 'Área privada', icon: '🔐' }
+  ];
+  activeToolTab: ToolTab = 'private-area';
   selectedServerId = '';
   activeSection: ServerSection = 'overview';
   isLoading = true;
@@ -228,6 +235,16 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     if (this.pendingNavigation) select.value = this.selectedServerId;
   }
   selectSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
+  selectToolTab(tab: ToolTab): void {
+    if (this.activeSection !== 'tools' || !this.toolTabs.some(item => item.id === tab)
+      || tab === this.activeToolTab || this.unifiedBusy || this.xpSaving || this.aiSaving
+      || this.vipSaving || this.backupSaving || this.themeSaving) return;
+    if (this.hasUnsavedChanges()) {
+      this.pendingNavigation = { kind: 'tool', tab };
+      return;
+    }
+    this.activeToolTab = tab;
+  }
 
   private applyModerationAccess(value: ModerationAccessState): void {
     this.moderationAccess = structuredClone(value);
@@ -1008,6 +1025,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     if (this.publicationDraftDirty) this.resetPublicationDraft();
     for (const log of this.logs?.logs ?? []) this.logDrafts[log.type] = { enabled: log.enabled, targetId: log.target?.id ?? null, saving: false, testing: false, error: '' };
     if (target.kind === 'flow') this.loadConfiguration(target.flowId);
+    else if (target.kind === 'tool') this.activeToolTab = target.tab;
     else this.navigateTo(target.guildId, target.section);
   }
   private prepareConfirmation(title: string, summary: string, request: GuildOperationRequest): void { if (!this.mutationInFlight) this.pendingConfirmation = { title, summary, request: structuredClone(request) }; }
@@ -1085,11 +1103,17 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     const server = this.servers.find(item => item.guildId === guildId);
     if (!server) { this.invalidGuild = true; this.selectedServerId = ''; this.clearConfiguration(); return; }
     this.invalidGuild = false;
+    // Deep links created before Ferramentas existed must keep working.
+    if (requestedSection === 'private-area') {
+      this.navigateTo(guildId, 'tools', true);
+      return;
+    }
     const section = this.sections.some(item => item.id === requestedSection) ? requestedSection as ServerSection : 'overview';
     if (!requestedSection || section !== requestedSection) { this.navigateTo(guildId, section, true); return; }
     const changedGuild = this.selectedServerId !== guildId;
     const changedSection = this.activeSection !== section;
     this.selectedServerId = guildId; this.activeSection = section;
+    if (section === 'tools' && (changedGuild || changedSection)) this.activeToolTab = 'private-area';
     if (changedGuild) {
       this.clearConfiguration();
       if (section !== 'backups' && section !== 'themes') {

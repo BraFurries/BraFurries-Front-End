@@ -730,8 +730,31 @@
               </article>
             }
           </section>
-        } @else if (activeSection === "private-area") {
-          <section class="space-y-5">
+        } @else if (activeSection === "tools") {
+          <section class="space-y-5" aria-label="Ferramentas do Coddy">
+            <article class="card">
+              <p class="eyebrow">Ferramentas</p>
+              <h3>Ferramentas do servidor</h3>
+              <p class="help">Selecione uma ferramenta para configurar ou executar ações neste servidor.</p>
+              <nav class="mt-5 flex flex-wrap gap-2 border-b border-gray-200 pb-3" role="tablist"
+                aria-label="Ferramentas disponíveis">
+                @for (tool of toolTabs; track tool.id) {
+                  <button type="button" role="tab" [id]="'coddy-tool-tab-' + tool.id"
+                    [attr.aria-selected]="activeToolTab === tool.id"
+                    [attr.aria-controls]="'coddy-tool-panel-' + tool.id"
+                    [ngClass]="activeToolTab === tool.id
+                      ? 'border-purple-300 bg-purple-50 text-braPurple'
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'"
+                    class="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-braPurple"
+                    (click)="selectToolTab(tool.id)">
+                    <span aria-hidden="true">{{ tool.icon }}</span>{{ tool.label }}
+                  </button>
+                }
+              </nav>
+            </article>
+            @if (activeToolTab === 'private-area') {
+              <div role="tabpanel" id="coddy-tool-panel-private-area"
+                aria-labelledby="coddy-tool-tab-private-area" class="space-y-5">
             <article class="card">
               <p class="eyebrow">Preview reutilizável</p>
               <h3>Área exclusiva para cargos</h3>
@@ -762,7 +785,9 @@
                 {{ mutationInFlight ? 'Criando área…' : 'Criar área privada' }}
               </button>
             </article>
-            <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
+                <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
+              </div>
+            }
           </section>
         } @else if (activeSection === 'cargos-temporarios') {
           <app-temporary-roles-panel

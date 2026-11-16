@@ -879,6 +879,78 @@ describe('ServidoresComponent', () => {
     expect(component.operationModal?.message).toBe('Mensagem de acesso publicada com sucesso.');
   });
 
+  it('groups the existing private area under Ferramentas with a reusable sub-tab list', () => {
+    create();
+    expect(component.sections.some(section => section.id === 'tools' && section.label === 'Ferramentas')).toBeTrue();
+    expect(component.sections.some(section => section.id === ('private-area' as any))).toBeFalse();
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area']);
+
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    expect(component.activeSection).toBe('tools');
+    const root = fixture.nativeElement as HTMLElement;
+    const mainNav = root.querySelector('nav.section-tabs') as HTMLElement;
+    expect(mainNav.textContent).toContain('Ferramentas');
+    expect(mainNav.textContent).not.toContain('Área privada');
+
+    const subTab = root.querySelector('#coddy-tool-tab-private-area') as HTMLButtonElement;
+    expect(subTab).toBeTruthy();
+    expect(subTab.getAttribute('role')).toBe('tab');
+    expect(subTab.getAttribute('aria-selected')).toBe('true');
+    expect(subTab.getAttribute('aria-controls')).toBe('coddy-tool-panel-private-area');
+    const panel = root.querySelector('#coddy-tool-panel-private-area') as HTMLElement;
+    expect(panel.getAttribute('role')).toBe('tabpanel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('coddy-tool-tab-private-area');
+    expect(panel.textContent).toContain('Área exclusiva para cargos');
+    expect(panel.querySelector('app-role-selection')).toBeTruthy();
+    expect(panel.textContent).toContain('Criar área privada');
+
+    // The same preview and confirmation flow remain associated with this guild.
+    component.privateCategoryName = 'Equipe';
+    fixture.detectChanges();
+    expect(component.privateAreaPreview.creates.categories[0].name).toBe('Equipe');
+    component.createPrivateArea();
+    const request = component.pendingConfirmation?.request;
+    expect(request?.operation).toBe('private-area');
+    if (request?.operation === 'private-area') {
+      expect(request.categoryName).toBe('Equipe');
+    }
+  });
+
+  it('redirects legacy private-area URLs to Ferramentas in the same community and guild', () => {
+    create();
+    const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+    setRoute({ guildId: resources.guildId, section: 'private-area' });
+
+    expect(navigate).toHaveBeenCalledWith(
+      ['/painel/comunidades', 10, 'coddy', resources.guildId, 'tools'],
+      { replaceUrl: true }
+    );
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    expect(component.activeToolTab).toBe('private-area');
+    expect(fixture.nativeElement.querySelector('#coddy-tool-panel-private-area')).toBeTruthy();
+  });
+
+  it('preserves the unsaved-changes guard when leaving Ferramentas', () => {
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    spyOn(router, 'navigate').and.resolveTo(true);
+
+    component.privateChannelNames = 'interno, avisos';
+    expect(component.privateAreaDirty).toBeTrue();
+    component.selectSection('logs');
+    expect(component.pendingNavigation).toEqual({
+      kind: 'route', guildId: resources.guildId, section: 'logs'
+    });
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    component.discardAndNavigate();
+    expect(component.privateChannelNames).toBe('staff, avisos-staff, logs');
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/painel/comunidades', 10, 'coddy', resources.guildId, 'logs'],
+      { replaceUrl: false }
+    );
+  });
+
   it('removes the Cargos tab and exposes Moderação & Acesso as its own route', () => {
     create();
     expect(component.sections.find(section => section.label === 'Cargos')).toBeUndefined();
