@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { concatMap, firstValueFrom, forkJoin, Observable, of, Subscription } from 'rxjs';
-import { ChannelPermissionCopyPreview, ChannelPermissionCopyResult, AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
+import { concatMap, firstValueFrom, forkJoin, Observable, of, Subscription, interval, startWith, switchMap, takeWhile } from 'rxjs';
+import { ChannelPermissionCopyPreview, ChannelPermissionCopyResult, AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, BulkRolePreview, RoleToolOperation, RoleRecoveryCandidate, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
 import { PartnerDiscordPanelComponent } from './partner-discord-panel.component';
@@ -11,7 +11,7 @@ type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
 interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
-type ToolTab = 'private-area' | 'channel-permissions';
+type ToolTab = 'private-area' | 'channel-permissions' | 'bulk-roles' | 'recovery';
 interface ToolTabLink { id: ToolTab; label: string; icon: string; }
 interface LogDraft { enabled: boolean; targetId: string | null; saving: boolean; testing: boolean; error: string; }
 interface PortariaWizardDraft { newFlowName: string; newFlowTargetChannelId: string; isolateVisitors: boolean; visitorRoleName: string; portariaCategoryName: string; portariaStaffRoleIds: string[]; portariaCreationMode: 'template' | 'manual'; createApproved: boolean; createRejected: boolean; manualVisitorRoleId: string; manualWelcomeChannelId: string; manualTargetChannelId: string; manualApprovedChannelId?: string; manualRejectedChannelId?: string; }
@@ -46,7 +46,9 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   // Sub-abas da seção Ferramentas: para adicionar outra, estenda ToolTab e esta lista.
   readonly toolTabs: ToolTabLink[] = [
     { id: 'private-area', label: 'Área privada', icon: '🔐' },
-    { id: 'channel-permissions', label: 'Permissões de canais', icon: '🔑' }
+    { id: 'channel-permissions', label: 'Permissões de canais', icon: '🔑' },
+    { id: 'bulk-roles', label: 'Adicionar cargo a todos', icon: '👥' },
+    { id: 'recovery', label: 'Recuperação', icon: '🛟' }
   ];
   activeToolTab: ToolTab = 'private-area';
   selectedServerId = '';
@@ -112,6 +114,23 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   channelCopyApplying = false;
   channelCopyConfirmed = false;
   channelCopyError = '';
+
+  bulkRoleId = '';
+  bulkRolePreview: BulkRolePreview | null = null;
+  bulkRoleConfirmed = false;
+  recoveryChannelId = '';
+  recoverySourceBot = 'Dyno';
+  recoveryScan: RoleToolOperation | null = null;
+  recoveryRoleKey = '';
+  recoveryTargetRoleId = '';
+  recoveryConfirmed = false;
+  roleToolBusy = false;
+  roleToolError = '';
+  roleToolOperation: RoleToolOperation | null = null;
+  roleToolHistory: RoleToolOperation[] = [];
+  private roleToolPolling?: Subscription;
+  private roleToolRequestKey = '';
+  private roleToolRequestSignature = '';
   private channelCopyRequestGeneration = 0;
 
   privateCategoryName = 'Staff';
@@ -170,6 +189,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.routeSubscription?.unsubscribe();
     this.contextSubscription?.unsubscribe();
+    this.roleToolPolling?.unsubscribe();
   }
   get selectedServer(): ManagedServer | undefined { return this.servers.find(server => server.guildId === this.selectedServerId); }
   get activeSectionDetails(): ServerSectionLink | undefined { return this.sections.find(section => section.id === this.activeSection); }
@@ -256,6 +276,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
       return;
     }
     this.activeToolTab = tab;
+    if (tab === 'bulk-roles' || tab === 'recovery') this.loadRoleToolHistory();
   }
 
   get channelCopyOptions(): { id: string; label: string }[] {
@@ -269,6 +290,230 @@ export class ServidoresComponent implements OnInit, OnDestroy {
       options.set(channel.id, { id: channel.id, label: prefix + channel.name });
     }
     return [...options.values()];
+  }
+
+  get roleToolAssignableRoles(): GuildRole[] {
+    return this.orderedRoles.filter(role => role.editableByBot && !role.managed);
+  }
+  get recoveryLogChannels(): GuildChannel[] {
+    return (this.resources?.channels ?? []).filter(channel =>
+      channel.type === 'text' || channel.type === 'news');
+  }
+  get selectedRecoveryRole(): RoleRecoveryCandidate | undefined {
+    return this.recoveryScan?.roles.find(entry => entry.key === this.recoveryRoleKey);
+  }
+  get roleToolActive(): boolean {
+    return this.roleToolOperation?.status === 'PENDING' || this.roleToolOperation?.status === 'RUNNING';
+  }
+  roleToolStatusLabel(status: RoleToolOperation['status']): string {
+    return ({
+      PENDING: 'Aguardando início', RUNNING: 'Em execução', READY: 'Análise pronta',
+      SUCCEEDED: 'Concluído', PARTIAL: 'Concluído parcialmente',
+      FAILED: 'Falha', CANCELLED: 'Cancelado'
+    })[status];
+  }
+  roleToolErrorMessage(error: unknown): string {
+    const result = error as { error?: { detail?: string; message?: string }; message?: string };
+    return result?.error?.detail || result?.error?.message ||
+      'Não foi possível realizar a operação. Confira suas permissões e tente novamente.';
+  }
+  private requestKeyFor(signature: string): string {
+    if (signature !== this.roleToolRequestSignature) {
+      this.roleToolRequestSignature = signature;
+      this.roleToolRequestKey = crypto.randomUUID();
+    }
+    return this.roleToolRequestKey;
+  }
+  private clearRequestKey(): void {
+    this.roleToolRequestSignature = '';
+    this.roleToolRequestKey = '';
+  }
+  invalidateBulkPreview(): void {
+    this.bulkRolePreview = null;
+    this.bulkRoleConfirmed = false;
+    this.roleToolError = '';
+  }
+  previewBulkRole(): void {
+    if (!this.selectedServerId || !this.bulkRoleId || this.roleToolBusy || this.roleToolActive) return;
+    const guildId = this.selectedServerId;
+    const roleId = this.bulkRoleId;
+    this.invalidateBulkPreview();
+    this.roleToolBusy = true;
+    this.managedServersService.previewBulkRole(guildId, roleId).subscribe({
+      next: result => {
+        if (guildId !== this.selectedServerId || roleId !== this.bulkRoleId) return;
+        this.bulkRolePreview = result;
+        this.roleToolBusy = false;
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolError = this.roleToolErrorMessage(error);
+        this.roleToolBusy = false;
+      }
+    });
+  }
+  startBulkRole(): void {
+    const preview = this.bulkRolePreview;
+    if (!preview || !this.bulkRoleConfirmed || !this.selectedServerId
+      || this.roleToolBusy || this.roleToolActive || preview.roleId !== this.bulkRoleId) return;
+    const guildId = this.selectedServerId;
+    this.roleToolError = '';
+    this.roleToolBusy = true;
+    const key = this.requestKeyFor(`bulk:${guildId}:${preview.roleId}:${preview.fingerprint}`);
+    this.managedServersService.startBulkRole(guildId, preview.roleId, preview.fingerprint, key).subscribe({
+      next: operation => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.bulkRolePreview = null;
+        this.bulkRoleConfirmed = false;
+        this.clearRequestKey();
+        this.watchRoleTool(operation);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  onRecoveryRoleChange(): void {
+    const entry = this.selectedRecoveryRole;
+    this.recoveryTargetRoleId = entry?.foundRoleId && this.roleToolAssignableRoles.some(
+      role => role.id === entry.foundRoleId) ? entry.foundRoleId : '';
+    this.recoveryConfirmed = false;
+    this.roleToolError = '';
+  }
+  startRecoveryScan(): void {
+    if (!this.recoveryChannelId || !this.selectedServerId || this.roleToolBusy || this.roleToolActive) return;
+    const guildId = this.selectedServerId;
+    this.roleToolBusy = true;
+    this.roleToolError = '';
+    this.recoveryScan = null;
+    this.recoveryRoleKey = '';
+    this.recoveryTargetRoleId = '';
+    const key = this.requestKeyFor(`scan:${guildId}:${this.recoveryChannelId}:${this.recoverySourceBot}`);
+    this.managedServersService.scanRecoveryRoles(guildId, this.recoveryChannelId, this.recoverySourceBot, key).subscribe({
+      next: operation => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.clearRequestKey();
+        this.watchRoleTool(operation);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  applyRecoveryRole(): void {
+    const scan = this.recoveryScan;
+    const selected = this.selectedRecoveryRole;
+    if (!scan || scan.status !== 'READY' || !selected || !this.recoveryTargetRoleId
+      || !this.recoveryConfirmed || this.roleToolBusy || this.roleToolActive) return;
+    const guildId = this.selectedServerId;
+    this.roleToolBusy = true;
+    this.roleToolError = '';
+    const key = this.requestKeyFor(`apply:${guildId}:${scan.id}:${selected.key}:${this.recoveryTargetRoleId}`);
+    this.managedServersService.applyRecoveryRole(guildId, scan.id, selected.key, this.recoveryTargetRoleId, key).subscribe({
+      next: operation => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.recoveryConfirmed = false;
+        this.clearRequestKey();
+        this.watchRoleTool(operation);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  selectRoleToolHistory(operation: RoleToolOperation): void {
+    const guildId = this.selectedServerId;
+    this.roleToolPolling?.unsubscribe();
+    this.managedServersService.getRoleToolOperation(guildId, operation.id).subscribe({
+      next: details => {
+        if (guildId !== this.selectedServerId) return;
+        if (details.type === 'RECOVERY_SCAN' && details.status === 'READY') {
+          this.recoveryScan = details;
+          this.recoveryRoleKey = '';
+          this.recoveryTargetRoleId = '';
+          this.recoveryConfirmed = false;
+        }
+        this.watchRoleTool(details);
+      },
+      error: error => { if (guildId === this.selectedServerId) this.roleToolError = this.roleToolErrorMessage(error); }
+    });
+  }
+  loadRoleToolHistory(): void {
+    if (!this.selectedServerId) return;
+    const guildId = this.selectedServerId;
+    this.managedServersService.listRoleToolOperations(guildId).subscribe({
+      next: operations => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolHistory = operations;
+        const active = operations.find(op => op.status === 'PENDING' || op.status === 'RUNNING');
+        if (active) this.watchRoleTool(active);
+        const ready = operations.find(op => op.type === 'RECOVERY_SCAN' && op.status === 'READY');
+        if (ready && !active && !this.recoveryScan) this.selectRoleToolHistory(ready);
+      },
+      error: error => { if (guildId === this.selectedServerId) this.roleToolError = this.roleToolErrorMessage(error); }
+    });
+  }
+  private watchRoleTool(operation: RoleToolOperation): void {
+    const guildId = this.selectedServerId;
+    this.roleToolPolling?.unsubscribe();
+    this.roleToolOperation = operation;
+    const isActive = (status: RoleToolOperation['status']) => status === 'PENDING' || status === 'RUNNING';
+    if (!isActive(operation.status)) {
+      this.finishedRoleTool(operation);
+      return;
+    }
+    this.roleToolPolling = interval(2000).pipe(
+      startWith(0),
+      switchMap(() => this.managedServersService.getRoleToolOperation(guildId, operation.id)),
+      takeWhile(next => isActive(next.status), true)
+    ).subscribe({
+      next: next => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolOperation = next;
+        if (!isActive(next.status)) this.finishedRoleTool(next);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  cancelPendingRoleTool(): void {
+    const op = this.roleToolOperation;
+    if (!op || op.status !== 'PENDING' || this.roleToolBusy) return;
+    const guildId = this.selectedServerId;
+    this.roleToolBusy = true;
+    this.roleToolError = '';
+    this.managedServersService.cancelPendingRoleTool(guildId, op.id).subscribe({
+      next: cancelled => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolPolling?.unsubscribe();
+        this.roleToolOperation = cancelled;
+        this.finishedRoleTool(cancelled);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  private finishedRoleTool(operation: RoleToolOperation): void {
+    if (operation.type === 'RECOVERY_SCAN' && operation.status === 'READY') {
+      this.recoveryScan = operation;
+      this.recoveryConfirmed = false;
+    }
+    this.roleToolHistory = [operation, ...this.roleToolHistory.filter(item => item.id !== operation.id)].slice(0, 30);
   }
 
   invalidateChannelCopyPreview(): void {
@@ -1158,7 +1403,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
       error: () => { if (guildId === this.selectedServerId && cleanupCandidate) this.visitorAutoJoinCleanupRoleId = cleanupCandidate; }
     });
   }
-  private roleName(roleId: string): string { return this.resources?.roles.find(role => role.id === roleId)?.name || `Cargo ${roleId}`; }
+  roleName(roleId: string): string { return this.resources?.roles.find(role => role.id === roleId)?.name || `Cargo ${roleId}`; }
   get normalizedPrivateCategoryName(): string { return this.privateCategoryName.trim() || 'Área privada'; }
   get normalizedPrivateChannelNames(): string[] { const values = this.privateChannelNames.split(',').map(name => name.trim()).filter(Boolean); return values.length ? values : ['privado']; }
   private get existingResources(): { id: string; name: string; type: string }[] {
@@ -1178,6 +1423,22 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     return firstSet.size === secondSet.size && [...firstSet].every(roleId => secondSet.has(roleId));
   }
   private clearConfiguration(): void {
+    this.roleToolPolling?.unsubscribe();
+    this.roleToolPolling = undefined;
+    this.bulkRoleId = '';
+    this.bulkRolePreview = null;
+    this.bulkRoleConfirmed = false;
+    this.recoveryChannelId = '';
+    this.recoverySourceBot = 'Dyno';
+    this.recoveryScan = null;
+    this.recoveryRoleKey = '';
+    this.recoveryTargetRoleId = '';
+    this.recoveryConfirmed = false;
+    this.roleToolBusy = false;
+    this.roleToolOperation = null;
+    this.roleToolHistory = [];
+    this.roleToolError = '';
+    this.clearRequestKey();
     this.resources = undefined; this.staff = undefined; this.moderationAccess = undefined; this.collaborativeDraft = undefined; this.collaborativeBaseline = undefined; this.portariaBypasses = []; this.bypassPortariaEnabled = true; this.bypassesLoading = false; this.bypassesError = ''; this.resetBypassDraft(); this.portaria = undefined; this.portariaBaseline = undefined; this.portariaWizardBaseline = undefined; this.privateAreaBaseline = undefined; this.autoJoinRoles = undefined; this.serverChannels = undefined; this.channelsBaseline = undefined; this.bumpPersisted = undefined; this.bumpDraft = undefined; this.bumpSaveState = { processing: 'idle', warning: 'idle', individual: 'idle', monthly: 'idle' }; this.bumpSaveError = {}; this.logs = undefined; this.logDrafts = {}; this.logsError = ''; this.autoJoinRoleId = ''; this.staffRoleDraft = []; this.portariaRoleDraft = { visitanteRoleId: null, acessoProvisorioRoleId: null, maior18RoleId: null, menor18RoleId: null }; this.resetPublicationDraft(); this.visitorAutoJoinCleanupRoleId = undefined;
     this.channelCopyRequestGeneration++;
     this.channelCopySourceId = '';

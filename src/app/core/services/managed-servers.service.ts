@@ -337,6 +337,46 @@ export interface BackupRestoreOperation {
 }
 export interface BackupRestoreOperationsResponse { operations: BackupRestoreOperation[]; }
 
+export interface BulkRolePreview {
+  guildId: string;
+  roleId: string;
+  roleName: string;
+  humanMembers: number;
+  eligible: number;
+  alreadyAssigned: number;
+  excludedBots: number;
+  fingerprint: string;
+}
+
+export type RoleToolKind = 'BULK_ADD' | 'RECOVERY_SCAN' | 'RECOVERY_APPLY';
+export type RoleToolStatus = 'PENDING' | 'RUNNING' | 'READY' | 'SUCCEEDED' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+export interface RoleRecoveryCandidate {
+  key: string;
+  name: string;
+  foundRoleId: string | null;
+  memberCount: number;
+  ambiguous: boolean;
+}
+export interface RoleToolOperation {
+  id: number;
+  type: RoleToolKind;
+  status: RoleToolStatus;
+  roleId: string | null;
+  sourceOperationId: number | null;
+  sourceBot: string | null;
+  channelId: string | null;
+  roleKey: string | null;
+  expectedCount: number;
+  progressCurrent: number;
+  progressTotal: number;
+  addedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  scannedCount: number;
+  errorCode: string | null;
+  roles: RoleRecoveryCandidate[];
+}
+
 export type GuildOperationRequest = PrivateAreaOperationRequest | PortariaTemplateOperationRequest | PortariaManualOperationRequest | VisitorIsolationOperationRequest | PortariaRepairRolesOperationRequest | PortariaRepairStructureOperationRequest | PortariaPermissionsOperationRequest | PortariaCreateRoleOperationRequest | PortariaCreateChannelOperationRequest;
 export interface DeleteFlowResult { flowId: number; deletedPublications: number; portariaConfigured: boolean; warnings: string[]; }
 export interface GuildOperationResult { created: { key?: string; id: string }[]; reused: { key?: string; id: string }[]; updated: { key?: string; id: string; roleId?: string }[]; warnings: string[]; resources?: { roleId?: string; channelId?: string; }; changedCount?: number; unchangedCount?: number; skippedCount?: number; }
@@ -484,6 +524,39 @@ export class ManagedServersService {
       retry({ delay: (_error, attempt) => timer(Math.min(30000, 1000 * 2 ** Math.min(attempt, 5))) }),
       repeat({ delay: () => timer(1500) })
     );
+  }
+
+  previewBulkRole(guildId: string, roleId: string): Observable<BulkRolePreview> {
+    return this.http.get<BulkRolePreview>(this.guildUrl(guildId, `roles/${encodeURIComponent(roleId)}/bulk-preview`));
+  }
+  startBulkRole(guildId: string, roleId: string, fingerprint: string, key: string): Observable<RoleToolOperation> {
+    return this.http.post<RoleToolOperation>(
+      this.guildUrl(guildId, 'role-tools/bulk'), { roleId, fingerprint },
+      { headers: { 'Idempotency-Key': key } }
+    );
+  }
+  scanRecoveryRoles(guildId: string, channelId: string, bot: string, key: string): Observable<RoleToolOperation> {
+    return this.http.post<RoleToolOperation>(
+      this.guildUrl(guildId, 'role-tools/recovery/scans'), { channelId, bot },
+      { headers: { 'Idempotency-Key': key } }
+    );
+  }
+  applyRecoveryRole(guildId: string, scanId: number, roleKey: string, targetRoleId: string, key: string): Observable<RoleToolOperation> {
+    return this.http.post<RoleToolOperation>(
+      this.guildUrl(guildId, 'role-tools/recovery/apply'), { scanId, roleKey, targetRoleId },
+      { headers: { 'Idempotency-Key': key } }
+    );
+  }
+  cancelPendingRoleTool(guildId: string, operationId: number): Observable<RoleToolOperation> {
+    return this.http.post<RoleToolOperation>(
+      this.guildUrl(guildId, `role-tools/operations/${operationId}/cancel`), {}
+    );
+  }
+  getRoleToolOperation(guildId: string, operationId: number): Observable<RoleToolOperation> {
+    return this.http.get<RoleToolOperation>(this.guildUrl(guildId, `role-tools/operations/${operationId}`));
+  }
+  listRoleToolOperations(guildId: string): Observable<RoleToolOperation[]> {
+    return this.http.get<RoleToolOperation[]>(this.guildUrl(guildId, 'role-tools/operations'));
   }
 
   getResources(guildId: string): Observable<GuildResources> { return this.http.get<GuildResources>(this.guildUrl(guildId, 'resources')); }
