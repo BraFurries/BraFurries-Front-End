@@ -801,10 +801,13 @@
           </div>
           <div class="mt-3 border-t border-purple-100 pt-3">
             <button type="button" (click)="selectProduct(product.id)"
+              [attr.aria-expanded]="expandedProductId === product.id"
+              [attr.aria-controls]="'commerce-product-artworks-' + product.id"
               class="text-sm font-bold text-braPurple hover:underline">
-              {{ selectedProductId === product.id ? 'Ocultar artes utilizadas' : 'Ver artes utilizadas neste produto' }}
+              {{ expandedProductId === product.id ? 'Ocultar artes utilizadas' : 'Ver artes utilizadas neste produto' }}
             </button>
-            <div *ngIf="selectedProductId === product.id" class="mt-3 space-y-3 rounded-xl bg-purple-50/50 p-4">
+            <div *ngIf="expandedProductId === product.id" [id]="'commerce-product-artworks-' + product.id"
+              class="mt-3 space-y-3 rounded-xl bg-purple-50/50 p-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <h4 class="font-bold text-braDark">Artes utilizadas no produto</h4>
                 <button *ngIf="can('CONTRACTS_MANAGE')" type="button" (click)="openCreate('links', product.id)"
