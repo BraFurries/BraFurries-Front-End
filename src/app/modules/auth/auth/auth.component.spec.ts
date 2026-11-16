@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Subject } from 'rxjs';
@@ -60,6 +61,20 @@ describe('AuthComponent social login callback', () => {
     expect(fixture.nativeElement.querySelector('app-login-status-overlay')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Login não concluído');
     expect(userService.completeSocialLoginFromCallback).not.toHaveBeenCalled();
+  });
+
+  it('shows an API error rather than access granted when OAuth cannot finish', () => {
+    const response = new Subject<any>();
+    userService.completeSocialLoginFromCallback.and.returnValue(response.asObservable());
+    spyOn<any>(component, 'getCallbackParams').and.returnValue(new URLSearchParams('code=test-code'));
+    fixture.detectChanges();
+
+    response.error(new HttpErrorResponse({ status: 401, error: { message: 'Invalid proof' } }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-login-status-overlay')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Login não concluído');
+    expect(component.loginState).not.toBe('success');
   });
 
   it('redirects to onboarding rather than showing a successful login', () => {
