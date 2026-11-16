@@ -487,6 +487,27 @@ export class ServidoresComponent implements OnInit, OnDestroy {
       }
     });
   }
+  cancelPendingRoleTool(): void {
+    const op = this.roleToolOperation;
+    if (!op || op.status !== 'PENDING' || this.roleToolBusy) return;
+    const guildId = this.selectedServerId;
+    this.roleToolBusy = true;
+    this.roleToolError = '';
+    this.managedServersService.cancelPendingRoleTool(guildId, op.id).subscribe({
+      next: cancelled => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolPolling?.unsubscribe();
+        this.roleToolOperation = cancelled;
+        this.finishedRoleTool(cancelled);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
   private finishedRoleTool(operation: RoleToolOperation): void {
     if (operation.type === 'RECOVERY_SCAN' && operation.status === 'READY') {
       this.recoveryScan = operation;
