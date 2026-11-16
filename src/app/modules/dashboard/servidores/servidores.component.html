@@ -736,12 +736,16 @@
               <p class="eyebrow">Ferramentas</p>
               <h3>Ferramentas do servidor</h3>
               <p class="help">Selecione uma ferramenta para configurar ou executar ações neste servidor.</p>
-              <nav class="tool-tabs" role="tablist" aria-label="Ferramentas disponíveis">
+              <nav class="mt-5 flex flex-wrap gap-2 border-b border-gray-200 pb-3" role="tablist"
+                aria-label="Ferramentas disponíveis">
                 @for (tool of toolTabs; track tool.id) {
                   <button type="button" role="tab" [id]="'coddy-tool-tab-' + tool.id"
                     [attr.aria-selected]="activeToolTab === tool.id"
                     [attr.aria-controls]="'coddy-tool-panel-' + tool.id"
-                    [class.active]="activeToolTab === tool.id"
+                    [ngClass]="activeToolTab === tool.id
+                      ? 'border-purple-300 bg-purple-50 text-braPurple'
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'"
+                    class="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-braPurple"
                     (click)="selectToolTab(tool.id)">
                     <span aria-hidden="true">{{ tool.icon }}</span>{{ tool.label }}
                   </button>
