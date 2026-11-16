@@ -909,8 +909,11 @@ describe('ServidoresComponent', () => {
     fixture.detectChanges();
     expect(component.privateAreaPreview.creates.categories[0].name).toBe('Equipe');
     component.createPrivateArea();
-    expect(component.pendingConfirmation?.request.operation).toBe('private-area');
-    expect(component.pendingConfirmation?.request.categoryName).toBe('Equipe');
+    const request = component.pendingConfirmation?.request;
+    expect(request?.operation).toBe('private-area');
+    if (request?.operation === 'private-area') {
+      expect(request.categoryName).toBe('Equipe');
+    }
   });
 
   it('redirects legacy private-area URLs to Ferramentas in the same community and guild', () => {
