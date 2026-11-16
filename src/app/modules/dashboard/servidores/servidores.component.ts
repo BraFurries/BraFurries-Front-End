@@ -457,7 +457,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
         const active = operations.find(op => op.status === 'PENDING' || op.status === 'RUNNING');
         if (active) this.watchRoleTool(active);
         const ready = operations.find(op => op.type === 'RECOVERY_SCAN' && op.status === 'READY');
-        if (ready && !this.recoveryScan) this.selectRoleToolHistory(ready);
+        if (ready && !active && !this.recoveryScan) this.selectRoleToolHistory(ready);
       },
       error: error => { if (guildId === this.selectedServerId) this.roleToolError = this.roleToolErrorMessage(error); }
     });
@@ -1382,7 +1382,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
       error: () => { if (guildId === this.selectedServerId && cleanupCandidate) this.visitorAutoJoinCleanupRoleId = cleanupCandidate; }
     });
   }
-  private roleName(roleId: string): string { return this.resources?.roles.find(role => role.id === roleId)?.name || `Cargo ${roleId}`; }
+  roleName(roleId: string): string { return this.resources?.roles.find(role => role.id === roleId)?.name || `Cargo ${roleId}`; }
   get normalizedPrivateCategoryName(): string { return this.privateCategoryName.trim() || 'Área privada'; }
   get normalizedPrivateChannelNames(): string[] { const values = this.privateChannelNames.split(',').map(name => name.trim()).filter(Boolean); return values.length ? values : ['privado']; }
   private get existingResources(): { id: string; name: string; type: string }[] {
