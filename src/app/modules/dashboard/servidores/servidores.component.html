@@ -788,6 +788,81 @@
                 <ng-container *ngTemplateOutlet="previewTemplate; context: { $implicit: privateAreaPreview }"></ng-container>
               </div>
             }
+            @if (activeToolTab === 'channel-permissions') {
+              <div role="tabpanel" id="coddy-tool-panel-channel-permissions"
+                aria-labelledby="coddy-tool-tab-channel-permissions" class="space-y-5">
+                <article class="card">
+                  <p class="eyebrow">Permissões</p>
+                  <h3>Copiar permissões de canais</h3>
+                  <p class="help">Copie todas as permissões específicas de um canal ou categoria para outro nesta rede Discord. As permissões atuais do destino serão substituídas.</p>
+                  @if (!resources.botCapabilities.canManageChannels) {
+                    <p class="warning" role="alert">O Coddy precisa da permissão Gerenciar canais para executar esta ferramenta.</p>
+                  }
+                  <div class="form-grid">
+                    <label><span class="field-label">Canal de origem</span>
+                      <select class="field-control" [(ngModel)]="channelCopySourceId"
+                        (ngModelChange)="invalidateChannelCopyPreview()" [disabled]="channelCopyApplying">
+                        <option value="">Selecione a origem</option>
+                        @for (channel of channelCopyOptions; track channel.id) {
+                          <option [value]="channel.id">{{ channel.label }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label><span class="field-label">Canal de destino</span>
+                      <select class="field-control" [(ngModel)]="channelCopyTargetId"
+                        (ngModelChange)="invalidateChannelCopyPreview()" [disabled]="channelCopyApplying">
+                        <option value="">Selecione o destino</option>
+                        @for (channel of channelCopyOptions; track channel.id) {
+                          <option [value]="channel.id" [disabled]="channel.id === channelCopySourceId">{{ channel.label }}</option>
+                        }
+                      </select>
+                    </label>
+                  </div>
+                  <button type="button" class="secondary-button mt-5" (click)="previewChannelPermissionCopy()"
+                    [disabled]="channelCopyBusy || channelCopyApplying || !resources.botCapabilities.canManageChannels || !channelCopySourceId || !channelCopyTargetId || channelCopySourceId === channelCopyTargetId">
+                    {{ channelCopyBusy ? 'Consultando permissões…' : 'Visualizar alterações' }}
+                  </button>
+                  @if (channelCopyError) {
+                    <p class="error-message mt-4" role="alert">{{ channelCopyError }}</p>
+                  }
+                  @if (channelCopyResult) {
+                    <p class="save-status success mt-4" role="status">
+                      {{ channelCopyResult.changed ? 'Permissões copiadas com sucesso.' : 'Os canais já possuíam as mesmas permissões.' }}
+                      Sobrescritas aplicadas: {{ channelCopyResult.appliedCount }}.
+                    </p>
+                  }
+                </article>
+                @if (channelCopyPreview; as preview) {
+                  <article class="card">
+                    <p class="eyebrow">Prévia antes da aplicação</p>
+                    <h3>{{ preview.source.name }} → {{ preview.target.name }}</h3>
+                    <p class="warning mt-4" role="alert">{{ preview.warning }}</p>
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div class="rounded-xl border border-gray-200 p-4">
+                        <p class="font-bold">Origem: {{ preview.appliedCount }} regras</p>
+                        @for (entry of preview.sourceOverwrites; track entry.id) {
+                          <p class="mt-2 text-sm">{{ entry.type === 'role' ? 'Cargo' : 'Membro' }}: {{ entry.name }}</p>
+                        } @empty { <p class="help">Nenhuma permissão específica. O destino ficará sem sobrescritas.</p> }
+                      </div>
+                      <div class="rounded-xl border border-gray-200 p-4">
+                        <p class="font-bold">Destino atual: {{ preview.replacedCount }} regras</p>
+                        @for (entry of preview.targetOverwrites; track entry.id) {
+                          <p class="mt-2 text-sm">{{ entry.type === 'role' ? 'Cargo' : 'Membro' }}: {{ entry.name }}</p>
+                        } @empty { <p class="help">Sem sobrescritas atuais.</p> }
+                      </div>
+                    </div>
+                    <label class="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                      <input type="checkbox" class="mt-1" [(ngModel)]="channelCopyConfirmed" [disabled]="channelCopyApplying" />
+                      <span>Confirmo a substituição integral das permissões específicas de <strong>{{ preview.target.name }}</strong> pelas de <strong>{{ preview.source.name }}</strong>.</span>
+                    </label>
+                    <button type="button" class="primary-button mt-4" (click)="applyChannelPermissionCopy()"
+                      [disabled]="!channelCopyConfirmed || channelCopyBusy || channelCopyApplying || !resources.botCapabilities.canManageChannels">
+                      {{ channelCopyApplying ? 'Aplicando permissões…' : 'Copiar permissões para o destino' }}
+                    </button>
+                  </article>
+                }
+              </div>
+            }
           </section>
         } @else if (activeSection === 'cargos-temporarios') {
           <app-temporary-roles-panel

@@ -23,6 +23,26 @@ export interface BotCapabilities {
   botTopRole?: BotTopRole | null; rolesAboveBot?: RoleHierarchyEntry[];
 }
 export interface GuildResources { guildId: string; roles: GuildRole[]; channels: GuildChannel[]; categories: GuildCategory[]; botCapabilities: BotCapabilities; }
+export interface ChannelPermissionCopyRequest { sourceChannelId: string; targetChannelId: string; }
+export interface ChannelPermissionPrincipal { id: string; name: string; type: 'role' | 'member'; allow: string; deny: string; }
+export interface ChannelPermissionCopyPreview {
+  source: { id: string; name: string; type: string };
+  target: { id: string; name: string; type: string };
+  sourceOverwrites: ChannelPermissionPrincipal[];
+  targetOverwrites: ChannelPermissionPrincipal[];
+  appliedCount: number;
+  replacedCount: number;
+  changed: boolean;
+  fingerprint: string;
+  warning: string;
+}
+export interface ChannelPermissionCopyResult {
+  source: { id: string; name: string; type: string };
+  target: { id: string; name: string; type: string };
+  appliedCount: number;
+  replacedCount: number;
+  changed: boolean;
+}
 export interface StaffRoles { roleIds: string[]; roles: GuildRole[]; }
 export interface CollaborativeModerationConfig {
   enabled: boolean;
@@ -532,6 +552,12 @@ export class ManagedServersService {
   }
   updatePortariaResult(guildId: string, flowId: number, flow: PortariaFlow): Observable<PortariaState> {
     return this.http.patch<PortariaState>(this.guildUrl(guildId, `portaria/flows/${flowId}/result`), { targetChannelId: flow.targetChannelId, approvedTargetChannelId: flow.approvedTargetChannelId || null, rejectedTargetChannelId: flow.rejectedTargetChannelId || null, rejectionFeedbackEnabled: flow.rejectionFeedbackEnabled });
+  }
+  previewChannelPermissionCopy(guildId: string, request: ChannelPermissionCopyRequest): Observable<ChannelPermissionCopyPreview> {
+    return this.http.post<ChannelPermissionCopyPreview>(this.guildUrl(guildId, 'channel-permissions/preview'), request);
+  }
+  applyChannelPermissionCopy(guildId: string, request: ChannelPermissionCopyRequest & { fingerprint: string }): Observable<ChannelPermissionCopyResult> {
+    return this.http.post<ChannelPermissionCopyResult>(this.guildUrl(guildId, 'channel-permissions/apply'), request);
   }
   previewStructure(guildId: string, request: StructurePreviewRequest): Observable<StructurePreview> { return this.http.post<StructurePreview>(this.guildUrl(guildId, 'structure-preview'), request); }
   applyOperation(guildId: string, request: GuildOperationRequest): Observable<GuildOperationResult> { return this.http.post<GuildOperationResult>(this.guildUrl(guildId, 'operations'), request); }

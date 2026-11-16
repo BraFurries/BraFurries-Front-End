@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { concatMap, firstValueFrom, forkJoin, Observable, of, Subscription } from 'rxjs';
-import { AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
+import { ChannelPermissionCopyPreview, ChannelPermissionCopyResult, AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
 import { PartnerDiscordPanelComponent } from './partner-discord-panel.component';
@@ -11,7 +11,7 @@ type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
 interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
-type ToolTab = 'private-area';
+type ToolTab = 'private-area' | 'channel-permissions';
 interface ToolTabLink { id: ToolTab; label: string; icon: string; }
 interface LogDraft { enabled: boolean; targetId: string | null; saving: boolean; testing: boolean; error: string; }
 interface PortariaWizardDraft { newFlowName: string; newFlowTargetChannelId: string; isolateVisitors: boolean; visitorRoleName: string; portariaCategoryName: string; portariaStaffRoleIds: string[]; portariaCreationMode: 'template' | 'manual'; createApproved: boolean; createRejected: boolean; manualVisitorRoleId: string; manualWelcomeChannelId: string; manualTargetChannelId: string; manualApprovedChannelId?: string; manualRejectedChannelId?: string; }
@@ -45,7 +45,8 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   ];
   // Sub-abas da seção Ferramentas: para adicionar outra, estenda ToolTab e esta lista.
   readonly toolTabs: ToolTabLink[] = [
-    { id: 'private-area', label: 'Área privada', icon: '🔐' }
+    { id: 'private-area', label: 'Área privada', icon: '🔐' },
+    { id: 'channel-permissions', label: 'Permissões de canais', icon: '🔑' }
   ];
   activeToolTab: ToolTab = 'private-area';
   selectedServerId = '';
@@ -103,6 +104,16 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   isolateVisitors = false;
   visitorRoleName = 'Visitante';
   portariaCategoryName = 'Portaria';
+  channelCopySourceId = '';
+  channelCopyTargetId = '';
+  channelCopyPreview: ChannelPermissionCopyPreview | null = null;
+  channelCopyResult: ChannelPermissionCopyResult | null = null;
+  channelCopyBusy = false;
+  channelCopyApplying = false;
+  channelCopyConfirmed = false;
+  channelCopyError = '';
+  private channelCopyRequestGeneration = 0;
+
   privateCategoryName = 'Staff';
   privateChannelNames = 'staff, avisos-staff, logs';
   privateAllowedRoleIds: string[] = [];
@@ -237,13 +248,96 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   selectSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
   selectToolTab(tab: ToolTab): void {
     if (this.activeSection !== 'tools' || !this.toolTabs.some(item => item.id === tab)
-      || tab === this.activeToolTab || this.unifiedBusy || this.xpSaving || this.aiSaving
-      || this.vipSaving || this.backupSaving || this.themeSaving) return;
+      || tab === this.activeToolTab || this.unifiedBusy || this.channelCopyApplying
+      || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving
+      || this.themeSaving) return;
     if (this.hasUnsavedChanges()) {
       this.pendingNavigation = { kind: 'tool', tab };
       return;
     }
     this.activeToolTab = tab;
+  }
+
+  get channelCopyOptions(): { id: string; label: string }[] {
+    const options = new Map<string, { id: string; label: string }>();
+    for (const category of this.resources?.categories ?? []) {
+      options.set(category.id, { id: category.id, label: '📁 ' + category.name });
+    }
+    for (const channel of this.resources?.channels ?? []) {
+      if (!['text', 'news', 'voice', 'stage_voice', 'forum', 'category'].includes(channel.type)) continue;
+      const prefix = channel.type === 'voice' || channel.type === 'stage_voice' ? '🔊 ' : '# ';
+      options.set(channel.id, { id: channel.id, label: prefix + channel.name });
+    }
+    return [...options.values()];
+  }
+
+  invalidateChannelCopyPreview(): void {
+    this.channelCopyRequestGeneration++;
+    // A stale request will be ignored by its generation guard.
+    // Reset busy as well so selecting another channel never traps the UI.
+    this.channelCopyBusy = false;
+    this.channelCopyPreview = null;
+    this.channelCopyResult = null;
+    this.channelCopyConfirmed = false;
+    this.channelCopyError = '';
+  }
+
+  previewChannelPermissionCopy(): void {
+    if (this.channelCopyBusy || this.channelCopyApplying
+        || !this.resources?.botCapabilities.canManageChannels
+        || !this.channelCopySourceId || !this.channelCopyTargetId
+        || this.channelCopySourceId === this.channelCopyTargetId) return;
+    this.invalidateChannelCopyPreview();
+    const generation = ++this.channelCopyRequestGeneration;
+    const guildId = this.selectedServerId;
+    const sourceChannelId = this.channelCopySourceId;
+    const targetChannelId = this.channelCopyTargetId;
+    this.channelCopyBusy = true;
+    this.managedServersService.previewChannelPermissionCopy(guildId, { sourceChannelId, targetChannelId }).subscribe({
+      next: preview => {
+        if (generation !== this.channelCopyRequestGeneration || guildId !== this.selectedServerId
+            || sourceChannelId !== this.channelCopySourceId || targetChannelId !== this.channelCopyTargetId) return;
+        this.channelCopyPreview = preview;
+        this.channelCopyBusy = false;
+      },
+      error: error => {
+        if (generation !== this.channelCopyRequestGeneration || guildId !== this.selectedServerId) return;
+        this.channelCopyError = error?.error?.message || 'Não foi possível gerar a prévia. Confira os canais e as permissões.';
+        this.channelCopyBusy = false;
+      }
+    });
+  }
+
+  applyChannelPermissionCopy(): void {
+    const preview = this.channelCopyPreview;
+    if (!preview || !this.channelCopyConfirmed || this.channelCopyBusy || this.channelCopyApplying
+        || preview.source.id !== this.channelCopySourceId || preview.target.id !== this.channelCopyTargetId
+        || !this.resources?.botCapabilities.canManageChannels) return;
+    const generation = ++this.channelCopyRequestGeneration;
+    const guildId = this.selectedServerId;
+    this.channelCopyApplying = true;
+    this.channelCopyError = '';
+    this.managedServersService.applyChannelPermissionCopy(guildId, {
+      sourceChannelId: preview.source.id, targetChannelId: preview.target.id,
+      fingerprint: preview.fingerprint
+    }).subscribe({
+      next: result => {
+        if (generation !== this.channelCopyRequestGeneration || guildId !== this.selectedServerId) return;
+        this.channelCopyResult = result;
+        this.channelCopyPreview = null;
+        this.channelCopyConfirmed = false;
+        this.channelCopyApplying = false;
+      },
+      error: error => {
+        if (generation !== this.channelCopyRequestGeneration || guildId !== this.selectedServerId) return;
+        this.channelCopyApplying = false;
+        this.channelCopyConfirmed = false;
+        this.channelCopyPreview = null;
+        this.channelCopyError = error?.status === 409
+          ? 'As permissões mudaram desde a prévia. Gere uma nova prévia antes de aplicar.'
+          : (error?.error?.message || 'Falha ao migrar permissões. Verifique o canal de destino.');
+      }
+    });
   }
 
   private applyModerationAccess(value: ModerationAccessState): void {
@@ -1004,7 +1098,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   requestOverviewSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
   continueEditing(): void { this.pendingNavigation = undefined; }
   discardAndNavigate(): void {
-    if (this.unifiedSaving || this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || this.partnerDiscordSaving) return;
+    if (this.unifiedSaving || this.mutationInFlight || this.channelCopyApplying || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || this.partnerDiscordSaving) return;
     const target = this.pendingNavigation;
     this.pendingNavigation = undefined;
     if (!target) return;
@@ -1085,6 +1179,15 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   }
   private clearConfiguration(): void {
     this.resources = undefined; this.staff = undefined; this.moderationAccess = undefined; this.collaborativeDraft = undefined; this.collaborativeBaseline = undefined; this.portariaBypasses = []; this.bypassPortariaEnabled = true; this.bypassesLoading = false; this.bypassesError = ''; this.resetBypassDraft(); this.portaria = undefined; this.portariaBaseline = undefined; this.portariaWizardBaseline = undefined; this.privateAreaBaseline = undefined; this.autoJoinRoles = undefined; this.serverChannels = undefined; this.channelsBaseline = undefined; this.bumpPersisted = undefined; this.bumpDraft = undefined; this.bumpSaveState = { processing: 'idle', warning: 'idle', individual: 'idle', monthly: 'idle' }; this.bumpSaveError = {}; this.logs = undefined; this.logDrafts = {}; this.logsError = ''; this.autoJoinRoleId = ''; this.staffRoleDraft = []; this.portariaRoleDraft = { visitanteRoleId: null, acessoProvisorioRoleId: null, maior18RoleId: null, menor18RoleId: null }; this.resetPublicationDraft(); this.visitorAutoJoinCleanupRoleId = undefined;
+    this.channelCopyRequestGeneration++;
+    this.channelCopySourceId = '';
+    this.channelCopyTargetId = '';
+    this.channelCopyPreview = null;
+    this.channelCopyResult = null;
+    this.channelCopyBusy = false;
+    this.channelCopyApplying = false;
+    this.channelCopyConfirmed = false;
+    this.channelCopyError = '';
     this.configurationLoading = false;
     this.configurationError = '';
     this.unifiedSaving = false; this.unifiedSaveError = ''; this.unifiedSaveMessage = '';
@@ -1138,7 +1241,7 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     this.router.navigate(communityId == null ? ['/painel'] : ['/painel/comunidades', communityId, 'coddy']);
   }
   private requestNavigation(guildId: string, section: ServerSection): void {
-    if (this.unifiedSaving || this.partnerDiscordSaving || this.mutationInFlight || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || (guildId === this.selectedServerId && section === this.activeSection)) return;
+    if (this.unifiedSaving || this.partnerDiscordSaving || this.mutationInFlight || this.channelCopyApplying || this.bumpMutationInFlight || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving || this.themeSaving || (guildId === this.selectedServerId && section === this.activeSection)) return;
     if (this.hasUnsavedChanges()) { this.pendingNavigation = { kind: 'route', guildId, section }; return; }
     this.navigateTo(guildId, section);
   }
