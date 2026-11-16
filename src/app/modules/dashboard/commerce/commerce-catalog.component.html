@@ -138,10 +138,13 @@
           </div>
           <div class="mt-3 border-t border-purple-100 pt-3">
             <button type="button" (click)="selectArtwork(item.id)"
+              [attr.aria-expanded]="expandedArtworkId === item.id"
+              [attr.aria-controls]="'commerce-artwork-details-' + item.id"
               class="text-sm font-bold text-braPurple hover:underline">
-              {{ selectedArtworkId === item.id ? 'Ocultar arquivos e vínculos' : 'Ver arquivos e vínculos da arte' }}
+              {{ expandedArtworkId === item.id ? 'Ocultar arquivos e vínculos' : 'Ver arquivos e vínculos da arte' }}
             </button>
-            <div *ngIf="selectedArtworkId === item.id" class="mt-3 space-y-3 rounded-xl bg-purple-50/50 p-4">
+            <div *ngIf="expandedArtworkId === item.id" [id]="'commerce-artwork-details-' + item.id"
+              class="mt-3 space-y-3 rounded-xl bg-purple-50/50 p-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <h4 class="font-bold text-braDark">Arquivos desta arte</h4>
                 <button type="button" (click)="openCreate('files', item.id)"

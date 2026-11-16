@@ -414,6 +414,62 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Artes cadastradas');
   });
 
+  it('starts with every artwork files and links section collapsed, even with an artwork selected', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    const root = fixture.nativeElement as HTMLElement;
+    const toggle = root.querySelector('button[aria-controls="commerce-artwork-details-12"]') as HTMLButtonElement;
+
+    expect(component.selectedArtworkId).toBe(12);
+    expect(component.expandedArtworkId).toBeNull();
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.textContent).toContain('Ver arquivos e vínculos da arte');
+    expect(root.querySelector('#commerce-artwork-details-12')).toBeNull();
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(component.selectedArtworkId).toBe(12);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('#commerce-artwork-details-12')).toBeTruthy();
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('#commerce-artwork-details-12')).toBeNull();
+    // Collapsing must not clear the selection used by the file/contract workflows.
+    expect(component.selectedArtworkId).toBe(12);
+  });
+
+  it('shows files and links only for the currently expanded artwork', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    component.artworks.push({
+      ...component.artworks[0], id: 23, title: 'Arte adicional'
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const first = root.querySelector('button[aria-controls="commerce-artwork-details-12"]') as HTMLButtonElement;
+    const second = root.querySelector('button[aria-controls="commerce-artwork-details-23"]') as HTMLButtonElement;
+    expect(first.getAttribute('aria-expanded')).toBe('false');
+    expect(second.getAttribute('aria-expanded')).toBe('false');
+
+    first.click();
+    fixture.detectChanges();
+    expect(root.querySelector('#commerce-artwork-details-12')).toBeTruthy();
+
+    second.click();
+    fixture.detectChanges();
+    expect(root.querySelector('#commerce-artwork-details-12')).toBeNull();
+    expect(root.querySelector('#commerce-artwork-details-23')).toBeTruthy();
+    expect(component.selectedArtworkId).toBe(23);
+
+    component.selectTab('artworks');
+    fixture.detectChanges();
+    expect(component.expandedArtworkId).toBeNull();
+    expect(root.querySelector('#commerce-artwork-details-23')).toBeNull();
+    expect(component.selectedArtworkId).toBe(23);
+  });
+
   it('shows private files within the selected artwork record, never under a detached tab', async () => {
     await create(['ARTWORKS_MANAGE']);
     catalog.artworkFiles.and.returnValue(of([{
@@ -423,6 +479,11 @@ describe('CommerceCatalogComponent', () => {
       createdAt: '2026-11-11T13:00:00', archivedAt: null
     }]));
     component.reloadFiles();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('mascote.psd');
+    const toggle = (fixture.nativeElement as HTMLElement)
+      .querySelector('button[aria-controls="commerce-artwork-details-12"]') as HTMLButtonElement;
+    toggle.click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('mascote.psd');
     expect(component.visibleTabs().some(tab => tab.key === 'files')).toBeFalse();
