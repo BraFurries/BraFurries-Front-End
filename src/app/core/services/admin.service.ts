@@ -44,6 +44,9 @@ import {
   UserIdentityLinkView
 } from '../../shared/models/api/admin/admin';
 
+export interface AdminRecordGame { id: number; name: string; }
+export interface AdminRecordBlacklist { games: AdminRecordGame[]; }
+
 export interface AdminCoddyPresenceFilters {
   page?: number;
   pageSize?: number;
@@ -79,6 +82,16 @@ export class AdminService {
 
   getOverview(): Observable<AdminOverview> {
     return this.http.get<AdminOverview>(`${this.baseUrl}/overview`);
+  }
+
+  getRecordBlacklist(): Observable<AdminRecordBlacklist> {
+    return this.http.get<AdminRecordBlacklist>(this.baseUrl + '/records/blacklist');
+  }
+  addRecordBlacklist(name: string): Observable<AdminRecordBlacklist> {
+    return this.http.post<AdminRecordBlacklist>(this.baseUrl + '/records/blacklist', { name });
+  }
+  removeRecordBlacklist(gameId: number): Observable<AdminRecordBlacklist> {
+    return this.http.delete<AdminRecordBlacklist>(this.baseUrl + '/records/blacklist/' + gameId);
   }
 
   getCoddyPresence(filters: AdminCoddyPresenceFilters = {}): Observable<AdminCoddyPresenceResponse> {
