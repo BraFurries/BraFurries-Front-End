@@ -1,18 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
+import type { MetricChart, MetricMarker } from './metric-line-chart.component';
 import { AdminService } from '../../../../../core/services/admin.service';
 import {
   AdminCanonicalMetrics, AdminMetricsPeriod
 } from '../../../../../shared/models/api/admin/admin';
-
-interface MetricMarker { x: number; y: number; value: number; date: string; }
-interface MetricChart {
-  segments: { points: string }[];
-  markers: MetricMarker[];
-  count: number;
-  min: number | null;
-  max: number | null;
-}
 
 @Component({
   selector: 'app-admin-metricas',
@@ -96,7 +88,7 @@ export class AdminMetricsComponent implements OnInit, OnDestroy {
   }
 
   private emptyChart(): MetricChart {
-    return {segments:[],markers:[],count:0,min:null,max:null};
+    return {segments:[],markers:[],ticks:[],count:0,min:null,max:null};
   }
 
   /** Missing dates break the line instead of being drawn as fictional zeros. */
@@ -106,6 +98,20 @@ export class AdminMetricsComponent implements OnInit, OnDestroy {
     if (!known.length) return this.emptyChart();
     const min=Math.min(...known);
     const max=Math.max(...known);
+    // Counts are integral. Use readable Y-axis steps and a little headroom
+    // so the trend and the numeric reference lines share the same scale.
+    const step=this.niceStep(max===min ? Math.max(1, Math.abs(min)*0.02) : (max-min)/4);
+    const axisMin=max===min
+      ? Math.max(0,Math.floor(min/step)*step-2*step)
+      : Math.max(0,Math.floor(min/step)*step-step);
+    const axisMax=max===min
+      ? Math.max(axisMin+4*step,Math.ceil(max/step)*step+2*step)
+      : Math.ceil(max/step)*step+step;
+    const yFor=(value:number)=>170-((value-axisMin)/(axisMax-axisMin))*148;
+    const ticks=Array.from(
+      {length:Math.round((axisMax-axisMin)/step)+1},
+      (_,i)=>{const value=Math.round(axisMin+i*step);return {value,y:yFor(value)};}
+    );
     const segments:{points:string}[]=[];
     const markers:MetricMarker[]=[];
     let current:string[]=[];
@@ -115,12 +121,19 @@ export class AdminMetricsComponent implements OnInit, OnDestroy {
         current=[];
         return;
       }
-      const x=20+(points.length===1?280:(index/(points.length-1))*560);
-      const y=max===min?96:174-((item.value-min)/(max-min))*148;
+      const x=78+(points.length===1?271:(index/(points.length-1))*542);
+      const y=yFor(item.value);
       current.push(x.toFixed(2)+','+y.toFixed(2));
       markers.push({x,y,value:item.value,date:item.date});
     });
     if(current.length) segments.push({points:current.join(' ')});
-    return {segments,markers,count:known.length,min,max};
+    return {segments,markers,ticks,count:known.length,min,max};
+  }
+
+  private niceStep(raw:number): number {
+    const candidate=Math.max(1,raw);
+    const order=Math.pow(10,Math.floor(Math.log10(candidate)));
+    const normalized=candidate/order;
+    return (normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*order;
   }
 }

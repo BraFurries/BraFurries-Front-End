@@ -10,6 +10,7 @@ import { AdminAnnouncementsComponent } from './pages/avisos/avisos.component';
 import { AdminBotComponent } from './pages/bot-coddy/bot-coddy.component';
 import { AdminBotDetailsComponent } from './pages/bot-coddy-details/bot-coddy-details.component';
 import { AdminMetricsComponent } from './pages/metricas/metricas.component';
+import { AdminMetricLineChartComponent } from './pages/metricas/metric-line-chart.component';
 import { AdminPartnersComponent } from './pages/parceiros/parceiros.component';
 import { ParceiroFormComponent } from './pages/parceiros/components/parceiro-form/parceiro-form.component';
 import { EditarParceiroComponent } from './pages/parceiros/editar/editar-parceiro.component';
@@ -37,6 +38,7 @@ import { AdminCoddyPresenceComponent } from './pages/presenca-coddy/coddy-presen
     AdminBotComponent,
     AdminBotDetailsComponent,
     AdminMetricsComponent,
+    AdminMetricLineChartComponent,
     AdminAnnouncementsComponent
   ],
   imports: [
