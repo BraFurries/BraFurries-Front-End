@@ -944,6 +944,38 @@ describe('ServidoresComponent', () => {
     expect(service.applyChannelPermissionCopy).not.toHaveBeenCalled();
   });
 
+  it('ignores obsolete previews and releases the loading state when a channel changes', () => {
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    component.selectToolTab('channel-permissions');
+    const pendingPreview = new Subject<any>();
+    service.previewChannelPermissionCopy.and.returnValue(pendingPreview.asObservable());
+    component.channelCopySourceId = '888888888888888888';
+    component.channelCopyTargetId = '2';
+    component.previewChannelPermissionCopy();
+    expect(component.channelCopyBusy).toBeTrue();
+    component.channelCopyTargetId = '3';
+    component.invalidateChannelCopyPreview();
+    expect(component.channelCopyBusy).toBeFalse();
+    pendingPreview.next({
+      source: {id:'888888888888888888',name:'fichas',type:'text'},
+      target:{id:'2',name:'geral',type:'news'},sourceOverwrites:[],
+      targetOverwrites:[],appliedCount:0,replacedCount:0,changed:false,
+      fingerprint:'d'.repeat(64),warning:''
+    });
+    expect(component.channelCopyPreview).toBeNull();
+    expect(component.channelCopyBusy).toBeFalse();
+    service.previewChannelPermissionCopy.and.returnValue(of({
+      source: {id:'888888888888888888',name:'fichas',type:'text'},
+      target:{id:'3',name:'novo destino',type:'text'},sourceOverwrites:[],
+      targetOverwrites:[],appliedCount:0,replacedCount:0,changed:false,
+      fingerprint:'e'.repeat(64),warning:''
+    }));
+    component.previewChannelPermissionCopy();
+    expect(component.channelCopyPreview?.target.id).toBe('3');
+    expect(component.channelCopyBusy).toBeFalse();
+  });
+
   it('does not apply an expired permission preview after a 409 conflict', () => {
     create();
     setRoute({ guildId: resources.guildId, section: 'tools' });

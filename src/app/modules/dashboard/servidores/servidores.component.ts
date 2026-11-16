@@ -273,6 +273,9 @@ export class ServidoresComponent implements OnInit, OnDestroy {
 
   invalidateChannelCopyPreview(): void {
     this.channelCopyRequestGeneration++;
+    // A stale request will be ignored by its generation guard.
+    // Reset busy as well so selecting another channel never traps the UI.
+    this.channelCopyBusy = false;
     this.channelCopyPreview = null;
     this.channelCopyResult = null;
     this.channelCopyConfirmed = false;
