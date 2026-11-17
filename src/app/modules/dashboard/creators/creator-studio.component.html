@@ -150,9 +150,9 @@
             </span>
           </div>
           <p class="text-xs text-gray-500">
-            Pedido: {{ commission.requestedOn | date:'dd/MM/yyyy':'UTC' }}
+            Pedido: {{ formatCivilDate(commission.requestedOn) }}
             <ng-container *ngIf="commission.dueOn">
-              · Prazo: {{ commission.dueOn | date:'dd/MM/yyyy':'UTC' }}
+              · Prazo: {{ formatCivilDate(commission.dueOn) }}
             </ng-container>
           </p>
           <p *ngIf="commission.description" class="whitespace-pre-line break-words text-sm text-gray-700">
