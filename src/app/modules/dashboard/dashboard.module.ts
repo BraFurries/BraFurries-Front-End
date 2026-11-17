@@ -28,6 +28,7 @@ import { CommerceFinanceComponent } from './commerce/commerce-finance.component'
 import { CommerceNavigationComponent } from './commerce/commerce-navigation.component';
 import { CommerceArtistPortalComponent } from './commerce/commerce-artist-portal.component';
 import { CreatorStudioComponent } from './creators/creator-studio.component';
+import { CreatorProductionComponent } from './creators/creator-production.component';
 import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
@@ -70,6 +71,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     CommerceNavigationComponent,
     CommerceArtistPortalComponent,
     CreatorStudioComponent,
+    CreatorProductionComponent,
     CommunityActivityComponent,
     CommunityContextLayoutComponent,
     RecrutamentoComponent,
