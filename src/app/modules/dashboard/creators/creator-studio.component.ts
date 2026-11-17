@@ -71,6 +71,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.total = 0;
         this.page = 1;
         this.formOpen = false;
+        this.editingId = null;
+        this.saving = false;
+        this.changingId = null;
         if (!user) {
           this.accessError = 'Entre na sua conta para acessar o Creator Studio.';
           return;
@@ -107,6 +110,12 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   statusLabel(status: CreatorCommissionStatus): string {
     return this.statuses.find(option => option.value === status)?.label ?? status;
+  }
+
+  formatCivilDate(date: string | null): string {
+    if (!date) return '';
+    const [year, month, day] = date.split('-');
+    return year && month && day ? `${day}/${month}/${year}` : date;
   }
 
   reload(): void {
