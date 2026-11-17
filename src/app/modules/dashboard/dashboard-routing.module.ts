@@ -16,6 +16,7 @@ import { CommerceCatalogComponent } from './commerce/commerce-catalog.component'
 import { CommerceFinanceComponent } from './commerce/commerce-finance.component';
 import { CommerceArtistPortalComponent } from './commerce/commerce-artist-portal.component';
 import { CreatorStudioComponent } from './creators/creator-studio.component';
+import { CreatorProductionComponent } from './creators/creator-production.component';
 import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
 import { InscricoesComponent } from './inscricoes/inscricoes.component';
 import { TriagemComponent } from './triagem/triagem.component';
@@ -29,6 +30,7 @@ const routes: Routes = [
       { path: 'perfil', component: PerfilComponent },
       { path: 'minhas-artes', component: CommerceArtistPortalComponent },
       { path: 'creators', component: CreatorStudioComponent },
+      { path: 'creators/producao', component: CreatorProductionComponent },
       { path: 'minhas-parcerias', component: PartnerPostingComponent },
       { path: 'gestao-comercial/financeiro', component: CommerceFinanceComponent },
       { path: 'gestao-comercial/catalogo', component: CommerceCatalogComponent },
