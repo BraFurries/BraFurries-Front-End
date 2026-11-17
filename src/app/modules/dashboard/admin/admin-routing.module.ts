@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AdminComponent } from './admin.component';
 import { AdminPermissionsComponent } from './admin-permissions.component';
+import { AdminCreatorPilotComponent } from './admin-creator-pilot.component';
 import { AdminStorageComponent } from './pages/storage/admin-storage.component';
 import { AdminAnnouncementsComponent } from './pages/avisos/avisos.component';
 import { AdminBotComponent } from './pages/bot-coddy/bot-coddy.component';
@@ -24,6 +25,7 @@ const routes: Routes = [
       { path: '', redirectTo: 'visao-geral', pathMatch: 'full' },
       { path: 'visao-geral', component: AdminOverviewComponent },
       { path: 'permissoes', component: AdminPermissionsComponent },
+      { path: 'creators-piloto', component: AdminCreatorPilotComponent },
       { path: 'armazenamento', component: AdminStorageComponent },
       { path: 'usuarios', component: AdminUsersComponent },
       { path: 'usuarios/:id', component: AdminUserProfileComponent },
