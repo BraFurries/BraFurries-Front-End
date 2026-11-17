@@ -1,0 +1,198 @@
+<section class="mx-auto max-w-6xl space-y-6 p-4 text-gray-800 md:p-8">
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div class="space-y-2">
+      <p class="text-xs font-bold uppercase tracking-widest text-braPurple">BraFurries Creators</p>
+      <h1 class="font-amaranth text-3xl font-bold text-braDark">Creator Studio</h1>
+      <p class="max-w-2xl text-sm text-gray-600">
+        Sua fila de commissions, com a data verdadeira de cada pedido e todos os detalhes em um só lugar.
+      </p>
+    </div>
+    <span *ngIf="canUsePro" class="rounded-full bg-braPurple/10 px-3 py-1 text-xs font-bold text-braPurple">
+      Pro · piloto
+    </span>
+  </header>
+
+  <p *ngIf="loadingAccess" role="status"
+     class="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">
+    Verificando seu acesso ao Studio...
+  </p>
+
+  <section *ngIf="!loadingAccess && !canUsePro"
+    class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm" aria-label="Acesso ao Creator Studio">
+    <h2 class="font-amaranth text-xl font-bold text-braDark">Acesso restrito aos artistas do piloto</h2>
+    <p class="mt-2 text-sm text-gray-600" *ngIf="accessError">{{ accessError }}</p>
+    <ng-container *ngIf="!accessError">
+      <p class="mt-2 text-sm text-gray-600" *ngIf="access?.tier === 'FREE'">
+        Sua conta possui a modalidade Free, mas estamos desenvolvendo e validando primeiro
+        todos os recursos do Pro. A experiência Free será definida depois do piloto.
+      </p>
+      <p class="mt-2 text-sm text-gray-600" *ngIf="access?.tier !== 'FREE'">
+        Por enquanto, o Studio é exclusivo de contas convidadas e autorizadas.
+        Estamos construindo a experiência Pro com artistas participantes do piloto.
+      </p>
+    </ng-container>
+  </section>
+
+  <ng-container *ngIf="!loadingAccess && canUsePro">
+    <section class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-sm">
+      <div>
+        <h2 class="font-amaranth text-xl font-bold text-braDark">Minha fila</h2>
+        <p class="text-xs text-gray-500">Do pedido mais antigo ao mais recente · {{ total }} registro(s)</p>
+      </div>
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-sm font-semibold text-gray-700">
+          Mostrar
+          <select name="statusFilter" [(ngModel)]="selectedStatus" (ngModelChange)="filterChanged()"
+            class="mt-1 block rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+            <option value="ACTIVE">Fila ativa</option>
+            <option *ngFor="let option of statuses" [value]="option.value">{{ option.label }}</option>
+          </select>
+        </label>
+        <button type="button" (click)="newCommission()" [disabled]="saving"
+          class="rounded-xl bg-braPurple px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50">
+          + Nova commission
+        </button>
+      </div>
+    </section>
+
+    <p *ngIf="errorMessage" role="alert"
+      class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ errorMessage }}</p>
+
+    <section *ngIf="formOpen" class="rounded-2xl border border-braPurple/20 bg-white p-5 shadow-sm">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h2 class="font-amaranth text-xl font-bold text-braDark">
+          {{ editingId === null ? 'Registrar commission' : 'Editar commission' }}
+        </h2>
+        <button type="button" (click)="closeForm()" [disabled]="saving"
+          class="text-sm font-semibold text-gray-500 hover:text-braPurple disabled:opacity-50">
+          Fechar
+        </button>
+      </div>
+      <p class="mb-4 text-sm text-gray-600">
+        Registre o pedido rapidamente. A data abaixo é a do pedido original,
+        mesmo quando você o cadastra dias depois.
+      </p>
+
+      <form #commissionForm="ngForm" (ngSubmit)="save()" class="space-y-4">
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="text-sm font-semibold text-gray-700">
+            Título da commission *
+            <input name="title" required maxlength="160" [(ngModel)]="form.title"
+              placeholder="Ex.: Ref Sheet da Luna"
+              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal">
+          </label>
+          <label class="text-sm font-semibold text-gray-700">
+            Cliente *
+            <input name="clientName" required maxlength="120" [(ngModel)]="form.clientName"
+              placeholder="Nome ou apelido do cliente"
+              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal">
+          </label>
+          <label class="text-sm font-semibold text-gray-700">
+            Data do pedido *
+            <input type="date" name="requestedOn" required [(ngModel)]="form.requestedOn"
+              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal">
+          </label>
+          <label class="text-sm font-semibold text-gray-700">
+            Prazo combinado (opcional)
+            <input type="date" name="dueOn" [(ngModel)]="form.dueOn"
+              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal">
+          </label>
+        </div>
+        <label class="block text-sm font-semibold text-gray-700">
+          O que o cliente pediu?
+          <textarea name="description" maxlength="8000" rows="4" [(ngModel)]="form.description"
+            placeholder="Detalhes da arte, personagens, poses, preferências..."
+            class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal"></textarea>
+        </label>
+        <label class="block text-sm font-semibold text-gray-700">
+          Notas privadas
+          <textarea name="privateNotes" maxlength="8000" rows="3" [(ngModel)]="form.privateNotes"
+            placeholder="Anotações que somente você poderá consultar"
+            class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 font-normal"></textarea>
+        </label>
+        <p *ngIf="saveError" role="alert" class="text-sm font-semibold text-red-700">{{ saveError }}</p>
+        <div class="flex flex-wrap gap-3">
+          <button type="submit" [disabled]="saving || commissionForm.invalid"
+            class="rounded-xl bg-braPurple px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            {{ saving ? 'Salvando...' : (editingId === null ? 'Adicionar à fila' : 'Salvar alterações') }}
+          </button>
+          <button type="button" (click)="closeForm()" [disabled]="saving"
+            class="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 disabled:opacity-50">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <p *ngIf="loading" role="status" class="rounded-xl bg-white p-5 text-sm text-gray-600">
+      Carregando suas commissions...
+    </p>
+
+    <section *ngIf="!loading && !commissions.length && !errorMessage"
+      class="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
+      <h2 class="font-amaranth text-xl font-bold text-braDark">Nenhuma commission nesta visualização</h2>
+      <p class="mt-2 text-sm text-gray-600">
+        {{ selectedStatus === 'ACTIVE' ? 'Cadastre seu primeiro pedido para começar a organizar a fila.' : 'Experimente outro filtro de status.' }}
+      </p>
+    </section>
+
+    <section *ngIf="!loading && commissions.length" class="grid gap-3 md:grid-cols-2" aria-label="Commissions da fila">
+      <article *ngFor="let commission of commissions; trackBy: trackById"
+        class="flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div class="min-w-0">
+              <h3 class="break-words font-amaranth text-lg font-bold text-braDark">{{ commission.title }}</h3>
+              <p class="text-sm text-gray-600">Cliente: {{ commission.clientName }}</p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+              {{ statusLabel(commission.status) }}
+            </span>
+          </div>
+          <p class="text-xs text-gray-500">
+            Pedido: {{ commission.requestedOn | date:'dd/MM/yyyy':'UTC' }}
+            <ng-container *ngIf="commission.dueOn">
+              · Prazo: {{ commission.dueOn | date:'dd/MM/yyyy':'UTC' }}
+            </ng-container>
+          </p>
+          <p *ngIf="commission.description" class="whitespace-pre-line break-words text-sm text-gray-700">
+            {{ commission.description }}
+          </p>
+          <p *ngIf="commission.privateNotes" class="whitespace-pre-line break-words rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+            <strong>Notas privadas:</strong> {{ commission.privateNotes }}
+          </p>
+        </div>
+        <div class="flex flex-wrap items-end justify-between gap-3 border-t border-gray-100 pt-3">
+          <label class="text-xs font-semibold text-gray-600">
+            Andamento
+            <select [ngModel]="commission.status" (ngModelChange)="changeStatus(commission, $event)"
+              [disabled]="changingId !== null || saving"
+              [attr.aria-label]="'Andamento de ' + commission.title"
+              class="mt-1 block max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+              <option *ngFor="let option of statuses" [value]="option.value">{{ option.label }}</option>
+            </select>
+          </label>
+          <button type="button" (click)="editCommission(commission)" [disabled]="saving"
+            class="rounded-lg border border-braPurple/30 px-4 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/10 disabled:opacity-50">
+            Editar pedido
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <div *ngIf="!loading && total > pageSize"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-3 text-sm">
+      <span>Página {{ page }} de {{ pageCount }}</span>
+      <div class="flex gap-2">
+        <button type="button" (click)="previousPage()" [disabled]="page <= 1"
+          class="rounded-lg border px-4 py-2 font-semibold disabled:opacity-40">Anterior</button>
+        <button type="button" (click)="nextPage()" [disabled]="page >= pageCount"
+          class="rounded-lg border px-4 py-2 font-semibold disabled:opacity-40">Próxima</button>
+      </div>
+    </div>
+    <p class="text-xs text-gray-500">
+      Concluir remove o pedido da fila ativa, sem excluir o histórico.
+      Para consultar, selecione “Concluída” em Mostrar.
+    </p>
+  </ng-container>
+</section>
