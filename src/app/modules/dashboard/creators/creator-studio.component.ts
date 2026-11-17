@@ -5,6 +5,11 @@ import {
   CreatorCommission,
   CreatorCommissionInput,
   CreatorCommissionStatus,
+  CreatorCommissionStep,
+  CreatorStepStatus,
+  CreatorArtType,
+  CreatorStageDefinition,
+  CreatorWorkflow,
   CreatorStudioAccess,
   CreatorStudioService
 } from '../../../core/services/creator-studio.service';
@@ -28,6 +33,25 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     { value: 'COMPLETED', label: 'Concluída' }
   ];
   readonly pageSize = 25;
+  readonly stepStatuses: {value: CreatorStepStatus; label: string}[] = [
+    {value: 'PENDING', label: 'Pendente'},
+    {value: 'IN_PROGRESS', label: 'Em execução'},
+    {value: 'WAITING_APPROVAL', label: 'Aguardando aprovação'},
+    {value: 'DONE', label: 'Finalizada'}
+  ];
+  artTypes: CreatorArtType[] = [];
+  definitions: CreatorStageDefinition[] = [];
+  workflows: CreatorWorkflow[] = [];
+  groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
+  expandedCommissionId: number | null = null;
+  steps: CreatorCommissionStep[] = [];
+  loadingSteps = false;
+  stepBusy = false;
+  stepError = '';
+  newStepName = '';
+  newStepDefinitionId: number | null = null;
+  importWorkflowId: number | null = null;
+  private stepsSequence = 0;
 
   loadingAccess = true;
   access: CreatorStudioAccess | null = null;
@@ -74,6 +98,15 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.editingId = null;
         this.saving = false;
         this.changingId = null;
+        this.stepsSequence++;
+        this.expandedCommissionId = null;
+        this.steps = [];
+        this.artTypes = [];
+        this.definitions = [];
+        this.workflows = [];
+        this.loadingSteps = false;
+        this.stepBusy = false;
+        this.stepError = '';
         if (!user) {
           this.accessError = 'Entre na sua conta para acessar o Creator Studio.';
           return;
@@ -84,7 +117,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
             if (this.accessSequence !== sequence || this.users.getUser()?.id !== userId) return;
             this.loadingAccess = false;
             this.access = access;
-            if (this.canUsePro) this.reload();
+            if (this.canUsePro) {
+              this.reloadCatalog();
+              this.reload();
+            }
           },
           error: () => {
             if (this.accessSequence !== sequence || this.users.getUser()?.id !== userId) return;
@@ -107,6 +143,57 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   get pageCount(): number {
     return Math.max(1, Math.ceil(this.total / this.pageSize));
   }
+
+  get groupedCommissions(): { key: string; label: string; items: CreatorCommission[] }[] {
+    const groups = new Map<string, { key: string; label: string; items: CreatorCommission[] }>();
+    for (const card of this.commissions) {
+      let key = card.requestedOn;
+      let label = this.formatCivilDate(card.requestedOn);
+      if (this.groupBy === 'status') {
+        key = card.status;
+        label = this.statusLabel(card.status);
+      } else if (this.groupBy === 'type') {
+        key = String(card.artTypeId ?? 'none');
+        label = this.typeName(card.artTypeId);
+      } else if (this.groupBy === 'stage') {
+        key = card.currentStageDefinitionId != null
+          ? 'shared:' + card.currentStageDefinitionId
+          : 'custom:' + (card.currentStageName || 'none');
+        label = card.currentStageName || 'Sem etapa atual';
+      }
+      if (!groups.has(key)) groups.set(key, {key,label,items:[]});
+      groups.get(key)!.items.push(card);
+    }
+    return [...groups.values()];
+  }
+
+  typeName(id: number | null): string {
+    return this.artTypes.find(type => type.id === id)?.name || 'Sem tipo de arte';
+  }
+
+  private reloadCatalog(): void {
+    const seq = this.accessSequence;
+    const userId = this.users.getUser()?.id;
+    this.creatorStudio.artTypes().pipe(takeUntil(this.destroy$)).subscribe({
+      next: rows => {
+        if (seq === this.accessSequence && this.users.getUser()?.id === userId)
+          this.artTypes = rows;
+      }
+    });
+    this.creatorStudio.workflows().pipe(takeUntil(this.destroy$)).subscribe({
+      next: rows => {
+        if (seq === this.accessSequence && this.users.getUser()?.id === userId)
+          this.workflows = rows;
+      }
+    });
+    this.creatorStudio.stageDefinitions().pipe(takeUntil(this.destroy$)).subscribe({
+      next: rows => {
+        if (seq === this.accessSequence && this.users.getUser()?.id === userId)
+          this.definitions = rows;
+      }
+    });
+  }
+
 
   statusLabel(status: CreatorCommissionStatus): string {
     return this.statuses.find(option => option.value === status)?.label ?? status;
@@ -147,6 +234,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   filterChanged(): void {
     this.page = 1;
+    this.expandedCommissionId = null;
+    this.stepsSequence++;
     this.reload();
   }
 
@@ -180,7 +269,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       privateNotes: commission.privateNotes ?? '',
       requestedOn: commission.requestedOn,
       dueOn: commission.dueOn,
-      artTypeId: commission.artTypeId
+      artTypeId: commission.artTypeId,
+      workflowId: null
     };
     this.formOpen = true;
     this.saveError = '';
@@ -256,6 +346,143 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       });
   }
 
+  toggleSteps(commission: CreatorCommission): void {
+    if (!this.canUsePro) return;
+    if (this.expandedCommissionId === commission.id) {
+      this.stepsSequence++;
+      this.expandedCommissionId = null;
+      this.steps = [];
+      return;
+    }
+    this.expandedCommissionId = commission.id;
+    this.steps = [];
+    this.newStepName = '';
+    this.newStepDefinitionId = null;
+    this.importWorkflowId = null;
+    this.loadSteps(commission.id);
+  }
+
+  private loadSteps(commissionId: number): void {
+    const seq = ++this.stepsSequence;
+    const account = this.users.getUser()?.id;
+    this.loadingSteps = true;
+    this.stepError = '';
+    this.creatorStudio.commissionSteps(commissionId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: rows => {
+          if (seq !== this.stepsSequence || this.users.getUser()?.id !== account ||
+              this.expandedCommissionId !== commissionId) return;
+          this.steps = rows;
+          this.loadingSteps = false;
+        },
+        error: () => {
+          if (seq !== this.stepsSequence || this.users.getUser()?.id !== account) return;
+          this.loadingSteps = false;
+          this.stepError = 'Não conseguimos carregar as etapas deste pedido.';
+        }
+      });
+  }
+
+  setDefinition(id: number | null): void {
+    this.newStepDefinitionId = id;
+    const found = this.definitions.find(d => d.id === id);
+    if (found) this.newStepName = found.name;
+  }
+
+  addStep(commissionId: number): void {
+    if (!this.canUsePro || this.stepBusy || !this.newStepName.trim()) return;
+    const account = this.users.getUser()?.id;
+    this.stepBusy = true;
+    this.stepError = '';
+    this.creatorStudio.addCommissionStep(commissionId, {
+      name: this.newStepName.trim(),
+      stageDefinitionId: this.newStepDefinitionId
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        if (this.users.getUser()?.id !== account) return;
+        this.stepBusy = false;
+        this.newStepName = '';
+        this.newStepDefinitionId = null;
+        this.loadSteps(commissionId);
+        this.reload();
+      },
+      error: () => {
+        if (this.users.getUser()?.id !== account) return;
+        this.stepBusy = false;
+        this.stepError = 'Não foi possível adicionar a etapa.';
+      }
+    });
+  }
+
+  copyWorkflow(commissionId: number): void {
+    if (!this.canUsePro || this.stepBusy || this.importWorkflowId == null ||
+        this.steps.length > 0) return;
+    const account = this.users.getUser()?.id;
+    this.stepBusy = true;
+    this.stepError = '';
+    this.creatorStudio.copyWorkflowToCommission(commissionId, this.importWorkflowId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          if (this.users.getUser()?.id !== account) return;
+          this.stepBusy = false;
+          this.importWorkflowId = null;
+          this.loadSteps(commissionId);
+          this.reload();
+        },
+        error: () => {
+          if (this.users.getUser()?.id !== account) return;
+          this.stepBusy = false;
+          this.stepError = 'Não foi possível aplicar o modelo. Ele só pode ser copiado antes de criar etapas.';
+        }
+      });
+  }
+
+  saveStep(step: CreatorCommissionStep): void {
+    if (!this.canUsePro || this.stepBusy || !step.name.trim()) return;
+    const account = this.users.getUser()?.id;
+    this.stepBusy = true;
+    this.stepError = '';
+    this.creatorStudio.updateCommissionStep(step.commissionId, step.id, {
+      name: step.name.trim(),
+      stageDefinitionId: step.stageDefinitionId,
+      status: step.status,
+      notes: step.notes
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        if (this.users.getUser()?.id !== account) return;
+        this.stepBusy = false;
+        this.loadSteps(step.commissionId);
+        this.reload();
+      },
+      error: () => {
+        if (this.users.getUser()?.id !== account) return;
+        this.stepBusy = false;
+        this.stepError = 'Não foi possível salvar o andamento da etapa.';
+      }
+    });
+  }
+
+  removeStep(step: CreatorCommissionStep): void {
+    if (!this.canUsePro || this.stepBusy ||
+        !window.confirm('Excluir esta etapa e suas anotações deste pedido?')) return;
+    const account = this.users.getUser()?.id;
+    this.stepBusy = true;
+    this.creatorStudio.deleteCommissionStep(step.commissionId, step.id)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          if (this.users.getUser()?.id !== account) return;
+          this.stepBusy = false;
+          this.loadSteps(step.commissionId);
+          this.reload();
+        },
+        error: () => {
+          if (this.users.getUser()?.id !== account) return;
+          this.stepBusy = false;
+          this.stepError = 'Não foi possível excluir esta etapa.';
+        }
+      });
+  }
+
   trackById(_: number, item: CreatorCommission): number {
     return item.id;
   }
@@ -274,7 +501,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       privateNotes: '',
       requestedOn: today,
       dueOn: null,
-      artTypeId: null
+      artTypeId: null,
+      workflowId: null
     };
   }
 }
