@@ -35,12 +35,19 @@ describe('CreatorStudioComponent', () => {
   beforeEach(async () => {
     user$ = new BehaviorSubject<User | null>(user);
     studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
-      ['myAccess', 'commissions', 'create', 'update', 'changeStatus']);
+      ['myAccess', 'commissions', 'create', 'update', 'changeStatus',
+        'artTypes', 'workflows', 'stageDefinitions', 'commissionSteps',
+        'addCommissionStep', 'updateCommissionStep', 'deleteCommissionStep',
+        'copyWorkflowToCommission']);
     studio.myAccess.and.returnValue(of(pro));
     studio.commissions.and.returnValue(of({items:[card],page:1,pageSize:25,total:1}));
     studio.create.and.returnValue(of(card));
     studio.update.and.returnValue(of(card));
     studio.changeStatus.and.returnValue(of({...card,status:'COMPLETED'}));
+    studio.artTypes.and.returnValue(of([]));
+    studio.workflows.and.returnValue(of([]));
+    studio.stageDefinitions.and.returnValue(of([]));
+    studio.commissionSteps.and.returnValue(of([]));
     users = jasmine.createSpyObj<UserService>('UserService',
       ['getUser'], { user$: user$.asObservable() });
     users.getUser.and.callFake(() => user$.value);
@@ -114,6 +121,26 @@ describe('CreatorStudioComponent', () => {
     component.changeStatus(card,'COMPLETED');
     expect(studio.changeStatus).toHaveBeenCalledWith(11,'COMPLETED');
     expect(studio.commissions).toHaveBeenCalledTimes(2);
+  });
+
+  it('groups different art types under the same shared production stage', () => {
+    const sketch = { ...card, currentStageName: 'Sketch', currentStageDefinitionId: 4 };
+    const other = { ...card, id:12, title:'Ícone', currentStageName:'Esboço',
+      currentStageDefinitionId:4 };
+    component.commissions=[sketch,other];
+    component.groupBy='stage';
+    expect(component.groupedCommissions.length).toBe(1);
+    expect(component.groupedCommissions[0].items.length).toBe(2);
+    component.groupBy='type';
+    expect(component.groupedCommissions.length).toBe(1);
+  });
+
+  it('loads existing stages only for a Pro-authorized commission', () => {
+    component.toggleSteps(card);
+    expect(studio.commissionSteps).toHaveBeenCalledWith(11);
+    expect(component.expandedCommissionId).toBe(11);
+    component.toggleSteps(card);
+    expect(component.expandedCommissionId).toBeNull();
   });
 
   it('formats date-only fields without local timezone conversion', () => {
