@@ -22,6 +22,7 @@ export interface CreatorCommissionInput {
   requestedOn: string; // Date-only; never convert into a timezone-sensitive timestamp.
   dueOn: string | null;
   artTypeId: number | null;
+  workflowId?: number | null; // Optional for creation only; changing a model never rewrites steps.
 }
 
 export interface CreatorCommission extends CreatorCommissionInput {
@@ -30,6 +31,8 @@ export interface CreatorCommission extends CreatorCommissionInput {
   createdAtUtc: string;
   updatedAtUtc: string;
   completedAtUtc: string | null;
+  currentStageName?: string | null;
+  currentStageDefinitionId?: number | null;
 }
 
 export interface CreatorCommissionPage {
@@ -37,6 +40,42 @@ export interface CreatorCommissionPage {
   page: number;
   pageSize: number;
   total: number;
+}
+
+export interface CreatorArtType {
+  id: number;
+  name: string;
+  workflowId: number | null;
+}
+export interface CreatorStageDefinition { id: number; name: string; }
+export interface CreatorStepDraft { name: string; stageDefinitionId: number | null; }
+export interface CreatorWorkflowDraft {
+  name: string;
+  isDefault: boolean;
+  steps: CreatorStepDraft[];
+}
+export interface CreatorWorkflowStep extends CreatorStepDraft {
+  id: number;
+  position: number;
+}
+export interface CreatorWorkflow {
+  id: number;
+  name: string;
+  isDefault: boolean;
+  steps: CreatorWorkflowStep[];
+}
+export type CreatorStepStatus = 'PENDING' | 'IN_PROGRESS' | 'WAITING_APPROVAL' | 'DONE';
+export interface CreatorCommissionStep extends CreatorStepDraft {
+  id: number;
+  commissionId: number;
+  position: number;
+  status: CreatorStepStatus;
+  notes: string | null;
+  completedAtUtc: string | null;
+}
+export interface CreatorStepUpdate extends CreatorStepDraft {
+  status: CreatorStepStatus;
+  notes: string | null;
 }
 
 /**
@@ -72,5 +111,62 @@ export class CreatorStudioService {
 
   changeStatus(id: number, status: CreatorCommissionStatus): Observable<CreatorCommission> {
     return this.http.patch<CreatorCommission>(`${this.base}/commissions/${id}/status`, { status });
+  }
+
+  artTypes(): Observable<CreatorArtType[]> {
+    return this.http.get<CreatorArtType[]>(`${this.base}/art-types`);
+  }
+
+  createArtType(name: string, workflowId: number | null): Observable<CreatorArtType> {
+    return this.http.post<CreatorArtType>(`${this.base}/art-types`, { name, workflowId });
+  }
+
+  updateArtType(id: number, name: string, workflowId: number | null): Observable<CreatorArtType> {
+    return this.http.put<CreatorArtType>(`${this.base}/art-types/${id}`, { name, workflowId });
+  }
+
+  stageDefinitions(): Observable<CreatorStageDefinition[]> {
+    return this.http.get<CreatorStageDefinition[]>(`${this.base}/stage-definitions`);
+  }
+
+  createStageDefinition(name: string): Observable<CreatorStageDefinition> {
+    return this.http.post<CreatorStageDefinition>(`${this.base}/stage-definitions`, { name });
+  }
+
+  workflows(): Observable<CreatorWorkflow[]> {
+    return this.http.get<CreatorWorkflow[]>(`${this.base}/workflows`);
+  }
+
+  createWorkflow(input: CreatorWorkflowDraft): Observable<CreatorWorkflow> {
+    return this.http.post<CreatorWorkflow>(`${this.base}/workflows`, input);
+  }
+
+  updateWorkflow(id: number, input: CreatorWorkflowDraft): Observable<CreatorWorkflow> {
+    return this.http.put<CreatorWorkflow>(`${this.base}/workflows/${id}`, input);
+  }
+
+  commissionSteps(id: number): Observable<CreatorCommissionStep[]> {
+    return this.http.get<CreatorCommissionStep[]>(`${this.base}/commissions/${id}/steps`);
+  }
+
+  addCommissionStep(id: number, input: CreatorStepDraft): Observable<CreatorCommissionStep> {
+    return this.http.post<CreatorCommissionStep>(`${this.base}/commissions/${id}/steps`, input);
+  }
+
+  copyWorkflowToCommission(id: number, workflowId: number): Observable<CreatorCommissionStep[]> {
+    return this.http.post<CreatorCommissionStep[]>(
+      `${this.base}/commissions/${id}/steps/from-workflow/${workflowId}`, {}
+    );
+  }
+
+  updateCommissionStep(commissionId: number, id: number, input: CreatorStepUpdate):
+    Observable<CreatorCommissionStep> {
+    return this.http.put<CreatorCommissionStep>(
+      `${this.base}/commissions/${commissionId}/steps/${id}`, input
+    );
+  }
+
+  deleteCommissionStep(commissionId: number, id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/commissions/${commissionId}/steps/${id}`);
   }
 }
