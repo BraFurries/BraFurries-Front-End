@@ -64,6 +64,43 @@ describe('CreatorStudioService', () => {
       updatedAtUtc: '2026-11-17T20:00:00', completedAtUtc: null });
   });
 
+  it('loads only the signed-in artist’s reusable production catalog', () => {
+    studio.workflows().subscribe();
+    const req = http.expectOne(`${base}/workflows`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.has('ownerUserId')).toBeFalse();
+    req.flush([]);
+  });
+
+  it('sends step references and order without persisting any Community IDs', () => {
+    studio.createWorkflow({
+      name:'Ref Sheet',isDefault:true,
+      steps:[{name:'Sketch',stageDefinitionId:7},{name:'Correção',stageDefinitionId:null}]
+    }).subscribe();
+    const req = http.expectOne(`${base}/workflows`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body.steps.map((s: {name:string}) => s.name))
+      .toEqual(['Sketch','Correção']);
+    expect(req.request.body.ownerUserId).toBeUndefined();
+    expect(req.request.body.communityId).toBeUndefined();
+    req.flush({id:12,name:'Ref Sheet',isDefault:true,steps:[]});
+  });
+
+  it('loads and modifies only the stages of the current commission', () => {
+    studio.commissionSteps(11).subscribe();
+    const read = http.expectOne(`${base}/commissions/11/steps`);
+    expect(read.request.method).toBe('GET');
+    read.flush([]);
+    studio.updateCommissionStep(11, 17, {
+      name:'Sketch',stageDefinitionId:7,status:'IN_PROGRESS',notes:'revisar olhos'
+    }).subscribe();
+    const update = http.expectOne(`${base}/commissions/11/steps/17`);
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.body.stageDefinitionId).toBe(7);
+    expect(update.request.body.ownerUserId).toBeUndefined();
+    update.flush({});
+  });
+
   it('uses an isolated status endpoint rather than duplicating a card', () => {
     studio.changeStatus(10, 'COMPLETED').subscribe();
     const req = http.expectOne(`${base}/commissions/10/status`);
