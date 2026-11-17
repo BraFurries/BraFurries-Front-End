@@ -215,7 +215,7 @@ describe('ServidoresComponent', () => {
   });
 
   it('orders Coddy sections by importance while keeping identifiers and routes unchanged', () => {
-    const priorityOrder = [
+    const priorityOrder: Array<(typeof component.sections)[number]['id']> = [
       'overview',
       'moderation-access', 'portaria', 'logs', 'backups',
       'cargos-automaticos', 'leveling', 'vip', 'cargos-temporarios',
