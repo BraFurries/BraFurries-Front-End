@@ -101,6 +101,40 @@ describe('CreatorStudioService', () => {
     update.flush({});
   });
 
+  it('sends reference URLs for only the selected commission, no owner ID', () => {
+    studio.createReference(11, {
+      label: 'Pose', url: 'https://example.com/pose'
+    }).subscribe();
+    const req = http.expectOne(`${base}/commissions/11/references`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({label:'Pose',url:'https://example.com/pose'});
+    expect(req.request.body.ownerUserId).toBeUndefined();
+    req.flush({id:15,commissionId:11,label:'Pose',url:'https://example.com/pose',position:0});
+  });
+
+  it('loads paginated manual activity without exposing Community information', () => {
+    studio.activity(11, 2, 20).subscribe();
+    const req = http.expectOne(r => r.url === `${base}/commissions/11/activity`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('pageSize')).toBe('20');
+    expect(req.request.params.has('communityId')).toBeFalse();
+    req.flush({items:[],page:2,pageSize:20,total:40});
+  });
+
+  it('creates an artist-reported revision without claiming client authentication', () => {
+    studio.createActivity(11, {
+      eventKind:'REVISION_REQUEST',
+      description:'Trocar cor dos olhos',occurredOn:'2026-11-17'
+    }).subscribe();
+    const req = http.expectOne(`${base}/commissions/11/activity`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body.eventKind).toBe('REVISION_REQUEST');
+    expect(req.request.body.ownerUserId).toBeUndefined();
+    expect(req.request.body.clientApproved).toBeUndefined();
+    req.flush({id:91,commissionId:11,...req.request.body,createdAtUtc:'2026-11-17T23:00:00'});
+  });
+
   it('uses an isolated status endpoint rather than duplicating a card', () => {
     studio.changeStatus(10, 'COMPLETED').subscribe();
     const req = http.expectOne(`${base}/commissions/10/status`);
