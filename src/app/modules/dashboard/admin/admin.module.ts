@@ -4,6 +4,7 @@ import { NgModule } from '@angular/core';
 
 import { AdminComponent } from './admin.component';
 import { AdminPermissionsComponent } from './admin-permissions.component';
+import { AdminCreatorPilotComponent } from './admin-creator-pilot.component';
 import { AdminStorageComponent } from './pages/storage/admin-storage.component';
 import { AdminRoutingModule } from './admin-routing.module';
 import { AdminAnnouncementsComponent } from './pages/avisos/avisos.component';
@@ -26,6 +27,7 @@ import { AdminCoddyPresenceComponent } from './pages/presenca-coddy/coddy-presen
   declarations: [
     AdminComponent,
     AdminPermissionsComponent,
+    AdminCreatorPilotComponent,
     AdminStorageComponent,
     AdminOverviewComponent,
     AdminCoddyPresenceComponent,
