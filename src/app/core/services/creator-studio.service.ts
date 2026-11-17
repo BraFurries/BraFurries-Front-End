@@ -78,6 +78,34 @@ export interface CreatorStepUpdate extends CreatorStepDraft {
   notes: string | null;
 }
 
+export interface CreatorReferenceDraft {
+  label: string | null;
+  url: string;
+}
+export interface CreatorReference extends CreatorReferenceDraft {
+  id: number;
+  commissionId: number;
+  position: number;
+}
+export type CreatorActivityKind = 'NOTE' | 'REVISION_REQUEST' | 'CHANGE_RECORDED' |
+  'CLIENT_FEEDBACK' | 'APPROVAL_REPORTED' | 'DELIVERY_RECORDED';
+export interface CreatorActivityDraft {
+  eventKind: CreatorActivityKind;
+  description: string;
+  occurredOn: string; // Civil date, not timestamp.
+}
+export interface CreatorActivity extends CreatorActivityDraft {
+  id: number;
+  commissionId: number;
+  createdAtUtc: string;
+}
+export interface CreatorActivityPage {
+  items: CreatorActivity[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 /**
  * Backend is the authority for artist ownership and effective subscription.
  * Browser-side access checks only improve UX; they never grant access.
@@ -168,5 +196,41 @@ export class CreatorStudioService {
 
   deleteCommissionStep(commissionId: number, id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/commissions/${commissionId}/steps/${id}`);
+  }
+
+  findCommission(id: number): Observable<CreatorCommission> {
+    return this.http.get<CreatorCommission>(`${this.base}/commissions/${id}`);
+  }
+
+  references(commissionId: number): Observable<CreatorReference[]> {
+    return this.http.get<CreatorReference[]>(`${this.base}/commissions/${commissionId}/references`);
+  }
+
+  createReference(commissionId: number, input: CreatorReferenceDraft): Observable<CreatorReference> {
+    return this.http.post<CreatorReference>(
+      `${this.base}/commissions/${commissionId}/references`, input);
+  }
+
+  updateReference(commissionId: number, id: number, input: CreatorReferenceDraft):
+    Observable<CreatorReference> {
+    return this.http.put<CreatorReference>(
+      `${this.base}/commissions/${commissionId}/references/${id}`, input);
+  }
+
+  deleteReference(commissionId: number, id: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/commissions/${commissionId}/references/${id}`);
+  }
+
+  activity(commissionId: number, page = 1, pageSize = 20): Observable<CreatorActivityPage> {
+    const params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
+    return this.http.get<CreatorActivityPage>(
+      `${this.base}/commissions/${commissionId}/activity`, { params });
+  }
+
+  createActivity(commissionId: number, input: CreatorActivityDraft):
+    Observable<CreatorActivity> {
+    return this.http.post<CreatorActivity>(
+      `${this.base}/commissions/${commissionId}/activity`, input);
   }
 }
