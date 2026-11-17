@@ -50,6 +50,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   activityDraft: CreatorActivityDraft = this.emptyActivity();
 
   private requestSequence = 0;
+  private loadSequence = 0;
   private readonly destroy$ = new Subject<void>();
 
   constructor(private readonly studio: CreatorStudioService,
@@ -112,6 +113,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   }
 
   private clearPrivateState(): void {
+    this.loadSequence++;
     this.loadingAccess = false;
     this.allowed = false;
     this.loading = false;
@@ -138,6 +140,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     const id = this.commissionId;
     if (!this.allowed || id === null) return;
     const seq = this.requestSequence;
+    const loadSeq = ++this.loadSequence;
     const userId = this.users.getUser()?.id;
     if (userId === undefined) return;
     this.loading = true;
@@ -148,7 +151,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
       activity: this.studio.activity(id, this.activityPage, this.activityPageSize)
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: result => {
-        if (!this.isCurrent(seq, userId, id)) return;
+        if (!this.isCurrent(seq, userId, id) || loadSeq !== this.loadSequence) return;
         this.commission = result.commission;
         this.references = result.references;
         this.activity = result.activity.items;
@@ -156,7 +159,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: err => {
-        if (!this.isCurrent(seq, userId, id)) return;
+        if (!this.isCurrent(seq, userId, id) || loadSeq !== this.loadSequence) return;
         this.loading = false;
         if (err instanceof HttpErrorResponse &&
             (err.status === 403 || err.status === 404)) {
