@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, convertToParamMap, ParamMap, RouterModule } from '@angular/router';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, Subject } from 'rxjs';
 import {
   CreatorCommission, CreatorStudioService
 } from '../../../core/services/creator-studio.service';
@@ -121,6 +121,21 @@ describe('CreatorCommissionDetailsComponent', () => {
       description:'Corrigir pose',
       occurredOn:'2026-11-11'
     });
+  });
+
+  it('ignores an outdated detail fetch after a newer refresh', () => {
+    const old$ = new Subject<CreatorCommission>();
+    const latest$ = new Subject<CreatorCommission>();
+    studio.findCommission.and.returnValues(old$.asObservable(), latest$.asObservable());
+
+    component.load();
+    component.load();
+    latest$.next({...commission,title:'Atualizada'});
+    latest$.complete();
+    old$.next({...commission,title:'Antiga'});
+    old$.complete();
+
+    expect(component.commission?.title).toBe('Atualizada');
   });
 
   it('refuses to submit http links client-side before asking the API', () => {
