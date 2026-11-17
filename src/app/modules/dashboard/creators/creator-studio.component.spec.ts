@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
 import { CreatorCommission, CreatorStudioAccess, CreatorStudioService } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
@@ -54,7 +55,7 @@ describe('CreatorStudioComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [CreatorStudioComponent],
-      imports: [CommonModule, FormsModule],
+      imports: [CommonModule, FormsModule, RouterModule.forRoot([])],
       providers: [
         {provide: CreatorStudioService, useValue: studio},
         {provide: UserService, useValue: users}
