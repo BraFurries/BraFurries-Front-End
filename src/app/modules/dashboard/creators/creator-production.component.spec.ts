@@ -1,0 +1,112 @@
+import { CommonModule } from '@angular/common';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { FormsModule } from '@angular/forms';
+import { BehaviorSubject, of } from 'rxjs';
+import { CreatorStudioService } from '../../../core/services/creator-studio.service';
+import { UserService } from '../../../core/services/user.service';
+import { User } from '../../../shared/models/user';
+import { CreatorProductionComponent } from './creator-production.component';
+
+describe('CreatorProductionComponent', () => {
+  let fixture: ComponentFixture<CreatorProductionComponent>;
+  let component: CreatorProductionComponent;
+  let studio: jasmine.SpyObj<CreatorStudioService>;
+  let users: jasmine.SpyObj<UserService>;
+  let user$: BehaviorSubject<User | null>;
+  const user: User = {
+    id: 31, name: 'Artista', email:'artist@example.invalid',
+    roles:[],permissions:[],profileImageUrl:null
+  };
+
+  beforeEach(async () => {
+    user$ = new BehaviorSubject<User | null>(user);
+    studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
+      ['myAccess','artTypes','stageDefinitions','workflows',
+        'createArtType','updateArtType','createStageDefinition',
+        'createWorkflow','updateWorkflow']);
+    studio.myAccess.and.returnValue(of({
+      allowed:true,tier:'PRO',status:'ACTIVE',sourceKind:'PILOT',expiresAtUtc:null
+    }));
+    studio.artTypes.and.returnValue(of([]));
+    studio.stageDefinitions.and.returnValue(of([{id:7,name:'Sketch'}]));
+    studio.workflows.and.returnValue(of([]));
+    studio.createWorkflow.and.returnValue(of({id:12,name:'Ref Sheet',
+      isDefault:true,steps:[]}));
+    studio.createArtType.and.returnValue(of({id:4,name:'Ref Sheet',workflowId:12}));
+    studio.createStageDefinition.and.returnValue(of({id:9,name:'Revisão'}));
+    users = jasmine.createSpyObj<UserService>(
+      'UserService',['getUser'],{user$:user$.asObservable()});
+    users.getUser.and.callFake(() => user$.value);
+    await TestBed.configureTestingModule({
+      declarations:[CreatorProductionComponent],
+      imports:[CommonModule,FormsModule],
+      providers:[
+        {provide:CreatorStudioService,useValue:studio},
+        {provide:UserService,useValue:users}
+      ]
+    }).compileComponents();
+    fixture=TestBed.createComponent(CreatorProductionComponent);
+    component=fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    fixture.destroy();
+    user$.complete();
+  });
+
+  it('loads only the signed-in artist’s Pro catalog', () => {
+    expect(component.allowed).toBeTrue();
+    expect(studio.artTypes).toHaveBeenCalledTimes(1);
+    expect(studio.stageDefinitions).toHaveBeenCalledTimes(1);
+    expect(studio.workflows).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.textContent).toContain('Etapas reutilizáveis');
+  });
+
+  it('sends reusable stage references with the copied workflow step order', () => {
+    component.workflow={name:'Ref Sheet',isDefault:true,steps:[]};
+    component.addWorkflowStep();
+    component.setSharedDefinition(component.workflow.steps[0],7);
+    expect(component.workflow.steps[0]).toEqual({
+      name:'Sketch',stageDefinitionId:7
+    });
+    component.addWorkflowStep();
+    component.workflow.steps[1].name='Revisão final';
+    component.moveStep(1,-1);
+    component.saveWorkflow();
+    expect(studio.createWorkflow).toHaveBeenCalledWith({
+      name:'Ref Sheet',isDefault:true,
+      steps:[
+        {name:'Revisão final',stageDefinitionId:null},
+        {name:'Sketch',stageDefinitionId:7}
+      ]
+    });
+  });
+
+  it('allows an art type to select a workflow without any user or Community ID', () => {
+    component.typeName='Ref Sheet';
+    component.typeWorkflowId=12;
+    component.saveType();
+    expect(studio.createArtType).toHaveBeenCalledWith('Ref Sheet',12);
+  });
+
+  it('denies catalog display to an authorized Free user', () => {
+    studio.myAccess.and.returnValue(of({
+      allowed:true,tier:'FREE',status:'ACTIVE',
+      sourceKind:'INVITE',expiresAtUtc:null
+    }));
+    user$.next({...user,id:32});
+    fixture.detectChanges();
+    expect(component.allowed).toBeFalse();
+    expect(component.definitions).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('exclusiva das contas Pro');
+  });
+
+  it('does not allow a new template with blank stage names', () => {
+    component.workflow={name:'Teste',isDefault:false,
+      steps:[{name:' ',stageDefinitionId:null}]};
+    component.saveWorkflow();
+    expect(studio.createWorkflow).not.toHaveBeenCalled();
+    expect(component.error).toContain('preencha cada etapa');
+  });
+});
