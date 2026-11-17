@@ -225,6 +225,10 @@
                 </select>
               </label>
               <div class="flex flex-wrap gap-2">
+                <a [routerLink]="['/painel/creators/pedido', commission.id]"
+                  class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/10">
+                  Referências e revisões
+                </a>
                 <button type="button" (click)="toggleSteps(commission)" [disabled]="saving"
                   class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/10">
                   {{ expandedCommissionId === commission.id ? 'Fechar etapas' : 'Etapas' }}
