@@ -158,7 +158,8 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
 
   lookupCandidate(): void {
     if (!this.owner || this.searching || this.saving) return;
-    const userId = Number(String(this.candidateInput).trim());
+    const rawId = String(this.candidateInput).trim();
+    const userId = /^[1-9]\\d*$/.test(rawId) ? Number(rawId) : NaN;
     if (!Number.isSafeInteger(userId) || userId <= 0) {
       this.candidate = null;
       this.errorMessage = 'Informe um ID de usuário válido.';
