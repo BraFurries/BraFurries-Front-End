@@ -227,16 +227,19 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
         if (!this.isCurrentAccount(account) || seq !== this.accountSequence) return;
         this.saving = false;
         this.successMessage = success;
-        this.loadParticipants();
+        // A previous preview must never look current after a grant/revocation.
         if (this.candidate?.userId === targetId) {
-          this.lookupCandidate();
+          this.candidateSequence++;
+          this.candidate = null;
+          this.candidateInput = '';
         }
+        this.loadParticipants();
       },
       error: error => {
         if (!this.isCurrentAccount(account) || seq !== this.accountSequence) return;
         this.saving = false;
         this.handleError(error, 'A alteração de acesso não foi confirmada.');
-        if (this.owner) this.loadParticipants();
+        // Preserve the failure message; refreshing here would erase it.
       }
     });
   }
