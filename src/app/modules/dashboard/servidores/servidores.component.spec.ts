@@ -214,6 +214,39 @@ describe('ServidoresComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('app-portaria-clarification-settings').length).toBe(1);
   });
 
+  it('orders Coddy sections by importance while keeping identifiers and routes unchanged', () => {
+    const priorityOrder = [
+      'overview',
+      'moderation-access', 'portaria', 'logs', 'backups',
+      'cargos-automaticos', 'leveling', 'vip', 'cargos-temporarios',
+      'bump', 'ai', 'partners',
+      'tools', 'themes', 'channels',
+      'economy', 'tickets'
+    ];
+    create();
+    expect(component.sections.map(section => section.id)).toEqual(priorityOrder);
+    expect(component.sections.filter(section => section.groupLabel)
+      .map(section => [section.id, section.groupLabel])).toEqual([
+        ['moderation-access', 'Gestão e segurança'],
+        ['cargos-automaticos', 'Membros e engajamento'],
+        ['tools', 'Administração e utilitários'],
+        ['economy', 'Em breve']
+      ]);
+    expect(component.sections.filter(section => section.status === 'coming-soon')
+      .map(section => section.id)).toEqual(['economy', 'tickets']);
+
+    const nav = fixture.nativeElement.querySelector('nav.section-tabs') as HTMLElement;
+    expect(nav).not.toBeNull();
+    const separators = Array.from(nav.querySelectorAll('.section-group-separator'))
+      .map(element => element.textContent?.trim());
+    expect(separators).toEqual([
+      'Gestão e segurança', 'Membros e engajamento',
+      'Administração e utilitários', 'Em breve'
+    ]);
+    expect(nav.querySelectorAll('button').length).toBe(component.visibleSections.length);
+    expect(nav.querySelectorAll('.section-group-separator button').length).toBe(0);
+  });
+
   it('loads real resources, Portaria and staff roles while preserving snowflakes as strings', () => {
     create();
     expect(component.selectedServerId).toBe('1480343896461545606');
