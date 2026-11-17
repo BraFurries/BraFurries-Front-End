@@ -171,6 +171,11 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     return this.artTypes.find(type => type.id === id)?.name || 'Sem tipo de arte';
   }
 
+  private reportCatalogError(seq: number, userId: number | undefined): void {
+    if (seq !== this.accessSequence || this.users.getUser()?.id !== userId) return;
+    this.errorMessage = 'Não foi possível carregar seus tipos e modelos. Recarregue para tentar novamente.';
+  }
+
   private reloadCatalog(): void {
     const seq = this.accessSequence;
     const userId = this.users.getUser()?.id;
@@ -178,19 +183,22 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       next: rows => {
         if (seq === this.accessSequence && this.users.getUser()?.id === userId)
           this.artTypes = rows;
-      }
+      },
+      error: () => this.reportCatalogError(seq, userId)
     });
     this.creatorStudio.workflows().pipe(takeUntil(this.destroy$)).subscribe({
       next: rows => {
         if (seq === this.accessSequence && this.users.getUser()?.id === userId)
           this.workflows = rows;
-      }
+      },
+      error: () => this.reportCatalogError(seq, userId)
     });
     this.creatorStudio.stageDefinitions().pipe(takeUntil(this.destroy$)).subscribe({
       next: rows => {
         if (seq === this.accessSequence && this.users.getUser()?.id === userId)
           this.definitions = rows;
-      }
+      },
+      error: () => this.reportCatalogError(seq, userId)
     });
   }
 
