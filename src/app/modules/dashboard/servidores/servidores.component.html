@@ -63,8 +63,11 @@
           </label>
         }
       </section>
-      <nav class="section-tabs" role="tablist">
+      <nav class="section-tabs" role="tablist" aria-label="Configurações do Coddy">
         @for (section of visibleSections; track section.id) {
+          @if (section.groupLabel) {
+            <span class="section-group-separator inline-flex shrink-0 self-stretch items-center ml-2 pl-3 pr-1 border-l border-gray-200 text-xs font-semibold text-gray-400 whitespace-nowrap" aria-hidden="true">{{ section.groupLabel }}</span>
+          }
           <button
             type="button"
             [class.active]="activeSection === section.id"
