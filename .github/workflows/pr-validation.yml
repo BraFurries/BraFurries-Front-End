@@ -112,6 +112,7 @@ jobs:
           --include=**/creator-studio.service.spec.ts
           --include=**/creator-studio.component.spec.ts
           --include=**/creator-production.component.spec.ts
+          --include=**/creator-commission-details.component.spec.ts
           --include=**/admin-storage.component.spec.ts
           --include=**/admin-storage.service.spec.ts
           --include=**/commerce-access.service.spec.ts
