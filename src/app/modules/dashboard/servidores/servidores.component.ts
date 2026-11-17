@@ -10,7 +10,7 @@ import { PortariaClarificationSettingsComponent } from './portaria-clarification
 type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump' | 'portaria' | 'moderation-access' | 'backups' | 'themes' | 'cargos-automaticos' | 'cargos-temporarios' | 'tools' | 'logs' | 'leveling' | 'economy' | 'tickets';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
-interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
+interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; groupLabel?: string; }
 type ToolTab = 'private-area' | 'channel-permissions' | 'bulk-roles' | 'role-migrate' | 'recovery';
 interface ToolTabLink { id: ToolTab; label: string; icon: string; }
 interface LogDraft { enabled: boolean; targetId: string | null; saving: boolean; testing: boolean; error: string; }
@@ -37,11 +37,31 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   unifiedSaveMessage = '';
   servers: ManagedServer[] = [];
   readonly sections: ServerSectionLink[] = [
-    { id: 'overview', label: 'Visão geral', icon: '✨' }, { id: 'vip', label: 'VIP', icon: '💎' }, { id: 'channels', label: 'Canais', icon: '#️⃣' }, { id: 'ai', label: 'IA', icon: '🤖' }, { id: 'bump', label: 'Bump', icon: '🚀' },
-    { id: 'portaria', label: 'Portaria', icon: '🚪' }, { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️' }, { id: 'backups', label: 'Backups', icon: '💾' }, { id: 'themes', label: 'Temas', icon: '🎨' }, { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️' }, { id: 'cargos-temporarios', label: 'Cargos temporários', icon: '⏳' }, { id: 'tools', label: 'Ferramentas', icon: '🧰' },
+    { id: 'overview', label: 'Visão geral', icon: '✨' },
+
+    // Operação e proteção da comunidade.
+    { id: 'moderation-access', label: 'Moderação & Acesso', icon: '🛡️', groupLabel: 'Gestão e segurança' },
+    { id: 'portaria', label: 'Portaria', icon: '🚪' },
+    { id: 'logs', label: 'Logs', icon: '📜' },
+    { id: 'backups', label: 'Backups', icon: '💾' },
+
+    // Membros, reconhecimento e atividade.
+    { id: 'cargos-automaticos', label: 'Cargos automáticos', icon: '⚙️', groupLabel: 'Membros e engajamento' },
+    { id: 'leveling', label: 'XP & Leveling', icon: '🏆' },
+    { id: 'vip', label: 'VIP', icon: '💎' },
+    { id: 'cargos-temporarios', label: 'Cargos temporários', icon: '⏳' },
+    { id: 'bump', label: 'Bump', icon: '🚀' },
+    { id: 'ai', label: 'IA', icon: '🤖' },
     { id: 'partners', label: 'Parceiros', icon: '🤝' },
-    { id: 'logs', label: 'Logs', icon: '📜' }, { id: 'leveling', label: 'XP & Leveling', icon: '🏆' },
-    { id: 'economy', label: 'Economia', icon: '💰', status: 'coming-soon' }, { id: 'tickets', label: 'Tickets', icon: '🎫', status: 'coming-soon' }
+
+    // Ferramentas pontuais e personalização.
+    { id: 'tools', label: 'Ferramentas', icon: '🧰', groupLabel: 'Administração e utilitários' },
+    { id: 'themes', label: 'Temas', icon: '🎨' },
+    { id: 'channels', label: 'Canais', icon: '#️⃣' },
+
+    // Recursos planejados permanecem ao final.
+    { id: 'economy', label: 'Economia', icon: '💰', status: 'coming-soon', groupLabel: 'Em breve' },
+    { id: 'tickets', label: 'Tickets', icon: '🎫', status: 'coming-soon' }
   ];
   readonly toolTabs: ToolTabLink[] = [
     { id: 'private-area', label: 'Área privada', icon: '🔐' },
