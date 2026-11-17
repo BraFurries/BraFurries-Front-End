@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { concatMap, firstValueFrom, forkJoin, Observable, of, Subscription, interval, startWith, switchMap, takeWhile } from 'rxjs';
-import { ChannelPermissionCopyPreview, ChannelPermissionCopyResult, AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, BulkRolePreview, RoleToolOperation, RoleRecoveryCandidate, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
+import { ChannelPermissionCopyPreview, ChannelPermissionCopyResult, AutoJoinRolesState, BumpConfigResponse, BumpMonthlyRankingConfig, BumpWarningRequest, CollaborativeModerationConfig, GuildChannel, GuildOperationRequest, GuildOperationResult, GuildResources, GuildRole, BulkRolePreview, RoleMigrationPreview, RoleToolOperation, RoleRecoveryCandidate, LogConfiguration, LogsState, ManagedServer, ManagedServersService, ModerationAccessState, PermissionChange, PortariaBypass, PortariaBypassCreateRequest, PortariaConfig, PortariaFlow, PortariaPublicationRequest, PortariaRoleIds, PortariaState, PreviewSubjectRef, ServerChannelsConfig, StaffRoles, StructurePreview } from '../../../core/services/managed-servers.service';
 import { CommunityContextService, CommunityContextState } from '../../../core/services/community-context.service';
 import { PartnerDiscordService } from '../../../core/services/partner-discord.service';
 import { PartnerDiscordPanelComponent } from './partner-discord-panel.component';
@@ -11,7 +11,7 @@ type ServerSection = 'partners' | 'overview' | 'vip' | 'channels' | 'ai' | 'bump
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type BumpCard = 'processing' | 'warning' | 'individual' | 'monthly';
 interface ServerSectionLink { id: ServerSection; label: string; icon: string; status?: 'coming-soon'; }
-type ToolTab = 'private-area' | 'channel-permissions' | 'bulk-roles' | 'recovery';
+type ToolTab = 'private-area' | 'channel-permissions' | 'bulk-roles' | 'role-migrate' | 'recovery';
 interface ToolTabLink { id: ToolTab; label: string; icon: string; }
 interface LogDraft { enabled: boolean; targetId: string | null; saving: boolean; testing: boolean; error: string; }
 interface PortariaWizardDraft { newFlowName: string; newFlowTargetChannelId: string; isolateVisitors: boolean; visitorRoleName: string; portariaCategoryName: string; portariaStaffRoleIds: string[]; portariaCreationMode: 'template' | 'manual'; createApproved: boolean; createRejected: boolean; manualVisitorRoleId: string; manualWelcomeChannelId: string; manualTargetChannelId: string; manualApprovedChannelId?: string; manualRejectedChannelId?: string; }
@@ -43,13 +43,16 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     { id: 'logs', label: 'Logs', icon: '📜' }, { id: 'leveling', label: 'XP & Leveling', icon: '🏆' },
     { id: 'economy', label: 'Economia', icon: '💰', status: 'coming-soon' }, { id: 'tickets', label: 'Tickets', icon: '🎫', status: 'coming-soon' }
   ];
-  // Sub-abas da seção Ferramentas: para adicionar outra, estenda ToolTab e esta lista.
   readonly toolTabs: ToolTabLink[] = [
     { id: 'private-area', label: 'Área privada', icon: '🔐' },
-    { id: 'channel-permissions', label: 'Permissões de canais', icon: '🔑' },
-    { id: 'bulk-roles', label: 'Adicionar cargo a todos', icon: '👥' },
-    { id: 'recovery', label: 'Recuperação', icon: '🛟' }
+    { id: 'channel-permissions', label: 'Permissões de canais', icon: '🔑' }
   ];
+  readonly roleToolTabs: ToolTabLink[] = [
+    { id: 'bulk-roles', label: 'Adicionar a todos', icon: '👥' },
+    { id: 'role-migrate', label: 'Migrar membros', icon: '🔄' },
+    { id: 'recovery', label: 'Recuperar estado', icon: '🛟' }
+  ];
+  roleToolsDropdownOpen = false;
   activeToolTab: ToolTab = 'private-area';
   selectedServerId = '';
   activeSection: ServerSection = 'overview';
@@ -117,6 +120,10 @@ export class ServidoresComponent implements OnInit, OnDestroy {
 
   bulkRoleId = '';
   bulkRolePreview: BulkRolePreview | null = null;
+  migrationSourceRoleId = '';
+  migrationTargetRoleId = '';
+  migrationPreview: RoleMigrationPreview | null = null;
+  migrationConfirmed = false;
   bulkRoleConfirmed = false;
   recoveryChannelId = '';
   recoverySourceBot = 'Dyno';
@@ -267,16 +274,30 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   }
   selectSection(section: ServerSection): void { this.requestNavigation(this.selectedServerId, section); }
   selectToolTab(tab: ToolTab): void {
-    if (this.activeSection !== 'tools' || !this.toolTabs.some(item => item.id === tab)
-      || tab === this.activeToolTab || this.unifiedBusy || this.channelCopyApplying
+    if (this.activeSection !== 'tools' || ![...this.toolTabs, ...this.roleToolTabs].some(item => item.id === tab)
+      || this.unifiedBusy || this.channelCopyApplying
       || this.xpSaving || this.aiSaving || this.vipSaving || this.backupSaving
       || this.themeSaving) return;
+    if (tab === this.activeToolTab) {
+      this.roleToolsDropdownOpen = false;
+      return;
+    }
     if (this.hasUnsavedChanges()) {
       this.pendingNavigation = { kind: 'tool', tab };
       return;
     }
     this.activeToolTab = tab;
-    if (tab === 'bulk-roles' || tab === 'recovery') this.loadRoleToolHistory();
+    this.roleToolsDropdownOpen = false;
+    if (this.roleToolTabs.some(tool => tool.id === tab)) this.loadRoleToolHistory();
+  }
+  toggleRoleToolsDropdown(): void {
+    this.roleToolsDropdownOpen = !this.roleToolsDropdownOpen;
+  }
+  get roleToolGroupActive(): boolean {
+    return this.roleToolTabs.some(tab => tab.id === this.activeToolTab);
+  }
+  get selectedRoleToolLabel(): string {
+    return this.roleToolTabs.find(tab => tab.id === this.activeToolTab)?.label ?? '';
   }
 
   get channelCopyOptions(): { id: string; label: string }[] {
@@ -373,6 +394,67 @@ export class ServidoresComponent implements OnInit, OnDestroy {
         if (guildId !== this.selectedServerId) return;
         this.roleToolBusy = false;
         this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  invalidateMigrationPreview(): void {
+    this.migrationPreview = null;
+    this.migrationConfirmed = false;
+    this.roleToolError = '';
+    this.clearRequestKey();
+  }
+  previewRoleMigration(): void {
+    const guildId = this.selectedServerId;
+    const source = this.migrationSourceRoleId;
+    const target = this.migrationTargetRoleId;
+    if (!guildId || !source || !target || source === target
+      || this.roleToolBusy || this.roleToolActive) return;
+    this.invalidateMigrationPreview();
+    this.roleToolBusy = true;
+    this.managedServersService.previewRoleMigration(guildId, source, target).subscribe({
+      next: preview => {
+        if (guildId !== this.selectedServerId
+          || source !== this.migrationSourceRoleId || target !== this.migrationTargetRoleId) return;
+        this.migrationPreview = preview;
+        this.roleToolBusy = false;
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+      }
+    });
+  }
+  startRoleMigration(): void {
+    const preview = this.migrationPreview;
+    const guildId = this.selectedServerId;
+    if (!preview || !guildId || !this.migrationConfirmed || preview.sourceMembers === 0
+      || this.roleToolBusy || this.roleToolActive
+      || preview.sourceRoleId !== this.migrationSourceRoleId
+      || preview.targetRoleId !== this.migrationTargetRoleId) return;
+    this.roleToolBusy = true;
+    this.roleToolError = '';
+    const key = this.requestKeyFor(
+      `migrate:${guildId}:${preview.sourceRoleId}:${preview.targetRoleId}:${preview.fingerprint}`);
+    this.managedServersService.startRoleMigration(
+      guildId, preview.sourceRoleId, preview.targetRoleId, preview.fingerprint, key
+    ).subscribe({
+      next: operation => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.invalidateMigrationPreview();
+        this.watchRoleTool(operation);
+      },
+      error: error => {
+        if (guildId !== this.selectedServerId) return;
+        this.roleToolBusy = false;
+        this.roleToolError = this.roleToolErrorMessage(error);
+        if (error?.status === 409) {
+          this.migrationPreview = null;
+          this.migrationConfirmed = false;
+          this.clearRequestKey();
+          this.roleToolError = 'Os membros ou cargos mudaram desde a prévia. Gere uma nova prévia.';
+        }
       }
     });
   }
@@ -1364,7 +1446,11 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     if (this.publicationDraftDirty) this.resetPublicationDraft();
     for (const log of this.logs?.logs ?? []) this.logDrafts[log.type] = { enabled: log.enabled, targetId: log.target?.id ?? null, saving: false, testing: false, error: '' };
     if (target.kind === 'flow') this.loadConfiguration(target.flowId);
-    else if (target.kind === 'tool') this.activeToolTab = target.tab;
+    else if (target.kind === 'tool') {
+      this.activeToolTab = target.tab;
+      this.roleToolsDropdownOpen = false;
+      if (this.roleToolTabs.some(tab => tab.id === target.tab)) this.loadRoleToolHistory();
+    }
     else this.navigateTo(target.guildId, target.section);
   }
   private prepareConfirmation(title: string, summary: string, request: GuildOperationRequest): void { if (!this.mutationInFlight) this.pendingConfirmation = { title, summary, request: structuredClone(request) }; }
@@ -1425,8 +1511,13 @@ export class ServidoresComponent implements OnInit, OnDestroy {
   private clearConfiguration(): void {
     this.roleToolPolling?.unsubscribe();
     this.roleToolPolling = undefined;
+    this.roleToolsDropdownOpen = false;
     this.bulkRoleId = '';
     this.bulkRolePreview = null;
+    this.migrationSourceRoleId = '';
+    this.migrationTargetRoleId = '';
+    this.migrationPreview = null;
+    this.migrationConfirmed = false;
     this.bulkRoleConfirmed = false;
     this.recoveryChannelId = '';
     this.recoverySourceBot = 'Dyno';
@@ -1477,7 +1568,10 @@ export class ServidoresComponent implements OnInit, OnDestroy {
     const changedGuild = this.selectedServerId !== guildId;
     const changedSection = this.activeSection !== section;
     this.selectedServerId = guildId; this.activeSection = section;
-    if (section === 'tools' && (changedGuild || changedSection)) this.activeToolTab = 'private-area';
+    if (section === 'tools' && (changedGuild || changedSection)) {
+      this.activeToolTab = 'private-area';
+      this.roleToolsDropdownOpen = false;
+    }
     if (changedGuild) {
       this.clearConfiguration();
       if (section !== 'backups' && section !== 'themes') {

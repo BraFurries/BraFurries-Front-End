@@ -348,7 +348,20 @@ export interface BulkRolePreview {
   fingerprint: string;
 }
 
-export type RoleToolKind = 'BULK_ADD' | 'RECOVERY_SCAN' | 'RECOVERY_APPLY';
+export interface RoleMigrationPreview {
+  guildId: string;
+  sourceRoleId: string;
+  sourceRoleName: string;
+  targetRoleId: string;
+  targetRoleName: string;
+  sourceMembers: number;
+  needsAddition: number;
+  alreadyHasDestination: number;
+  excludedBots: number;
+  fingerprint: string;
+}
+
+export type RoleToolKind = 'BULK_ADD' | 'ROLE_MIGRATE' | 'RECOVERY_SCAN' | 'RECOVERY_APPLY';
 export type RoleToolStatus = 'PENDING' | 'RUNNING' | 'READY' | 'SUCCEEDED' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
 export interface RoleRecoveryCandidate {
   key: string;
@@ -362,6 +375,7 @@ export interface RoleToolOperation {
   type: RoleToolKind;
   status: RoleToolStatus;
   roleId: string | null;
+  sourceRoleId?: string | null;
   sourceOperationId: number | null;
   sourceBot: string | null;
   channelId: string | null;
@@ -370,6 +384,7 @@ export interface RoleToolOperation {
   progressCurrent: number;
   progressTotal: number;
   addedCount: number;
+  removedCount?: number;
   skippedCount: number;
   failedCount: number;
   scannedCount: number;
@@ -532,6 +547,19 @@ export class ManagedServersService {
   startBulkRole(guildId: string, roleId: string, fingerprint: string, key: string): Observable<RoleToolOperation> {
     return this.http.post<RoleToolOperation>(
       this.guildUrl(guildId, 'role-tools/bulk'), { roleId, fingerprint },
+      { headers: { 'Idempotency-Key': key } }
+    );
+  }
+  previewRoleMigration(guildId: string, sourceRoleId: string, targetRoleId: string): Observable<RoleMigrationPreview> {
+    return this.http.get<RoleMigrationPreview>(this.guildUrl(guildId, 'role-tools/migration/preview'), {
+      params: { sourceRoleId, targetRoleId }
+    });
+  }
+  startRoleMigration(guildId: string, sourceRoleId: string, targetRoleId: string,
+                     fingerprint: string, key: string): Observable<RoleToolOperation> {
+    return this.http.post<RoleToolOperation>(
+      this.guildUrl(guildId, 'role-tools/migration'),
+      { sourceRoleId, targetRoleId, fingerprint },
       { headers: { 'Idempotency-Key': key } }
     );
   }

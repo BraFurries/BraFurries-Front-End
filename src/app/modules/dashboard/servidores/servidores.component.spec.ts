@@ -185,7 +185,7 @@ describe('ServidoresComponent', () => {
         of({ kind: 'ready', state: contextState$.value })
       )
     };
-    service = jasmine.createSpyObj('ManagedServersService', ['getManagedServers','getResources','previewChannelPermissionCopy','applyChannelPermissionCopy','getServerChannels','getBump','getStaffRoles','getModerationAccess','getPortariaBypasses','getVipRoles','getPortaria','getAutoJoinRoles','getLogs','updateLog','testLog','addAutoJoinRole','removeAutoJoinRole','updateAutoJoinEnabled','updateStaffRoles','updateModerationStaffRoles','updateCollaborativeModeration','createPortariaBypass','updatePortariaBypass','removePortariaBypass','updateVipRoles','updateBirthdayChannel','updatePortariaRoles','updatePortariaEnabled','updatePortariaEntry','updatePortariaForm','updatePortariaResult','createPortariaFlow','publishPortariaFlow','updateBumpProcessing','updateBumpWarning','updateBumpIndividualReward','updateBumpMonthlyRanking','previewBulkRole','startBulkRole','scanRecoveryRoles','applyRecoveryRole','getRoleToolOperation','listRoleToolOperations','cancelPendingRoleTool']);
+    service = jasmine.createSpyObj('ManagedServersService', ['getManagedServers','getResources','previewChannelPermissionCopy','applyChannelPermissionCopy','getServerChannels','getBump','getStaffRoles','getModerationAccess','getPortariaBypasses','getVipRoles','getPortaria','getAutoJoinRoles','getLogs','updateLog','testLog','addAutoJoinRole','removeAutoJoinRole','updateAutoJoinEnabled','updateStaffRoles','updateModerationStaffRoles','updateCollaborativeModeration','createPortariaBypass','updatePortariaBypass','removePortariaBypass','updateVipRoles','updateBirthdayChannel','updatePortariaRoles','updatePortariaEnabled','updatePortariaEntry','updatePortariaForm','updatePortariaResult','createPortariaFlow','publishPortariaFlow','updateBumpProcessing','updateBumpWarning','updateBumpIndividualReward','updateBumpMonthlyRanking','previewBulkRole','startBulkRole','previewRoleMigration','startRoleMigration','scanRecoveryRoles','applyRecoveryRole','getRoleToolOperation','listRoleToolOperations','cancelPendingRoleTool']);
     service.getManagedServers.and.returnValue(of(servers)); service.getResources.and.returnValue(of(resources)); service.getServerChannels.and.returnValue(of(serverChannels)); service.getBump.and.returnValue(of(bump)); service.getStaffRoles.and.returnValue(of(staff)); service.getModerationAccess.and.returnValue(of(moderationAccess)); service.getPortariaBypasses.and.returnValue(of({ portariaEnabled: true, bypasses: [] })); service.getVipRoles.and.returnValue(of({ roleIds: ['1'], roles: [resources.roles[0]] })); service.getPortaria.and.returnValue(of(portaria)); service.getAutoJoinRoles.and.returnValue(of(autoJoinRoles));
     service.addAutoJoinRole.and.returnValue(of(autoJoinRoles)); service.removeAutoJoinRole.and.returnValue(of(autoJoinRoles)); service.updateAutoJoinEnabled.and.returnValue(of(autoJoinRoles)); service.updateModerationStaffRoles.and.returnValue(of(moderationAccess)); service.updateCollaborativeModeration.and.returnValue(of(moderationAccess)); service.updatePortariaEntry.and.returnValue(of(portaria)); service.updatePortariaForm.and.returnValue(of(portaria)); service.updatePortariaResult.and.returnValue(of(portaria)); service.createPortariaFlow.and.returnValue(of(portaria));
     service.updateVipRoles.and.returnValue(of({ roleIds: ['1'], roles: [resources.roles[0]] }));
@@ -880,10 +880,77 @@ describe('ServidoresComponent', () => {
     expect(component.operationModal?.message).toBe('Mensagem de acesso publicada com sucesso.');
   });
 
+  it('groups role tools into one expandable Cargos tab with all three actions', () => {
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const button = root.querySelector('#coddy-role-tool-dropdown') as HTMLButtonElement;
+    expect(button).toBeTruthy();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('#coddy-tool-tab-role-migrate')).toBeNull();
+    button.click();
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    const options = root.querySelector('#coddy-role-tool-options') as HTMLElement;
+    expect(options.textContent).toContain('Adicionar a todos');
+    expect(options.textContent).toContain('Migrar membros');
+    expect(options.textContent).toContain('Recuperar estado');
+    const migrationTab = root.querySelector('#coddy-tool-tab-role-migrate') as HTMLButtonElement;
+    migrationTab.click();
+    fixture.detectChanges();
+    expect(component.activeToolTab).toBe('role-migrate');
+    expect(component.roleToolsDropdownOpen).toBeFalse();
+    expect(root.querySelector('#coddy-tool-panel-role-migrate')).not.toBeNull();
+  });
+
+  it('requires reviewed migration preview and confirmation before moving members', () => {
+    const preview = {
+      guildId: resources.guildId,
+      sourceRoleId: '1', targetRoleId: '999999999999999999',
+      sourceRoleName: 'Cargo baixo', targetRoleName: 'Moderador',
+      sourceMembers: 7, needsAddition: 5, alreadyHasDestination: 2,
+      excludedBots: 1, fingerprint: 'a'.repeat(64)
+    };
+    const done: RoleToolOperation = {
+      id: 81, type: 'ROLE_MIGRATE', status: 'SUCCEEDED',
+      roleId: preview.targetRoleId, sourceRoleId: preview.sourceRoleId,
+      sourceOperationId: null, sourceBot: null, channelId: null, roleKey: null,
+      expectedCount: 7, progressCurrent: 7, progressTotal: 7,
+      addedCount: 5, removedCount: 7, skippedCount: 0, failedCount: 0,
+      scannedCount: 0, errorCode: null, roles: []
+    };
+    service.previewRoleMigration.and.returnValue(of(preview));
+    service.startRoleMigration.and.returnValue(of(done));
+    create();
+    setRoute({ guildId: resources.guildId, section: 'tools' });
+    component.selectToolTab('role-migrate');
+    component.migrationSourceRoleId = preview.sourceRoleId;
+    component.migrationTargetRoleId = preview.sourceRoleId;
+    component.previewRoleMigration();
+    expect(service.previewRoleMigration).not.toHaveBeenCalled();
+    component.migrationTargetRoleId = preview.targetRoleId;
+    component.previewRoleMigration();
+    fixture.detectChanges();
+    expect(component.migrationPreview?.sourceMembers).toBe(7);
+    expect(service.previewRoleMigration).toHaveBeenCalledOnceWith(
+      resources.guildId, preview.sourceRoleId, preview.targetRoleId);
+    component.startRoleMigration();
+    expect(service.startRoleMigration).not.toHaveBeenCalled();
+    component.migrationConfirmed = true;
+    component.startRoleMigration();
+    expect(service.startRoleMigration).toHaveBeenCalledOnceWith(
+      resources.guildId, preview.sourceRoleId, preview.targetRoleId,
+      preview.fingerprint, jasmine.any(String));
+    expect(component.roleToolOperation?.removedCount).toBe(7);
+    expect(component.migrationPreview).toBeNull();
+  });
+
   it('offers permission copying only under Ferramentas and requires explicit preview and confirmation', () => {
     create();
     setRoute({ guildId: resources.guildId, section: 'tools' });
-    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions', 'bulk-roles', 'recovery']);
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions']);
+    expect(component.roleToolTabs.map(tab => tab.id)).toEqual(['bulk-roles', 'role-migrate', 'recovery']);
     component.selectToolTab('channel-permissions');
     fixture.detectChanges();
 
@@ -1001,7 +1068,8 @@ describe('ServidoresComponent', () => {
     create();
     expect(component.sections.some(section => section.id === 'tools' && section.label === 'Ferramentas')).toBeTrue();
     expect(component.sections.some(section => section.id === ('private-area' as any))).toBeFalse();
-    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions', 'bulk-roles', 'recovery']);
+    expect(component.toolTabs.map(tab => tab.id)).toEqual(['private-area', 'channel-permissions']);
+    expect(component.roleToolTabs.map(tab => tab.id)).toEqual(['bulk-roles', 'role-migrate', 'recovery']);
 
     setRoute({ guildId: resources.guildId, section: 'tools' });
     expect(component.activeSection).toBe('tools');
