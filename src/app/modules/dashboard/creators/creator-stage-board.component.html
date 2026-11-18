@@ -1,18 +1,4 @@
-<section class="mx-auto max-w-7xl space-y-5 p-4 text-gray-800 md:p-8">
-  <header class="space-y-2">
-    <a routerLink="/painel/creators/producao/processos"
-      class="text-sm font-semibold text-braPurple hover:underline">← Meus processos</a>
-    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Creator Studio</p>
-    <h1 class="font-amaranth text-3xl font-bold text-braDark">
-      {{ mode === 'process' ? (workflow?.name || 'Quadro do processo') : 'Quadro por etapas' }}
-    </h1>
-    <p class="max-w-2xl text-sm text-gray-600">
-      {{ mode === 'process'
-        ? 'Acompanhe os pedidos deste processo em cada etapa. Você pode mover apenas para etapas que fazem parte do pedido.'
-        : 'Veja pedidos de processos diferentes agrupados pelas etapas reutilizáveis que você vinculou.' }}
-    </p>
-  </header>
-
+<section class="min-w-0 space-y-4 text-gray-800" aria-label="Quadro de produção">
   <p *ngIf="loading" role="status" class="rounded-xl bg-white p-5 text-sm text-gray-600">
     Verificando seu acesso...
   </p>
