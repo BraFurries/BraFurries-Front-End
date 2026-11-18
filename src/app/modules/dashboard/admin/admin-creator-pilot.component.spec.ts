@@ -221,7 +221,7 @@ describe('AdminCreatorPilotComponent', () => {
     await init(true);
     const pending = new Subject<{
       expiredCommissions:number;blockedByHold:number;blockedByMissingD30:number;
-      blockedByMissingD7:number;smtpAcceptedBoth:number;deliveryProofSupported:boolean;
+      blockedByMissingD7:number;smtpAcceptedBoth:number;providerConfirmedBoth:number;deliveryProofSupported:boolean;
     }>();
     pilot.retentionDryRun.and.returnValue(pending.asObservable());
     component.loadRetentionReport();
