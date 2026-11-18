@@ -1,0 +1,138 @@
+<section class="space-y-6">
+  <header class="space-y-2">
+    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">BraFurries Creators · Administração</p>
+    <h2 class="font-amaranth text-2xl font-bold text-braDark">Modelos globais de produção</h2>
+    <p class="max-w-3xl text-sm text-gray-600">
+      Publique processos prontos para os artistas do Creator Studio. Cada artista
+      importa uma cópia independente, preservando seus próprios trabalhos.
+    </p>
+  </header>
+  <p *ngIf="checkingOwner" role="status" class="rounded-xl border bg-white p-5 text-sm text-gray-600">
+    Verificando acesso administrativo...
+  </p>
+  <section *ngIf="!checkingOwner && !owner" class="rounded-xl border bg-white p-5">
+    <h3 class="font-amaranth text-xl font-bold text-braDark">Área restrita</h3>
+    <p class="mt-2 text-sm text-gray-600">Somente o proprietário da BraFurries pode administrar modelos globais.</p>
+    <p *ngIf="globalError" role="alert" class="mt-2 text-sm text-red-700">{{ globalError }}</p>
+  </section>
+  <ng-container *ngIf="!checkingOwner && owner">
+    <section id="creator-global-library" class="space-y-5 rounded-2xl border border-braPurple/20 bg-white p-5 shadow-sm"
+      aria-labelledby="creator-global-library-title">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="space-y-2">
+          <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Processos de produção</p>
+          <h3 id="creator-global-library-title" class="font-amaranth text-2xl font-bold text-braDark">
+            Biblioteca global de modelos
+          </h3>
+          <p class="max-w-3xl text-sm text-gray-600">
+            Gerencie os modelos que todos os artistas Pro convidados poderão copiar.
+            Cada artista recebe uma cópia independente; editar ou ocultar um modelo
+            global não modifica os processos nem os pedidos já existentes.
+          </p>
+        </div>
+        <button type="button" (click)="loadGlobalModels()" [disabled]="globalLoading || globalBusy"
+          class="rounded-lg border border-braPurple/30 px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+          Atualizar biblioteca
+        </button>
+      </div>
+
+      <p *ngIf="globalLoading" role="status" class="text-sm text-gray-600">
+        Carregando modelos globais...
+      </p>
+      <p *ngIf="globalError" role="alert" class="text-sm font-semibold text-red-700">
+        {{ globalError }}
+      </p>
+      <p *ngIf="globalNotice" role="status" class="text-sm font-semibold text-green-800">
+        {{ globalNotice }}
+      </p>
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <article *ngFor="let model of globalModels" class="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h4 class="font-amaranth text-lg font-bold text-braDark">{{ model.name }}</h4>
+            <span class="rounded-full px-2.5 py-1 text-xs font-semibold"
+              [ngClass]="model.active ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'">
+              {{ model.active ? 'Publicado' : 'Oculto' }}
+            </span>
+          </div>
+          <p class="text-sm text-gray-600">{{ model.description }}</p>
+          <p class="text-xs text-gray-500">{{ model.steps.length }} etapas</p>
+          <button type="button" (click)="editGlobalModel(model)" [disabled]="globalBusy"
+            class="rounded-lg border border-braPurple/25 bg-white px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+            Editar modelo
+          </button>
+        </article>
+      </div>
+      <p *ngIf="!globalLoading && !globalModels.length" class="text-sm text-gray-500">
+        Nenhum modelo disponível. Cadastre o primeiro abaixo.
+      </p>
+
+      <form (ngSubmit)="saveGlobalModel()" class="space-y-4 rounded-xl border border-braPurple/15 p-4"
+        aria-label="Formulário de modelo global">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h4 class="font-amaranth text-xl font-bold text-braDark">
+            {{ editingGlobalId === null ? 'Criar modelo global' : 'Editar modelo global' }}
+          </h4>
+          <button *ngIf="editingGlobalId !== null" type="button" (click)="resetGlobalModel()"
+            [disabled]="globalBusy" class="rounded-lg border px-3 py-2 text-sm font-semibold">
+            Novo modelo
+          </button>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <label class="text-sm font-semibold text-gray-700">
+            Nome do modelo *
+            <input name="globalModelName" [(ngModel)]="globalModel.name" required maxlength="100"
+              placeholder="Ex.: Processo de ícones"
+              class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal">
+          </label>
+          <label class="flex items-center gap-3 self-end rounded-lg border px-3 py-3 text-sm font-semibold text-gray-700">
+            <input type="checkbox" name="globalModelActive" [(ngModel)]="globalModel.active"
+              class="h-4 w-4 accent-braPurple">
+            Disponibilizar para os artistas
+          </label>
+        </div>
+        <label class="block text-sm font-semibold text-gray-700">
+          Descrição
+          <textarea name="globalModelDescription" [(ngModel)]="globalModel.description" maxlength="500"
+            rows="2" placeholder="Explique para que tipo de trabalho este modelo serve"
+            class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></textarea>
+        </label>
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h5 class="font-semibold text-gray-800">Etapas ({{ globalModel.steps.length }}/40)</h5>
+            <button type="button" (click)="addGlobalStep()"
+              [disabled]="globalBusy || globalModel.steps.length >= 40"
+              class="rounded-lg border border-braPurple/25 px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              + Adicionar etapa
+            </button>
+          </div>
+          <div *ngFor="let step of globalModel.steps; let i = index; trackBy: trackByStepIndex"
+            class="flex flex-wrap items-end gap-2 rounded-lg border bg-gray-50 p-3">
+            <label class="min-w-36 flex-1 text-xs font-semibold text-gray-700">
+              Etapa {{ i + 1 }}
+              <input [name]="'globalStep' + i" [(ngModel)]="globalModel.steps[i]"
+                required maxlength="100" placeholder="Ex.: Revisão"
+                class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 text-sm font-normal">
+            </label>
+            <button type="button" (click)="moveGlobalStep(i,-1)" [disabled]="globalBusy || i===0"
+              [attr.aria-label]="'Subir etapa ' + (i+1)"
+              class="rounded-lg border bg-white px-3 py-2 text-sm disabled:opacity-30">↑</button>
+            <button type="button" (click)="moveGlobalStep(i,1)"
+              [disabled]="globalBusy || i===globalModel.steps.length-1"
+              [attr.aria-label]="'Descer etapa ' + (i+1)"
+              class="rounded-lg border bg-white px-3 py-2 text-sm disabled:opacity-30">↓</button>
+            <button type="button" (click)="removeGlobalStep(i)" [disabled]="globalBusy"
+              [attr.aria-label]="'Remover etapa ' + (i+1)"
+              class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-700 disabled:opacity-50">
+              Remover
+            </button>
+          </div>
+        </div>
+        <button type="submit" [disabled]="globalBusy || !globalModel.name.trim() || !globalModel.steps.length"
+          class="rounded-xl bg-braPurple px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          {{ globalBusy ? 'Salvando...' : 'Salvar modelo global' }}
+        </button>
+      </form>
+    </section>
+
+  </ng-container>
+</section>
