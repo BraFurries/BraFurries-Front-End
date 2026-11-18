@@ -59,7 +59,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   boardError = '';
   draggedBoardCardId: number | null = null;
   hoveredBoardStatus: CreatorCommissionStatus | null = null;
-  boardGhostTop = 64;
+  boardGhostIndex: number | null = null;
   boardGhostHeight = 160;
   @ViewChildren('boardDropZone', {read: ElementRef})
   private boardDropZones!: QueryList<ElementRef<HTMLElement>>;
@@ -128,6 +128,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.boardError = '';
         this.draggedBoardCardId = null;
         this.hoveredBoardStatus = null;
+        this.boardGhostIndex = null;
         this.access = null;
         this.accessError = '';
         this.loadingAccess = user !== null;
@@ -520,8 +521,27 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     if (!this.canUsePro || this.viewMode !== 'board' || this.changingId !== null) return;
     this.draggedBoardCardId = commission.id;
     this.hoveredBoardStatus = null;
+    this.boardGhostIndex = null;
     const height = event.source.getPlaceholderElement().getBoundingClientRect().height;
-    this.boardGhostHeight = Math.min(180, Math.max(110, Math.ceil(height || 160)));
+    this.boardGhostHeight = Math.max(110, Math.ceil(height || 160));
+  }
+
+  /**
+   * Show a fixed empty slot where the commission would be placed after the API
+   * reloads the lane. Backend order: requested_on ASC, id ASC. Pointer
+   * movement inside a lane must never change the slot.
+   */
+  boardInsertionIndex(commission: CreatorCommission, status: CreatorCommissionStatus): number | null {
+    const column = this.boardColumns.find(item => item.status === status);
+    if (!column) return null;
+    const index = column.items.findIndex(item =>
+      item.requestedOn > commission.requestedOn ||
+      (item.requestedOn === commission.requestedOn && item.id > commission.id));
+    const insertion = index >= 0 ? index : column.items.length;
+    // A paginated board only shows the first 12 orders. Avoid displaying a
+    // misleading placeholder if the true position is after the visible page.
+    return insertion === column.items.length && column.total > column.items.length
+      ? null : insertion;
   }
 
   boardDragMoved(event: CdkDragMove<CreatorCommission>): void {
@@ -530,17 +550,13 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     if (!point) return;
     const target = this.boardDropZoneAt(point.x, point.y);
     const nextStatus = target?.status === event.source.data.status ? null : target?.status ?? null;
-    const nextTop = target && nextStatus && nextStatus !== 'COMPLETED'
-      ? Math.max(58, Math.min(
-          Math.max(58, target.rect.height - this.boardGhostHeight - 12),
-          Math.round(point.y - target.rect.top - this.boardGhostHeight / 2)
-        ))
-      : 64;
-    // Drag movements fire outside Angular's zone and may happen every pixel.
-    if (nextStatus !== this.hoveredBoardStatus || Math.abs(nextTop - this.boardGhostTop) >= 12) {
+    const nextIndex = nextStatus && nextStatus !== 'COMPLETED'
+      ? this.boardInsertionIndex(event.source.data, nextStatus) : null;
+    // CDK emits this for every pixel: update Angular only on a lane change.
+    if (nextStatus !== this.hoveredBoardStatus || nextIndex !== this.boardGhostIndex) {
       this.zone.run(() => {
         this.hoveredBoardStatus = nextStatus;
-        this.boardGhostTop = nextTop;
+        this.boardGhostIndex = nextIndex;
       });
     }
   }
@@ -551,6 +567,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     const status = point ? this.boardDropZoneAt(point.x, point.y)?.status ?? null : null;
     this.draggedBoardCardId = null;
     this.hoveredBoardStatus = null;
+    this.boardGhostIndex = null;
     // A release inside the origin, outside the board or a cancelled drag is a no-op.
     if (status && status !== commission.status) this.moveBoardCommission(commission, status);
   }
