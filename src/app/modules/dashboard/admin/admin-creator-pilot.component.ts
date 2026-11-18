@@ -236,7 +236,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   private holdIds(): {artistUserId: number; commissionId: number} | null {
     const rawArtist = String(this.holdArtistId).trim();
     const rawCommission = String(this.holdCommissionId).trim();
-    if (!/^[1-9]\d*$/.test(rawArtist) || !/^[1-9]\\d*$/.test(rawCommission)) return null;
+    if (!/^[1-9]\d*$/.test(rawArtist) || !/^[1-9]\d*$/.test(rawCommission)) return null;
     const artistUserId = Number(rawArtist);
     const commissionId = Number(rawCommission);
     if (!Number.isSafeInteger(artistUserId) || !Number.isSafeInteger(commissionId)) return null;
