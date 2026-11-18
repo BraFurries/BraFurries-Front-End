@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { distinctUntilChanged, Observable, Subject, takeUntil } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
+import { CreatorGlobalWorkflow, CreatorGlobalWorkflowDraft } from '../../../core/services/creator-studio.service';
 import {
   CreatorPilotCandidate, CreatorPilotFilter, CreatorPilotInvitation,
   CreatorHoldCategory, CreatorRetentionHold, CreatorRetentionDryRun, CreatorRetentionHealth,
@@ -55,6 +56,15 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   retentionHealthError = '';
   private retentionHealthSequence = 0;
 
+  globalModels: CreatorGlobalWorkflow[] = [];
+  globalModel: CreatorGlobalWorkflowDraft = this.emptyGlobalModel();
+  editingGlobalId: number | null = null;
+  globalLoading = false;
+  globalBusy = false;
+  globalError = '';
+  globalNotice = '';
+  private globalSequence = 0;
+
   private accountId: number | null = null;
   private accountSequence = 0;
   private listSequence = 0;
@@ -84,6 +94,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
         this.retentionReportBusy = false;
         this.retentionReportError = '';
         this.invalidateRetentionHealth();
+        this.invalidateGlobalModels();
         this.hold = null;
         this.holdArtistId = '';
         this.holdCommissionId = '';
@@ -111,7 +122,10 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
             if (!this.isCurrent(seq, user.id)) return;
             this.checkingOwner = false;
             this.owner = access.enabled && access.owner;
-            if (this.owner) this.loadParticipants();
+            if (this.owner) {
+              this.loadParticipants();
+              this.loadGlobalModels();
+            }
           },
           error: () => {
             if (!this.isCurrent(seq, user.id)) return;
@@ -125,6 +139,128 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private emptyGlobalModel(): CreatorGlobalWorkflowDraft {
+    return {name:'',description:'',active:true,steps:[]};
+  }
+
+  private invalidateGlobalModels(): void {
+    this.globalSequence++;
+    this.globalLoading = false;
+    this.globalBusy = false;
+    this.globalModels = [];
+    this.globalError = '';
+    this.globalNotice = '';
+    this.editingGlobalId = null;
+    this.globalModel = this.emptyGlobalModel();
+  }
+
+  loadGlobalModels(): void {
+    if (!this.owner) return;
+    const seq = ++this.globalSequence;
+    const account = this.accountId;
+    this.globalLoading = true;
+    this.globalError = '';
+    this.studio.globalWorkflows().pipe(takeUntil(this.destroy$)).subscribe({
+      next: models => {
+        if (!this.isCurrentAccount(account) || seq !== this.globalSequence) return;
+        this.globalLoading = false;
+        this.globalModels = models;
+      },
+      error: error => {
+        if (!this.isCurrentAccount(account) || seq !== this.globalSequence) return;
+        this.globalLoading = false;
+        if (error instanceof HttpErrorResponse && error.status === 403) {
+          this.handleError(error, 'Acesso negado à biblioteca global.');
+        } else {
+          this.globalError = 'Não foi possível carregar a biblioteca global.';
+        }
+      }
+    });
+  }
+
+  resetGlobalModel(): void {
+    if (this.globalBusy) return;
+    this.globalModel = this.emptyGlobalModel();
+    this.editingGlobalId = null;
+    this.globalError = '';
+  }
+
+  editGlobalModel(source: CreatorGlobalWorkflow): void {
+    if (!this.owner || this.globalBusy) return;
+    this.editingGlobalId = source.id;
+    this.globalModel = {
+      name:source.name,
+      description:source.description,
+      active:source.active,
+      steps:source.steps.map(step => step.name)
+    };
+    this.globalError = '';
+    this.globalNotice = '';
+  }
+
+  addGlobalStep(): void {
+    if (!this.owner || this.globalBusy || this.globalModel.steps.length >= 40) return;
+    this.globalModel.steps.push('');
+  }
+
+  moveGlobalStep(index: number, offset: number): void {
+    const other = index + offset;
+    if (this.globalBusy || other < 0 || other >= this.globalModel.steps.length) return;
+    const [value] = this.globalModel.steps.splice(index,1);
+    this.globalModel.steps.splice(other,0,value);
+  }
+
+  removeGlobalStep(index: number): void {
+    if (this.globalBusy) return;
+    this.globalModel.steps.splice(index,1);
+  }
+
+  saveGlobalModel(): void {
+    if (!this.owner || this.globalBusy) return;
+    const input: CreatorGlobalWorkflowDraft = {
+      name:this.globalModel.name.trim(),
+      description:this.globalModel.description.trim(),
+      active:this.globalModel.active,
+      steps:this.globalModel.steps.map(s => s.trim())
+    };
+    if (!input.name || input.name.length > 100 || input.description.length > 500 ||
+        !input.steps.length || input.steps.length > 40 ||
+        input.steps.some(step => !step || step.length > 100)) {
+      this.globalError = 'Informe o nome, uma descrição de até 500 caracteres e de 1 a 40 etapas válidas.';
+      return;
+    }
+    const account = this.accountId;
+    const seq = ++this.globalSequence;
+    const id = this.editingGlobalId;
+    this.globalBusy = true;
+    this.globalError = '';
+    this.globalNotice = '';
+    const request = id === null
+      ? this.studio.createGlobalWorkflow(input)
+      : this.studio.updateGlobalWorkflow(id,input);
+    request.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        if (!this.isCurrentAccount(account) || seq !== this.globalSequence) return;
+        this.globalBusy = false;
+        this.globalModel = this.emptyGlobalModel();
+        this.editingGlobalId = null;
+        this.globalNotice = 'Modelo global salvo. Cópias pessoais e trabalhos em andamento não foram alterados.';
+        this.loadGlobalModels();
+      },
+      error: error => {
+        if (!this.isCurrentAccount(account) || seq !== this.globalSequence) return;
+        this.globalBusy = false;
+        if (error instanceof HttpErrorResponse && error.status === 403) {
+          this.handleError(error, 'Acesso negado aos modelos globais.');
+        } else {
+          this.globalError = error instanceof HttpErrorResponse && error.status === 409
+            ? 'Já existe um modelo global com este nome.'
+            : 'Não foi possível salvar o modelo global.';
+        }
+      }
+    });
   }
 
   get pageCount(): number {
@@ -480,6 +616,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
       this.total = 0;
       this.invalidateRetentionReport();
       this.invalidateRetentionHealth();
+      this.invalidateGlobalModels();
       this.errorMessage = 'Você não tem autorização para gerenciar o piloto.';
       return;
     }
