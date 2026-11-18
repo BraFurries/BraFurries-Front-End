@@ -4,7 +4,8 @@ import { distinctUntilChanged, Observable, Subject, takeUntil } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import {
   CreatorPilotCandidate, CreatorPilotFilter, CreatorPilotInvitation,
-  CreatorHoldCategory, CreatorRetentionHold, CreatorRetentionDryRun, CreatorStudioPilotAdminService
+  CreatorHoldCategory, CreatorRetentionHold, CreatorRetentionDryRun, CreatorRetentionHealth,
+  CreatorStudioPilotAdminService
 } from '../../../core/services/creator-studio-pilot-admin.service';
 import { UserService } from '../../../core/services/user.service';
 
@@ -49,6 +50,11 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   retentionReportError = '';
   private retentionReportSequence = 0;
 
+  retentionHealth: CreatorRetentionHealth | null = null;
+  retentionHealthBusy = false;
+  retentionHealthError = '';
+  private retentionHealthSequence = 0;
+
   private accountId: number | null = null;
   private accountSequence = 0;
   private listSequence = 0;
@@ -77,6 +83,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
         this.retentionReport = null;
         this.retentionReportBusy = false;
         this.retentionReportError = '';
+        this.invalidateRetentionHealth();
         this.hold = null;
         this.holdArtistId = '';
         this.holdCommissionId = '';
@@ -272,6 +279,40 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
     this.retentionReportError = '';
   }
 
+  /** Only queried on demand, scoped to this authenticated platform owner. */
+  loadRetentionHealth(): void {
+    if (!this.owner || this.retentionHealthBusy) return;
+    const seq = ++this.retentionHealthSequence;
+    const account = this.accountId;
+    this.retentionHealthBusy = true;
+    this.retentionHealthError = '';
+    this.retentionHealth = null;
+    this.studio.retentionHealth().pipe(takeUntil(this.destroy$)).subscribe({
+      next: report => {
+        if (!this.isCurrentAccount(account) || seq !== this.retentionHealthSequence) return;
+        this.retentionHealthBusy = false;
+        this.retentionHealth = report;
+      },
+      error: error => {
+        if (!this.isCurrentAccount(account) || seq !== this.retentionHealthSequence) return;
+        this.retentionHealthBusy = false;
+        this.retentionHealth = null;
+        if (error instanceof HttpErrorResponse && error.status === 403) {
+          this.handleError(error, 'Acesso negado ao diagnóstico de avisos.');
+        } else {
+          this.retentionHealthError = 'Não foi possível consultar a saúde dos avisos.';
+        }
+      }
+    });
+  }
+
+  private invalidateRetentionHealth(): void {
+    this.retentionHealthSequence++;
+    this.retentionHealth = null;
+    this.retentionHealthBusy = false;
+    this.retentionHealthError = '';
+  }
+
   onHoldFieldsChanged(): void {
     this.holdSequence++;
     this.hold = null;
@@ -438,6 +479,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
       this.participants = [];
       this.total = 0;
       this.invalidateRetentionReport();
+      this.invalidateRetentionHealth();
       this.errorMessage = 'Você não tem autorização para gerenciar o piloto.';
       return;
     }
