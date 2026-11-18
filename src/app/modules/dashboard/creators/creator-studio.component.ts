@@ -48,8 +48,11 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   definitions: CreatorStageDefinition[] = [];
   workflows: CreatorWorkflow[] = [];
   // Kanban is the default; the chronological list remains available for detail work.
-  viewMode: 'board' | 'list' | 'process' | 'stages' = 'board';
+  viewMode: 'board' | 'list' | 'stages' = 'board';
   selectedWorkflowId: number | null = null;
+  organizingStageColumns = false;
+  stageOrderAvailable = false;
+  stageMoveInProgress = false;
   @ViewChild(CreatorStageBoardComponent) private stageBoard?: CreatorStageBoardComponent;
   groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
   readonly boardStatuses: CreatorCommissionStatus[] =
@@ -155,6 +158,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.definitions = [];
         this.workflows = [];
         this.selectedWorkflowId = null;
+        this.organizingStageColumns = false;
+        this.stageOrderAvailable = false;
+        this.stageMoveInProgress = false;
         this.viewMode = 'board';
         this.loading = false;
         this.loadingSteps = false;
@@ -289,8 +295,14 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     return this.boardColumns.reduce((sum, col) => sum + col.total, 0);
   }
 
-  setViewMode(mode: 'board' | 'list' | 'process' | 'stages'): void {
-    if (mode === this.viewMode || !this.canUsePro) return;
+  setViewMode(mode: 'board' | 'list' | 'stages'): void {
+    if (mode === this.viewMode || !this.canUsePro || this.changingId !== null || this.stageMoveInProgress) return;
+    this.selectedWorkflowId = null;
+    this.organizingStageColumns = false;
+    this.stageOrderAvailable = false;
+    this.draggedBoardCardId = null;
+    this.hoveredBoardStatus = null;
+    this.boardGhostIndex = null;
     this.viewMode = mode;
     this.listSequence++;
     this.boardSequence++;
@@ -303,6 +315,20 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     // The embedded stage board reacts to its workflow input and loads
     // itself. Do not reload the previous board while switching modes.
     if (mode === 'board' || mode === 'list') this.reload();
+  }
+
+  selectStageProcess(id: number | null): void {
+    if (this.viewMode !== 'stages' || this.organizingStageColumns || this.stageMoveInProgress ||
+        id === this.selectedWorkflowId || (id !== null && !this.workflows.some(model => model.id === id))) return;
+    this.selectedWorkflowId = id;
+    this.stageOrderAvailable = false;
+    this.errorMessage = '';
+  }
+
+  organizeStageColumns(): void {
+    if (this.viewMode === 'stages' && this.selectedWorkflowId === null && this.stageOrderAvailable) {
+      this.stageBoard?.openStageOrder();
+    }
   }
 
   showStatusList(status: CreatorCommissionStatus): void {
@@ -406,7 +432,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       this.loadBoard();
       return;
     }
-    if (this.viewMode === 'process' || this.viewMode === 'stages') {
+    if (this.viewMode === 'stages') {
       this.stageBoard?.reloadBoard();
       return;
     }
@@ -568,7 +594,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
    * The whole lane is a hit area, rather than the small list inside it.
    */
   boardDragStarted(event: CdkDragStart<CreatorCommission>, commission: CreatorCommission): void {
-    if (!this.canUsePro || this.viewMode !== 'board' || this.changingId !== null) return;
+    if (!this.canUsePro || this.viewMode !== 'board' || this.changingId !== null || this.saving || this.boardLoading) return;
     this.draggedBoardCardId = commission.id;
     this.hoveredBoardStatus = null;
     this.boardGhostIndex = null;
@@ -595,7 +621,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   }
 
   boardDragMoved(event: CdkDragMove<CreatorCommission>): void {
-    if (this.draggedBoardCardId === null || !this.canUsePro) return;
+    if (this.viewMode !== 'board' || this.draggedBoardCardId === null || !this.canUsePro) return;
     const point = this.boardPointer(event.event);
     if (!point) return;
     const target = this.boardDropZoneAt(point.x, point.y);
@@ -612,7 +638,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   }
 
   boardDragEnded(event: CdkDragEnd<CreatorCommission>, commission: CreatorCommission): void {
-    if (this.draggedBoardCardId !== commission.id) return;
+    if (this.viewMode !== 'board' || this.draggedBoardCardId !== commission.id) return;
     const point = this.boardPointer(event.event);
     const status = point ? this.boardDropZoneAt(point.x, point.y)?.status ?? null : null;
     this.draggedBoardCardId = null;
@@ -627,7 +653,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       const touch = event.changedTouches[0] ?? event.touches[0];
       return touch ? {x: touch.clientX, y: touch.clientY} : null;
     }
-    return {x: event.clientX, y: event.clientY};
+    return Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
+      ? {x: event.clientX, y: event.clientY} : null;
   }
 
   private boardDropZoneAt(x: number, y: number): {status: CreatorCommissionStatus; rect: DOMRect} | null {
