@@ -39,7 +39,7 @@ describe('CreatorStudioComponent', () => {
       ['myAccess', 'commissions', 'create', 'update', 'changeStatus',
         'artTypes', 'workflows', 'stageDefinitions', 'commissionSteps',
         'addCommissionStep', 'updateCommissionStep', 'deleteCommissionStep',
-        'copyWorkflowToCommission']);
+        'copyWorkflowToCommission', 'retention', 'exportMyData']);
     studio.myAccess.and.returnValue(of(pro));
     studio.commissions.and.returnValue(of({items:[card],page:1,pageSize:25,total:1}));
     studio.create.and.returnValue(of(card));
@@ -49,6 +49,12 @@ describe('CreatorStudioComponent', () => {
     studio.workflows.and.returnValue(of([]));
     studio.stageDefinitions.and.returnValue(of([]));
     studio.commissionSteps.and.returnValue(of([]));
+    studio.retention.and.returnValue(of({
+      policy: '12_MONTHS_AFTER_LAST_COMPLETION',
+      retentionMonths: 12, advanceNoticeDays: 30, finalNoticeDays: 7,
+      automaticDeletionEnabled: false, commissions: []
+    }));
+    studio.exportMyData.and.returnValue(of(new Blob(['{}'],{type:'application/json'})));
     users = jasmine.createSpyObj<UserService>('UserService',
       ['getUser'], { user$: user$.asObservable() });
     users.getUser.and.callFake(() => user$.value);
@@ -142,6 +148,39 @@ describe('CreatorStudioComponent', () => {
     expect(component.expandedCommissionId).toBe(11);
     component.toggleSteps(card);
     expect(component.expandedCommissionId).toBeNull();
+  });
+
+  it('shows 30/7-day notices while keeping automatic deletion disabled', () => {
+    studio.retention.and.returnValue(of({
+      policy:'12_MONTHS_AFTER_LAST_COMPLETION',
+      retentionMonths:12, advanceNoticeDays:30, finalNoticeDays:7,
+      automaticDeletionEnabled:false,
+      commissions:[{
+        id:101,title:'Encomenda concluída',
+        completedAtUtc:'2025-11-20T10:00:00',
+        expiresAtUtc:'2026-11-20T10:00:00',
+        warning:'FINAL_7_DAYS'
+      }]
+    }));
+    user$.next({...user,id:51});
+    fixture.detectChanges();
+    const html = fixture.nativeElement.textContent as string;
+    expect(html).toContain('Encomenda concluída');
+    expect(html).toContain('Até 7 dias');
+    expect(html).toContain('exclusão automática está desativada');
+  });
+
+  it('shows data export even if a prior Pro holder no longer has access', () => {
+    studio.myAccess.and.returnValue(of({
+      allowed:false,tier:'PRO',status:'REVOKED',
+      sourceKind:'PILOT',expiresAtUtc:null
+    }));
+    user$.next({...user,id:61});
+    fixture.detectChanges();
+    expect(component.canUsePro).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Exportar meus dados');
+    expect(fixture.nativeElement.textContent).not.toContain('Cliente: Theo');
+    expect(studio.retention).toHaveBeenCalledTimes(2);
   });
 
   it('formats date-only fields without local timezone conversion', () => {
