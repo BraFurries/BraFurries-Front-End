@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
+import { CdkDrag, CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
-import { CreatorCommission, CreatorStudioAccess, CreatorStudioService } from '../../../core/services/creator-studio.service';
+import { CreatorCommission, CreatorCommissionStatus, CreatorStudioAccess, CreatorStudioService } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
 import { User } from '../../../shared/models/user';
 import { CreatorStudioComponent } from './creator-studio.component';
@@ -65,7 +67,7 @@ describe('CreatorStudioComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [CreatorStudioComponent],
-      imports: [CommonModule, FormsModule, RouterModule.forRoot([])],
+      imports: [CommonModule, FormsModule, DragDropModule, RouterModule.forRoot([])],
       providers: [
         {provide: CreatorStudioService, useValue: studio},
         {provide: UserService, useValue: users}
@@ -96,6 +98,100 @@ describe('CreatorStudioComponent', () => {
     expect(html).toContain('12/11/2026');
     expect(html).toContain('Aguardando retorno');
     expect(html).toContain('Em pausa');
+  });
+
+  function drop(commission: CreatorCommission, from: CreatorCommissionStatus,
+    to: CreatorCommissionStatus): CdkDragDrop<CreatorCommissionStatus, CreatorCommissionStatus, CreatorCommission> {
+    return {
+      previousContainer: {data: from},
+      container: {data: to},
+      item: {data: commission}
+    } as unknown as CdkDragDrop<CreatorCommissionStatus, CreatorCommissionStatus, CreatorCommission>;
+  }
+
+  it('allows dragging the board cards without a Mover para select', () => {
+    const board = fixture.nativeElement.querySelector('[aria-label="Quadro de filas por situação"]') as HTMLElement;
+    expect(board.querySelector('select')).toBeNull();
+    expect(fixture.debugElement.queryAll(By.directive(CdkDrag)).length).toBe(1);
+    expect(board.textContent).toContain('Arraste para cá para concluir');
+  });
+
+  it('moves a card immediately and reconciles with the explicit status endpoint', () => {
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
+    component.dropCommission(drop(card, 'QUEUED', 'IN_PROGRESS'));
+    fixture.detectChanges();
+
+    expect(studio.changeStatus).toHaveBeenCalledOnceWith(11, 'IN_PROGRESS');
+    expect(component.changingId).toBe(11);
+    expect(component.boardColumns[0].total).toBe(0);
+    expect(component.boardColumns[0].items.length).toBe(0);
+    expect(component.boardColumns[1].items[0].status).toBe('IN_PROGRESS');
+    expect(component.boardColumns[1].total).toBe(1);
+
+    pending.next({...card, status:'IN_PROGRESS'});
+    pending.complete();
+    expect(component.changingId).toBeNull();
+    expect(studio.commissions).toHaveBeenCalledTimes(8);
+  });
+
+  it('rolls back an unsuccessful move and keeps the server-owned status', () => {
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
+    const original = component.boardColumns;
+    component.dropCommission(drop(card,'QUEUED','WAITING'));
+    pending.error(new Error('offline'));
+    fixture.detectChanges();
+
+    expect(component.boardColumns).toBe(original);
+    expect(component.boardColumns[0].items[0].status).toBe('QUEUED');
+    expect(component.changingId).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Ele voltou à fila anterior');
+    expect(studio.commissions).toHaveBeenCalledTimes(4);
+  });
+
+  it('ignores same-lane drops, unknown cards and simultaneous moves', () => {
+    component.dropCommission(drop(card,'QUEUED','QUEUED'));
+    component.dropCommission(drop({...card,id:999},'QUEUED','WAITING'));
+    expect(studio.changeStatus).not.toHaveBeenCalled();
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
+    component.dropCommission(drop(card,'QUEUED','WAITING'));
+    component.dropCommission(drop(card,'QUEUED','PAUSED'));
+    expect(studio.changeStatus).toHaveBeenCalledTimes(1);
+    pending.error(new Error('offline'));
+  });
+
+  it('moves between adjacent queues with keyboard arrows when the card has focus', () => {
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
+    const target = {};
+    const event = {target, currentTarget: target, key: 'ArrowRight',
+      preventDefault: jasmine.createSpy('preventDefault')} as unknown as KeyboardEvent;
+    component.moveBoardCardByKeyboard(event, card);
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(studio.changeStatus).toHaveBeenCalledOnceWith(11,'IN_PROGRESS');
+    expect(component.boardColumns[1].items[0].id).toBe(11);
+    pending.error(new Error('offline'));
+  });
+
+  it('can conclude a card through the compact board drop zone', () => {
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
+    component.dropCommission(drop(card, 'QUEUED', 'COMPLETED'));
+    expect(studio.changeStatus).toHaveBeenCalledOnceWith(11,'COMPLETED');
+    expect(component.activeCount).toBe(0);
+    expect(component.boardColumns[0].items.length).toBe(0);
+    pending.error(new Error('offline'));
+    expect(component.boardColumns[0].items.length).toBe(1);
+  });
+
+  it('does not move a card after access to Pro has been revoked', () => {
+    studio.myAccess.and.returnValue(of({allowed:false,tier:'PRO',status:'REVOKED',
+      sourceKind:'PILOT',expiresAtUtc:null}));
+    user$.next({...user,id:56});
+    component.dropCommission(drop(card,'QUEUED','IN_PROGRESS'));
+    expect(studio.changeStatus).not.toHaveBeenCalled();
   });
 
   it('opens the complete paginated list for a selected lane', () => {

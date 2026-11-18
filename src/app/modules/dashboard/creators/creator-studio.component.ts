@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subject, forkJoin, distinctUntilChanged, takeUntil } from 'rxjs';
 import {
@@ -49,7 +50,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
   readonly boardStatuses: CreatorCommissionStatus[] =
     ['QUEUED','IN_PROGRESS','WAITING','PAUSED'];
+  readonly completedBoardStatus: CreatorCommissionStatus = 'COMPLETED';
   readonly boardPageSize = 12;
+  readonly boardDragStartDelay = {touch: 200, mouse: 0};
   boardColumns: {status: CreatorCommissionStatus; items: CreatorCommission[]; total: number}[] =
     this.boardStatuses.map(status => ({status,items:[],total:0}));
   boardLoading = false;
@@ -374,11 +377,11 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadBoard(): void {
+  private loadBoard(showLoading = true): void {
     const seq = ++this.boardSequence;
     const account = this.users.getUser()?.id;
     this.boardError = '';
-    this.boardLoading = true;
+    if (showLoading) this.boardLoading = true;
     // Separate paginated requests keep correct per-lane totals without
     // assuming that one global page contains all statuses.
     forkJoin(this.boardStatuses.map(status =>
@@ -395,6 +398,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       error: err => {
         if (seq !== this.boardSequence || this.users.getUser()?.id !== account) return;
         this.boardLoading = false;
+        if (!showLoading) {
+          this.errorMessage = 'Pedido atualizado, mas não foi possível recarregar o quadro. Atualize a página.';
+          return;
+        }
         this.boardError = err instanceof HttpErrorResponse && err.status === 403
           ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página.'
           : 'Não foi possível carregar todas as filas. Tente novamente.';
@@ -493,6 +500,72 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
           : 'Não foi possível salvar. Confira os campos e tente novamente.';
       }
     });
+  }
+
+  /** Moving cards only changes their status. Ordering stays server-defined (oldest first). */
+  dropCommission(event: CdkDragDrop<CreatorCommissionStatus, CreatorCommissionStatus, CreatorCommission>): void {
+    if (event.previousContainer === event.container) return;
+    this.moveBoardCommission(event.item.data, event.container.data);
+  }
+
+  moveBoardCardByKeyboard(event: KeyboardEvent, commission: CreatorCommission): void {
+    if (event.target !== event.currentTarget ||
+        (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    const index = this.boardStatuses.indexOf(commission.status);
+    const destination = index + (event.key === 'ArrowRight' ? 1 : -1);
+    if (destination < 0 || destination >= this.boardStatuses.length ||
+        !this.canUsePro || this.changingId !== null || this.saving) return;
+    event.preventDefault();
+    this.moveBoardCommission(commission, this.boardStatuses[destination]);
+  }
+
+  private moveBoardCommission(commission: CreatorCommission, status: CreatorCommissionStatus): void {
+    if (!this.canUsePro || this.viewMode !== 'board' || this.boardLoading ||
+        this.saving || this.changingId !== null || commission.status === status ||
+        (!this.boardStatuses.includes(status) && status !== 'COMPLETED')) return;
+    const source = this.boardColumns.find(column => column.status === commission.status);
+    if (!source?.items.some(item => item.id === commission.id)) return;
+
+    const previousColumns = this.boardColumns;
+    const moved = {...commission, status};
+    const account = this.users.getUser()?.id;
+    const accessSequence = this.accessSequence;
+    this.changingId = commission.id;
+    this.boardSequence++; // Invalidate any earlier background board refresh.
+    this.errorMessage = '';
+    // Show the move immediately. The server remains the authority for status,
+    // chronology, totals and any paginated items we cannot currently see.
+    this.boardColumns = previousColumns.map(column => {
+      if (column.status === commission.status) {
+        return {...column, items: column.items.filter(item => item.id !== commission.id),
+          total: Math.max(0, column.total - 1)};
+      }
+      if (column.status === status) {
+        return {...column, items: [...column.items, moved], total: column.total + 1};
+      }
+      return column;
+    });
+    this.creatorStudio.changeStatus(commission.id, status)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          if (accessSequence !== this.accessSequence ||
+              this.users.getUser()?.id !== account || !this.canUsePro) return;
+          this.changingId = null;
+          // Refresh silently to reconcile paginated columns without flickering.
+          if (this.viewMode === 'board') this.loadBoard(false);
+          else this.reload();
+        },
+        error: (error: HttpErrorResponse) => {
+          if (accessSequence !== this.accessSequence ||
+              this.users.getUser()?.id !== account || !this.canUsePro) return;
+          this.changingId = null;
+          if (this.viewMode === 'board') this.boardColumns = previousColumns;
+          this.errorMessage = error.status === 403
+            ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página.'
+            : 'Não foi possível mover o pedido. Ele voltou à fila anterior.';
+        }
+      });
   }
 
   changeStatus(commission: CreatorCommission, status: CreatorCommissionStatus): void {
