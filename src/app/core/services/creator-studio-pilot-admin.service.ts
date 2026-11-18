@@ -57,6 +57,19 @@ export interface CreatorRetentionDryRun {
   deliveryProofSupported: boolean;
 }
 
+/** Mutually exclusive operational buckets for current completed commissions only. */
+export interface CreatorRetentionHealth {
+  totalNotices: number;
+  pending: number;
+  sending: number;
+  stuckSending: number;
+  smtpUnknown: number;
+  smtpUnconfirmed: number;
+  providerConfirmed: number;
+  bounced: number;
+  complaints: number;
+}
+
 /**
  * Owner-only administrative contract; authorization lives exclusively in API.
  * Does not create public invitations, checkout, bulk grants, or self-enrollment.
@@ -103,6 +116,11 @@ export class CreatorStudioPilotAdminService {
   retentionDryRun(): Observable<CreatorRetentionDryRun> {
     return this.http.get<CreatorRetentionDryRun>(
       `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/dry-run`);
+  }
+
+  retentionHealth(): Observable<CreatorRetentionHealth> {
+    return this.http.get<CreatorRetentionHealth>(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/health`);
   }
 
   releaseHold(artistId: number, commissionId: number): Observable<void> {
