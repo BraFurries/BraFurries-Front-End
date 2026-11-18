@@ -199,7 +199,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         document.body.appendChild(link);
         link.click();
         link.remove();
-        URL.revokeObjectURL(url);
+        // Some mobile browsers start attachment downloads asynchronously.
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
         this.exportSuccess = 'Exportação disponibilizada para download.';
       },
       error: () => {
