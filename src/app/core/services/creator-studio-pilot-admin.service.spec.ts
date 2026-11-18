@@ -82,7 +82,7 @@ describe('CreatorStudioPilotAdminService', () => {
     expect(req.request.body).toBeNull();
     req.flush({
       expiredCommissions:4,blockedByHold:1,blockedByMissingD30:2,
-      blockedByMissingD7:1,smtpAcceptedBoth:0,deliveryProofSupported:false
+      blockedByMissingD7:1,smtpAcceptedBoth:0,providerConfirmedBoth:0,deliveryProofSupported:false
     });
   });
 
