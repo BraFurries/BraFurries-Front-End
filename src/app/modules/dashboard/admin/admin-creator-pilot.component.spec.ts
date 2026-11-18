@@ -49,7 +49,8 @@ describe('AdminCreatorPilotComponent', () => {
     pilot = jasmine.createSpyObj<CreatorStudioPilotAdminService>(
       'CreatorStudioPilotAdminService',
       ['list','candidate','grantLifetimePro','revoke',
-       'inspectHold','placeHold','releaseHold','retentionDryRun','retentionHealth']);
+       'inspectHold','placeHold','releaseHold','retentionDryRun','retentionHealth',
+       'globalWorkflows','createGlobalWorkflow','updateGlobalWorkflow']);
     pilot.list.and.returnValue(of({items:[participant],page:1,pageSize:25,total:1}));
     pilot.candidate.and.returnValue(of(candidate));
     pilot.grantLifetimePro.and.returnValue(of({allowed:true,tier:'PRO',
@@ -67,6 +68,18 @@ describe('AdminCreatorPilotComponent', () => {
     pilot.retentionDryRun.and.returnValue(of({
       expiredCommissions:9,blockedByHold:2,blockedByMissingD30:3,
       blockedByMissingD7:4,smtpAcceptedBoth:0,providerConfirmedBoth:0,deliveryProofSupported:false
+    }));
+    pilot.globalWorkflows.and.returnValue(of([{
+      id:8,name:'Processo básico',description:'Para começar',active:true,
+      steps:[{id:81,name:'Alinhamento',position:0},{id:82,name:'Entrega',position:1}]
+    }]));
+    pilot.createGlobalWorkflow.and.returnValue(of({
+      id:9,name:'Novo',description:'Personalizado',active:true,
+      steps:[{id:83,name:'Sketch',position:0}]
+    }));
+    pilot.updateGlobalWorkflow.and.returnValue(of({
+      id:8,name:'Processo básico',description:'Para começar',active:false,
+      steps:[{id:81,name:'Alinhamento',position:0}]
     }));
     pilot.retentionHealth.and.returnValue(of({
       totalNotices:8,pending:1,sending:0,stuckSending:1,
@@ -105,6 +118,51 @@ describe('AdminCreatorPilotComponent', () => {
     expect(pilot.list).toHaveBeenCalledWith('ALL',1,25);
     expect(fixture.nativeElement.textContent).toContain('Artista convidada');
     expect(fixture.nativeElement.textContent).toContain('Piloto vitalício');
+  });
+
+  it('renders owner-only global starter management but not for Community admins', async () => {
+    await init(false);
+    expect(pilot.globalWorkflows).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain('Biblioteca global de modelos');
+    platform.myAccess.and.returnValue(of({enabled:true,owner:true,permissions:[]}));
+    user$.next({...ownerUser,id:2});
+    fixture.detectChanges();
+    expect(pilot.globalWorkflows).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.textContent).toContain('Biblioteca global de modelos');
+    expect(fixture.nativeElement.textContent).toContain('Processo básico');
+  });
+
+  it('saves the exact ordered global stage names without client or Community fields', async () => {
+    await init(true);
+    component.globalModel={
+      name:'Novo',description:'Personalizado',active:true,steps:['Sketch','Entrega']
+    };
+    component.moveGlobalStep(1,-1);
+    component.saveGlobalModel();
+    expect(pilot.createGlobalWorkflow).toHaveBeenCalledWith({
+      name:'Novo',description:'Personalizado',active:true,steps:['Entrega','Sketch']
+    });
+    expect(component.globalNotice).toContain('Cópias pessoais');
+  });
+
+  it('edits and deactivates a global template without modifying artist projects', async () => {
+    await init(true);
+    component.editGlobalModel(component.globalModels[0]);
+    component.globalModel.active=false;
+    component.saveGlobalModel();
+    expect(pilot.updateGlobalWorkflow).toHaveBeenCalledWith(8,
+      jasmine.objectContaining({active:false,name:'Processo básico'}));
+    expect(pilot.revoke).not.toHaveBeenCalled();
+  });
+
+  it('drops global catalog when platform ownership changes', async () => {
+    await init(true);
+    expect(component.globalModels.length).toBe(1);
+    platform.myAccess.and.returnValue(of({enabled:true,owner:false,permissions:[]}));
+    user$.next({...ownerUser,id:77});
+    fixture.detectChanges();
+    expect(component.globalModels).toEqual([]);
+    expect(fixture.nativeElement.textContent).not.toContain('Biblioteca global de modelos');
   });
 
   it('previews a candidate before permitting grant', async () => {
