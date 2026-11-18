@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, Subject } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import {
   CreatorPilotCandidate, CreatorPilotInvitation, CreatorStudioPilotAdminService
@@ -48,7 +48,7 @@ describe('AdminCreatorPilotComponent', () => {
     pilot = jasmine.createSpyObj<CreatorStudioPilotAdminService>(
       'CreatorStudioPilotAdminService',
       ['list','candidate','grantLifetimePro','revoke',
-       'inspectHold','placeHold','releaseHold']);
+       'inspectHold','placeHold','releaseHold','retentionDryRun']);
     pilot.list.and.returnValue(of({items:[participant],page:1,pageSize:25,total:1}));
     pilot.candidate.and.returnValue(of(candidate));
     pilot.grantLifetimePro.and.returnValue(of({allowed:true,tier:'PRO',
@@ -63,6 +63,10 @@ describe('AdminCreatorPilotComponent', () => {
       reason:'Solicitação de correção pendente',active:true
     }));
     pilot.releaseHold.and.returnValue(of(void 0));
+    pilot.retentionDryRun.and.returnValue(of({
+      expiredCommissions:9,blockedByHold:2,blockedByMissingD30:3,
+      blockedByMissingD7:4,smtpAcceptedBoth:0,deliveryProofSupported:false
+    }));
 
     await TestBed.configureTestingModule({
       declarations:[AdminCreatorPilotComponent],
@@ -194,6 +198,56 @@ describe('AdminCreatorPilotComponent', () => {
     fixture.detectChanges();
     expect(component.hold).toBeNull();
     expect(component.owner).toBeFalse();
+  });
+
+  it('loads a dry-run only on demand for the owner and renders SMTP disclaimer', async () => {
+    await init(true);
+    expect(pilot.retentionDryRun).not.toHaveBeenCalled();
+    component.loadRetentionReport();
+    fixture.detectChanges();
+    expect(pilot.retentionDryRun).toHaveBeenCalledTimes(1);
+    expect(component.retentionReport?.expiredCommissions).toBe(9);
+    expect(fixture.nativeElement.textContent).toContain('Dois aceites SMTP');
+    expect(fixture.nativeElement.textContent).toContain('não comprovam');
+  });
+
+  it('forbids the retention report for non-owners', async () => {
+    await init(false);
+    component.loadRetentionReport();
+    expect(pilot.retentionDryRun).not.toHaveBeenCalled();
+  });
+
+  it('drops in-flight retention reports when the active account changes', async () => {
+    await init(true);
+    const pending = new Subject<{
+      expiredCommissions:number;blockedByHold:number;blockedByMissingD30:number;
+      blockedByMissingD7:number;smtpAcceptedBoth:number;deliveryProofSupported:boolean;
+    }>();
+    pilot.retentionDryRun.and.returnValue(pending.asObservable());
+    component.loadRetentionReport();
+    platform.myAccess.and.returnValue(of({enabled:true,owner:false,permissions:[]}));
+    user$.next({...ownerUser,id:77});
+    pending.next({
+      expiredCommissions:1,blockedByHold:0,blockedByMissingD30:1,
+      blockedByMissingD7:0,smtpAcceptedBoth:0,deliveryProofSupported:false
+    });
+    fixture.detectChanges();
+    expect(component.owner).toBeFalse();
+    expect(component.retentionReport).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Dois aceites SMTP');
+    pending.complete();
+  });
+
+  it('invalidates the previous diagnosis when a hold changes', async () => {
+    await init(true);
+    component.loadRetentionReport();
+    expect(component.retentionReport).not.toBeNull();
+    component.holdArtistId='22';
+    component.holdCommissionId='88';
+    component.holdReason='Contestação formal';
+    spyOn(window,'confirm').and.returnValue(true);
+    component.placeHold();
+    expect(component.retentionReport).toBeNull();
   });
 
   it('rejects invalid IDs before previewing or inviting anybody', async () => {
