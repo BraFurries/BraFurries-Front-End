@@ -46,12 +46,23 @@ describe('AdminCreatorPilotComponent', () => {
     platform.myAccess.and.returnValue(of({enabled:true,owner,permissions:[]}));
 
     pilot = jasmine.createSpyObj<CreatorStudioPilotAdminService>(
-      'CreatorStudioPilotAdminService',['list','candidate','grantLifetimePro','revoke']);
+      'CreatorStudioPilotAdminService',
+      ['list','candidate','grantLifetimePro','revoke',
+       'inspectHold','placeHold','releaseHold']);
     pilot.list.and.returnValue(of({items:[participant],page:1,pageSize:25,total:1}));
     pilot.candidate.and.returnValue(of(candidate));
     pilot.grantLifetimePro.and.returnValue(of({allowed:true,tier:'PRO',
       status:'ACTIVE',sourceKind:'PILOT',expiresAtUtc:null}));
     pilot.revoke.and.returnValue(of(void 0));
+    pilot.inspectHold.and.returnValue(of({
+      artistUserId:22,commissionId:88,category:'DISPUTE',
+      reason:'Solicitação de correção pendente',active:true
+    }));
+    pilot.placeHold.and.returnValue(of({
+      artistUserId:22,commissionId:88,category:'DISPUTE',
+      reason:'Solicitação de correção pendente',active:true
+    }));
+    pilot.releaseHold.and.returnValue(of(void 0));
 
     await TestBed.configureTestingModule({
       declarations:[AdminCreatorPilotComponent],
@@ -137,6 +148,52 @@ describe('AdminCreatorPilotComponent', () => {
     expect(component.owner).toBeFalse();
     expect(component.participants).toEqual([]);
     expect(fixture.nativeElement.textContent).not.toContain('Artista convidada');
+  });
+
+  it('cannot inspect a legal hold without platform owner permission', async () => {
+    await init(false);
+    component.holdArtistId='22';
+    component.holdCommissionId='88';
+    component.inspectHold();
+    expect(pilot.inspectHold).not.toHaveBeenCalled();
+  });
+
+  it('requires explicit confirmation and reason to place a legal hold', async () => {
+    await init(true);
+    component.holdArtistId='22';
+    component.holdCommissionId='88';
+    component.holdReason='Solicitação de correção pendente';
+    spyOn(window,'confirm').and.returnValue(false);
+    component.placeHold();
+    expect(pilot.placeHold).not.toHaveBeenCalled();
+    (window.confirm as jasmine.Spy).and.returnValue(true);
+    component.placeHold();
+    expect(pilot.placeHold).toHaveBeenCalledWith({
+      artistUserId:22,commissionId:88,category:'DISPUTE',
+      reason:'Solicitação de correção pendente'
+    });
+    expect(component.hold?.active).toBeTrue();
+  });
+
+  it('blocks release if the current hold is not the selected commission', async () => {
+    await init(true);
+    component.holdArtistId='22';
+    component.holdCommissionId='89';
+    component.hold={artistUserId:22,commissionId:88,category:'DISPUTE',
+      reason:'Contestação',active:true};
+    component.releaseHold();
+    expect(pilot.releaseHold).not.toHaveBeenCalled();
+  });
+
+  it('clears private legal hold details when the account changes', async () => {
+    await init(true);
+    component.hold={artistUserId:22,commissionId:88,category:'DISPUTE',
+      reason:'Contestação',active:true};
+    platform.myAccess.and.returnValue(of({enabled:true,owner:false,permissions:[]}));
+    user$.next({...ownerUser,id:99});
+    fixture.detectChanges();
+    expect(component.hold).toBeNull();
+    expect(component.owner).toBeFalse();
   });
 
   it('rejects invalid IDs before previewing or inviting anybody', async () => {
