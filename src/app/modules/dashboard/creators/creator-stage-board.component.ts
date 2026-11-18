@@ -43,6 +43,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   loading = true;
   loadingBoard = false;
   loadingMore = false;
+  loadingLaneKey: string | null = null;
+  private readonly lanePages = new Map<string, number>();
   error = '';
   busyId: number | null = null;
   processPage = 0;
@@ -79,6 +81,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
         this.allowed = false;
         this.loading = !!user;
         this.loadingBoard = false;
+        this.loadingLaneKey = null;
+        this.lanePages.clear();
         this.busyId = null;
         this.draggedId = null;
         this.hoveredKey = null;
@@ -200,11 +204,46 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
         this.columns = this.columns.map((lane, index) => ({
           ...lane, items: pages[index].items, total: pages[index].total
         }));
+        this.lanePages.clear();
+        this.columns.forEach(lane => this.lanePages.set(lane.key, 1));
+        this.loadingLaneKey = null;
         this.loadingBoard = false;
         this.busyId = null;
       },
       error: () => this.failLoad(seq, account)
     });
+  }
+
+  canLoadMoreLane(lane: StageLane): boolean {
+    return this.mode === 'shared' && !this.loadingBoard &&
+      this.loadingLaneKey === null && lane.items.length < lane.total;
+  }
+
+  loadMoreLane(lane: StageLane): void {
+    if (!this.canLoadMoreLane(lane)) return;
+    this.loadingLaneKey = lane.key;
+    const seq = this.dataSequence;
+    const account = this.users.getUser()?.id;
+    const page = (this.lanePages.get(lane.key) ?? 1) + 1;
+    this.studio.commissionsForBoard(
+      lane.key === 'unlinked' ? {unlinked:true} :
+        {stageDefinitionId:lane.stageDefinitionId!}, page, 12)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          if (!this.stillCurrent(seq, account)) return;
+          this.columns = this.columns.map(current =>
+            current.key === lane.key ? {
+              ...current, items:[...current.items, ...result.items], total:result.total
+            } : current);
+          this.lanePages.set(lane.key, page);
+          this.loadingLaneKey = null;
+        },
+        error: () => {
+          if (!this.stillCurrent(seq, account)) return;
+          this.loadingLaneKey = null;
+          this.error = 'Não foi possível carregar mais pedidos desta etapa.';
+        }
+      });
   }
 
   loadMore(): void {
