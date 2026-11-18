@@ -31,7 +31,10 @@ const routes: Routes = [
       { path: 'perfil', component: PerfilComponent },
       { path: 'minhas-artes', component: CommerceArtistPortalComponent },
       { path: 'creators', component: CreatorStudioComponent },
-      { path: 'creators/producao', component: CreatorProductionComponent },
+      // Existing deep link becomes a quiet overview, with focused child pages.
+      { path: 'creators/producao', component: CreatorProductionComponent, data: { section: 'home' } },
+      { path: 'creators/producao/artes', component: CreatorProductionComponent, data: { section: 'arts' } },
+      { path: 'creators/producao/processos', component: CreatorProductionComponent, data: { section: 'processes' } },
       { path: 'creators/pedido/:id', component: CreatorCommissionDetailsComponent },
       { path: 'minhas-parcerias', component: PartnerPostingComponent },
       { path: 'gestao-comercial/financeiro', component: CommerceFinanceComponent },
