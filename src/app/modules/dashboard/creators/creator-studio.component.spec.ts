@@ -98,45 +98,53 @@ describe('CreatorStudioComponent', () => {
     expect(component.activeCount).toBe(1);
     expect(component.boardColumns.find(col => col.status === 'QUEUED')?.total).toBe(1);
     const html = fixture.nativeElement.textContent as string;
-    expect(html).toContain('Quadro de filas');
+    expect(html).toContain('Situação dos pedidos');
     expect(html).toContain('Ref Sheet');
     expect(html).toContain('12/11/2026');
     expect(html).toContain('Aguardando retorno');
     expect(html).toContain('Em pausa');
   });
 
-  it('keeps operational modes in one selector and loads only the selected board', () => {
+  it('uses one stage view with its process selector inside the main card and restores drag per scope', () => {
     const group = fixture.nativeElement.querySelector('[aria-label="Modo de visualização"]');
-    expect(group.textContent).toContain('Quadro de filas');
-    expect(group.textContent).toContain('Lista detalhada');
-    expect(group.textContent).toContain('Quadro por processo');
-    expect(group.textContent).toContain('Quadro por etapas');
     expect(Array.from(group.querySelectorAll('button')).map(button => (button as HTMLElement).textContent?.trim())).toEqual([
-      'Quadro de filas','Quadro por processo','Quadro por etapas','Lista detalhada'
+      'Situação dos pedidos','Etapas da produção','Lista de pedidos'
     ]);
     const model = {id:33,name:'Ícones',isDefault:false,
-      steps:[{id:1,name:'Rascunho',position:0,stageDefinitionId:7}]};
+      steps:[{id:1,name:'Rascunho',position:0,stageDefinitionId:7},
+        {id:2,name:'Pintura',position:1,stageDefinitionId:null}]};
+    const scopedCard = {...card,sourceWorkflowId:33,currentStageDefinitionId:7,currentStageName:'Rascunho',currentStagePosition:0};
     component.workflows = [model];
     studio.workflows.and.returnValue(of([model]));
     studio.stageDefinitions.and.returnValue(of([{id:7,name:'Rascunho'}]));
-    component.setViewMode('process');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('select[name="operationalWorkflowId"]')).not.toBeNull();
-    expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).toBeNull();
-    component.selectedWorkflowId = 33;
-    fixture.detectChanges();
-    expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
-    expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('app-creator-stage-board').classList.contains('block')).toBeTrue();
-    expect(fixture.nativeElement.querySelector('app-creator-stage-board').classList.contains('mt-6')).toBeTrue();
+    studio.commissionsForBoard.and.callFake(filter=>of({
+      items:filter.workflowId===33 || filter.stageDefinitionId===7 ? [scopedCard] : [],
+      total:filter.workflowId===33 || filter.stageDefinitionId===7 ? 1 : 0,page:1,pageSize:100
+    }));
     component.setViewMode('stages');
     fixture.detectChanges();
+    const main = fixture.nativeElement.querySelector('[aria-label="Visualização da produção"]');
+    expect(main.querySelector('select[name="operationalWorkflowId"]')).not.toBeNull();
+    expect(main.textContent).toContain('Todas as etapas');
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({stageDefinitionId:7},1,12);
-    expect(fixture.nativeElement.querySelector('select[name="operationalWorkflowId"]')).toBeNull();
+    const child=fixture.debugElement.query(By.directive(CreatorStageBoardComponent));
+    expect(child.nativeElement.querySelector('select')).toBeNull();
+    expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
+    component.selectStageProcess(33);
+    fixture.detectChanges();
+    expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
+    expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeFalse();
+    expect(child.nativeElement.textContent).toContain('Pintura');
+    expect(child.nativeElement.classList.contains('block')).toBeTrue();
+    expect(child.nativeElement.classList.contains('mt-6')).toBeTrue();
+    component.selectStageProcess(null);
+    fixture.detectChanges();
+    expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
     component.setViewMode('board');
     fixture.detectChanges();
     expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).toBeNull();
     expect(fixture.nativeElement.querySelector('[aria-label="Quadro de filas por situação"]')).not.toBeNull();
+    expect(fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeFalse();
   });
 
   function mockZones(): {status: CreatorCommissionStatus; x: number; y: number}[] {

@@ -136,10 +136,9 @@
         <div class="space-y-1">
           <h2 class="font-amaranth text-2xl font-bold text-braDark">Meus trabalhos</h2>
           <p class="text-sm text-gray-600">
-            {{ viewMode === 'board' ? 'Arraste os cartões entre as filas para atualizar a situação de cada pedido.' :
-            viewMode === 'process' ? 'Acompanhe os pedidos de um processo pelas suas etapas.' :
-            viewMode === 'stages' ? 'Acompanhe os pedidos de diferentes processos nas etapas reutilizáveis.' :
-            'Consulte uma fila por vez ou ordene os pedidos conforme sua preferência.' }}
+            {{ viewMode === 'board' ? 'Arraste os pedidos entre as filas para atualizar a situação de cada trabalho.' :
+            viewMode === 'stages' ? 'Consulte todas as etapas ou escolha um processo para acompanhar e avançar seus pedidos.' :
+            'Consulte, filtre e organize os detalhes dos seus pedidos.' }}
           </p>
         </div>
         <button type="button" (click)="newCommission()" [disabled]="saving"
@@ -149,29 +148,23 @@
       </div>
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap gap-1 rounded-xl border border-braPurple/20 p-1" role="group" aria-label="Modo de visualização">
-          <button type="button" (click)="setViewMode('board')"
+          <button type="button" (click)="setViewMode('board')" [disabled]="changingId !== null || stageMoveInProgress"
             [attr.aria-pressed]="viewMode === 'board'"
             [ngClass]="viewMode === 'board' ? 'bg-braPurple text-white' : 'text-braPurple'"
             class="rounded-lg px-4 py-2 text-sm font-bold">
-            Quadro de filas
+            Situação dos pedidos
           </button>
-          <button type="button" (click)="setViewMode('process')"
-            [attr.aria-pressed]="viewMode === 'process'"
-            [ngClass]="viewMode === 'process' ? 'bg-braPurple text-white' : 'text-braPurple'"
-            class="rounded-lg px-4 py-2 text-sm font-bold">
-            Quadro por processo
-          </button>
-          <button type="button" (click)="setViewMode('stages')"
+          <button type="button" (click)="setViewMode('stages')" [disabled]="changingId !== null || stageMoveInProgress"
             [attr.aria-pressed]="viewMode === 'stages'"
             [ngClass]="viewMode === 'stages' ? 'bg-braPurple text-white' : 'text-braPurple'"
             class="rounded-lg px-4 py-2 text-sm font-bold">
-            Quadro por etapas
+            Etapas da produção
           </button>
-          <button type="button" (click)="setViewMode('list')"
+          <button type="button" (click)="setViewMode('list')" [disabled]="changingId !== null || stageMoveInProgress"
             [attr.aria-pressed]="viewMode === 'list'"
             [ngClass]="viewMode === 'list' ? 'bg-braPurple text-white' : 'text-braPurple'"
             class="rounded-lg px-4 py-2 text-sm font-bold">
-            Lista detalhada
+            Lista de pedidos
           </button>
         </div>
         <p class="text-sm text-gray-600" *ngIf="viewMode === 'board'">
@@ -182,15 +175,28 @@
           Organizar meu ateliê
         </a>
       </div>
-      <div *ngIf="viewMode === 'process'" class="flex flex-wrap items-end gap-3 border-t pt-3">
-        <label class="w-full max-w-sm text-sm font-semibold text-gray-700">
-          Processo
-          <select name="operationalWorkflowId" [(ngModel)]="selectedWorkflowId"
-            class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-            <option [ngValue]="null">Selecione um processo</option>
-            <option *ngFor="let workflow of workflows" [ngValue]="workflow.id">{{ workflow.name }}</option>
-          </select>
-        </label>
+      <div *ngIf="viewMode === 'stages'" class="space-y-2 border-t pt-3">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <label class="w-full max-w-sm text-sm font-semibold text-gray-700">
+            Mostrar etapas
+            <select name="operationalWorkflowId" [ngModel]="selectedWorkflowId"
+              (ngModelChange)="selectStageProcess($event)" [disabled]="organizingStageColumns || stageMoveInProgress"
+              class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+              <option [ngValue]="null">Todas as etapas</option>
+              <option *ngFor="let workflow of workflows" [ngValue]="workflow.id">{{ workflow.name }}</option>
+            </select>
+          </label>
+          <button *ngIf="selectedWorkflowId === null && !organizingStageColumns" type="button"
+            (click)="organizeStageColumns()" [disabled]="!stageOrderAvailable"
+            class="rounded-lg border border-braPurple/30 bg-white px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+            Organizar colunas
+          </button>
+        </div>
+        <p class="text-xs text-gray-500">
+          {{ selectedWorkflowId === null
+            ? 'Visão geral para consulta. Selecione um processo acima para mover pedidos entre etapas.'
+            : 'Somente pedidos deste processo. Arraste os cartões entre as etapas ou use as setas do teclado.' }}
+        </p>
       </div>
       <div *ngIf="viewMode === 'list'" class="flex flex-wrap items-end gap-3 border-t pt-3">
         <label class="text-sm font-semibold text-gray-700">
@@ -302,13 +308,12 @@
       </form>
     </section>
 
-    <div *ngIf="viewMode === 'process' && selectedWorkflowId === null"
-      class="rounded-xl border border-dashed bg-white p-5 text-sm text-gray-600">
-      {{ workflows.length ? 'Selecione um processo acima para visualizar seus pedidos.' : 'Cadastre um processo em Meu ateliê para acompanhar suas etapas aqui.' }}
-    </div>
-    <app-creator-stage-board *ngIf="viewMode === 'stages' || (viewMode === 'process' && selectedWorkflowId !== null)"
+    <app-creator-stage-board *ngIf="viewMode === 'stages'"
       class="block mt-6 min-w-0"
-      [workflowId]="viewMode === 'process' ? selectedWorkflowId : null">
+      [workflowId]="selectedWorkflowId"
+      (orderAvailableChange)="stageOrderAvailable = $event"
+      (orderEditingChange)="organizingStageColumns = $event"
+      (moveInProgressChange)="stageMoveInProgress = $event">
     </app-creator-stage-board>
 
     <p *ngIf="viewMode === 'board' && boardLoading" role="status"
