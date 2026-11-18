@@ -133,39 +133,53 @@ describe('CreatorStageBoardComponent', () => {
     expect(component.columns[0].items[0].id).toBe(7);
   });
 
-  it('filters shared columns by process definition IDs in process order without restricting shared orders', () => {
+  it('switches from general stages to the actual selected process including exclusive stages and restores movement', () => {
     const selected: CreatorWorkflow = {
       id:34,name:'Stickers',isDefault:false,
       steps:[
         {id:1,name:'Pintura',position:0,stageDefinitionId:20},
         {id:2,name:'Particular',position:1,stageDefinitionId:null},
-        {id:3,name:'Rascunho',position:2,stageDefinitionId:10},
-        {id:4,name:'Rascunho repetido',position:3,stageDefinitionId:10}
+        {id:3,name:'Rascunho',position:2,stageDefinitionId:10}
       ]
     };
+    const selectedCard={...card,sourceWorkflowId:34,currentStageDefinitionId:20,currentStageName:'Pintura',currentStagePosition:0};
     studio.workflows.and.returnValue(of([workflow, selected]));
     studio.stageDefinitions.and.returnValue(of([
       {id:10,name:'Rascunho'},{id:20,name:'Pintura'},{id:30,name:'Acabamento'}
     ]));
+    studio.commissionsForBoard.and.callFake(filter=>of({
+      items:filter.workflowId===34?[selectedCard]:filter.stageDefinitionId===10?[card]:[],
+      total:filter.workflowId===34||filter.stageDefinitionId===10?1:0,page:1,pageSize:100
+    }));
     fixture.componentRef.setInput('workflowId',null);
     fixture.detectChanges();
-    expect(component.sharedWorkflowId).toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Todas as etapas');
-    studio.commissionsForBoard.calls.reset();
-    component.filterSharedStages(34);
-    fixture.detectChanges();
-    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10']);
-    expect(studio.commissionsForBoard.calls.allArgs()).toEqual([
-      [{stageDefinitionId:20},1,12],[{stageDefinitionId:10},1,12]
-    ]);
-    expect(component.columns[1].items).toEqual([card]); // order belongs to process 33
-    expect(component.canOrganizeStages).toBeFalse();
-    expect(fixture.nativeElement.textContent).not.toContain('Organizar etapas');
-    component.filterSharedStages(null);
     expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
+    expect(fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
+    studio.commissionsForBoard.calls.reset();
+    fixture.componentRef.setInput('workflowId',34);
+    fixture.detectChanges();
+    expect(component.mode).toBe('process');
+    expect(component.columns.map(lane=>lane.name)).toEqual(['Pintura','Particular','Rascunho','Etapas personalizadas / finalizadas']);
+    expect(studio.commissionsForBoard.calls.allArgs()).toEqual([[{workflowId:34},1,100]]);
+    expect(component.columns[0].items).toEqual([selectedCard]);
+    expect(component.canOrganizeStages).toBeFalse();
+    expect(component.canMoveCard(card)).toBeFalse();
+    expect(fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeFalse();
+    studio.commissionSteps.and.returnValue(of([
+      {id:80,commissionId:7,name:'Pintura',stageDefinitionId:20,position:0,status:'IN_PROGRESS',notes:null,completedAtUtc:null},
+      {id:81,commissionId:7,name:'Particular',stageDefinitionId:null,position:1,status:'PENDING',notes:null,completedAtUtc:null}
+    ]));
+    const target=zones().find(zone=>zone.key==='position:1')!;
+    start(selectedCard);
+    component.dragEnd({event:{clientX:target.x,clientY:target.y}} as unknown as CdkDragEnd<CreatorCommission>,selectedCard,'position:0');
+    expect(studio.moveCommissionToStep).toHaveBeenCalledOnceWith(7,81);
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
+    expect(fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
   });
 
-  it('has no move action in either shared-stage scope, including keyboard and direct event calls', () => {
+  it('blocks card movement in the general view, including keyboard and direct event calls', () => {
     fixture.componentRef.setInput('workflowId',null);
     fixture.detectChanges();
     const drag = fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag);
@@ -178,10 +192,6 @@ describe('CreatorStageBoardComponent', () => {
     const element=fixture.nativeElement.querySelector('article');
     component.moveByKeyboard({key:'ArrowRight',target:element,currentTarget:element,
       preventDefault:()=>{}} as unknown as KeyboardEvent,card,'shared:10');
-    component.filterSharedStages(33);
-    fixture.detectChanges();
-    expect(fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
-    expect(component.columns.every(lane=>!lane.movable)).toBeTrue();
     expect(studio.commissionSteps).not.toHaveBeenCalled();
     expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
   });
@@ -210,29 +220,32 @@ describe('CreatorStageBoardComponent', () => {
     expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
     user$.next(user);
     expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10','shared:30','unlinked']);
-    component.filterSharedStages(33);
-    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20']);
-    component.filterSharedStages(null);
+    fixture.componentRef.setInput('workflowId',33);
+    fixture.detectChanges();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['position:0','position:1','other']);
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
     expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10','shared:30','unlinked']);
   });
 
-  it('ignores stale shared-board responses after filtering and handles processes with no reusable stages', () => {
+  it('ignores stale general responses after choosing a process with only exclusive stages', () => {
     const exclusive: CreatorWorkflow={id:44,name:'Exclusivo',isDefault:false,
       steps:[{id:1,name:'Só local',position:0,stageDefinitionId:null}]};
     studio.workflows.and.returnValue(of([workflow,exclusive]));
     const pending = new Subject<{items:CreatorCommission[];total:number;page:number;pageSize:number}>();
-    studio.commissionsForBoard.and.returnValue(pending.asObservable());
+    studio.commissionsForBoard.and.callFake(filter=>filter.workflowId===44
+      ? of({items:[],total:0,page:1,pageSize:100})
+      : pending.asObservable());
     fixture.componentRef.setInput('workflowId',null);
     fixture.detectChanges();
     expect(component.loadingBoard).toBeTrue();
-    component.filterSharedStages(44);
+    fixture.componentRef.setInput('workflowId',44);
     fixture.detectChanges();
-    expect(component.columns).toEqual([]);
+    expect(component.columns.map(lane=>lane.name)).toEqual(['Só local','Etapas personalizadas / finalizadas']);
     expect(component.loadingBoard).toBeFalse();
-    expect(fixture.nativeElement.textContent).toContain('não possui etapas reutilizáveis');
     pending.next({items:[card],total:1,page:1,pageSize:12});
     pending.complete();
-    expect(component.columns).toEqual([]);
+    expect(component.columns.every(lane=>lane.items.length===0)).toBeTrue();
   });
 
   it('keeps a fixed blank ghost at the destination without moving existing cards', () => {
