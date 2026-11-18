@@ -261,6 +261,81 @@
       </ng-container>
     </section>
 
+    <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+      aria-labelledby="creator-retention-health-title">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="space-y-2">
+          <h3 id="creator-retention-health-title"
+            class="font-amaranth text-xl font-bold text-gray-800">
+            Saúde dos avisos de retenção
+          </h3>
+          <p class="max-w-3xl text-sm text-gray-600">
+            Situação dos avisos registrados para a conclusão atual de cada commission.
+            Não inclui épocas anteriores ou pedidos reabertos. Consulta somente leitura,
+            sem destinatários, dados dos clientes ou operações de reenvio.
+          </p>
+        </div>
+        <button type="button" (click)="loadRetentionHealth()" [disabled]="retentionHealthBusy"
+          class="rounded-xl border border-braPurple/30 px-4 py-2.5 text-sm font-semibold text-braPurple disabled:opacity-40">
+          {{ retentionHealthBusy ? 'Consultando...' :
+             (retentionHealth ? 'Atualizar saúde' : 'Consultar saúde') }}
+        </button>
+      </div>
+
+      <p *ngIf="retentionHealthBusy" role="status" class="text-sm text-gray-600">
+        Verificando a situação dos avisos...
+      </p>
+      <p *ngIf="retentionHealthError" role="alert" class="text-sm text-red-700">
+        {{ retentionHealthError }}
+      </p>
+      <ng-container *ngIf="retentionHealth as health">
+        <p class="text-sm font-semibold text-gray-700" aria-live="polite">
+          {{ health.totalNotices }} avisos contabilizados
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-live="polite">
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Na fila (PENDING)</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.pending }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Em envio</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.sending }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Envio travado (30+ min)</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.stuckSending }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Resultado SMTP incerto</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.smtpUnknown }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">SMTP aceito, sem confirmação</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.smtpUnconfirmed }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Servidor destinatário confirmou</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.providerConfirmed }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Devolvidos (bounce)</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.bounced }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Reclamações de spam</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ health.complaints }}</p>
+          </div>
+        </div>
+        <p class="text-xs text-amber-800">
+          Os estados são exclusivos. Avisos pendentes podem estar impedidos por retenção
+          excepcional ou prazo vencido. Envio travado indica que o envio não foi
+          finalizado em 30 minutos; o resultado SMTP incerto exige investigação manual.
+          Aceite do servidor destinatário não confirma recebimento na caixa de entrada
+          nem leitura. Este diagnóstico não autoriza reenvio nem exclusão.
+        </p>
+      </ng-container>
+    </section>
+
     <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="space-y-2">
         <h3 class="font-amaranth text-xl font-bold text-gray-800">
