@@ -69,8 +69,13 @@
       </p>
     </section>
 
-    <ng-container *ngIf="section === 'arts' && !catalogLoading">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    <div *ngIf="section === 'home'" class="flex justify-end">
+      <a routerLink="/painel/creators/producao/dados"
+        class="text-sm font-semibold text-braPurple underline underline-offset-2">Dados e privacidade</a>
+    </div>
+
+    <ng-container *ngIf="section === 'arts' && !catalogLoading && !workflowFormOpen">
+      <div *ngIf="!typeFormOpen" class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-gray-500">{{ artTypes.length }} tipo(s) cadastrado(s)</p>
         <button *ngIf="!typeFormOpen" type="button" (click)="startType()" [disabled]="busy"
           class="rounded-xl bg-braPurple px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
@@ -81,31 +86,38 @@
       <section *ngIf="typeFormOpen" class="space-y-4 rounded-2xl border border-braPurple/25 bg-white p-5 shadow-sm"
         aria-labelledby="art-editor-title">
         <h2 id="art-editor-title" class="font-amaranth text-xl font-bold text-braDark">
-          {{ editingTypeId === null ? 'Novo tipo de arte' : 'Editar tipo de arte' }}
+          {{ linkingTypeOnly ? 'Vincular processo a ' + typeName : (editingTypeId === null ? 'Novo tipo de arte' : 'Editar tipo de arte') }}
         </h2>
         <form (ngSubmit)="saveType()" class="space-y-4">
-          <label class="block text-sm font-semibold text-gray-700">
+          <label *ngIf="!linkingTypeOnly" class="block text-sm font-semibold text-gray-700">
             Como você chama essa arte?
             <input name="typeName" [(ngModel)]="typeName" maxlength="100" required
               placeholder="Ex.: Ícone de perfil"
               class="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-3 font-normal">
           </label>
-          <button *ngIf="!typeAdvancedOpen && workflows.length" type="button"
+          <button *ngIf="!typeAdvancedOpen" type="button"
             (click)="typeAdvancedOpen = true" class="text-sm font-semibold text-braPurple hover:underline">
-            + Vincular um processo específico (opcional)
+            + Vincular processo (opcional)
           </button>
-          <label *ngIf="typeAdvancedOpen" class="block text-sm font-semibold text-gray-700">
-            Processo usado neste tipo (opcional)
-            <select name="typeWorkflowId" [(ngModel)]="typeWorkflowId"
-              class="mt-1 block w-full rounded-xl border bg-white px-3 py-3 font-normal">
-              <option [ngValue]="null">Usar meu processo padrão</option>
-              <option *ngFor="let option of workflows" [ngValue]="option.id">{{ option.name }}</option>
-            </select>
-          </label>
+          <div *ngIf="typeAdvancedOpen" class="space-y-3 rounded-xl border border-gray-200 p-4">
+            <label class="block text-sm font-semibold text-gray-700">
+              Vincular processo existente
+              <select name="typeWorkflowId" [(ngModel)]="typeWorkflowId"
+                class="mt-1 block w-full rounded-xl border bg-white px-3 py-3 font-normal">
+                <option [ngValue]="null">Sem vínculo específico (usar padrão, se houver)</option>
+                <option *ngFor="let option of workflows" [ngValue]="option.id">{{ option.name }}</option>
+              </select>
+            </label>
+            <p *ngIf="!workflows.length" class="text-xs text-gray-500">Você ainda não tem processos cadastrados.</p>
+            <button type="button" (click)="startWorkflowForType()" [disabled]="busy"
+              class="rounded-lg border border-braPurple/30 px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              + Criar novo processo
+            </button>
+          </div>
           <div class="flex flex-wrap gap-2">
             <button type="submit" [disabled]="busy || !typeName.trim()"
               class="rounded-xl bg-braPurple px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-              {{ busy ? 'Salvando...' : 'Salvar tipo de arte' }}
+              {{ busy ? 'Salvando...' : (linkingTypeOnly ? 'Salvar vínculo' : 'Salvar tipo de arte') }}
             </button>
             <button type="button" (click)="resetType()" [disabled]="busy"
               class="rounded-xl border px-5 py-2.5 text-sm font-semibold text-gray-700">
@@ -125,30 +137,31 @@
         </button>
       </section>
 
-      <section *ngIf="artTypes.length" class="space-y-3" aria-label="Meus tipos de arte">
+      <section *ngIf="artTypes.length && !typeFormOpen" class="space-y-3" aria-label="Meus tipos de arte">
         <div *ngFor="let art of artTypes"
           class="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
           <div>
             <h2 class="font-semibold text-braDark">{{ art.name }}</h2>
-            <p *ngIf="art.workflowId !== null" class="mt-1 text-xs text-gray-500">
-              {{ workflowName(art.workflowId) }}
+            <p class="mt-1 text-xs text-gray-500">
+              {{ art.workflowId !== null ? workflowName(art.workflowId) : 'Sem processo vinculado' }}
             </p>
           </div>
-          <button type="button" (click)="editType(art)" [disabled]="busy"
-            class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
-            Editar
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" (click)="openTypeLink(art)" [disabled]="busy"
+              class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              {{ art.workflowId === null ? 'Vincular processo' : 'Alterar processo' }}
+            </button>
+            <button type="button" (click)="editType(art)" [disabled]="busy"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              Editar
+            </button>
+          </div>
         </div>
       </section>
-      <p class="text-sm text-gray-600">
-        Quer definir as etapas dessas artes?
-        <a routerLink="/painel/creators/producao/processos"
-          class="font-semibold text-braPurple underline underline-offset-2">Organizar meus processos</a>
-      </p>
-    </ng-container>
+     </ng-container>
 
-    <ng-container *ngIf="section === 'processes' && !catalogLoading">
-      <nav class="flex flex-wrap gap-2" aria-label="Visualização dos processos">
+    <ng-container *ngIf="(section === 'processes' || (section === 'arts' && workflowFormOpen)) && !catalogLoading">
+      <nav *ngIf="!workflowFormOpen" class="flex flex-wrap gap-2" aria-label="Visualização dos processos">
         <button type="button" (click)="setProcessView('models')" [attr.aria-pressed]="processView === 'models'"
           [ngClass]="processView === 'models' ? 'bg-braPurple text-white' : 'border bg-white text-braPurple'"
           class="rounded-lg px-4 py-2 text-sm font-semibold">Meus processos</button>
@@ -157,8 +170,8 @@
           class="rounded-lg px-4 py-2 text-sm font-semibold">Etapas reutilizáveis</button>
       </nav>
 
-      <ng-container *ngIf="processView === 'models'">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <ng-container *ngIf="processView === 'models' || workflowFormOpen">
+      <div *ngIf="!workflowFormOpen" class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-gray-500">{{ workflows.length }} processo(s) salvo(s)</p>
         <button *ngIf="!workflowFormOpen" type="button" (click)="startWorkflow()" [disabled]="busy"
           class="rounded-xl bg-braPurple px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
@@ -176,6 +189,9 @@
             Passo {{ workflowEditorStep }} de 2
           </span>
         </div>
+        <p *ngIf="workflowForType" class="text-sm text-gray-600">
+          Novo processo para {{ typeName.trim() || 'esta arte' }}. Você voltará ao formulário da arte após salvar.
+        </p>
         <form (ngSubmit)="workflowEditorStep === 1 ? nextWorkflowStep() : saveWorkflow()" class="space-y-4">
           <ng-container *ngIf="workflowEditorStep === 1">
             <p class="text-sm text-gray-600">Primeiro, escolha um nome fácil de reconhecer.</p>
@@ -298,7 +314,7 @@
         </form>
       </section>
 
-      <section *ngIf="workflows.length" class="space-y-3" aria-labelledby="my-processes-title">
+      <section *ngIf="workflows.length && !workflowFormOpen" class="space-y-3" aria-labelledby="my-processes-title">
         <h2 id="my-processes-title" class="font-amaranth text-xl font-bold text-braDark">Processos que você usa</h2>
         <div *ngFor="let template of workflows"
           class="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
@@ -362,12 +378,12 @@
         </div>
       </section>
 
-      <p class="text-xs text-gray-500">
+      <p *ngIf="!workflowFormOpen" class="text-xs text-gray-500">
         Alterações em processos não mudam as etapas de pedidos já cadastrados.
       </p>
       </ng-container>
 
-      <section *ngIf="processView === 'library'" class="space-y-5" aria-label="Biblioteca de etapas reutilizáveis">
+      <section *ngIf="processView === 'library' && !workflowFormOpen" class="space-y-5" aria-label="Biblioteca de etapas reutilizáveis">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="space-y-1">
             <h2 class="font-amaranth text-xl font-bold text-braDark">Sua biblioteca de etapas</h2>
