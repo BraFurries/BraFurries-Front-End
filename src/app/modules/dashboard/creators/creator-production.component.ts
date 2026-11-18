@@ -29,11 +29,11 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   globalWorkflows: CreatorGlobalWorkflow[] = [];
   importedGlobalId: number | null = null;
   section: 'home' | 'arts' | 'processes' = 'home';
+  processView: 'models' | 'library' = 'models';
   typeFormOpen = false;
   typeAdvancedOpen = false;
   workflowFormOpen = false;
   workflowEditorStep: 1 | 2 = 1;
-  showStepLibrary = false;
   expandedGlobalId: number | null = null;
 
   definitionName = '';
@@ -59,9 +59,9 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.route.data.pipe(takeUntil(this.destroy$)).subscribe(data => {
       const requested = data['section'];
       this.section = requested === 'arts' || requested === 'processes' ? requested : 'home';
+      this.processView = 'models';
       this.resetType();
       this.resetWorkflow();
-      this.showStepLibrary = false;
       this.expandedGlobalId = null;
     });
 
@@ -80,7 +80,6 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
         this.workflows = [];
         this.globalWorkflows = [];
         this.importedGlobalId = null;
-        this.showStepLibrary = false;
         this.expandedGlobalId = null;
         this.definitionName = '';
         this.resetType();
@@ -207,18 +206,20 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.workflowFormOpen = true;
     this.workflowEditorStep = 1;
     this.editingWorkflowId = source.id;
-    this.showStepLibrary = source.steps.some(step => step.stageDefinitionId !== null);
     this.workflow = {
       name: source.name,
       isDefault: source.isDefault,
-      steps: source.steps.map(s => ({ name: s.name, stageDefinitionId: s.stageDefinitionId }))
+      // Do not silently link historical custom-only stages.
+      steps: source.steps.map(step => ({
+        name: step.name, stageDefinitionId: step.stageDefinitionId,
+        reuse: step.stageDefinitionId !== null
+      }))
     };
   }
 
   resetWorkflow(): void {
     this.workflowFormOpen = false;
     this.workflowEditorStep = 1;
-    this.showStepLibrary = false;
     this.editingWorkflowId = null;
     this.workflow = this.emptyWorkflow();
   }
@@ -239,7 +240,46 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
 
   addWorkflowStep(): void {
     if (this.workflow.steps.length >= 40) return;
-    this.workflow.steps.push({ name: '', stageDefinitionId: null });
+    // Reuse is the friendly default, but artists may opt out for one-off steps.
+    this.workflow.steps.push({ name: '', stageDefinitionId: null, reuse: true });
+  }
+
+  setProcessView(view: 'models' | 'library'): void {
+    if (this.processView === view || this.busy) return;
+    this.resetWorkflow();
+    this.processView = view;
+    this.error = '';
+    this.notice = '';
+  }
+
+  setStepReuse(step: CreatorStepDraft, enabled: boolean): void {
+    step.reuse = enabled;
+    if (!enabled) step.stageDefinitionId = null;
+    else {
+      const match = this.findSharedDefinition(step.name);
+      if (match) step.stageDefinitionId = match.id;
+    }
+  }
+
+  updateStepName(step: CreatorStepDraft, name: string): void {
+    step.name = name;
+    const selected = this.definitions.find(item => item.id === step.stageDefinitionId);
+    if (selected && selected.name !== name.trim()) step.stageDefinitionId = null;
+    if (step.reuse) {
+      const match = this.findSharedDefinition(name);
+      if (match) step.stageDefinitionId = match.id;
+    }
+  }
+
+  private findSharedDefinition(name: string): CreatorStageDefinition | undefined {
+    const normalized = name.trim().toLocaleLowerCase();
+    return normalized ? this.definitions.find(
+      item => item.name.trim().toLocaleLowerCase() === normalized) : undefined;
+  }
+
+  stageUsageCount(id: number): number {
+    return this.workflows.filter(workflow =>
+      workflow.steps.some(step => step.stageDefinitionId === id)).length;
   }
 
   moveStep(index: number, offset: number): void {
@@ -254,15 +294,19 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   }
 
   setSharedDefinition(step: CreatorStepDraft, id: number | null): void {
+    step.reuse = true;
     step.stageDefinitionId = id;
     const definition = this.definitions.find(item => item.id === id);
     if (definition) step.name = definition.name;
+    // Selecting "new" keeps the typed name and resolves it at save time.
   }
 
   saveWorkflow(): void {
     const name = this.workflow.name.trim();
     const steps = this.workflow.steps.map(step => ({
-      name: step.name.trim(), stageDefinitionId: step.stageDefinitionId
+      name: step.name.trim(),
+      stageDefinitionId: step.reuse === false ? null : step.stageDefinitionId,
+      reuse: step.reuse === true
     }));
     if (!this.allowed || this.busy || !name || name.length > 100 || steps.length > 40 ||
         steps.some(step => !step.name || step.name.length > 100)) {
@@ -279,7 +323,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
       ? this.studio.createWorkflow(input)
       : this.studio.updateWorkflow(id, input), () => {
       this.resetWorkflow();
-      this.notice = 'Modelo de etapas salvo. Commissions existentes não foram alteradas.';
+      this.notice = 'Processo salvo! Etapas reutilizáveis estão disponíveis nos outros processos. Pedidos existentes não foram alterados.';
     });
   }
 

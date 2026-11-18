@@ -129,7 +129,7 @@ describe('CreatorProductionComponent', () => {
     component.saveWorkflow();
     expect(studio.createWorkflow).toHaveBeenCalledWith({
       name:'Processo de ícones',isDefault:false,
-      steps:[{name:'Rascunho',stageDefinitionId:null}]
+      steps:[{name:'Rascunho',stageDefinitionId:null,reuse:true}]
     });
     expect(component.workflowFormOpen).toBeFalse();
   });
@@ -141,10 +141,10 @@ describe('CreatorProductionComponent', () => {
     component.editWorkflow(source);
     fixture.detectChanges();
     expect(component.workflowFormOpen).toBeTrue();
-    expect(component.showStepLibrary).toBeTrue();
+    expect(component.workflow.steps[0].reuse).toBeTrue();
     component.workflowEditorStep=2;
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Usar uma etapa reutilizável');
+    expect(fixture.nativeElement.textContent).toContain('Etapa já cadastrada');
     expect(component.workflow.steps[0].stageDefinitionId).toBe(7);
   });
 
@@ -180,7 +180,7 @@ describe('CreatorProductionComponent', () => {
     component.addWorkflowStep();
     component.setSharedDefinition(component.workflow.steps[0],7);
     expect(component.workflow.steps[0]).toEqual({
-      name:'Sketch',stageDefinitionId:7
+      name:'Sketch',stageDefinitionId:7,reuse:true
     });
     component.addWorkflowStep();
     component.workflow.steps[1].name='Revisão final';
@@ -189,10 +189,62 @@ describe('CreatorProductionComponent', () => {
     expect(studio.createWorkflow).toHaveBeenCalledWith({
       name:'Ref Sheet',isDefault:true,
       steps:[
-        {name:'Revisão final',stageDefinitionId:null},
-        {name:'Sketch',stageDefinitionId:7}
+        {name:'Revisão final',stageDefinitionId:null,reuse:true},
+        {name:'Sketch',stageDefinitionId:7,reuse:true}
       ]
     });
+  });
+
+  it('offers reusable stages as the default and preserves custom-only opt-out', () => {
+    routeData$.next({section:'processes'});
+    component.startWorkflow();
+    component.workflow.name='Ícones';
+    component.nextWorkflowStep();
+    component.addWorkflowStep();
+    expect(component.workflow.steps[0].reuse).toBeTrue();
+    component.updateStepName(component.workflow.steps[0], 'sketch');
+    expect(component.workflow.steps[0].stageDefinitionId).toBe(7);
+    component.setStepReuse(component.workflow.steps[0], false);
+    expect(component.workflow.steps[0].stageDefinitionId).toBeNull();
+    component.saveWorkflow();
+    expect(studio.createWorkflow).toHaveBeenCalledWith({
+      name:'Ícones',isDefault:false,
+      steps:[{name:'sketch',stageDefinitionId:null,reuse:false}]
+    });
+  });
+
+  it('keeps preexisting unlinked steps exclusive until the artist opts in', () => {
+    const source={id:4,name:'Ícones',isDefault:false,
+      steps:[{id:6,name:'Etapa especial',stageDefinitionId:null,position:0}]};
+    component.editWorkflow(source);
+    expect(component.workflow.steps[0].reuse).toBeFalse();
+    component.setStepReuse(component.workflow.steps[0],true);
+    expect(component.workflow.steps[0].reuse).toBeTrue();
+    expect(component.workflow.steps[0].stageDefinitionId).toBeNull();
+  });
+
+  it('separates the reusable library view and displays process linkage', () => {
+    routeData$.next({section:'processes'});
+    component.workflows=[{id:4,name:'Ícones',isDefault:true,
+      steps:[{id:5,name:'Sketch',stageDefinitionId:7,position:0}]}];
+    component.setProcessView('library');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Sua biblioteca de etapas');
+    expect(fixture.nativeElement.textContent).toContain('1 processo(s) vinculados');
+    expect(fixture.nativeElement.textContent).not.toContain('Modelos prontos');
+    component.setProcessView('models');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Modelos prontos');
+  });
+
+  it('clears a former linked ID when renaming a step to a different name', () => {
+    const source={id:4,name:'Ícones',isDefault:false,
+      steps:[{id:5,name:'Sketch',stageDefinitionId:7,position:0}]};
+    component.editWorkflow(source);
+    const step=component.workflow.steps[0];
+    component.updateStepName(step,'Nova etapa');
+    expect(step.stageDefinitionId).toBeNull();
+    expect(step.reuse).toBeTrue();
   });
 
   it('allows an art type to select a workflow without any user or Community ID', () => {

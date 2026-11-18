@@ -48,7 +48,12 @@ export interface CreatorArtType {
   workflowId: number | null;
 }
 export interface CreatorStageDefinition { id: number; name: string; }
-export interface CreatorStepDraft { name: string; stageDefinitionId: number | null; }
+export interface CreatorStepDraft {
+  name: string;
+  stageDefinitionId: number | null;
+  /** Opt into the artist's reusable library (resolved atomically by API). */
+  reuse?: boolean;
+}
 export interface CreatorWorkflowDraft {
   name: string;
   isDefault: boolean;
