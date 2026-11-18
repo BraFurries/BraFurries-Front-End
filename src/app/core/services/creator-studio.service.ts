@@ -106,6 +106,23 @@ export interface CreatorActivityPage {
   total: number;
 }
 
+export type CreatorRetentionWarning = 'ADVANCE_30_DAYS' | 'FINAL_7_DAYS' | 'OVERDUE';
+export interface CreatorExpiringCommission {
+  id: number;
+  title: string;
+  completedAtUtc: string;
+  expiresAtUtc: string;
+  warning: CreatorRetentionWarning;
+}
+export interface CreatorRetentionOverview {
+  policy: string;
+  retentionMonths: number;
+  advanceNoticeDays: number;
+  finalNoticeDays: number;
+  automaticDeletionEnabled: boolean;
+  commissions: CreatorExpiringCommission[];
+}
+
 /**
  * Backend is the authority for artist ownership and effective subscription.
  * Browser-side access checks only improve UX; they never grant access.
@@ -232,5 +249,14 @@ export class CreatorStudioService {
     Observable<CreatorActivity> {
     return this.http.post<CreatorActivity>(
       `${this.base}/commissions/${commissionId}/activity`, input);
+  }
+
+  // Both methods work for the account owner even after Pro is revoked.
+  retention(): Observable<CreatorRetentionOverview> {
+    return this.http.get<CreatorRetentionOverview>(`${this.base}/retention`);
+  }
+
+  exportMyData(): Observable<Blob> {
+    return this.http.get(`${this.base}/export`, { responseType: 'blob' });
   }
 }
