@@ -2,7 +2,8 @@ import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { BehaviorSubject, of, Subject } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import {
   CreatorPilotCandidate, CreatorPilotInvitation, CreatorStudioPilotAdminService
@@ -48,7 +49,7 @@ describe('AdminCreatorPilotComponent', () => {
     pilot = jasmine.createSpyObj<CreatorStudioPilotAdminService>(
       'CreatorStudioPilotAdminService',
       ['list','candidate','grantLifetimePro','revoke',
-       'inspectHold','placeHold','releaseHold','retentionDryRun']);
+       'inspectHold','placeHold','releaseHold','retentionDryRun','retentionHealth']);
     pilot.list.and.returnValue(of({items:[participant],page:1,pageSize:25,total:1}));
     pilot.candidate.and.returnValue(of(candidate));
     pilot.grantLifetimePro.and.returnValue(of({allowed:true,tier:'PRO',
@@ -66,6 +67,10 @@ describe('AdminCreatorPilotComponent', () => {
     pilot.retentionDryRun.and.returnValue(of({
       expiredCommissions:9,blockedByHold:2,blockedByMissingD30:3,
       blockedByMissingD7:4,smtpAcceptedBoth:0,providerConfirmedBoth:0,deliveryProofSupported:false
+    }));
+    pilot.retentionHealth.and.returnValue(of({
+      totalNotices:8,pending:1,sending:0,stuckSending:1,
+      smtpUnknown:1,smtpUnconfirmed:2,providerConfirmed:1,bounced:1,complaints:1
     }));
 
     await TestBed.configureTestingModule({
@@ -248,6 +253,60 @@ describe('AdminCreatorPilotComponent', () => {
     spyOn(window,'confirm').and.returnValue(true);
     component.placeHold();
     expect(component.retentionReport).toBeNull();
+  });
+
+  it('only loads operational health on demand for the platform owner', async () => {
+    await init(true);
+    expect(pilot.retentionHealth).not.toHaveBeenCalled();
+    component.loadRetentionHealth();
+    fixture.detectChanges();
+    expect(pilot.retentionHealth).toHaveBeenCalledTimes(1);
+    expect(component.retentionHealth?.totalNotices).toBe(8);
+    expect(fixture.nativeElement.textContent).toContain('Resultado SMTP incerto');
+    expect(fixture.nativeElement.textContent).toContain('Devolvidos (bounce)');
+    expect(fixture.nativeElement.textContent).toContain('não autoriza reenvio');
+  });
+
+  it('cannot load health for a community admin or non-owner', async () => {
+    await init(false);
+    component.loadRetentionHealth();
+    expect(pilot.retentionHealth).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain('Na fila (PENDING)');
+  });
+
+  it('never shows health data from a stale response after account switch', async () => {
+    await init(true);
+    const pending = new Subject<{
+      totalNotices:number;pending:number;sending:number;stuckSending:number;
+      smtpUnknown:number;smtpUnconfirmed:number;providerConfirmed:number;
+      bounced:number;complaints:number;
+    }>();
+    pilot.retentionHealth.and.returnValue(pending.asObservable());
+    component.loadRetentionHealth();
+    platform.myAccess.and.returnValue(of({enabled:true,owner:false,permissions:[]}));
+    user$.next({...ownerUser,id:77});
+    pending.next({
+      totalNotices:8,pending:1,sending:0,stuckSending:1,
+      smtpUnknown:1,smtpUnconfirmed:2,providerConfirmed:1,bounced:1,complaints:1
+    });
+    fixture.detectChanges();
+    expect(component.owner).toBeFalse();
+    expect(component.retentionHealth).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Na fila (PENDING)');
+    pending.complete();
+  });
+
+  it('fails closed when the health endpoint revokes owner access', async () => {
+    await init(true);
+    pilot.retentionHealth.and.returnValue(throwError(
+      () => new HttpErrorResponse({status:403})));
+    component.loadRetentionHealth();
+    fixture.detectChanges();
+    expect(component.owner).toBeFalse();
+    expect(component.retentionHealth).toBeNull();
+    expect(component.retentionReport).toBeNull();
+    expect(component.participants).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('Acesso administrativo restrito');
   });
 
   it('rejects invalid IDs before previewing or inviting anybody', async () => {
