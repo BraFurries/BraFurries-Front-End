@@ -4,11 +4,11 @@
       BraFurries Creators
     </p>
     <h2 class="font-amaranth text-2xl font-bold text-gray-800">
-      Participantes do piloto
+      Gestão do piloto Creators
     </h2>
     <p class="max-w-3xl text-sm text-gray-600">
-      Acesso fechado ao Creator Studio. Conceda Pro vitalício somente aos artistas
-      convidados que estão colaborando com os testes. Sem cobrança, sem expiração automática.
+      Administre os convites dos artistas e a biblioteca de modelos de produção
+      disponíveis para quem participa do Creator Studio.
     </p>
   </header>
 
@@ -32,6 +32,25 @@
   </section>
 
   <ng-container *ngIf="!checkingOwner && owner">
+    <nav class="flex flex-wrap gap-2 rounded-xl border border-gray-100 bg-white p-2 shadow-sm"
+      role="tablist" aria-label="Seções administrativas do piloto">
+      <button type="button" role="tab" id="creator-tab-participants"
+        [attr.aria-selected]="activeTab === 'participants'"
+        aria-controls="creator-tab-panel-participants"
+        (click)="showTab('participants')"
+        [ngClass]="activeTab === 'participants' ? 'bg-braPurple text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
+        class="rounded-lg px-4 py-2.5 text-sm font-semibold">
+        Participantes e acessos
+      </button>
+      <button type="button" role="tab" id="creator-tab-models"
+        [attr.aria-selected]="activeTab === 'models'"
+        aria-controls="creator-global-library"
+        (click)="showTab('models')"
+        [ngClass]="activeTab === 'models' ? 'bg-braPurple text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
+        class="rounded-lg px-4 py-2.5 text-sm font-semibold">
+        Modelos globais
+      </button>
+    </nav>
     <p *ngIf="errorMessage" role="alert"
       class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       {{ errorMessage }}
@@ -41,7 +60,8 @@
       {{ successMessage }}
     </p>
 
-    <section id="creator-global-library" class="space-y-5 rounded-2xl border border-braPurple/20 bg-white p-5 shadow-sm"
+    <section *ngIf="activeTab === 'models'" role="tabpanel" aria-labelledby="creator-tab-models"
+      id="creator-global-library" class="space-y-5 rounded-2xl border border-braPurple/20 bg-white p-5 shadow-sm"
       aria-labelledby="creator-global-library-title">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="space-y-2">
@@ -159,7 +179,9 @@
       </form>
     </section>
 
-    <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <ng-container *ngIf="activeTab === 'participants'">
+      <section id="creator-tab-panel-participants" role="tabpanel" aria-labelledby="creator-tab-participants"
+        class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div>
         <h3 class="font-amaranth text-xl font-bold text-gray-800">Convidar artista</h3>
         <p class="mt-1 text-sm text-gray-600">
@@ -534,6 +556,7 @@
         {{ holdSuccess }}
       </p>
     </section>
+    </ng-container>
 
   </ng-container>
 </section>
