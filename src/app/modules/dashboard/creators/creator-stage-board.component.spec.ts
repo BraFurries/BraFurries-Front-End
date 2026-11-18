@@ -230,7 +230,7 @@ describe('CreatorStageBoardComponent', () => {
     expect(elements[2].querySelector('[data-order-insertion]')).not.toBeNull();
     expect(elements[2].querySelector('[data-order-insertion]')!.classList.contains('-right-2')).toBeTrue();
     expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
-    component.orderDragEnded({event:{clientX:650,clientY:100}} as unknown as CdkDragEnd<typeof first>,first);
+    component.orderDragEnded({event:{clientX:887,clientY:100}} as unknown as CdkDragEnd<typeof first>,first);
     fixture.detectChanges();
     expect(component.orderDragId).toBeNull();
     expect(component.orderTargetIndex).toBeNull();
