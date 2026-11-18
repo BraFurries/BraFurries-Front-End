@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { forkJoin, Subject, takeUntil, distinctUntilChanged } from 'rxjs';
 import {
   CreatorArtType, CreatorStageDefinition, CreatorStepDraft,
-  CreatorStudioService, CreatorWorkflow, CreatorWorkflowDraft
+  CreatorGlobalWorkflow, CreatorStudioService, CreatorWorkflow, CreatorWorkflowDraft
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
 
@@ -25,6 +25,8 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   artTypes: CreatorArtType[] = [];
   definitions: CreatorStageDefinition[] = [];
   workflows: CreatorWorkflow[] = [];
+  globalWorkflows: CreatorGlobalWorkflow[] = [];
+  importedGlobalId: number | null = null;
 
   definitionName = '';
   editingTypeId: number | null = null;
@@ -57,6 +59,8 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
         this.artTypes = [];
         this.definitions = [];
         this.workflows = [];
+        this.globalWorkflows = [];
+        this.importedGlobalId = null;
         this.resetType();
         this.resetWorkflow();
         if (!user) {
@@ -93,13 +97,15 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     forkJoin({
       artTypes: this.studio.artTypes(),
       definitions: this.studio.stageDefinitions(),
-      workflows: this.studio.workflows()
+      workflows: this.studio.workflows(),
+      globalWorkflows: this.studio.globalWorkflows()
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: result => {
         if (seq !== this.dataSequence || this.users.getUser()?.id !== userId) return;
         this.artTypes = result.artTypes;
         this.definitions = result.definitions;
         this.workflows = result.workflows;
+        this.globalWorkflows = result.globalWorkflows;
         this.catalogLoading = false;
       },
       error: () => {
@@ -108,6 +114,20 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
         this.error = 'Não foi possível carregar tipos de arte e etapas.';
       }
     });
+  }
+
+  adoptGlobalWorkflow(template: CreatorGlobalWorkflow): void {
+    if (!this.allowed || this.busy || !template.active || template.steps.length === 0) return;
+    this.importedGlobalId = template.id;
+    this.run(() => this.studio.importGlobalWorkflow(template.id, this.workflows.length === 0),
+      () => {
+        this.importedGlobalId = null;
+        this.notice = 'Modelo copiado para sua conta. Agora você pode personalizar as etapas sem alterar o original.';
+      },
+      () => {
+        this.importedGlobalId = null;
+        this.error = 'Não foi possível copiar este modelo. Se já existir um modelo seu com esse nome, renomeie-o primeiro.';
+      });
   }
 
   workflowName(id: number | null): string {
@@ -211,7 +231,8 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     return {name:'', isDefault:false, steps:[]};
   }
 
-  private run<T>(operation: () => import('rxjs').Observable<T>, onSuccess: () => void): void {
+  private run<T>(operation: () => import('rxjs').Observable<T>, onSuccess: () => void,
+                 onError?: () => void): void {
     const account = this.users.getUser()?.id;
     this.busy = true;
     this.error = '';
@@ -226,7 +247,8 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
       error: () => {
         if (this.users.getUser()?.id !== account) return;
         this.busy = false;
-        this.error = 'Não foi possível salvar. Confira se o nome já existe e se as etapas pertencem à sua conta.';
+        if (onError) onError();
+        else this.error = 'Não foi possível salvar. Confira se o nome já existe e se as etapas pertencem à sua conta.';
       }
     });
   }

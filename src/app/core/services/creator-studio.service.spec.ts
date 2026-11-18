@@ -19,6 +19,24 @@ describe('CreatorStudioService', () => {
 
   afterEach(() => http.verify());
 
+  it('reads globally published processes and imports them only into the current artist', () => {
+    studio.globalWorkflows().subscribe(models => expect(models.length).toBe(1));
+    const read = http.expectOne(`${base}/global-workflows`);
+    expect(read.request.method).toBe('GET');
+    expect(read.request.params.keys()).toEqual([]);
+    read.flush([{id:8,name:'Processo básico',description:'Padrão',
+      active:true,steps:[{id:81,name:'Sketch',position:0}]}]);
+
+    studio.importGlobalWorkflow(8,true).subscribe();
+    const copy = http.expectOne(`${base}/workflows/from-global/8`);
+    expect(copy.request.method).toBe('POST');
+    expect(copy.request.body).toEqual({setAsDefault:true});
+    expect(copy.request.body.ownerUserId).toBeUndefined();
+    expect(copy.request.body.communityId).toBeUndefined();
+    copy.flush({id:21,name:'Processo básico',isDefault:true,steps:[]});
+  });
+
+
   it('asks the API for the entitlement of the authenticated account, never an artist ID', () => {
     studio.myAccess().subscribe();
     const req = http.expectOne(`${base}/access`);

@@ -19,6 +19,30 @@ describe('CreatorStudioPilotAdminService', () => {
 
   afterEach(() => http.verify());
 
+  it('manages global models through owner-only admin URLs without Community scope', () => {
+    const path = `${environment.apiBaseUrl}/user/me/creator-studio/admin/global-workflows`;
+    service.globalWorkflows().subscribe();
+    const list = http.expectOne(path);
+    expect(list.request.method).toBe('GET');
+    expect(list.request.params.keys()).toEqual([]);
+    list.flush([]);
+
+    const draft = {name:'Padrão',description:'Processo',active:true,steps:['Sketch']};
+    service.createGlobalWorkflow(draft).subscribe();
+    const created = http.expectOne(path);
+    expect(created.request.method).toBe('POST');
+    expect(created.request.body).toEqual(draft);
+    expect(created.request.body.communityId).toBeUndefined();
+    created.flush({id:8,...draft,steps:[]});
+
+    service.updateGlobalWorkflow(8,{...draft,active:false}).subscribe();
+    const updated = http.expectOne(`${path}/8`);
+    expect(updated.request.method).toBe('PUT');
+    expect(updated.request.body.active).toBeFalse();
+    updated.flush({id:8,...draft,active:false,steps:[]});
+  });
+
+
   it('lists only bounded owner-only subscription grants', () => {
     service.list('ACTIVE', 2, 25).subscribe();
     const req = http.expectOne(r => r.url === base);

@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CreatorStudioAccess } from './creator-studio.service';
+import { CreatorStudioAccess, CreatorGlobalWorkflow, CreatorGlobalWorkflowDraft } from './creator-studio.service';
 
 export type CreatorPilotFilter = 'ALL' | 'ACTIVE' | 'REVOKED' | 'SUSPENDED';
 
@@ -111,6 +111,23 @@ export class CreatorStudioPilotAdminService {
 
   placeHold(draft: CreatorRetentionHoldDraft): Observable<CreatorRetentionHold> {
     return this.http.post<CreatorRetentionHold>(this.holdsBase, draft);
+  }
+
+  /** Only the configured platform owner may manage published starter workflows. */
+  globalWorkflows(): Observable<CreatorGlobalWorkflow[]> {
+    return this.http.get<CreatorGlobalWorkflow[]>(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/global-workflows`);
+  }
+
+  createGlobalWorkflow(input: CreatorGlobalWorkflowDraft): Observable<CreatorGlobalWorkflow> {
+    return this.http.post<CreatorGlobalWorkflow>(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/global-workflows`, input);
+  }
+
+  updateGlobalWorkflow(id: number, input: CreatorGlobalWorkflowDraft):
+    Observable<CreatorGlobalWorkflow> {
+    return this.http.put<CreatorGlobalWorkflow>(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/global-workflows/${id}`, input);
   }
 
   retentionDryRun(): Observable<CreatorRetentionDryRun> {
