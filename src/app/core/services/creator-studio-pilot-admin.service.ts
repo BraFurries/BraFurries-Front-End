@@ -46,6 +46,16 @@ export interface CreatorRetentionHold extends CreatorRetentionHoldDraft {
   active: boolean;
 }
 
+/** Counts of expired commissions, without names, clients or individual identifiers. */
+export interface CreatorRetentionDryRun {
+  expiredCommissions: number;
+  blockedByHold: number;
+  blockedByMissingD30: number;
+  blockedByMissingD7: number;
+  smtpAcceptedBoth: number;
+  deliveryProofSupported: boolean;
+}
+
 /**
  * Owner-only administrative contract; authorization lives exclusively in API.
  * Does not create public invitations, checkout, bulk grants, or self-enrollment.
@@ -87,6 +97,11 @@ export class CreatorStudioPilotAdminService {
 
   placeHold(draft: CreatorRetentionHoldDraft): Observable<CreatorRetentionHold> {
     return this.http.post<CreatorRetentionHold>(this.holdsBase, draft);
+  }
+
+  retentionDryRun(): Observable<CreatorRetentionDryRun> {
+    return this.http.get<CreatorRetentionDryRun>(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/dry-run`);
   }
 
   releaseHold(artistId: number, commissionId: number): Observable<void> {
