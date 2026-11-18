@@ -103,7 +103,6 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
         this.showMyArtistPortal = false;
         this.studioAccessRequestId++;
         this.showCreatorStudio = false;
-    this.showCreatorStudioData = false;
         this.showCreatorStudioData = false;
         this.showCommerceMenu = false;
         this.showPermissionsMenu = false;
@@ -331,6 +330,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     this.showMyArtistPortal = false;
     this.studioAccessRequestId++;
     this.showCreatorStudio = false;
+    this.showCreatorStudioData = false;
     this.isLoggingOut = true;
 
     setTimeout(() => {
