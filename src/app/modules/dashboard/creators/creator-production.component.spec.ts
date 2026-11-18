@@ -23,13 +23,21 @@ describe('CreatorProductionComponent', () => {
     studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','artTypes','stageDefinitions','workflows',
         'createArtType','updateArtType','createStageDefinition',
-        'createWorkflow','updateWorkflow']);
+        'createWorkflow','updateWorkflow','globalWorkflows','importGlobalWorkflow']);
     studio.myAccess.and.returnValue(of({
       allowed:true,tier:'PRO',status:'ACTIVE',sourceKind:'PILOT',expiresAtUtc:null
     }));
     studio.artTypes.and.returnValue(of([]));
     studio.stageDefinitions.and.returnValue(of([{id:7,name:'Sketch'}]));
     studio.workflows.and.returnValue(of([]));
+    studio.globalWorkflows.and.returnValue(of([{
+      id:8,name:'Processo básico',description:'Para começar',active:true,
+      steps:[{id:31,name:'Alinhamento',position:0},{id:32,name:'Entrega',position:1}]
+    }]));
+    studio.importGlobalWorkflow.and.returnValue(of({
+      id:12,name:'Processo básico',isDefault:true,
+      steps:[{id:41,name:'Alinhamento',stageDefinitionId:null,position:0}]
+    }));
     studio.createWorkflow.and.returnValue(of({id:12,name:'Ref Sheet',
       isDefault:true,steps:[]}));
     studio.createArtType.and.returnValue(of({id:4,name:'Ref Sheet',workflowId:12}));
@@ -61,6 +69,23 @@ describe('CreatorProductionComponent', () => {
     expect(studio.stageDefinitions).toHaveBeenCalledTimes(1);
     expect(studio.workflows).toHaveBeenCalledTimes(1);
     expect(fixture.nativeElement.textContent).toContain('Etapas reutilizáveis');
+  });
+
+  it('shows globally published starter templates above private configuration', () => {
+    expect(studio.globalWorkflows).toHaveBeenCalledTimes(1);
+    const html = fixture.nativeElement.textContent as string;
+    expect(html).toContain('Modelos prontos da BraFurries');
+    expect(html).toContain('Processo básico');
+    expect(html).toContain('Usar este modelo');
+  });
+
+  it('adopts global starter as artist default only when there are no personal models', () => {
+    component.adoptGlobalWorkflow(component.globalWorkflows[0]);
+    expect(studio.importGlobalWorkflow).toHaveBeenCalledWith(8,true);
+    expect(component.notice).toContain('cópia só sua');
+    component.workflows=[{id:77,name:'Já existe',isDefault:true,steps:[]}];
+    component.adoptGlobalWorkflow(component.globalWorkflows[0]);
+    expect(studio.importGlobalWorkflow).toHaveBeenCalledWith(8,false);
   });
 
   it('sends reusable stage references with the copied workflow step order', () => {
@@ -99,6 +124,7 @@ describe('CreatorProductionComponent', () => {
     fixture.detectChanges();
     expect(component.allowed).toBeFalse();
     expect(component.definitions).toEqual([]);
+    expect(component.globalWorkflows).toEqual([]);
     expect(fixture.nativeElement.textContent).toContain('exclusiva das contas Pro');
   });
 
