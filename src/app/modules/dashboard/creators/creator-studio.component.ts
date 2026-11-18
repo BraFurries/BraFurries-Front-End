@@ -641,11 +641,14 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     if (this.viewMode !== 'board' || this.draggedBoardCardId !== commission.id) return;
     const point = this.boardPointer(event.event);
     const status = point ? this.boardDropZoneAt(point.x, point.y)?.status ?? null : null;
-    this.draggedBoardCardId = null;
-    this.hoveredBoardStatus = null;
-    this.boardGhostIndex = null;
-    // A release inside the origin, outside the board or a cancelled drag is a no-op.
-    if (status && status !== commission.status) this.moveBoardCommission(commission, status);
+    this.zone.run(() => {
+      this.draggedBoardCardId = null;
+      this.hoveredBoardStatus = null;
+      this.boardGhostIndex = null;
+      // CDK pointer events can run outside Angular. Re-enter before applying a
+      // drop, including clearing the ghost for a cancelled drag.
+      if (status && status !== commission.status) this.moveBoardCommission(commission, status);
+    });
   }
 
   private boardPointer(event: MouseEvent | TouchEvent): {x: number; y: number} | null {
