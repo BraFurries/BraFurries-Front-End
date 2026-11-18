@@ -160,6 +160,88 @@ describe('CreatorStudioComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-board-drop-status="PAUSED"] [aria-hidden="true"]')).toBeNull();
   });
 
+  it('anchors the ghost between cards in the exact chronological insertion slot', () => {
+    const earlier = {...card, id: 18, requestedOn:'2026-11-10', status:'WAITING' as CreatorCommissionStatus};
+    const later = {...card, id: 19, requestedOn:'2026-11-15', status:'WAITING' as CreatorCommissionStatus};
+    component.boardColumns = component.boardColumns.map(column =>
+      column.status === 'WAITING' ? {...column, items:[earlier, later], total:2} : column);
+    fixture.detectChanges();
+    const target = mockZones().find(zone => zone.status === 'WAITING')!;
+    startDrag(card);
+    const move = (y: number) => component.boardDragMoved({
+      source:{data:card},
+      event:{clientX:target.x, clientY:y}
+    } as unknown as CdkDragMove<CreatorCommission>);
+    move(90);
+    fixture.detectChanges();
+    const lane = fixture.nativeElement.querySelector(
+      '[data-board-drop-status="WAITING"] .cdk-drop-list') as HTMLElement;
+    const children = Array.from(lane.children) as HTMLElement[];
+    expect(component.boardGhostIndex).toBe(1);
+    expect(children.length).toBe(3);
+    expect(children[0].textContent).toContain('Ref Sheet');
+    expect(children[1].getAttribute('aria-hidden')).toBe('true');
+    expect(children[2].textContent).toContain('Ref Sheet');
+    expect(component.boardColumns[2].items).toEqual([earlier, later]);
+    // Moving the pointer within the same lane must not move the placeholder.
+    const ghost = children[1];
+    move(345);
+    fixture.detectChanges();
+    expect(component.boardGhostIndex).toBe(1);
+    expect(lane.children[1]).toBe(ghost);
+    expect(studio.changeStatus).not.toHaveBeenCalled();
+  });
+
+  it('sorts equal request dates by id and inserts at the very beginning or end', () => {
+    const sameDayEarlier = {...card, id: 5, status:'WAITING' as CreatorCommissionStatus};
+    const sameDayLater = {...card, id: 24, status:'WAITING' as CreatorCommissionStatus};
+    component.boardColumns = component.boardColumns.map(column =>
+      column.status === 'WAITING'
+        ? {...column, items:[sameDayEarlier, sameDayLater], total:2} : column);
+    expect(component.boardInsertionIndex(card,'WAITING')).toBe(1);
+    const earliest = {...card, id:42, requestedOn:'2026-11-01'};
+    const latest = {...card, id:42, requestedOn:'2026-11-30'};
+    expect(component.boardInsertionIndex(earliest,'WAITING')).toBe(0);
+    expect(component.boardInsertionIndex(latest,'WAITING')).toBe(2);
+  });
+
+  it('does not falsely preview a slot beyond the paginated twelve visible cards', () => {
+    const visible = Array.from({length:12}, (_,i) => ({
+      ...card, id:i + 50, status:'WAITING' as CreatorCommissionStatus,
+      requestedOn:'2026-11-01'
+    }));
+    component.boardColumns = component.boardColumns.map(column =>
+      column.status === 'WAITING' ? {...column, items:visible, total:20} : column);
+    fixture.detectChanges();
+    const target = mockZones().find(zone => zone.status === 'WAITING')!;
+    startDrag(card);
+    component.boardDragMoved({
+      source:{data:card},
+      event:{clientX:target.x,clientY:target.y}
+    } as unknown as CdkDragMove<CreatorCommission>);
+    fixture.detectChanges();
+    expect(component.hoveredBoardStatus).toBe('WAITING');
+    expect(component.boardGhostIndex).toBeNull();
+    expect(fixture.nativeElement.querySelector(
+      '[data-board-drop-status="WAITING"]').textContent).toContain('mais abaixo');
+    expect(studio.changeStatus).not.toHaveBeenCalled();
+  });
+
+  it('places the fixed ghost first in an otherwise empty target lane', () => {
+    const target = mockZones().find(zone => zone.status === 'PAUSED')!;
+    startDrag(card);
+    component.boardDragMoved({
+      source:{data:card}, event:{clientX:target.x,clientY:target.y}
+    } as unknown as CdkDragMove<CreatorCommission>);
+    fixture.detectChanges();
+    const lane = fixture.nativeElement.querySelector(
+      '[data-board-drop-status="PAUSED"] .cdk-drop-list') as HTMLElement;
+    expect(component.boardGhostIndex).toBe(0);
+    expect(lane.children.length).toBe(1);
+    expect(lane.children[0].getAttribute('aria-hidden')).toBe('true');
+    expect(lane.textContent).not.toContain('Nada nesta fila');
+  });
+
   it('only moves the card when released inside a whole lane and after backend confirmation', () => {
     const pending = new Subject<CreatorCommission>();
     studio.changeStatus.and.returnValue(pending.asObservable());
