@@ -11,6 +11,7 @@ import {
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { PlatformAccessService } from '../../../services/platform-access.service';
 import { CommerceArtistService } from '../../../services/commerce-artist.service';
+import { CreatorStudioService } from '../../../services/creator-studio.service';
 import { PartnerDiscordService, OwnPartnerPublication } from '../../../services/partner-discord.service';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../../shared/models/user';
@@ -28,6 +29,7 @@ describe('BaseLayoutDashboardComponent', () => {
   let commerce: jasmine.SpyObj<PlatformAccessService>;
   let partners: jasmine.SpyObj<PartnerDiscordService>;
   let artists: jasmine.SpyObj<CommerceArtistService>;
+  let creators: jasmine.SpyObj<CreatorStudioService>;
   let router: Router;
 
   const user: User = {
@@ -88,6 +90,8 @@ describe('BaseLayoutDashboardComponent', () => {
     partners.getMyPublications.and.returnValue(of([]));
     artists = jasmine.createSpyObj<CommerceArtistService>('CommerceArtistService', ['myAccess']);
     artists.myAccess.and.returnValue(of({ eligible: false }));
+    creators = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService', ['myAccess']);
+    creators.myAccess.and.returnValue(of({ allowed: false, tier: null, status: 'NOT_AUTHORIZED', sourceKind: null, expiresAtUtc: null }));
     commerce.myAccess.and.returnValue(of({ enabled: false, owner: false, permissions: [] }));
     context.initialize.and.returnValue(of({ kind: 'ready', state: baseState }));
     context.selectCommunity.and.returnValue(of({ kind: 'ready', state: baseState }));
@@ -104,7 +108,8 @@ describe('BaseLayoutDashboardComponent', () => {
         { provide: CommunityContextService, useValue: context },
         { provide: PlatformAccessService, useValue: commerce },
         { provide: PartnerDiscordService, useValue: partners },
-        { provide: CommerceArtistService, useValue: artists }
+        { provide: CommerceArtistService, useValue: artists },
+        { provide: CreatorStudioService, useValue: creators }
       ]
     }).compileComponents();
 
@@ -173,6 +178,51 @@ describe('BaseLayoutDashboardComponent', () => {
     fixture.detectChanges();
     expect(component.showMyPartnerPublications).toBeFalse();
     expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
+  });
+
+  it('hides the Studio menu from people without explicit Pro authorization', () => {
+    expect(creators.myAccess).toHaveBeenCalledTimes(1);
+    expect(component.showCreatorStudio).toBeFalse();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')).toBeNull();
+  });
+
+  it('shows the Studio menu only when the authenticated account has active Pro', () => {
+    creators.myAccess.and.returnValue(of({
+      allowed: true, tier: 'PRO', status: 'ACTIVE',
+      sourceKind: 'PILOT', expiresAtUtc: null
+    }));
+    user$.next({ ...user, id: 2 });
+    fixture.detectChanges();
+    expect(component.showCreatorStudio).toBeTrue();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')).toBeTruthy();
+
+    creators.myAccess.and.returnValue(of({
+      allowed: true, tier: 'FREE', status: 'ACTIVE',
+      sourceKind: 'INVITE', expiresAtUtc: null
+    }));
+    user$.next({ ...user, id: 3 });
+    fixture.detectChanges();
+    expect(component.showCreatorStudio).toBeFalse();
+    expect(component.showCreatorStudioData).toBeTrue();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')?.textContent)
+      .toContain('Meus dados Creators');
+  });
+
+  it('keeps personal data export discoverable when a pilot Pro is revoked', () => {
+    creators.myAccess.and.returnValue(of({
+      allowed: false, tier: 'PRO', status: 'REVOKED',
+      sourceKind: 'PILOT', expiresAtUtc: null
+    }));
+    user$.next({ ...user, id: 9 });
+    fixture.detectChanges();
+    expect(component.showCreatorStudio).toBeFalse();
+    expect(component.showCreatorStudioData).toBeTrue();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')?.textContent)
+      .toContain('Meus dados Creators');
+    user$.next(null);
+    fixture.detectChanges();
+    expect(component.showCreatorStudioData).toBeFalse();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')).toBeNull();
   });
 
   it('hides Minhas Artes for ordinary accounts without an artist link', () => {

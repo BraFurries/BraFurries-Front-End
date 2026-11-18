@@ -10,6 +10,7 @@ import {
 import { CommunitySummary } from '../../../services/community-access.service';
 import { PlatformAccessService } from '../../../services/platform-access.service';
 import { CommerceArtistService } from '../../../services/commerce-artist.service';
+import { CreatorStudioService } from '../../../services/creator-studio.service';
 import { PartnerDiscordService } from '../../../services/partner-discord.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
 import { UserService } from '../../../services/user.service';
@@ -29,6 +30,8 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   showPartnersMenu = false;
   showMyPartnerPublications = false;
   showMyArtistPortal = false;
+  showCreatorStudio = false;
+  showCreatorStudioData = false;
   currentUser: User | null = null;
   isUserMenuOpen = false;
   isCommunityMenuOpen = false;
@@ -54,6 +57,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   private lastCommerceUserId: number | null = null;
   private partnerPublicationsRequestId = 0;
   private artistAccessRequestId = 0;
+  private studioAccessRequestId = 0;
   private readonly destroy$ = new Subject<void>();
   private readonly failedCommunityImageUrls = new Set<string>();
 
@@ -67,6 +71,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     private readonly commerceAccess: PlatformAccessService,
     private readonly partnerDiscord: PartnerDiscordService,
     private readonly commerceArtists: CommerceArtistService,
+    private readonly creatorStudio: CreatorStudioService,
     private readonly router: Router
   ) {
     this.activePath = window.location.pathname;
@@ -96,9 +101,30 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
         this.showMyPartnerPublications = false;
         this.artistAccessRequestId++;
         this.showMyArtistPortal = false;
+        this.studioAccessRequestId++;
+        this.showCreatorStudio = false;
+        this.showCreatorStudioData = false;
         this.showCommerceMenu = false;
         this.showPermissionsMenu = false;
         if (userId == null) return;
+
+        // Creator Studio is independent of Community and commercial roles.
+        // Navigation is only a convenience; API gates every Pro operation.
+        const studioRequestId = this.studioAccessRequestId;
+        this.creatorStudio.myAccess().pipe(takeUntil(this.destroy$)).subscribe({
+          next: access => {
+            if (this.lastCommerceUserId !== userId || studioRequestId !== this.studioAccessRequestId) return;
+            this.showCreatorStudio = access.allowed && access.tier === 'PRO';
+            // Former subscribers retain a discoverable path to their data archive.
+            this.showCreatorStudioData = !this.showCreatorStudio && !!access.sourceKind;
+          },
+          error: () => {
+            if (this.lastCommerceUserId === userId && studioRequestId === this.studioAccessRequestId) {
+              this.showCreatorStudio = false;
+              this.showCreatorStudioData = false;
+            }
+          }
+        });
 
         // Private commerce access is independent of the selected Community.
         this.commerceAccess.myAccess()
@@ -302,6 +328,9 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     this.showMyPartnerPublications = false;
     this.artistAccessRequestId++;
     this.showMyArtistPortal = false;
+    this.studioAccessRequestId++;
+    this.showCreatorStudio = false;
+    this.showCreatorStudioData = false;
     this.isLoggingOut = true;
 
     setTimeout(() => {
