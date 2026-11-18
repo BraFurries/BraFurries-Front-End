@@ -152,6 +152,11 @@ describe('CreatorProductionComponent', () => {
     routeData$.next({section:'arts'});
     component.startType();
     component.typeName='Dados de outro artista';
+    // The next account does not have Pro access. Old data and form state
+    // must disappear, instead of being refetched using the first account's mock.
+    studio.myAccess.and.returnValue(of({
+      allowed:false,tier:null,status:'NOT_AUTHORIZED',sourceKind:null,expiresAtUtc:null
+    }));
     user$.next({...user,id:52});
     fixture.detectChanges();
     expect(component.typeFormOpen).toBeFalse();
