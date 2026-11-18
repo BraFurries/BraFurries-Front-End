@@ -43,7 +43,8 @@ describe('CreatorStudioComponent', () => {
     studio.myAccess.and.returnValue(of(pro));
     studio.commissions.and.callFake((status, page, pageSize) => of({
       items: status === 'QUEUED' || status === null ? [card] : [],
-      page, pageSize, total: status === 'QUEUED' || status === null ? 1 : 0
+      page: page ?? 1, pageSize: pageSize ?? 25,
+      total: status === 'QUEUED' || status === null ? 1 : 0
     }));
     studio.create.and.returnValue(of(card));
     studio.update.and.returnValue(of(card));
