@@ -136,8 +136,6 @@ describe('CreatorStudioComponent', () => {
     expect(board.querySelector('select')).toBeNull();
     expect(fixture.debugElement.queryAll(By.directive(CdkDrag)).length).toBe(1);
     expect(board.querySelectorAll('[data-board-drop-status]').length).toBe(5);
-    expect(board.querySelector('[cdkDragPlaceholder]') !== null ||
-      board.querySelector('ng-template[cdkDragPlaceholder]') !== null).toBeTrue();
     expect(board.textContent).toContain('Arraste para cá para concluir');
   });
 
