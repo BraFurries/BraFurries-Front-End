@@ -103,6 +103,7 @@ describe('CreatorStudioComponent', () => {
     expect(html).toContain('12/11/2026');
     expect(html).toContain('Aguardando retorno');
     expect(html).toContain('Em pausa');
+    expect(fixture.nativeElement.querySelector('article [data-drag-indicator]')).not.toBeNull();
   });
 
   it('uses one stage view with its process selector inside the main card and restores drag per scope', () => {
@@ -130,10 +131,12 @@ describe('CreatorStudioComponent', () => {
     const child=fixture.debugElement.query(By.directive(CreatorStageBoardComponent));
     expect(child.nativeElement.querySelector('select')).toBeNull();
     expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
+    expect(child.nativeElement.querySelector('article [data-drag-indicator]')).toBeNull();
     component.selectStageProcess(33);
     fixture.detectChanges();
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
     expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeFalse();
+    expect(child.nativeElement.querySelector('article [data-drag-indicator]')).not.toBeNull();
     expect(child.nativeElement.textContent).toContain('Pintura');
     expect(child.nativeElement.classList.contains('block')).toBeTrue();
     expect(child.nativeElement.classList.contains('mt-6')).toBeTrue();
