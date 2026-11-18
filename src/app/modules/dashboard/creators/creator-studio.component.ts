@@ -264,7 +264,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     this.page = 1;
     this.expandedCommissionId = null;
     this.stepsSequence++;
-    this.reload();
+    this.errorMessage = '';
+    // The embedded stage board reacts to its workflow input and loads
+    // itself. Do not reload the previous board while switching modes.
+    if (mode === 'board' || mode === 'list') this.reload();
   }
 
   showStatusList(status: CreatorCommissionStatus): void {
