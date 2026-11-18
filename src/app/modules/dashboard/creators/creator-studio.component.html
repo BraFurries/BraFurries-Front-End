@@ -18,6 +18,66 @@
     </div>
   </header>
 
+  <section *ngIf="!loadingAccess && access"
+    class="space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+    aria-label="Retenção e exportação de dados do Creator Studio">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 class="font-amaranth text-xl font-bold text-braDark">Seus dados e privacidade</h2>
+        <p class="mt-1 max-w-2xl text-sm text-gray-600">
+          Trabalhos concluídos são elegíveis para exclusão 12 meses após a última
+          conclusão. Pedidos na fila, pausados ou em andamento são preservados.
+          Você pode exportar seus dados mesmo após o fim da assinatura.
+        </p>
+      </div>
+      <button type="button" (click)="downloadMyData()" [disabled]="exporting"
+        class="rounded-xl border border-braPurple/30 px-4 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/5 disabled:opacity-50">
+        {{ exporting ? 'Preparando arquivo...' : 'Exportar meus dados (JSON)' }}
+      </button>
+    </div>
+    <p class="text-xs text-gray-500">
+      O arquivo inclui commissions, referências, etapas, anotações e modelos de produção.
+      Os links são exportados como URLs; os arquivos externos não são copiados.
+    </p>
+    <p *ngIf="exportError" role="alert" class="text-sm font-semibold text-red-700">
+      {{ exportError }}
+    </p>
+    <p *ngIf="exportSuccess" role="status" class="text-sm font-semibold text-gray-700">
+      {{ exportSuccess }}
+    </p>
+    <p *ngIf="retentionLoading" role="status" class="text-sm text-gray-500">
+      Consultando os prazos de retenção...
+    </p>
+    <p *ngIf="retentionError" role="alert" class="text-sm text-red-700">
+      {{ retentionError }}
+    </p>
+    <div *ngIf="retention && retention.commissions.length" class="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <h3 class="text-sm font-bold text-amber-950">Avisos de retenção</h3>
+      <p class="text-xs text-amber-900">
+        {{ retention.automaticDeletionEnabled
+          ? 'As commissions abaixo se aproximam da exclusão automática.'
+          : 'A exclusão automática está desativada durante o piloto. Estes prazos são informativos.' }}
+      </p>
+      <ul class="space-y-2">
+        <li *ngFor="let item of retention.commissions" class="flex flex-wrap items-start justify-between gap-2 border-t border-amber-200 pt-2 text-sm">
+          <span class="min-w-0 break-words font-semibold text-amber-950">
+            {{ item.title }}
+            <span class="block text-xs font-normal">
+              {{ retentionWarningLabel(item.warning) }}
+            </span>
+          </span>
+          <span class="text-xs text-amber-900">
+            Prazo: {{ formatCivilDate(item.expiresAtUtc) }}
+          </span>
+        </li>
+      </ul>
+    </div>
+    <p *ngIf="retention && !retention.commissions.length"
+      class="text-xs text-gray-500">
+      Nenhuma commission concluída entra na janela de aviso de 30 dias.
+    </p>
+  </section>
+
   <p *ngIf="loadingAccess" role="status"
      class="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">
     Verificando seu acesso ao Studio...
