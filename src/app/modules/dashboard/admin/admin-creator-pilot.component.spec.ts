@@ -65,7 +65,7 @@ describe('AdminCreatorPilotComponent', () => {
     pilot.releaseHold.and.returnValue(of(void 0));
     pilot.retentionDryRun.and.returnValue(of({
       expiredCommissions:9,blockedByHold:2,blockedByMissingD30:3,
-      blockedByMissingD7:4,smtpAcceptedBoth:0,deliveryProofSupported:false
+      blockedByMissingD7:4,smtpAcceptedBoth:0,providerConfirmedBoth:0,deliveryProofSupported:false
     }));
 
     await TestBed.configureTestingModule({
@@ -207,8 +207,8 @@ describe('AdminCreatorPilotComponent', () => {
     fixture.detectChanges();
     expect(pilot.retentionDryRun).toHaveBeenCalledTimes(1);
     expect(component.retentionReport?.expiredCommissions).toBe(9);
-    expect(fixture.nativeElement.textContent).toContain('Dois aceites SMTP');
-    expect(fixture.nativeElement.textContent).toContain('não comprovam');
+    expect(fixture.nativeElement.textContent).toContain('Aceites SMTP sem prova');
+    expect(fixture.nativeElement.textContent).toContain('não comprova entrega');
   });
 
   it('forbids the retention report for non-owners', async () => {
@@ -229,12 +229,12 @@ describe('AdminCreatorPilotComponent', () => {
     user$.next({...ownerUser,id:77});
     pending.next({
       expiredCommissions:1,blockedByHold:0,blockedByMissingD30:1,
-      blockedByMissingD7:0,smtpAcceptedBoth:0,deliveryProofSupported:false
+      blockedByMissingD7:0,smtpAcceptedBoth:0,providerConfirmedBoth:0,deliveryProofSupported:false
     });
     fixture.detectChanges();
     expect(component.owner).toBeFalse();
     expect(component.retentionReport).toBeNull();
-    expect(fixture.nativeElement.textContent).not.toContain('Dois aceites SMTP');
+    expect(fixture.nativeElement.textContent).not.toContain('Aceites SMTP sem prova');
     pending.complete();
   });
 
