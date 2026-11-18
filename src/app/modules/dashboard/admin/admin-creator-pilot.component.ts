@@ -200,6 +200,8 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
     this.globalNotice = '';
   }
 
+  trackByStepIndex(index: number): number { return index; }
+
   addGlobalStep(): void {
     if (!this.owner || this.globalBusy || this.globalModel.steps.length >= 40) return;
     this.globalModel.steps.push('');
