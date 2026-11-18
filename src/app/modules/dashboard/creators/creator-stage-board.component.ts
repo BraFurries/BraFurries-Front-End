@@ -40,6 +40,11 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   mode: 'process' | 'shared' = 'shared';
   workflow: CreatorWorkflow | null = null;
   columns: StageLane[] = [];
+  sharedWorkflows: CreatorWorkflow[] = [];
+  sharedWorkflowId: number | null = null;
+  orderDraft: CreatorStageDefinition[] | null = null;
+  private sharedDefinitions: CreatorStageDefinition[] = [];
+  private sharedCatalogReady = false;
   allowed = false;
   loading = true;
   loadingBoard = false;
@@ -78,6 +83,11 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
         this.dataSequence++;
         this.workflow = null;
         this.columns = [];
+        this.sharedWorkflows = [];
+        this.sharedWorkflowId = null;
+        this.orderDraft = null;
+        this.sharedDefinitions = [];
+        this.sharedCatalogReady = false;
         this.processItems = [];
         this.processPage = 0;
         this.processTotal = 0;
@@ -136,12 +146,10 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
                     movable: false, items: [], total: 0
                   });
                 } else {
-                  this.columns = result.definitions.map(definition => this.sharedLane(definition));
-                  this.columns.push({
-                    key: 'unlinked', name: 'Sem etapa reutilizável',
-                    stageDefinitionId: null, workflowStep: null,
-                    movable: false, items: [], total: 0
-                  });
+                  this.sharedWorkflows = result.workflows;
+                  this.sharedDefinitions = this.restoreOrder(result.definitions, user.id);
+                  this.sharedCatalogReady = true;
+                  this.buildSharedLanes();
                 }
                 this.reloadBoard();
               },
@@ -167,8 +175,110 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
     return {
       key: 'shared:' + stage.id,
       name: stage.name, stageDefinitionId: stage.id,
-      workflowStep: null, movable: true, items: [], total: 0
+      workflowStep: null, movable: false, items: [], total: 0
     };
+  }
+
+  get canFilterShared(): boolean {
+    return this.mode === 'shared' && this.allowed && this.sharedCatalogReady;
+  }
+
+  private buildSharedLanes(): void {
+    if (this.sharedWorkflowId === null) {
+      this.columns = this.sharedDefinitions.map(definition => this.sharedLane(definition));
+      this.columns.push({
+        key: 'unlinked', name: 'Sem etapa reutilizável',
+        stageDefinitionId: null, workflowStep: null,
+        movable: false, items: [], total: 0
+      });
+      return;
+    }
+    const workflow = this.sharedWorkflows.find(model => model.id === this.sharedWorkflowId);
+    const byId = new Map(this.sharedDefinitions.map(definition => [definition.id, definition]));
+    const seen = new Set<number>();
+    this.columns = [];
+    for (const step of [...(workflow?.steps ?? [])].sort((a,b) => a.position - b.position)) {
+      if (step.stageDefinitionId == null || seen.has(step.stageDefinitionId)) continue;
+      const definition = byId.get(step.stageDefinitionId);
+      if (!definition) continue;
+      seen.add(definition.id);
+      this.columns.push(this.sharedLane(definition));
+    }
+  }
+
+  filterSharedStages(workflowId: number | null): void {
+    if (!this.canFilterShared || this.orderDraft || workflowId === this.sharedWorkflowId ||
+        (workflowId !== null && !this.sharedWorkflows.some(model => model.id === workflowId))) return;
+    this.dataSequence++;
+    this.sharedWorkflowId = workflowId;
+    this.loadingBoard = false;
+    this.loadingLaneKey = null;
+    this.lanePages.clear();
+    this.error = '';
+    this.buildSharedLanes();
+    this.reloadBoard();
+  }
+
+  private orderKey(account: number): string {
+    return 'brf.creator-studio.shared-stage-order.v1.' + account;
+  }
+
+  private restoreOrder(definitions: CreatorStageDefinition[], account: number): CreatorStageDefinition[] {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(this.orderKey(account)) : null;
+      const saved: unknown = raw === null ? null : JSON.parse(raw);
+      if (!Array.isArray(saved)) return definitions.slice();
+      const byId = new Map(definitions.map(definition => [definition.id, definition]));
+      const result: CreatorStageDefinition[] = [];
+      for (const id of saved) {
+        if (typeof id !== 'number') continue;
+        const definition = byId.get(id);
+        if (!definition) continue;
+        result.push(definition);
+        byId.delete(id);
+      }
+      return [...result, ...byId.values()];
+    } catch {
+      return definitions.slice();
+    }
+  }
+
+  get canOrganizeStages(): boolean {
+    return this.canFilterShared && this.sharedWorkflowId === null &&
+      !this.loadingBoard && this.loadingLaneKey === null && this.sharedDefinitions.length > 1;
+  }
+
+  openStageOrder(): void {
+    if (!this.canOrganizeStages) return;
+    this.orderDraft = [...this.sharedDefinitions];
+  }
+
+  moveStageOrder(index: number, offset: number): void {
+    if (!this.orderDraft || !this.canOrganizeStages) return;
+    const next = index + offset;
+    if (index < 0 || index >= this.orderDraft.length || next < 0 || next >= this.orderDraft.length) return;
+    const [definition] = this.orderDraft.splice(index, 1);
+    this.orderDraft.splice(next, 0, definition);
+  }
+
+  cancelStageOrder(): void { this.orderDraft = null; }
+
+  saveStageOrder(): void {
+    const account = this.users.getUser()?.id;
+    if (!this.orderDraft || !this.canOrganizeStages || account == null) return;
+    this.sharedDefinitions = this.orderDraft.slice();
+    this.orderDraft = null;
+    // Reorder already loaded lanes by ID. Never move or refetch orders for a
+    // presentation-only change; retain each lane's pages and totals.
+    const byKey = new Map(this.columns.map(lane => [lane.key, lane]));
+    this.columns = [...this.sharedDefinitions.map(definition => byKey.get('shared:' + definition.id)!),
+      byKey.get('unlinked')!].filter(lane => !!lane);
+    try {
+      if (typeof window !== 'undefined') window.localStorage.setItem(this.orderKey(account),
+        JSON.stringify(this.sharedDefinitions.map(definition => definition.id)));
+    } catch {
+      // The current view still uses the saved order when storage is unavailable.
+    }
   }
 
   ngOnDestroy(): void {
@@ -197,16 +307,19 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
       this.loadProcessPage(seq, account, 1);
       return;
     }
-    const queries = this.columns.map(lane =>
+    const requestedLanes = this.columns.slice();
+    const queries = requestedLanes.map(lane =>
       this.studio.commissionsForBoard(
         lane.key === 'unlinked' ? {unlinked: true} :
           {stageDefinitionId: lane.stageDefinitionId!}, 1, 12));
     forkJoin(queries).pipe(takeUntil(this.destroy$)).subscribe({
       next: pages => {
         if (!this.stillCurrent(seq, account)) return;
-        this.columns = this.columns.map((lane, index) => ({
-          ...lane, items: pages[index].items, total: pages[index].total
-        }));
+        const byKey = new Map(requestedLanes.map((lane, index) => [lane.key, pages[index]]));
+        this.columns = this.columns.map(lane => {
+          const page = byKey.get(lane.key);
+          return page ? {...lane, items:page.items, total:page.total} : lane;
+        });
         this.lanePages.clear();
         this.columns.forEach(lane => this.lanePages.set(lane.key, 1));
         this.loadingLaneKey = null;
@@ -282,6 +395,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
     if (!this.stillCurrent(seq, account)) return;
     this.loadingBoard = false;
     this.loadingMore = false;
+    this.loadingLaneKey = null;
     this.busyId = null;
     this.error = 'Não foi possível carregar este quadro. Tente novamente.';
   }
@@ -337,7 +451,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   }
 
   dragStart(event: CdkDragStart<CreatorCommission>, card: CreatorCommission): void {
-    if (!this.allowed || this.busyId !== null) return;
+    if (this.mode !== 'process' || !this.allowed || this.busyId !== null || !this.workflow ||
+        card.sourceWorkflowId !== this.workflow.id || card.status === 'COMPLETED') return;
     this.draggedId = card.id;
     this.hoveredKey = null;
     this.ghostIndex = null;
@@ -346,7 +461,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   }
 
   dragMove(event: CdkDragMove<CreatorCommission>, sourceKey: string): void {
-    if (this.draggedId === null || this.busyId !== null) return;
+    if (this.mode !== 'process' || this.draggedId === null || this.busyId !== null) return;
     const point = this.pointer(event.event);
     const target = point ? this.targetAt(point.x, point.y) : null;
     const key = target?.movable && target.key !== sourceKey ? target.key : null;
@@ -369,7 +484,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
 
   dragEnd(event: CdkDragEnd<CreatorCommission>, card: CreatorCommission,
           sourceKey: string): void {
-    if (this.draggedId !== card.id) return;
+    if (this.mode !== 'process' || this.draggedId !== card.id) return;
     const point = this.pointer(event.event);
     const lane = point ? this.targetAt(point.x, point.y) : null;
     this.draggedId = null;
@@ -379,7 +494,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   }
 
   moveByKeyboard(event: KeyboardEvent, card: CreatorCommission, sourceKey: string): void {
-    if (event.target !== event.currentTarget ||
+    if (this.mode !== 'process' || event.target !== event.currentTarget ||
         (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
     const index = this.columns.findIndex(column => column.key === sourceKey);
     const destination = this.columns[index + (event.key === 'ArrowRight' ? 1 : -1)];
@@ -389,8 +504,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   }
 
   private moveToLane(card: CreatorCommission, lane: StageLane): void {
-    if (!this.allowed || this.busyId !== null || !lane.movable ||
-        card.status === 'COMPLETED') return;
+    if (this.mode !== 'process' || !this.allowed || this.busyId !== null || !lane.movable ||
+        !this.workflow || card.sourceWorkflowId !== this.workflow.id || card.status === 'COMPLETED') return;
     this.busyId = card.id;
     this.error = '';
     const account = this.users.getUser()?.id;
@@ -439,7 +554,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
         step.stageDefinitionId == null && step.name === target.name &&
         step.position === target.position);
     }
-    return steps.filter(step => step.stageDefinitionId === lane.stageDefinitionId);
+    return []; // Shared-stage columns are read-only.
   }
 
   trackLane(_index: number, lane: StageLane): string { return lane.key; }
