@@ -1,5 +1,5 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { Component, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
+import { CdkDragEnd, CdkDragMove, CdkDragStart } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subject, forkJoin, distinctUntilChanged, takeUntil } from 'rxjs';
 import {
@@ -57,6 +57,12 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     this.boardStatuses.map(status => ({status,items:[],total:0}));
   boardLoading = false;
   boardError = '';
+  draggedBoardCardId: number | null = null;
+  hoveredBoardStatus: CreatorCommissionStatus | null = null;
+  boardGhostTop = 64;
+  boardGhostHeight = 160;
+  @ViewChildren('boardDropZone', {read: ElementRef})
+  private boardDropZones!: QueryList<ElementRef<HTMLElement>>;
   private boardSequence = 0;
   expandedCommissionId: number | null = null;
   steps: CreatorCommissionStep[] = [];
@@ -103,7 +109,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly creatorStudio: CreatorStudioService,
-    private readonly users: UserService
+    private readonly users: UserService,
+    private readonly zone: NgZone
   ) {}
 
   ngOnInit(): void {
@@ -119,6 +126,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.boardColumns = this.boardStatuses.map(status => ({status,items:[],total:0}));
         this.boardLoading = false;
         this.boardError = '';
+        this.draggedBoardCardId = null;
+        this.hoveredBoardStatus = null;
         this.access = null;
         this.accessError = '';
         this.loadingAccess = user !== null;
@@ -502,10 +511,69 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Moving cards only changes their status. Ordering stays server-defined (oldest first). */
-  dropCommission(event: CdkDragDrop<CreatorCommissionStatus, CreatorCommissionStatus, CreatorCommission>): void {
-    if (event.previousContainer === event.container) return;
-    this.moveBoardCommission(event.item.data, event.container.data);
+  /**
+   * Keep each CDK list disconnected. This leaves a copy of the source card
+   * in place while the pointer moves; target lanes show only a visual ghost.
+   * The whole lane is a hit area, rather than the small list inside it.
+   */
+  boardDragStarted(event: CdkDragStart<CreatorCommission>, commission: CreatorCommission): void {
+    if (!this.canUsePro || this.viewMode !== 'board' || this.changingId !== null) return;
+    this.draggedBoardCardId = commission.id;
+    this.hoveredBoardStatus = null;
+    const height = event.source.getPlaceholderElement().getBoundingClientRect().height;
+    this.boardGhostHeight = Math.min(180, Math.max(110, Math.ceil(height || 160)));
+  }
+
+  boardDragMoved(event: CdkDragMove<CreatorCommission>): void {
+    if (this.draggedBoardCardId === null || !this.canUsePro) return;
+    const point = this.boardPointer(event.event);
+    if (!point) return;
+    const target = this.boardDropZoneAt(point.x, point.y);
+    const nextStatus = target?.status === event.source.data.status ? null : target?.status ?? null;
+    const nextTop = target && nextStatus && nextStatus !== 'COMPLETED'
+      ? Math.max(58, Math.min(
+          Math.max(58, target.rect.height - this.boardGhostHeight - 12),
+          Math.round(point.y - target.rect.top - this.boardGhostHeight / 2)
+        ))
+      : 64;
+    // Drag movements fire outside Angular's zone and may happen every pixel.
+    if (nextStatus !== this.hoveredBoardStatus || Math.abs(nextTop - this.boardGhostTop) >= 12) {
+      this.zone.run(() => {
+        this.hoveredBoardStatus = nextStatus;
+        this.boardGhostTop = nextTop;
+      });
+    }
+  }
+
+  boardDragEnded(event: CdkDragEnd<CreatorCommission>, commission: CreatorCommission): void {
+    if (this.draggedBoardCardId !== commission.id) return;
+    const point = this.boardPointer(event.event);
+    const status = point ? this.boardDropZoneAt(point.x, point.y)?.status ?? null : null;
+    this.draggedBoardCardId = null;
+    this.hoveredBoardStatus = null;
+    // A release inside the origin, outside the board or a cancelled drag is a no-op.
+    if (status && status !== commission.status) this.moveBoardCommission(commission, status);
+  }
+
+  private boardPointer(event: MouseEvent | TouchEvent): {x: number; y: number} | null {
+    if ('changedTouches' in event) {
+      const touch = event.changedTouches[0] ?? event.touches[0];
+      return touch ? {x: touch.clientX, y: touch.clientY} : null;
+    }
+    return {x: event.clientX, y: event.clientY};
+  }
+
+  private boardDropZoneAt(x: number, y: number): {status: CreatorCommissionStatus; rect: DOMRect} | null {
+    for (const item of this.boardDropZones?.toArray() ?? []) {
+      const element = item.nativeElement;
+      const rect = element.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        const status = element.dataset['boardDropStatus'] as CreatorCommissionStatus | undefined;
+        return status && (this.boardStatuses.includes(status) || status === 'COMPLETED')
+          ? {status, rect} : null;
+      }
+    }
+    return null;
   }
 
   moveBoardCardByKeyboard(event: KeyboardEvent, commission: CreatorCommission): void {
@@ -526,25 +594,12 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     const source = this.boardColumns.find(column => column.status === commission.status);
     if (!source?.items.some(item => item.id === commission.id)) return;
 
-    const previousColumns = this.boardColumns;
-    const moved = {...commission, status};
     const account = this.users.getUser()?.id;
     const accessSequence = this.accessSequence;
     this.changingId = commission.id;
-    this.boardSequence++; // Invalidate any earlier background board refresh.
+    this.boardSequence++; // Invalidate older background refreshes.
     this.errorMessage = '';
-    // Show the move immediately. The server remains the authority for status,
-    // chronology, totals and any paginated items we cannot currently see.
-    this.boardColumns = previousColumns.map(column => {
-      if (column.status === commission.status) {
-        return {...column, items: column.items.filter(item => item.id !== commission.id),
-          total: Math.max(0, column.total - 1)};
-      }
-      if (column.status === status) {
-        return {...column, items: [...column.items, moved], total: column.total + 1};
-      }
-      return column;
-    });
+    // Never move the card in the local board before the API confirms the change.
     this.creatorStudio.changeStatus(commission.id, status)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -560,10 +615,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
           if (accessSequence !== this.accessSequence ||
               this.users.getUser()?.id !== account || !this.canUsePro) return;
           this.changingId = null;
-          if (this.viewMode === 'board') this.boardColumns = previousColumns;
           this.errorMessage = error.status === 403
             ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página.'
-            : 'Não foi possível mover o pedido. Ele voltou à fila anterior.';
+            : 'Não foi possível mover o pedido. Ele continua na fila anterior.';
         }
       });
   }

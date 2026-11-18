@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { CdkDrag, CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragEnd, CdkDragMove, CdkDragStart, DragDropModule } from '@angular/cdk/drag-drop';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
@@ -100,64 +100,126 @@ describe('CreatorStudioComponent', () => {
     expect(html).toContain('Em pausa');
   });
 
-  function drop(commission: CreatorCommission, from: CreatorCommissionStatus,
-    to: CreatorCommissionStatus): CdkDragDrop<CreatorCommissionStatus, CreatorCommissionStatus, CreatorCommission> {
-    return {
-      previousContainer: {data: from},
-      container: {data: to},
-      item: {data: commission}
-    } as unknown as CdkDragDrop<CreatorCommissionStatus, CreatorCommissionStatus, CreatorCommission>;
+  function mockZones(): {status: CreatorCommissionStatus; x: number; y: number}[] {
+    const zones = Array.from(fixture.nativeElement.querySelectorAll('[data-board-drop-status]')) as HTMLElement[];
+    return zones.map((zone, index) => {
+      const left = index * 300;
+      if (!jasmine.isSpy(zone.getBoundingClientRect)) {
+        spyOn(zone, 'getBoundingClientRect').and.returnValue({
+          left, right: left + 280, top: 40, bottom: 400, width: 280, height: 360
+        } as DOMRect);
+      }
+      return {status: zone.dataset['boardDropStatus'] as CreatorCommissionStatus, x: left + 70, y: 120};
+    });
   }
 
-  it('allows dragging the board cards without a Mover para select', () => {
+  function startDrag(commission: CreatorCommission): void {
+    component.boardDragStarted({
+      source: {getPlaceholderElement: () => ({
+        getBoundingClientRect: () => ({height: 150})
+      })}
+    } as unknown as CdkDragStart<CreatorCommission>, commission);
+  }
+
+  function drop(commission: CreatorCommission, from: CreatorCommissionStatus,
+    to: CreatorCommissionStatus): void {
+    const zones = mockZones();
+    const target = zones.find(zone => zone.status === to)!;
+    startDrag(commission);
+    component.boardDragEnded({
+      event: {clientX: target.x, clientY: target.y}
+    } as unknown as CdkDragEnd<CreatorCommission>, commission);
+  }
+
+  it('uses source placeholders and whole-column drop targets, without the Mover para select', () => {
     const board = fixture.nativeElement.querySelector('[aria-label="Quadro de filas por situação"]') as HTMLElement;
     expect(board.querySelector('select')).toBeNull();
     expect(fixture.debugElement.queryAll(By.directive(CdkDrag)).length).toBe(1);
+    expect(board.querySelectorAll('[data-board-drop-status]').length).toBe(5);
     expect(board.textContent).toContain('Arraste para cá para concluir');
   });
 
-  it('moves a card immediately and reconciles with the explicit status endpoint', () => {
+  it('shows a blank hover ghost without changing any cards before release', () => {
+    const zones = mockZones();
+    const target = zones.find(zone => zone.status === 'WAITING')!;
+    const originalColumns = component.boardColumns;
+    const origin = fixture.nativeElement.querySelector('[data-board-drop-status="QUEUED"] article');
+    startDrag(card);
+    component.boardDragMoved({
+      source: {data: card},
+      event: {clientX: target.x, clientY: target.y}
+    } as unknown as CdkDragMove<CreatorCommission>);
+    fixture.detectChanges();
+
+    expect(component.hoveredBoardStatus).toBe('WAITING');
+    expect(component.boardColumns).toBe(originalColumns);
+    expect(component.boardColumns[0].items[0]).toBe(card);
+    expect(studio.changeStatus).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('[data-board-drop-status="QUEUED"] article')).toBe(origin);
+    expect(fixture.nativeElement.querySelector('[data-board-drop-status="WAITING"] [aria-hidden="true"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-board-drop-status="PAUSED"] [aria-hidden="true"]')).toBeNull();
+  });
+
+  it('only moves the card when released inside a whole lane and after backend confirmation', () => {
     const pending = new Subject<CreatorCommission>();
     studio.changeStatus.and.returnValue(pending.asObservable());
-    component.dropCommission(drop(card, 'QUEUED', 'IN_PROGRESS'));
+    const original = component.boardColumns;
+    drop(card, 'QUEUED', 'IN_PROGRESS');
     fixture.detectChanges();
 
     expect(studio.changeStatus).toHaveBeenCalledOnceWith(11, 'IN_PROGRESS');
     expect(component.changingId).toBe(11);
-    expect(component.boardColumns[0].total).toBe(0);
-    expect(component.boardColumns[0].items.length).toBe(0);
-    expect(component.boardColumns[1].items[0].status).toBe('IN_PROGRESS');
-    expect(component.boardColumns[1].total).toBe(1);
+    expect(component.hoveredBoardStatus).toBeNull();
+    expect(component.boardColumns).toBe(original);
+    expect(component.boardColumns[0].items[0].status).toBe('QUEUED');
+    expect(component.boardColumns[1].items).toEqual([]);
 
-    pending.next({...card, status:'IN_PROGRESS'});
+    const changed = {...card,status:'IN_PROGRESS' as CreatorCommissionStatus};
+    studio.commissions.and.callFake((status,page,pageSize) => of({
+      items: status === 'IN_PROGRESS' ? [changed] : [],
+      page: page ?? 1, pageSize: pageSize ?? 12,
+      total: status === 'IN_PROGRESS' ? 1 : 0
+    }));
+    pending.next(changed);
     pending.complete();
     expect(component.changingId).toBeNull();
+    expect(component.boardColumns[0].total).toBe(0);
+    expect(component.boardColumns[1].items[0].status).toBe('IN_PROGRESS');
     expect(studio.commissions).toHaveBeenCalledTimes(8);
   });
 
-  it('rolls back an unsuccessful move and keeps the server-owned status', () => {
+  it('keeps the original card unchanged when the server rejects a move', () => {
     const pending = new Subject<CreatorCommission>();
     studio.changeStatus.and.returnValue(pending.asObservable());
     const original = component.boardColumns;
-    component.dropCommission(drop(card,'QUEUED','WAITING'));
+    drop(card, 'QUEUED', 'WAITING');
     pending.error(new Error('offline'));
     fixture.detectChanges();
 
     expect(component.boardColumns).toBe(original);
     expect(component.boardColumns[0].items[0].status).toBe('QUEUED');
     expect(component.changingId).toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Ele voltou à fila anterior');
+    expect(fixture.nativeElement.textContent).toContain('continua na fila anterior');
     expect(studio.commissions).toHaveBeenCalledTimes(4);
   });
 
-  it('ignores same-lane drops, unknown cards and simultaneous moves', () => {
-    component.dropCommission(drop(card,'QUEUED','QUEUED'));
-    component.dropCommission(drop({...card,id:999},'QUEUED','WAITING'));
+  it('does not submit cancelled or same-lane drops and blocks simultaneous moves', () => {
+    const zones = mockZones();
+    const origin = zones.find(zone => zone.status === 'QUEUED')!;
+    startDrag(card);
+    component.boardDragEnded({
+      event: {clientX: origin.x, clientY: origin.y}
+    } as unknown as CdkDragEnd<CreatorCommission>, card);
+    startDrag(card);
+    component.boardDragEnded({
+      event: {clientX: -500, clientY: -500}
+    } as unknown as CdkDragEnd<CreatorCommission>, card);
     expect(studio.changeStatus).not.toHaveBeenCalled();
+
     const pending = new Subject<CreatorCommission>();
     studio.changeStatus.and.returnValue(pending.asObservable());
-    component.dropCommission(drop(card,'QUEUED','WAITING'));
-    component.dropCommission(drop(card,'QUEUED','PAUSED'));
+    drop(card, 'QUEUED', 'WAITING');
+    drop(card, 'QUEUED', 'PAUSED');
     expect(studio.changeStatus).toHaveBeenCalledTimes(1);
     pending.error(new Error('offline'));
   });
@@ -171,26 +233,25 @@ describe('CreatorStudioComponent', () => {
     component.moveBoardCardByKeyboard(event, card);
     expect(event.preventDefault).toHaveBeenCalled();
     expect(studio.changeStatus).toHaveBeenCalledOnceWith(11,'IN_PROGRESS');
-    expect(component.boardColumns[1].items[0].id).toBe(11);
+    expect(component.boardColumns[0].items[0].status).toBe('QUEUED');
     pending.error(new Error('offline'));
   });
 
-  it('can conclude a card through the compact board drop zone', () => {
+  it('allows dropping into the completed area, keeping the card until confirmation', () => {
     const pending = new Subject<CreatorCommission>();
     studio.changeStatus.and.returnValue(pending.asObservable());
-    component.dropCommission(drop(card, 'QUEUED', 'COMPLETED'));
+    drop(card, 'QUEUED', 'COMPLETED');
     expect(studio.changeStatus).toHaveBeenCalledOnceWith(11,'COMPLETED');
-    expect(component.activeCount).toBe(0);
-    expect(component.boardColumns[0].items.length).toBe(0);
+    expect(component.activeCount).toBe(1);
     pending.error(new Error('offline'));
-    expect(component.boardColumns[0].items.length).toBe(1);
+    expect(component.boardColumns[0].items[0].status).toBe('QUEUED');
   });
 
   it('does not move a card after access to Pro has been revoked', () => {
     studio.myAccess.and.returnValue(of({allowed:false,tier:'PRO',status:'REVOKED',
       sourceKind:'PILOT',expiresAtUtc:null}));
     user$.next({...user,id:56});
-    component.dropCommission(drop(card,'QUEUED','IN_PROGRESS'));
+    drop(card,'QUEUED','IN_PROGRESS');
     expect(studio.changeStatus).not.toHaveBeenCalled();
   });
 
