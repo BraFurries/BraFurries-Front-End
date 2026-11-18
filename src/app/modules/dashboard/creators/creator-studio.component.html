@@ -106,6 +106,8 @@
           <h2 class="font-amaranth text-2xl font-bold text-braDark">Meus trabalhos</h2>
           <p class="text-sm text-gray-600">
             {{ viewMode === 'board' ? 'Arraste os cartões entre as filas para atualizar a situação de cada pedido.' :
+            viewMode === 'process' ? 'Acompanhe os pedidos de um processo pelas suas etapas.' :
+            viewMode === 'stages' ? 'Acompanhe os pedidos de diferentes processos nas etapas reutilizáveis.' :
             'Consulte uma fila por vez ou ordene os pedidos conforme sua preferência.' }}
           </p>
         </div>
@@ -115,7 +117,7 @@
         </button>
       </div>
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex rounded-xl border border-braPurple/20 p-1" role="group" aria-label="Modo de visualização">
+        <div class="flex flex-wrap gap-1 rounded-xl border border-braPurple/20 p-1" role="group" aria-label="Modo de visualização">
           <button type="button" (click)="setViewMode('board')"
             [attr.aria-pressed]="viewMode === 'board'"
             [ngClass]="viewMode === 'board' ? 'bg-braPurple text-white' : 'text-braPurple'"
@@ -128,6 +130,18 @@
             class="rounded-lg px-4 py-2 text-sm font-bold">
             Lista detalhada
           </button>
+          <button type="button" (click)="setViewMode('process')"
+            [attr.aria-pressed]="viewMode === 'process'"
+            [ngClass]="viewMode === 'process' ? 'bg-braPurple text-white' : 'text-braPurple'"
+            class="rounded-lg px-4 py-2 text-sm font-bold">
+            Quadro por processo
+          </button>
+          <button type="button" (click)="setViewMode('stages')"
+            [attr.aria-pressed]="viewMode === 'stages'"
+            [ngClass]="viewMode === 'stages' ? 'bg-braPurple text-white' : 'text-braPurple'"
+            class="rounded-lg px-4 py-2 text-sm font-bold">
+            Quadro por etapas
+          </button>
         </div>
         <p class="text-sm text-gray-600" *ngIf="viewMode === 'board'">
           {{ activeCount }} pedido(s) ativos, distribuídos por situação
@@ -136,6 +150,16 @@
           class="text-sm font-semibold text-braPurple underline underline-offset-2">
           Organizar meu ateliê
         </a>
+      </div>
+      <div *ngIf="viewMode === 'process'" class="flex flex-wrap items-end gap-3 border-t pt-3">
+        <label class="w-full max-w-sm text-sm font-semibold text-gray-700">
+          Processo
+          <select name="operationalWorkflowId" [(ngModel)]="selectedWorkflowId"
+            class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+            <option [ngValue]="null">Selecione um processo</option>
+            <option *ngFor="let workflow of workflows" [ngValue]="workflow.id">{{ workflow.name }}</option>
+          </select>
+        </label>
       </div>
       <div *ngIf="viewMode === 'list'" class="flex flex-wrap items-end gap-3 border-t pt-3">
         <label class="text-sm font-semibold text-gray-700">
@@ -246,6 +270,14 @@
         </div>
       </form>
     </section>
+
+    <div *ngIf="viewMode === 'process' && selectedWorkflowId === null"
+      class="rounded-xl border border-dashed bg-white p-5 text-sm text-gray-600">
+      {{ workflows.length ? 'Selecione um processo acima para visualizar seus pedidos.' : 'Cadastre um processo em Meu ateliê para acompanhar suas etapas aqui.' }}
+    </div>
+    <app-creator-stage-board *ngIf="viewMode === 'stages' || (viewMode === 'process' && selectedWorkflowId !== null)"
+      [workflowId]="viewMode === 'process' ? selectedWorkflowId : null">
+    </app-creator-stage-board>
 
     <p *ngIf="viewMode === 'board' && boardLoading" role="status"
       class="rounded-xl bg-white p-5 text-sm text-gray-600">
