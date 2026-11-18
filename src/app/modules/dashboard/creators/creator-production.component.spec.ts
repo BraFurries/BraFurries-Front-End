@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Data } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { CreatorStudioService } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
@@ -13,6 +14,7 @@ describe('CreatorProductionComponent', () => {
   let studio: jasmine.SpyObj<CreatorStudioService>;
   let users: jasmine.SpyObj<UserService>;
   let user$: BehaviorSubject<User | null>;
+  let routeData$: BehaviorSubject<Data>;
   const user: User = {
     id: 31, name: 'Artista', email:'artist@example.invalid',
     roles:[],permissions:[],profileImageUrl:null
@@ -20,6 +22,7 @@ describe('CreatorProductionComponent', () => {
 
   beforeEach(async () => {
     user$ = new BehaviorSubject<User | null>(user);
+    routeData$ = new BehaviorSubject<Data>({section:'home'});
     studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','artTypes','stageDefinitions','workflows',
         'createArtType','updateArtType','createStageDefinition',
@@ -50,7 +53,8 @@ describe('CreatorProductionComponent', () => {
       imports:[CommonModule,FormsModule],
       providers:[
         {provide:CreatorStudioService,useValue:studio},
-        {provide:UserService,useValue:users}
+        {provide:UserService,useValue:users},
+        {provide:ActivatedRoute,useValue:{data:routeData$.asObservable()}}
       ]
     }).compileComponents();
     fixture=TestBed.createComponent(CreatorProductionComponent);
@@ -61,6 +65,7 @@ describe('CreatorProductionComponent', () => {
   afterEach(() => {
     fixture.destroy();
     user$.complete();
+    routeData$.complete();
   });
 
   it('loads only the signed-in artist’s Pro catalog', () => {
@@ -68,15 +73,92 @@ describe('CreatorProductionComponent', () => {
     expect(studio.artTypes).toHaveBeenCalledTimes(1);
     expect(studio.stageDefinitions).toHaveBeenCalledTimes(1);
     expect(studio.workflows).toHaveBeenCalledTimes(1);
-    expect(fixture.nativeElement.textContent).toContain('Etapas reutilizáveis');
+    const content = fixture.nativeElement.textContent as string;
+    expect(content).toContain('Meu ateliê');
+    expect(content).toContain('Artes que faço');
+    expect(content).toContain('Meus processos');
+    expect(content).not.toContain('Etapas reutilizáveis');
+    expect(content).not.toContain('Usar modelo');
   });
 
-  it('shows globally published starter templates above private configuration', () => {
+  it('shows global starter templates only inside the processes page', () => {
+    expect(fixture.nativeElement.textContent).not.toContain('Processo básico');
+    routeData$.next({section:'processes'});
+    fixture.detectChanges();
     expect(studio.globalWorkflows).toHaveBeenCalledTimes(1);
     const html = fixture.nativeElement.textContent as string;
-    expect(html).toContain('Modelos prontos da BraFurries');
+    expect(html).toContain('Modelos prontos');
     expect(html).toContain('Processo básico');
-    expect(html).toContain('Usar este modelo');
+    expect(html).toContain('Usar modelo');
+  });
+
+  it('uses separate focused pages and only opens the art editor on request', () => {
+    routeData$.next({section:'arts'});
+    fixture.detectChanges();
+    const read = () => fixture.nativeElement.textContent as string;
+    expect(read()).toContain('Artes que faço');
+    expect(read()).not.toContain('Modelos prontos');
+    expect(read()).not.toContain('Como você chama essa arte?');
+    component.startType();
+    fixture.detectChanges();
+    expect(read()).toContain('Como você chama essa arte?');
+    expect(read()).not.toContain('Processo usado neste tipo');
+    component.resetType();
+    fixture.detectChanges();
+    expect(read()).not.toContain('Como você chama essa arte?');
+  });
+
+  it('guides process editing through two steps and hides advanced fields', () => {
+    routeData$.next({section:'processes'});
+    fixture.detectChanges();
+    component.startWorkflow();
+    fixture.detectChanges();
+    expect(component.workflowEditorStep).toBe(1);
+    expect(fixture.nativeElement.textContent).toContain('Passo 1 de 2');
+    expect(fixture.nativeElement.textContent).not.toContain('Adicionar etapa');
+    component.nextWorkflowStep();
+    expect(component.error).toContain('Dê um nome');
+    component.workflow.name = 'Processo de ícones';
+    component.nextWorkflowStep();
+    fixture.detectChanges();
+    expect(component.workflowEditorStep).toBe(2);
+    expect(fixture.nativeElement.textContent).toContain('Passo 2 de 2');
+    expect(fixture.nativeElement.textContent).toContain('Adicionar etapa');
+    component.addWorkflowStep();
+    component.workflow.steps[0].name = 'Rascunho';
+    component.saveWorkflow();
+    expect(studio.createWorkflow).toHaveBeenCalledWith({
+      name:'Processo de ícones',isDefault:false,
+      steps:[{name:'Rascunho',stageDefinitionId:null}]
+    });
+    expect(component.workflowFormOpen).toBeFalse();
+  });
+
+  it('opens existing models without losing their reusable stage references', () => {
+    routeData$.next({section:'processes'});
+    const source = {id:4,name:'Arte final',isDefault:false,
+      steps:[{id:55,name:'Sketch',stageDefinitionId:7,position:0}]};
+    component.editWorkflow(source);
+    fixture.detectChanges();
+    expect(component.workflowFormOpen).toBeTrue();
+    expect(component.showStepLibrary).toBeTrue();
+    component.workflowEditorStep=2;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Usar uma etapa reutilizável');
+    expect(component.workflow.steps[0].stageDefinitionId).toBe(7);
+  });
+
+  it('clears draft and catalog data on account switch', () => {
+    routeData$.next({section:'arts'});
+    component.startType();
+    component.typeName='Dados de outro artista';
+    user$.next({...user,id:52});
+    fixture.detectChanges();
+    expect(component.typeFormOpen).toBeFalse();
+    expect(component.typeName).toBe('');
+    expect(component.artTypes).toEqual([]);
+    expect(component.globalWorkflows).toEqual([]);
+    expect(fixture.nativeElement.textContent).not.toContain('Dados de outro artista');
   });
 
   it('adopts global starter as artist default only when there are no personal models', () => {
