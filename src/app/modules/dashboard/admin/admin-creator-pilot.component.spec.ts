@@ -128,8 +128,27 @@ describe('AdminCreatorPilotComponent', () => {
     user$.next({...ownerUser,id:2});
     fixture.detectChanges();
     expect(pilot.globalWorkflows).toHaveBeenCalledTimes(1);
+    expect(component.activeTab).toBe('participants');
+    expect(fixture.nativeElement.textContent).not.toContain('Biblioteca global de modelos');
+    expect(fixture.nativeElement.textContent).toContain('Convidar artista');
+    component.showTab('models');
+    fixture.detectChanges();
+    expect(component.activeTab).toBe('models');
     expect(fixture.nativeElement.textContent).toContain('Biblioteca global de modelos');
     expect(fixture.nativeElement.textContent).toContain('Processo básico');
+    expect(fixture.nativeElement.textContent).not.toContain('Convidar artista');
+    component.showTab('participants');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Convidar artista');
+    expect(fixture.nativeElement.textContent).not.toContain('Biblioteca global de modelos');
+  });
+
+  it('does not allow a non-owner to switch administrative sub-tabs', async () => {
+    await init(false);
+    component.showTab('models');
+    fixture.detectChanges();
+    expect(component.activeTab).toBe('participants');
+    expect(fixture.nativeElement.textContent).not.toContain('Modelos globais');
   });
 
   it('saves the exact ordered global stage names without client or Community fields', async () => {
