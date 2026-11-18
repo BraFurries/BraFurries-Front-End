@@ -41,7 +41,11 @@ describe('CreatorStudioComponent', () => {
         'addCommissionStep', 'updateCommissionStep', 'deleteCommissionStep',
         'copyWorkflowToCommission', 'retention', 'exportMyData']);
     studio.myAccess.and.returnValue(of(pro));
-    studio.commissions.and.returnValue(of({items:[card],page:1,pageSize:25,total:1}));
+    studio.commissions.and.callFake((status, page, pageSize) => of({
+      items: status === 'QUEUED' || status === null ? [card] : [],
+      page: page ?? 1, pageSize: pageSize ?? 25,
+      total: status === 'QUEUED' || status === null ? 1 : 0
+    }));
     studio.create.and.returnValue(of(card));
     studio.update.and.returnValue(of(card));
     studio.changeStatus.and.returnValue(of({...card,status:'COMPLETED'}));
@@ -77,12 +81,33 @@ describe('CreatorStudioComponent', () => {
     user$.complete();
   });
 
-  it('shows the private Pro queue and the original civil order date', () => {
+  it('shows four production lanes at once, each with its own server-side total', () => {
     expect(component.canUsePro).toBeTrue();
-    expect(studio.commissions).toHaveBeenCalledWith(null, 1, 25);
+    expect(component.viewMode).toBe('board');
+    expect(studio.commissions).toHaveBeenCalledTimes(4);
+    for (const state of component.boardStatuses) {
+      expect(studio.commissions).toHaveBeenCalledWith(state, 1, 12);
+    }
+    expect(component.activeCount).toBe(1);
+    expect(component.boardColumns.find(col => col.status === 'QUEUED')?.total).toBe(1);
     const html = fixture.nativeElement.textContent as string;
+    expect(html).toContain('Quadro de filas');
     expect(html).toContain('Ref Sheet');
     expect(html).toContain('12/11/2026');
+    expect(html).toContain('Aguardando retorno');
+    expect(html).toContain('Em pausa');
+  });
+
+  it('opens the complete paginated list for a selected lane', () => {
+    component.showStatusList('QUEUED');
+    fixture.detectChanges();
+    expect(component.viewMode).toBe('list');
+    expect(component.selectedStatus).toBe('QUEUED');
+    expect(studio.commissions).toHaveBeenCalledWith('QUEUED', 1, 25);
+    expect(fixture.nativeElement.textContent).toContain('Editar pedido');
+    component.setViewMode('board');
+    fixture.detectChanges();
+    expect(component.boardColumns[0].total).toBe(1);
   });
 
   it('hides commission details when entitlement is revoked or downgraded to Free', () => {
@@ -96,7 +121,7 @@ describe('CreatorStudioComponent', () => {
     expect(component.commissions.length).toBe(0);
     expect(fixture.nativeElement.textContent).not.toContain('Cliente: Theo');
     expect(fixture.nativeElement.textContent).toContain('modalidade Free');
-    expect(studio.commissions).toHaveBeenCalledTimes(1);
+    expect(studio.commissions).toHaveBeenCalledTimes(4);
   });
 
   it('never shows a previous account response after switching accounts', () => {
@@ -121,13 +146,30 @@ describe('CreatorStudioComponent', () => {
       title:'Ícone',clientName:'Theo',requestedOn:'2026-11-11'
     }));
     expect(component.formOpen).toBeFalse();
-    expect(studio.commissions).toHaveBeenCalledTimes(2);
+    expect(studio.commissions).toHaveBeenCalledTimes(8);
   });
 
   it('uses the explicit status endpoint to conclude instead of deleting', () => {
     component.changeStatus(card,'COMPLETED');
     expect(studio.changeStatus).toHaveBeenCalledWith(11,'COMPLETED');
-    expect(studio.commissions).toHaveBeenCalledTimes(2);
+    expect(studio.commissions).toHaveBeenCalledTimes(8);
+  });
+
+  it('does not leak queued data from a previous account while a board request is delayed', () => {
+    const delayed = new Subject<{items:CreatorCommission[],page:number,pageSize:number,total:number}>();
+    studio.commissions.and.returnValue(delayed.asObservable());
+    component.setViewMode('list');
+    component.setViewMode('board');
+    studio.myAccess.and.returnValue(of({
+      allowed:false,tier:null,status:'NOT_AUTHORIZED',sourceKind:null,expiresAtUtc:null
+    }));
+    user$.next({...user,id:92});
+    delayed.next({items:[card],page:1,pageSize:12,total:1});
+    fixture.detectChanges();
+    expect(component.canUsePro).toBeFalse();
+    expect(component.activeCount).toBe(0);
+    expect(fixture.nativeElement.textContent).not.toContain('Cliente: Theo');
+    delayed.complete();
   });
 
   it('groups different art types under the same shared production stage', () => {

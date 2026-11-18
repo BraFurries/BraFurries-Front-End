@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subject, distinctUntilChanged, takeUntil } from 'rxjs';
+import { Subject, forkJoin, distinctUntilChanged, takeUntil } from 'rxjs';
 import {
   CreatorCommission,
   CreatorCommissionInput,
@@ -44,7 +44,17 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   artTypes: CreatorArtType[] = [];
   definitions: CreatorStageDefinition[] = [];
   workflows: CreatorWorkflow[] = [];
+  // Kanban is the default; the chronological list remains available for detail work.
+  viewMode: 'board' | 'list' = 'board';
   groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
+  readonly boardStatuses: CreatorCommissionStatus[] =
+    ['QUEUED','IN_PROGRESS','WAITING','PAUSED'];
+  readonly boardPageSize = 12;
+  boardColumns: {status: CreatorCommissionStatus; items: CreatorCommission[]; total: number}[] =
+    this.boardStatuses.map(status => ({status,items:[],total:0}));
+  boardLoading = false;
+  boardError = '';
+  private boardSequence = 0;
   expandedCommissionId: number | null = null;
   steps: CreatorCommissionStep[] = [];
   loadingSteps = false;
@@ -96,6 +106,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       .subscribe(user => {
         const sequence = ++this.accessSequence;
         this.listSequence++;
+        this.boardSequence++;
+        this.boardColumns = this.boardStatuses.map(status => ({status,items:[],total:0}));
+        this.boardLoading = false;
+        this.boardError = '';
         this.access = null;
         this.accessError = '';
         this.loadingAccess = user !== null;
@@ -211,6 +225,31 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     });
   }
 
+  get activeCount(): number {
+    return this.boardColumns.reduce((sum, col) => sum + col.total, 0);
+  }
+
+  setViewMode(mode: 'board' | 'list'): void {
+    if (mode === this.viewMode || !this.canUsePro) return;
+    this.viewMode = mode;
+    this.listSequence++;
+    this.boardSequence++;
+    this.page = 1;
+    this.expandedCommissionId = null;
+    this.stepsSequence++;
+    this.reload();
+  }
+
+  showStatusList(status: CreatorCommissionStatus): void {
+    if (!this.canUsePro) return;
+    this.viewMode = 'list';
+    this.listSequence++;
+    this.boardSequence++;
+    this.selectedStatus = status;
+    this.page = 1;
+    this.reload();
+  }
+
   get pageCount(): number {
     return Math.max(1, Math.ceil(this.total / this.pageSize));
   }
@@ -286,6 +325,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   reload(): void {
     if (!this.canUsePro) return;
+    if (this.viewMode === 'board') {
+      this.loadBoard();
+      return;
+    }
     const seq = ++this.listSequence;
     const userId = this.users.getUser()?.id;
     this.errorMessage = '';
@@ -296,17 +339,48 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       this.pageSize
     ).pipe(takeUntil(this.destroy$)).subscribe({
       next: result => {
-        if (seq !== this.listSequence || this.users.getUser()?.id !== userId) return;
+        if (seq !== this.listSequence || this.users.getUser()?.id !== userId ||
+            this.viewMode !== 'list') return;
         this.commissions = result.items;
         this.total = result.total;
         this.loading = false;
       },
       error: error => {
-        if (seq !== this.listSequence || this.users.getUser()?.id !== userId) return;
+        if (seq !== this.listSequence || this.users.getUser()?.id !== userId ||
+            this.viewMode !== 'list') return;
         this.loading = false;
         this.errorMessage = error instanceof HttpErrorResponse && error.status === 403
           ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página para verificar.'
           : 'Não conseguimos carregar a fila. Tente novamente.';
+      }
+    });
+  }
+
+  private loadBoard(): void {
+    const seq = ++this.boardSequence;
+    const account = this.users.getUser()?.id;
+    this.boardError = '';
+    this.boardLoading = true;
+    // Separate paginated requests keep correct per-lane totals without
+    // assuming that one global page contains all statuses.
+    forkJoin(this.boardStatuses.map(status =>
+      this.creatorStudio.commissions(status,1,this.boardPageSize)
+    )).pipe(takeUntil(this.destroy$)).subscribe({
+      next: pages => {
+        if (seq !== this.boardSequence || this.users.getUser()?.id !== account ||
+            this.viewMode !== 'board') return;
+        this.boardColumns = this.boardStatuses.map((status,i) => ({
+          status, items:pages[i].items, total:pages[i].total
+        }));
+        this.boardLoading = false;
+      },
+      error: err => {
+        if (seq !== this.boardSequence || this.users.getUser()?.id !== account) return;
+        this.boardLoading = false;
+        this.boardError = err instanceof HttpErrorResponse && err.status === 403
+          ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página.'
+          : 'Não foi possível carregar todas as filas. Tente novamente.';
+        this.boardColumns = this.boardStatuses.map(status => ({status,items:[],total:0}));
       }
     });
   }
