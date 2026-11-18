@@ -179,9 +179,9 @@
       </form>
     </section>
 
-    <ng-container *ngIf="activeTab === 'participants'">
-      <section id="creator-tab-panel-participants" role="tabpanel" aria-labelledby="creator-tab-participants"
-        class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div *ngIf="activeTab === 'participants'" id="creator-tab-panel-participants"
+      role="tabpanel" aria-labelledby="creator-tab-participants" class="space-y-5">
+      <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div>
         <h3 class="font-amaranth text-xl font-bold text-gray-800">Convidar artista</h3>
         <p class="mt-1 text-sm text-gray-600">
@@ -556,7 +556,7 @@
         {{ holdSuccess }}
       </p>
     </section>
-    </ng-container>
+    </div>
 
   </ng-container>
 </section>
