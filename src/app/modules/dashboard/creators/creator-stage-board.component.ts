@@ -91,7 +91,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
         this.draggedId = null;
         this.hoveredKey = null;
         this.ghostIndex = null;
-        this.error = user ? '' : 'Entre na sua conta para acessar o ateliê.';
+        this.error = user ? '' : 'Entre na sua conta para acessar o Creator Studio.';
         if (!user) return;
         if (requested !== null && (!Number.isSafeInteger(requested) || requested <= 0)) {
           this.loading = false;
