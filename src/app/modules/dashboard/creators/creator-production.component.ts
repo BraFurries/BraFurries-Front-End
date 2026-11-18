@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { forkJoin, Subject, takeUntil, distinctUntilChanged } from 'rxjs';
 import {
   CreatorArtType, CreatorStageDefinition, CreatorStepDraft,
@@ -27,6 +28,13 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   workflows: CreatorWorkflow[] = [];
   globalWorkflows: CreatorGlobalWorkflow[] = [];
   importedGlobalId: number | null = null;
+  section: 'home' | 'arts' | 'processes' = 'home';
+  typeFormOpen = false;
+  typeAdvancedOpen = false;
+  workflowFormOpen = false;
+  workflowEditorStep: 1 | 2 = 1;
+  showStepLibrary = false;
+  expandedGlobalId: number | null = null;
 
   definitionName = '';
   editingTypeId: number | null = null;
@@ -42,10 +50,21 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly studio: CreatorStudioService,
-    private readonly users: UserService
+    private readonly users: UserService,
+    private readonly route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
+    // Separate URLs keep each job focused while sharing the same catalog API.
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe(data => {
+      const requested = data['section'];
+      this.section = requested === 'arts' || requested === 'processes' ? requested : 'home';
+      this.resetType();
+      this.resetWorkflow();
+      this.showStepLibrary = false;
+      this.expandedGlobalId = null;
+    });
+
     this.users.user$
       .pipe(distinctUntilChanged((a, b) => a?.id === b?.id), takeUntil(this.destroy$))
       .subscribe(user => {
@@ -143,13 +162,22 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     });
   }
 
+  startType(): void {
+    this.resetType();
+    this.typeFormOpen = true;
+  }
+
   editType(type: CreatorArtType): void {
+    this.typeFormOpen = true;
+    this.typeAdvancedOpen = type.workflowId !== null;
     this.editingTypeId = type.id;
     this.typeName = type.name;
     this.typeWorkflowId = type.workflowId;
   }
 
   resetType(): void {
+    this.typeFormOpen = false;
+    this.typeAdvancedOpen = false;
     this.editingTypeId = null;
     this.typeName = '';
     this.typeWorkflowId = null;
@@ -167,7 +195,14 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     });
   }
 
+  startWorkflow(): void {
+    this.resetWorkflow();
+    this.workflowFormOpen = true;
+  }
+
   editWorkflow(source: CreatorWorkflow): void {
+    this.workflowFormOpen = true;
+    this.workflowEditorStep = 1;
     this.editingWorkflowId = source.id;
     this.workflow = {
       name: source.name,
@@ -177,8 +212,24 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   }
 
   resetWorkflow(): void {
+    this.workflowFormOpen = false;
+    this.workflowEditorStep = 1;
     this.editingWorkflowId = null;
     this.workflow = this.emptyWorkflow();
+  }
+
+  nextWorkflowStep(): void {
+    const name = this.workflow.name.trim();
+    if (!name || name.length > 100) {
+      this.error = 'Dê um nome de até 100 caracteres ao seu processo.';
+      return;
+    }
+    this.error = '';
+    this.workflowEditorStep = 2;
+  }
+
+  toggleGlobalDetails(id: number): void {
+    this.expandedGlobalId = this.expandedGlobalId === id ? null : id;
   }
 
   addWorkflowStep(): void {
@@ -208,7 +259,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     const steps = this.workflow.steps.map(step => ({
       name: step.name.trim(), stageDefinitionId: step.stageDefinitionId
     }));
-    if (!this.allowed || this.busy || !name || steps.length > 40 ||
+    if (!this.allowed || this.busy || !name || name.length > 100 || steps.length > 40 ||
         steps.some(step => !step.name || step.name.length > 100)) {
       this.error = 'Dê um nome ao modelo e preencha cada etapa (máximo de 40).';
       return;
