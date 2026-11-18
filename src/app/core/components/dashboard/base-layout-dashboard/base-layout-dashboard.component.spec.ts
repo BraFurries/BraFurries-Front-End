@@ -203,6 +203,25 @@ describe('BaseLayoutDashboardComponent', () => {
     user$.next({ ...user, id: 3 });
     fixture.detectChanges();
     expect(component.showCreatorStudio).toBeFalse();
+    expect(component.showCreatorStudioData).toBeTrue();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')?.textContent)
+      .toContain('Meus dados Creators');
+  });
+
+  it('keeps personal data export discoverable when a pilot Pro is revoked', () => {
+    creators.myAccess.and.returnValue(of({
+      allowed: false, tier: 'PRO', status: 'REVOKED',
+      sourceKind: 'PILOT', expiresAtUtc: null
+    }));
+    user$.next({ ...user, id: 9 });
+    fixture.detectChanges();
+    expect(component.showCreatorStudio).toBeFalse();
+    expect(component.showCreatorStudioData).toBeTrue();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')?.textContent)
+      .toContain('Meus dados Creators');
+    user$.next(null);
+    fixture.detectChanges();
+    expect(component.showCreatorStudioData).toBeFalse();
     expect(fixture.nativeElement.querySelector('a[href="/painel/creators"]')).toBeNull();
   });
 
