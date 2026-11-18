@@ -35,6 +35,10 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   workflowFormOpen = false;
   workflowEditorStep: 1 | 2 = 1;
   expandedGlobalId: number | null = null;
+  selectedStageId: number | null = null;
+  creatingStage = false;
+  newStageName = '';
+  newStageExclusive = false;
 
   definitionName = '';
   editingTypeId: number | null = null;
@@ -203,6 +207,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   }
 
   editWorkflow(source: CreatorWorkflow): void {
+    this.resetStagePicker();
     this.workflowFormOpen = true;
     this.workflowEditorStep = 1;
     this.editingWorkflowId = source.id;
@@ -222,6 +227,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.workflowEditorStep = 1;
     this.editingWorkflowId = null;
     this.workflow = this.emptyWorkflow();
+    this.resetStagePicker();
   }
 
   nextWorkflowStep(): void {
@@ -238,10 +244,59 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.expandedGlobalId = this.expandedGlobalId === id ? null : id;
   }
 
-  addWorkflowStep(): void {
-    if (this.workflow.steps.length >= 40) return;
-    // Reuse is the friendly default, but artists may opt out for one-off steps.
-    this.workflow.steps.push({ name: '', stageDefinitionId: null, reuse: true });
+  resetStagePicker(): void {
+    this.selectedStageId = null;
+    this.creatingStage = false;
+    this.newStageName = '';
+    this.newStageExclusive = false;
+  }
+
+  get availableStages(): CreatorStageDefinition[] {
+    return this.definitions.filter(definition =>
+      !this.workflow.steps.some(step => step.stageDefinitionId === definition.id));
+  }
+
+  get canAddStage(): boolean {
+    return this.allowed && !this.busy && this.workflow.steps.length < 40;
+  }
+
+  addSelectedStage(): void {
+    if (!this.canAddStage || this.creatingStage) return;
+    const definition = this.availableStages.find(stage => stage.id === this.selectedStageId);
+    if (!definition) return;
+    this.workflow.steps.push({name: definition.name, stageDefinitionId: definition.id, reuse: true});
+    this.resetStagePicker();
+  }
+
+  openNewStage(): void {
+    if (!this.canAddStage) return;
+    this.resetStagePicker();
+    this.creatingStage = true;
+  }
+
+  addNewStage(): void {
+    const name = this.newStageName.trim();
+    if (!this.creatingStage || !this.canAddStage || !name || name.length > 100) return;
+    const existing = this.newStageExclusive ? undefined : this.findSharedDefinition(name);
+    const duplicate = !this.newStageExclusive && this.workflow.steps.some(step =>
+      step.reuse !== false && (existing
+        ? step.stageDefinitionId === existing.id || this.sameStageName(step.name, name)
+        : this.sameStageName(step.name, name)));
+    if (duplicate) {
+      this.error = 'Esta etapa reutilizável já foi incluída no processo.';
+      return;
+    }
+    this.workflow.steps.push({
+      name: existing?.name ?? name,
+      stageDefinitionId: existing?.id ?? null,
+      reuse: !this.newStageExclusive
+    });
+    this.error = '';
+    this.resetStagePicker();
+  }
+
+  private sameStageName(a: string, b: string): boolean {
+    return a.trim().localeCompare(b.trim(), undefined, {sensitivity: 'base'}) === 0;
   }
 
   setProcessView(view: 'models' | 'library'): void {
@@ -252,29 +307,25 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.notice = '';
   }
 
-  setStepReuse(step: CreatorStepDraft, enabled: boolean): void {
-    step.reuse = enabled;
-    if (!enabled) step.stageDefinitionId = null;
-    else {
-      const match = this.findSharedDefinition(step.name);
-      if (match) step.stageDefinitionId = match.id;
+  // Existing exclusive steps stay exclusive. Linking one is an explicit
+  // artist action; the backend resolves new definitions at workflow save.
+  makeStepReusable(step: CreatorStepDraft): void {
+    if (!this.allowed || this.busy || step.reuse !== false) return;
+    const existing = this.findSharedDefinition(step.name);
+    if (this.workflow.steps.some(other => other !== step && other.reuse !== false &&
+        (this.sameStageName(other.name, step.name) ||
+         (existing && other.stageDefinitionId === existing.id)))) {
+      this.error = 'Esta etapa reutilizável já foi incluída no processo.';
+      return;
     }
-  }
-
-  updateStepName(step: CreatorStepDraft, name: string): void {
-    step.name = name;
-    const selected = this.definitions.find(item => item.id === step.stageDefinitionId);
-    if (selected && selected.name !== name.trim()) step.stageDefinitionId = null;
-    if (step.reuse) {
-      const match = this.findSharedDefinition(name);
-      if (match) step.stageDefinitionId = match.id;
-    }
+    step.reuse = true;
+    step.stageDefinitionId = existing?.id ?? null;
+    if (existing) step.name = existing.name;
+    this.error = '';
   }
 
   private findSharedDefinition(name: string): CreatorStageDefinition | undefined {
-    const normalized = name.trim().toLocaleLowerCase();
-    return normalized ? this.definitions.find(
-      item => item.name.trim().toLocaleLowerCase() === normalized) : undefined;
+    return this.definitions.find(definition => this.sameStageName(definition.name, name));
   }
 
   stageUsageCount(id: number): number {
@@ -293,15 +344,11 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.workflow.steps.splice(index, 1);
   }
 
-  setSharedDefinition(step: CreatorStepDraft, id: number | null): void {
-    step.reuse = true;
-    step.stageDefinitionId = id;
-    const definition = this.definitions.find(item => item.id === id);
-    if (definition) step.name = definition.name;
-    // Selecting "new" keeps the typed name and resolves it at save time.
-  }
-
   saveWorkflow(): void {
+    if (this.creatingStage && this.newStageName.trim()) {
+      this.error = 'Inclua ou cancele a nova etapa antes de salvar o processo.';
+      return;
+    }
     const name = this.workflow.name.trim();
     const steps = this.workflow.steps.map(step => ({
       name: step.name.trim(),

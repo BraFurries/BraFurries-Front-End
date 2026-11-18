@@ -198,66 +198,89 @@
             <p class="text-sm text-gray-600">
               Agora organize as etapas na ordem em que você trabalha.
             </p>
-            <div class="space-y-3">
+            <div class="space-y-2">
               <div *ngFor="let step of workflow.steps; let i = index"
-                class="space-y-3 rounded-xl border bg-gray-50 p-3">
-                <div class="flex flex-wrap items-end gap-2">
-                  <label class="min-w-40 flex-1 text-sm font-semibold text-gray-700">
-                    Etapa {{ i + 1 }}
-                    <input [name]="'stepName' + i" [ngModel]="step.name"
-                      (ngModelChange)="updateStepName(step, $event)" required maxlength="100"
-                      placeholder="Ex.: Rascunho"
-                      class="mt-1 block w-full rounded-lg border bg-white px-3 py-2.5 font-normal">
-                  </label>
-                  <button type="button" (click)="moveStep(i,-1)" [disabled]="busy || i===0"
-                    [attr.aria-label]="'Subir etapa ' + (i+1)"
-                    class="rounded-lg border bg-white px-3 py-2.5 disabled:opacity-30">↑</button>
-                  <button type="button" (click)="moveStep(i,1)" [disabled]="busy || i===workflow.steps.length-1"
-                    [attr.aria-label]="'Descer etapa ' + (i+1)"
-                    class="rounded-lg border bg-white px-3 py-2.5 disabled:opacity-30">↓</button>
-                  <button type="button" (click)="removeWorkflowStep(i)" [disabled]="busy"
-                    [attr.aria-label]="'Remover etapa ' + (i+1)"
-                    class="rounded-lg border border-red-200 bg-white px-3 py-2.5 text-red-700 disabled:opacity-50">×</button>
-                </div>
-                <div class="space-y-2">
-                  <label class="flex items-center gap-2 text-xs font-medium text-gray-700">
-                    <input type="checkbox" [name]="'reuse' + i" [ngModel]="step.reuse !== false"
-                      (ngModelChange)="setStepReuse(step, $event)"
-                      class="h-4 w-4 accent-braPurple">
-                    Reutilizar em outros processos
-                  </label>
-                  <label *ngIf="step.reuse !== false && definitions.length"
-                    class="block text-xs font-semibold text-gray-700">
-                    Etapa já cadastrada
-                    <select [name]="'definition' + i" [ngModel]="step.stageDefinitionId"
-                      (ngModelChange)="setSharedDefinition(step, $event)"
-                      class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal">
-                      <option [ngValue]="null">Criar/reutilizar pelo nome digitado</option>
-                      <option *ngFor="let definition of definitions" [ngValue]="definition.id">
-                        {{ definition.name }}
-                      </option>
-                    </select>
-                  </label>
-                  <p class="text-xs text-gray-500">
-                    {{ step.reuse === false
-                       ? 'Esta etapa ficará exclusiva deste processo.'
-                       : (step.stageDefinitionId !== null
-                           ? 'Vinculada à biblioteca de etapas reutilizáveis.'
-                           : 'Ao salvar, esta etapa será cadastrada ou vinculada automaticamente pelo nome.') }}
+                class="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-gray-50 p-3">
+                <div class="min-w-0 flex-1">
+                  <p class="break-words text-sm font-semibold text-braDark">{{ i + 1 }}. {{ step.name }}</p>
+                  <p class="mt-1 text-xs text-gray-500">
+                    {{ step.reuse === false ? 'Exclusiva deste processo' :
+                       (step.stageDefinitionId === null ? 'Nova etapa reutilizável · ao salvar' : 'Etapa reutilizável') }}
                   </p>
                 </div>
+                <div class="flex flex-wrap items-center gap-1">
+                  <button *ngIf="step.reuse === false" type="button" (click)="makeStepReusable(step)"
+                    [disabled]="busy" class="rounded-lg px-2 py-2 text-xs font-semibold text-braPurple disabled:opacity-50">
+                    Tornar reutilizável
+                  </button>
+                  <button type="button" (click)="moveStep(i,-1)" [disabled]="busy || i===0"
+                    [attr.aria-label]="'Subir etapa ' + (i+1)"
+                    class="rounded-lg border bg-white px-3 py-2 disabled:opacity-30">↑</button>
+                  <button type="button" (click)="moveStep(i,1)" [disabled]="busy || i===workflow.steps.length-1"
+                    [attr.aria-label]="'Descer etapa ' + (i+1)"
+                    class="rounded-lg border bg-white px-3 py-2 disabled:opacity-30">↓</button>
+                  <button type="button" (click)="removeWorkflowStep(i)" [disabled]="busy"
+                    [attr.aria-label]="'Remover etapa ' + (i+1)"
+                    class="rounded-lg border border-red-200 bg-white px-3 py-2 text-red-700 disabled:opacity-50">×</button>
+                </div>
               </div>
-              <button type="button" (click)="addWorkflowStep()"
-                [disabled]="busy || workflow.steps.length >= 40"
-                class="rounded-xl border border-braPurple/30 bg-white px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              <p *ngIf="!workflow.steps.length" class="rounded-xl border border-dashed p-4 text-sm text-gray-500">
+                Nenhuma etapa adicionada ao processo.
+              </p>
+            </div>
+            <div *ngIf="!creatingStage" class="space-y-3 rounded-xl border bg-white p-4">
+              <div class="flex flex-wrap items-end gap-2">
+                <label class="min-w-40 flex-1 text-sm font-semibold text-gray-700">
+                  Escolher etapa reutilizável
+                  <select name="selectedStageId" [(ngModel)]="selectedStageId"
+                    [disabled]="!canAddStage || !availableStages.length"
+                    class="mt-1 block w-full rounded-lg border bg-white px-3 py-2.5 font-normal disabled:bg-gray-50">
+                    <option [ngValue]="null">{{ availableStages.length ? 'Selecione uma etapa da biblioteca' : 'Nenhuma etapa disponível' }}</option>
+                    <option *ngFor="let definition of availableStages" [ngValue]="definition.id">{{ definition.name }}</option>
+                  </select>
+                </label>
+                <button type="button" (click)="addSelectedStage()"
+                  [disabled]="!canAddStage || selectedStageId === null"
+                  class="rounded-lg bg-braPurple px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                  Incluir etapa
+                </button>
+              </div>
+              <button type="button" (click)="openNewStage()" [disabled]="!canAddStage"
+                class="rounded-lg border border-braPurple/30 bg-white px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
                 + Adicionar etapa
               </button>
-
+            </div>
+            <div *ngIf="creatingStage" class="space-y-3 rounded-xl border border-braPurple/25 bg-gray-50 p-4">
+              <h3 class="text-sm font-semibold text-braDark">Nova etapa</h3>
+              <label class="block text-sm font-semibold text-gray-700">
+                Nome da etapa
+                <input name="newStageName" [(ngModel)]="newStageName" maxlength="100"
+                  placeholder="Ex.: Rascunho"
+                  class="mt-1 block w-full rounded-lg border bg-white px-3 py-2.5 font-normal">
+              </label>
+              <label class="flex items-start gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="newStageExclusive" [(ngModel)]="newStageExclusive"
+                  class="mt-0.5 h-4 w-4 accent-braPurple">
+                <span>Etapa exclusiva deste processo
+                  <span class="mt-1 block text-xs text-gray-500">Marque apenas se não quiser reutilizá-la em outros processos.</span>
+                </span>
+              </label>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" (click)="addNewStage()" [disabled]="!canAddStage || !newStageName.trim()"
+                  class="rounded-lg bg-braPurple px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                  Incluir nova etapa
+                </button>
+                <button type="button" (click)="resetStagePicker()" [disabled]="busy"
+                  class="rounded-lg border bg-white px-4 py-2.5 text-sm font-semibold text-gray-700">Cancelar</button>
+              </div>
+              <p *ngIf="!newStageExclusive" class="text-xs text-gray-500">
+                A etapa será compartilhada na sua biblioteca ao salvar o processo.
+              </p>
             </div>
             <p class="text-xs text-gray-500">Etapas reutilizáveis são compartilhadas entre seus processos, mas cada pedido recebe sua própria cópia independente.</p>
           </ng-container>
           <div class="flex flex-wrap gap-2 border-t pt-4">
-            <button type="submit" [disabled]="busy || !workflow.name.trim()"
+            <button type="submit" [disabled]="busy || !workflow.name.trim() || (workflowEditorStep === 2 && creatingStage && !!newStageName.trim())"
               class="rounded-xl bg-braPurple px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
               {{ workflowEditorStep === 1 ? 'Continuar para as etapas' :
                  (busy ? 'Salvando...' : 'Salvar processo') }}
@@ -286,10 +309,16 @@
               <span *ngIf="template.isDefault" class="font-semibold text-braPurple">· Padrão</span>
             </p>
           </div>
-          <button type="button" (click)="editWorkflow(template)" [disabled]="busy"
-            class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
-            Editar
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <a routerLink="/painel/creators/producao/quadro" [queryParams]="{workflowId:template.id}"
+              class="rounded-lg border border-braPurple/30 bg-white px-3 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/5">
+              Ver quadro
+            </a>
+            <button type="button" (click)="editWorkflow(template)" [disabled]="busy"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              Editar
+            </button>
+          </div>
         </div>
       </section>
 
@@ -343,9 +372,15 @@
       </ng-container>
 
       <section *ngIf="processView === 'library'" class="space-y-5" aria-label="Biblioteca de etapas reutilizáveis">
-        <div class="space-y-1">
-          <h2 class="font-amaranth text-xl font-bold text-braDark">Sua biblioteca de etapas</h2>
-          <p class="text-sm text-gray-600">Use a mesma etapa em vários processos. Assim será possível acompanhar todos os pedidos nela em um único quadro.</p>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="space-y-1">
+            <h2 class="font-amaranth text-xl font-bold text-braDark">Sua biblioteca de etapas</h2>
+            <p class="max-w-xl text-sm text-gray-600">Use a mesma etapa em vários processos e acompanhe os pedidos em um só lugar.</p>
+          </div>
+          <a routerLink="/painel/creators/producao/quadro"
+            class="rounded-lg bg-braPurple px-4 py-2.5 text-sm font-bold text-white">
+            Ver quadro por etapas
+          </a>
         </div>
         <form (ngSubmit)="addDefinition()" class="flex flex-wrap items-end gap-2 rounded-xl border bg-white p-4">
           <label class="min-w-40 flex-1 text-sm font-semibold text-gray-700">
@@ -372,7 +407,7 @@
           </div>
         </div>
         <p class="text-xs text-gray-500">
-          Para vincular etapas de processos antigos, abra o editor do processo e marque “Reutilizar em outros processos”. Nenhum pedido já criado será modificado.
+          Para vincular etapas de processos antigos, abra o editor do processo e selecione “Tornar reutilizável”. Nenhum pedido já criado será modificado.
         </p>
       </section>
 

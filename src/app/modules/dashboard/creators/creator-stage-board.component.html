@@ -1,0 +1,147 @@
+<section class="mx-auto max-w-7xl space-y-5 p-4 text-gray-800 md:p-8">
+  <header class="space-y-2">
+    <a routerLink="/painel/creators/producao/processos"
+      class="text-sm font-semibold text-braPurple hover:underline">← Meus processos</a>
+    <p class="text-xs font-bold uppercase tracking-widest text-braPurple">Creator Studio</p>
+    <h1 class="font-amaranth text-3xl font-bold text-braDark">
+      {{ mode === 'process' ? (workflow?.name || 'Quadro do processo') : 'Quadro por etapas' }}
+    </h1>
+    <p class="max-w-2xl text-sm text-gray-600">
+      {{ mode === 'process'
+        ? 'Acompanhe os pedidos deste processo em cada etapa. Você pode mover apenas para etapas que fazem parte do pedido.'
+        : 'Veja pedidos de processos diferentes agrupados pelas etapas reutilizáveis que você vinculou.' }}
+    </p>
+  </header>
+
+  <p *ngIf="loading" role="status" class="rounded-xl bg-white p-5 text-sm text-gray-600">
+    Verificando seu acesso...
+  </p>
+  <section *ngIf="!loading && !allowed"
+    class="rounded-xl border bg-white p-5 text-sm text-gray-600">
+    {{ error || 'Este quadro exige acesso Pro.' }}
+  </section>
+
+  <ng-container *ngIf="!loading && allowed">
+    <p *ngIf="error" role="alert"
+      class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ error }}
+    </p>
+    <p *ngIf="busyId !== null" role="status" class="text-sm text-gray-600">
+      Atualizando a etapa do pedido...
+    </p>
+    <p *ngIf="loadingBoard" role="status" class="rounded-xl bg-white p-5 text-sm text-gray-600">
+      Carregando o quadro...
+    </p>
+    <div *ngIf="mode === 'process' && workflow && workflow.steps.length === 0"
+      class="rounded-xl border border-dashed bg-white p-5 text-sm text-gray-600">
+      Este processo ainda não tem etapas. Configure-as em
+      <a routerLink="/painel/creators/producao/processos"
+        class="font-semibold text-braPurple underline">Meus processos</a>.
+    </div>
+    <div *ngIf="mode === 'shared' && columns.length === 1 && !loadingBoard"
+      class="rounded-xl border border-dashed bg-white p-5 text-sm text-gray-600">
+      Cadastre e vincule etapas reutilizáveis nos seus processos para acompanhar todos os pedidos em um único lugar.
+      <a routerLink="/painel/creators/producao/processos"
+        class="font-semibold text-braPurple underline">Organizar minhas etapas</a>.
+    </div>
+
+    <div *ngIf="!loadingBoard && columns.length" class="space-y-4"
+      aria-label="Quadro de andamento dos pedidos">
+      <div class="flex items-stretch gap-4 overflow-x-auto pb-3">
+        <div *ngFor="let lane of columns; trackBy: trackLane"
+          #boardDropZone [attr.data-stage-target]="lane.key"
+          [ngClass]="hoveredKey === lane.key ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 bg-gray-50/80'"
+          class="min-h-[17rem] w-[min(80vw,19rem)] shrink-0 snap-start rounded-2xl border p-3 transition-colors">
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <h2 class="break-words font-amaranth text-lg font-bold text-braDark">
+              {{ lane.name }}
+            </h2>
+            <span class="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-braPurple"
+              [attr.aria-label]="lane.total + ' pedidos nesta etapa'">{{ lane.total }}</span>
+          </div>
+
+          <div cdkDropList cdkDropListSortingDisabled [cdkDropListData]="lane.key"
+            class="min-h-[8rem] space-y-3">
+            <ng-container *ngFor="let card of lane.items; let i = index; trackBy: trackCard">
+              <div *ngIf="hoveredKey === lane.key && ghostIndex === i"
+                aria-hidden="true" [style.height.px]="ghostHeight"
+                class="pointer-events-none rounded-xl border-2 border-dashed border-braPurple/40 bg-white/90">
+              </div>
+              <article cdkDrag [cdkDragData]="card" [cdkDragStartDelay]="dragDelay"
+                [cdkDragDisabled]="busyId !== null"
+                (cdkDragStarted)="dragStart($event,card)"
+                (cdkDragMoved)="dragMove($event,lane.key)"
+                (cdkDragEnded)="dragEnd($event,card,lane.key)"
+                (keydown)="moveByKeyboard($event,card,lane.key)"
+                tabindex="0"
+                [attr.aria-label]="'Pedido ' + card.title + '. Arraste para outra etapa do pedido ou use as setas esquerda e direita.'"
+                class="cursor-grab space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-braPurple">
+                <ng-container *ngTemplateOutlet="cardContent"></ng-container>
+                <ng-template cdkDragPlaceholder>
+                  <div aria-hidden="true" class="pointer-events-none space-y-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <h3 class="break-words font-amaranth font-bold text-braDark">{{ card.title }}</h3>
+                    <p class="break-words text-xs text-gray-600">{{ card.clientName }}</p>
+                    <p class="text-xs text-gray-500">Pedido: {{ formatDate(card.requestedOn) }}</p>
+                  </div>
+                </ng-template>
+                <ng-template #cardContent>
+                  <div>
+                    <h3 class="break-words font-amaranth font-bold text-braDark">{{ card.title }}</h3>
+                    <p class="mt-1 break-words text-xs text-gray-600">{{ card.clientName }}</p>
+                  </div>
+                  <div class="text-xs text-gray-600">
+                    <p>Pedido: {{ formatDate(card.requestedOn) }}</p>
+                    <p *ngIf="card.dueOn">Prazo: {{ formatDate(card.dueOn) }}</p>
+                    <p *ngIf="mode === 'shared'" class="mt-1 font-semibold text-braPurple">
+                      {{ card.currentStageName }}
+                    </p>
+                    <p *ngIf="card.status === 'PAUSED'" class="mt-1 text-amber-700">Em pausa</p>
+                    <p *ngIf="card.status === 'WAITING'" class="mt-1 text-amber-700">Aguardando retorno</p>
+                  </div>
+                  <a [routerLink]="['/painel/creators/pedido',card.id]"
+                    class="block rounded-lg border border-braPurple/30 px-3 py-2 text-center text-sm font-semibold text-braPurple hover:bg-braPurple/10">
+                    Abrir pedido
+                  </a>
+                </ng-template>
+              </article>
+            </ng-container>
+            <div *ngIf="hoveredKey === lane.key && ghostIndex === lane.items.length"
+              aria-hidden="true" [style.height.px]="ghostHeight"
+              class="pointer-events-none rounded-xl border-2 border-dashed border-braPurple/40 bg-white/90">
+            </div>
+            <p *ngIf="!lane.items.length && hoveredKey !== lane.key"
+              class="rounded-xl border border-dashed bg-white p-4 text-center text-sm text-gray-500">
+              Nenhum pedido nesta etapa.
+            </p>
+            <p *ngIf="hoveredKey === lane.key && ghostIndex === null"
+              class="rounded-xl border border-dashed bg-white p-3 text-center text-xs text-gray-600">
+              Este pedido será posicionado mais abaixo, conforme a data.
+            </p>
+          </div>
+          <div *ngIf="mode === 'shared' && lane.total > lane.items.length" class="mt-3 space-y-2">
+            <p class="text-xs text-gray-500">Mostrando {{ lane.items.length }} de {{ lane.total }} pedidos.</p>
+            <button type="button" (click)="loadMoreLane(lane)" [disabled]="!canLoadMoreLane(lane)"
+              class="w-full rounded-lg border border-braPurple/30 bg-white px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              {{ loadingLaneKey === lane.key ? 'Carregando...' : 'Carregar mais pedidos' }}
+            </button>
+          </div>
+          <p *ngIf="!lane.movable"
+            class="mt-3 text-xs text-gray-500">
+            {{ mode === 'process' ? 'Pedidos com etapas diferentes do modelo atual.' : 'Etapas exclusivas ou já finalizadas.' }}
+          </p>
+        </div>
+      </div>
+      <div *ngIf="mode === 'process'" class="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
+        <p>Exibindo {{ visibleCount }} de {{ processTotal }} pedidos ativos deste processo.</p>
+        <button *ngIf="canLoadMore" type="button" (click)="loadMore()"
+          class="rounded-lg border border-braPurple/30 bg-white px-4 py-2 font-semibold text-braPurple">
+          Carregar mais pedidos
+        </button>
+        <span *ngIf="loadingMore">Carregando mais pedidos...</span>
+      </div>
+      <p class="text-xs text-gray-500">
+        O status geral (fila, pausa, aguardando retorno ou conclusão) é independente das etapas. Alterações nos modelos não modificam pedidos antigos.
+      </p>
+    </div>
+  </ng-container>
+</section>
