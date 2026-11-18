@@ -86,6 +86,23 @@ describe('CreatorStudioPilotAdminService', () => {
     });
   });
 
+  it('reads owner-only notice health without mutations, artist IDs or community IDs', () => {
+    service.retentionHealth().subscribe(report => {
+      expect(report.totalNotices).toBe(8);
+      expect(report.smtpUnknown).toBe(1);
+      expect(report.bounced).toBe(1);
+    });
+    const req = http.expectOne(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/health`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.keys()).toEqual([]);
+    expect(req.request.body).toBeNull();
+    req.flush({
+      totalNotices:8,pending:1,sending:0,stuckSending:1,
+      smtpUnknown:1,smtpUnconfirmed:2,providerConfirmed:1,bounced:1,complaints:1
+    });
+  });
+
   it('releases a specific hold without deleting the commission itself', () => {
     service.releaseHold(31,105).subscribe();
     const req = http.expectOne(
