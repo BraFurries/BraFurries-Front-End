@@ -185,6 +185,7 @@ describe('CreatorStudioComponent', () => {
 
   it('formats date-only fields without local timezone conversion', () => {
     expect(component.formatCivilDate('2026-01-01')).toBe('01/01/2026');
+    expect(component.formatCivilDate('2026-11-20T10:00:00')).toBe('20/11/2026');
     expect(component.formatCivilDate(null)).toBe('');
   });
 });
