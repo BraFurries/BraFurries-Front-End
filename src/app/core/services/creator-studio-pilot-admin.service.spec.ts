@@ -48,6 +48,35 @@ describe('CreatorStudioPilotAdminService', () => {
       sourceKind:'PILOT',expiresAtUtc:null});
   });
 
+  it('reads a retention hold exclusively by artist and commission IDs', () => {
+    service.inspectHold(31, 105).subscribe();
+    const req = http.expectOne(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/holds/31/105`);
+    expect(req.request.method).toBe('GET');
+    req.flush({artistUserId:31,commissionId:105,category:'DISPUTE',
+      reason:'Contestação',active:true});
+  });
+
+  it('sends a justified hold with no client notes or community data', () => {
+    service.placeHold({artistUserId:31,commissionId:105,
+      category:'LEGAL_OBLIGATION',reason:'Retenção necessária'}).subscribe();
+    const req = http.expectOne(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/holds`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({artistUserId:31,commissionId:105,
+      category:'LEGAL_OBLIGATION',reason:'Retenção necessária'});
+    expect(req.request.body.communityId).toBeUndefined();
+    req.flush({...req.request.body,active:true});
+  });
+
+  it('releases a specific hold without deleting the commission itself', () => {
+    service.releaseHold(31,105).subscribe();
+    const req = http.expectOne(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/holds/31/105`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
+
   it('revokes authorization without deleting commissions or issuing an unrelated request', () => {
     service.revoke(22).subscribe();
     const req = http.expectOne(`${base}/22`);
