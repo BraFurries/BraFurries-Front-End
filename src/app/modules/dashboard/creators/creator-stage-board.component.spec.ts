@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { CdkDragEnd, CdkDragMove, CdkDragStart, DragDropModule } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragEnd, CdkDragMove, CdkDragStart, DragDropModule } from '@angular/cdk/drag-drop';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
@@ -46,6 +47,8 @@ describe('CreatorStageBoardComponent', () => {
   ];
 
   beforeEach(async () => {
+    localStorage.removeItem('brf.creator-studio.shared-stage-order.v1.31');
+    localStorage.removeItem('brf.creator-studio.shared-stage-order.v1.99');
     user$ = new BehaviorSubject<User | null>(user);
     studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','workflows','stageDefinitions','commissionsForBoard',
@@ -84,6 +87,8 @@ describe('CreatorStageBoardComponent', () => {
   afterEach(() => {
     fixture.destroy();
     user$.complete();
+    localStorage.removeItem('brf.creator-studio.shared-stage-order.v1.31');
+    localStorage.removeItem('brf.creator-studio.shared-stage-order.v1.99');
   });
 
   function zones(): {key:string;x:number;y:number}[] {
@@ -126,6 +131,108 @@ describe('CreatorStageBoardComponent', () => {
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({stageDefinitionId:10},1,12);
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({unlinked:true},1,12);
     expect(component.columns[0].items[0].id).toBe(7);
+  });
+
+  it('filters shared columns by process definition IDs in process order without restricting shared orders', () => {
+    const selected: CreatorWorkflow = {
+      id:34,name:'Stickers',isDefault:false,
+      steps:[
+        {id:1,name:'Pintura',position:0,stageDefinitionId:20},
+        {id:2,name:'Particular',position:1,stageDefinitionId:null},
+        {id:3,name:'Rascunho',position:2,stageDefinitionId:10},
+        {id:4,name:'Rascunho repetido',position:3,stageDefinitionId:10}
+      ]
+    };
+    studio.workflows.and.returnValue(of([workflow, selected]));
+    studio.stageDefinitions.and.returnValue(of([
+      {id:10,name:'Rascunho'},{id:20,name:'Pintura'},{id:30,name:'Acabamento'}
+    ]));
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    expect(component.sharedWorkflowId).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Todas as etapas');
+    studio.commissionsForBoard.calls.reset();
+    component.filterSharedStages(34);
+    fixture.detectChanges();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10']);
+    expect(studio.commissionsForBoard.calls.allArgs()).toEqual([
+      [{stageDefinitionId:20},1,12],[{stageDefinitionId:10},1,12]
+    ]);
+    expect(component.columns[1].items).toEqual([card]); // order belongs to process 33
+    expect(component.canOrganizeStages).toBeFalse();
+    expect(fixture.nativeElement.textContent).not.toContain('Organizar etapas');
+    component.filterSharedStages(null);
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
+  });
+
+  it('has no move action in either shared-stage scope, including keyboard and direct event calls', () => {
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    const drag = fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag);
+    expect(drag.disabled).toBeTrue();
+    expect(component.columns.every(lane=>!lane.movable)).toBeTrue();
+    expect(fixture.nativeElement.querySelector('article').getAttribute('tabindex')).toBeNull();
+    const target=zones().find(zone=>zone.key==='shared:20')!;
+    start(card);
+    component.dragEnd({event:{clientX:target.x,clientY:target.y}} as unknown as CdkDragEnd<CreatorCommission>,card,'shared:10');
+    const element=fixture.nativeElement.querySelector('article');
+    component.moveByKeyboard({key:'ArrowRight',target:element,currentTarget:element,
+      preventDefault:()=>{}} as unknown as KeyboardEvent,card,'shared:10');
+    component.filterSharedStages(33);
+    fixture.detectChanges();
+    expect(fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
+    expect(component.columns.every(lane=>!lane.movable)).toBeTrue();
+    expect(studio.commissionSteps).not.toHaveBeenCalled();
+    expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
+  });
+
+  it('reorders only general columns, keeps loaded data, restores preference by account and ignores stale IDs', () => {
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    const previous=component.columns[0];
+    const originalCalls=studio.commissionsForBoard.calls.count();
+    component.openStageOrder();
+    component.moveStageOrder(0,1);
+    component.cancelStageOrder();
+    expect(component.columns[0]).toBe(previous);
+    component.openStageOrder();
+    component.moveStageOrder(0,1);
+    component.saveStageOrder();
+    fixture.detectChanges();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10','unlinked']);
+    expect(component.columns[1]).toBe(previous);
+    expect(studio.commissionsForBoard.calls.count()).toBe(originalCalls);
+    expect(localStorage.getItem('brf.creator-studio.shared-stage-order.v1.31')).toBe('[20,10]');
+    expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
+    localStorage.setItem('brf.creator-studio.shared-stage-order.v1.31','[20,20,999,10]');
+    studio.stageDefinitions.and.returnValue(of([{id:10,name:'Rascunho'},{id:20,name:'Pintura'},{id:30,name:'Nova'}]));
+    user$.next({...user,id:99});
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
+    user$.next(user);
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10','shared:30','unlinked']);
+    component.filterSharedStages(33);
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20']);
+    component.filterSharedStages(null);
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:10','shared:30','unlinked']);
+  });
+
+  it('ignores stale shared-board responses after filtering and handles processes with no reusable stages', () => {
+    const exclusive: CreatorWorkflow={id:44,name:'Exclusivo',isDefault:false,
+      steps:[{id:1,name:'Só local',position:0,stageDefinitionId:null}]};
+    studio.workflows.and.returnValue(of([workflow,exclusive]));
+    const pending = new Subject<{items:CreatorCommission[];total:number;page:number;pageSize:number}>();
+    studio.commissionsForBoard.and.returnValue(pending.asObservable());
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    expect(component.loadingBoard).toBeTrue();
+    component.filterSharedStages(44);
+    fixture.detectChanges();
+    expect(component.columns).toEqual([]);
+    expect(component.loadingBoard).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('não possui etapas reutilizáveis');
+    pending.next({items:[card],total:1,page:1,pageSize:12});
+    pending.complete();
+    expect(component.columns).toEqual([]);
   });
 
   it('keeps a fixed blank ghost at the destination without moving existing cards', () => {
