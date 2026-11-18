@@ -4,7 +4,7 @@ import { distinctUntilChanged, Observable, Subject, takeUntil } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import {
   CreatorPilotCandidate, CreatorPilotFilter, CreatorPilotInvitation,
-  CreatorStudioPilotAdminService
+  CreatorHoldCategory, CreatorRetentionHold, CreatorStudioPilotAdminService
 } from '../../../core/services/creator-studio-pilot-admin.service';
 import { UserService } from '../../../core/services/user.service';
 
@@ -34,6 +34,16 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   page = 1;
   total = 0;
 
+  holdArtistId = '';
+  holdCommissionId = '';
+  holdCategory: CreatorHoldCategory = 'DISPUTE';
+  holdReason = '';
+  hold: CreatorRetentionHold | null = null;
+  holdBusy = false;
+  holdError = '';
+  holdSuccess = '';
+  private holdSequence = 0;
+
   private accountId: number | null = null;
   private accountSequence = 0;
   private listSequence = 0;
@@ -57,6 +67,14 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
         this.accountId = user?.id ?? null;
         this.listSequence++;
         this.candidateSequence++;
+        this.holdSequence++;
+        this.hold = null;
+        this.holdArtistId = '';
+        this.holdCommissionId = '';
+        this.holdReason = '';
+        this.holdBusy = false;
+        this.holdError = '';
+        this.holdSuccess = '';
         this.checkingOwner = user != null;
         this.owner = false;
         this.loading = false;
@@ -206,6 +224,118 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
     if (!confirmed) return;
     this.change(this.studio.revoke(item.userId),
       'Acesso revogado. Dados das commissions preservados.', item.userId);
+  }
+
+  onHoldFieldsChanged(): void {
+    this.holdSequence++;
+    this.hold = null;
+    this.holdError = '';
+    this.holdSuccess = '';
+  }
+
+  private holdIds(): {artistUserId: number; commissionId: number} | null {
+    const rawArtist = String(this.holdArtistId).trim();
+    const rawCommission = String(this.holdCommissionId).trim();
+    if (!/^[1-9]\d*$/.test(rawArtist) || !/^[1-9]\\d*$/.test(rawCommission)) return null;
+    const artistUserId = Number(rawArtist);
+    const commissionId = Number(rawCommission);
+    if (!Number.isSafeInteger(artistUserId) || !Number.isSafeInteger(commissionId)) return null;
+    return {artistUserId, commissionId};
+  }
+
+  inspectHold(): void {
+    if (!this.owner || this.holdBusy) return;
+    const ids = this.holdIds();
+    if (!ids) {
+      this.holdError = 'Informe IDs válidos do artista e da commission.';
+      return;
+    }
+    const seq = ++this.holdSequence;
+    const account = this.accountId;
+    this.holdBusy = true;
+    this.holdError = '';
+    this.holdSuccess = '';
+    this.hold = null;
+    this.studio.inspectHold(ids.artistUserId, ids.commissionId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
+          this.holdBusy = false;
+          this.hold = result;
+        },
+        error: err => {
+          if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
+          this.holdBusy = false;
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.holdError = 'Não existe retenção registrada para esses IDs, ou o pedido não foi encontrado.';
+          } else {
+            this.handleError(err, 'Não foi possível consultar a retenção.');
+          }
+        }
+      });
+  }
+
+  placeHold(): void {
+    if (!this.owner || this.holdBusy) return;
+    const ids = this.holdIds();
+    const reason = this.holdReason.trim();
+    if (!ids || !reason || reason.length > 500) {
+      this.holdError = 'Informe IDs válidos e uma justificativa com até 500 caracteres.';
+      return;
+    }
+    if (!window.confirm(
+      `Bloquear a exclusão da commission #${ids.commissionId} do artista #${ids.artistUserId}? ` +
+      'A ação será auditada. Confirme a necessidade de retenção excepcional.'
+    )) return;
+    const seq = ++this.holdSequence;
+    const account = this.accountId;
+    this.holdBusy = true;
+    this.holdError = '';
+    this.holdSuccess = '';
+    this.studio.placeHold({...ids, category:this.holdCategory,reason})
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: result => {
+          if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
+          this.holdBusy = false;
+          this.hold = result;
+          this.holdSuccess = 'Retenção excepcional registrada com auditoria.';
+        },
+        error: err => {
+          if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
+          this.holdBusy = false;
+          this.handleError(err, 'Não foi possível registrar a retenção.');
+        }
+      });
+  }
+
+  releaseHold(): void {
+    const hold = this.hold;
+    const ids = this.holdIds();
+    if (!this.owner || this.holdBusy || !hold?.active || !ids ||
+        hold.artistUserId !== ids.artistUserId || hold.commissionId !== ids.commissionId) return;
+    if (!window.confirm(
+      `Liberar a retenção excepcional da commission #${ids.commissionId}? ` +
+      'Ela poderá voltar a ser elegível para limpeza quando todos os requisitos forem cumpridos.'
+    )) return;
+    const seq = ++this.holdSequence;
+    const account = this.accountId;
+    this.holdBusy = true;
+    this.holdError = '';
+    this.holdSuccess = '';
+    this.studio.releaseHold(ids.artistUserId, ids.commissionId)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next: () => {
+          if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
+          this.holdBusy = false;
+          this.hold = {...hold,active:false};
+          this.holdSuccess = 'Retenção excepcional liberada e auditada.';
+        },
+        error: err => {
+          if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
+          this.holdBusy = false;
+          this.handleError(err, 'Não foi possível liberar a retenção.');
+        }
+      });
   }
 
   sourceLabel(source: CreatorPilotInvitation['sourceKind'] | string | null): string {
