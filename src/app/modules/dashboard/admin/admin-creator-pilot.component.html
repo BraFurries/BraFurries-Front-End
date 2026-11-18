@@ -197,6 +197,65 @@
         histórico do artista. Exclusão e retenção de dados serão tratadas separadamente.
       </p>
     </section>
+    <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+      aria-labelledby="creator-retention-dry-run-title">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="space-y-2">
+          <h3 id="creator-retention-dry-run-title"
+            class="font-amaranth text-xl font-bold text-gray-800">
+            Diagnóstico da retenção
+          </h3>
+          <p class="max-w-3xl text-sm text-gray-600">
+            Consulte somente os totais de commissions concluídas com prazo de 12 meses vencido.
+            Esta consulta não envia avisos, não altera registros e não executa exclusões.
+          </p>
+        </div>
+        <button type="button" (click)="loadRetentionReport()" [disabled]="retentionReportBusy"
+          class="rounded-xl border border-braPurple/30 px-4 py-2.5 text-sm font-semibold text-braPurple disabled:opacity-40">
+          {{ retentionReportBusy ? 'Consultando...' :
+             (retentionReport ? 'Atualizar diagnóstico' : 'Gerar diagnóstico') }}
+        </button>
+      </div>
+      <p *ngIf="retentionReportBusy" role="status" class="text-sm text-gray-600">
+        Verificando os bloqueios de retenção...
+      </p>
+      <p *ngIf="retentionReportError" role="alert" class="text-sm text-red-700">
+        {{ retentionReportError }}
+      </p>
+      <ng-container *ngIf="retentionReport as report">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-live="polite">
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Prazo vencido</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ report.expiredCommissions }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Retenção excepcional</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ report.blockedByHold }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Sem aviso de 30 dias</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ report.blockedByMissingD30 }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Sem aviso de 7 dias</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ report.blockedByMissingD7 }}</p>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p class="text-xs font-semibold text-gray-600">Dois aceites SMTP</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800">{{ report.smtpAcceptedBoth }}</p>
+          </div>
+        </div>
+        <p class="text-xs text-amber-800">
+          As categorias são exclusivas: a ausência do aviso de 7 dias é contada apenas
+          quando o de 30 dias existe. Dois aceites SMTP não comprovam que o artista
+          recebeu os e-mails e não autorizam a exclusão de dados.
+          {{ report.deliveryProofSupported ?
+            'A prova de entrega depende de validação operacional.' :
+            'A comprovação de entrega ainda não está implementada.' }}
+        </p>
+      </ng-container>
+    </section>
+
     <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="space-y-2">
         <h3 class="font-amaranth text-xl font-bold text-gray-800">
