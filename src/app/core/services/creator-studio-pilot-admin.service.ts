@@ -32,6 +32,20 @@ export interface CreatorPilotPage {
   total: number;
 }
 
+export type CreatorHoldCategory =
+  'LEGAL_OBLIGATION' | 'DISPUTE' | 'DATA_REQUEST' | 'OTHER';
+
+export interface CreatorRetentionHoldDraft {
+  artistUserId: number;
+  commissionId: number;
+  category: CreatorHoldCategory;
+  reason: string;
+}
+
+export interface CreatorRetentionHold extends CreatorRetentionHoldDraft {
+  active: boolean;
+}
+
 /**
  * Owner-only administrative contract; authorization lives exclusively in API.
  * Does not create public invitations, checkout, bulk grants, or self-enrollment.
@@ -39,6 +53,8 @@ export interface CreatorPilotPage {
 @Injectable({ providedIn: 'root' })
 export class CreatorStudioPilotAdminService {
   private readonly base = `${environment.apiBaseUrl}/user/me/creator-studio/admin/invitations`;
+  private readonly holdsBase =
+    `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/holds`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -62,5 +78,19 @@ export class CreatorStudioPilotAdminService {
 
   revoke(userId: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${userId}`);
+  }
+
+  inspectHold(artistId: number, commissionId: number): Observable<CreatorRetentionHold> {
+    return this.http.get<CreatorRetentionHold>(
+      `${this.holdsBase}/${artistId}/${commissionId}`);
+  }
+
+  placeHold(draft: CreatorRetentionHoldDraft): Observable<CreatorRetentionHold> {
+    return this.http.post<CreatorRetentionHold>(this.holdsBase, draft);
+  }
+
+  releaseHold(artistId: number, commissionId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.holdsBase}/${artistId}/${commissionId}`);
   }
 }
