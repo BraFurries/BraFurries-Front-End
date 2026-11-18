@@ -51,6 +51,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   readonly boardStatuses: CreatorCommissionStatus[] =
     ['QUEUED','IN_PROGRESS','WAITING','PAUSED'];
   readonly boardPageSize = 12;
+  readonly boardDragStartDelay = {touch: 200, mouse: 0};
   boardColumns: {status: CreatorCommissionStatus; items: CreatorCommission[]; total: number}[] =
     this.boardStatuses.map(status => ({status,items:[],total:0}));
   boardLoading = false;
@@ -529,6 +530,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     const account = this.users.getUser()?.id;
     const accessSequence = this.accessSequence;
     this.changingId = commission.id;
+    this.boardSequence++; // Invalidate any earlier background board refresh.
     this.errorMessage = '';
     // Show the move immediately. The server remains the authority for status,
     // chronology, totals and any paginated items we cannot currently see.
