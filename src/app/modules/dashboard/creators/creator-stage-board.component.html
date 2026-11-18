@@ -12,25 +12,53 @@
       aria-label="Organizar etapas gerais">
       <div>
         <h2 class="font-amaranth text-xl font-bold text-braDark">Organizar etapas gerais</h2>
-        <p class="mt-1 text-sm text-gray-600">Defina a ordem das colunas da esquerda para a direita, sem alterar seus processos ou pedidos.</p>
+        <p class="mt-1 text-sm text-gray-600">Arraste as colunas para mudar a ordem. A alteração é apenas visual e não modifica seus processos ou pedidos.</p>
       </div>
-      <ol class="space-y-2">
-        <li *ngFor="let definition of draft; let i = index"
-          class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
-          <span class="min-w-0 break-words text-sm font-semibold text-braDark">{{ i + 1 }}. {{ definition.name }}</span>
-          <div class="flex shrink-0 gap-1">
-            <button type="button" (click)="moveStageOrder(i,-1)" [disabled]="i === 0"
-              [attr.aria-label]="'Mover ' + definition.name + ' para cima'"
-              class="rounded-lg border px-3 py-2 text-braPurple disabled:opacity-30">↑</button>
-            <button type="button" (click)="moveStageOrder(i,1)" [disabled]="i === draft.length - 1"
-              [attr.aria-label]="'Mover ' + definition.name + ' para baixo'"
-              class="rounded-lg border px-3 py-2 text-braPurple disabled:opacity-30">↓</button>
+      <div cdkDropList cdkDropListOrientation="horizontal" cdkDropListSortingDisabled
+        [cdkDropListData]="draft" class="flex min-w-0 items-stretch gap-4 overflow-x-auto p-2"
+        aria-label="Colunas de etapas para reorganizar">
+        <div *ngFor="let definition of draft; let i = index; trackBy: trackDefinition"
+          #orderDropZone [attr.data-order-stage-id]="definition.id"
+          class="relative w-[min(72vw,14rem)] shrink-0">
+          <div *ngIf="orderTargetIndex === i && orderSourceIndex !== null"
+            aria-hidden="true" data-order-insertion
+            [ngClass]="orderSourceIndex < i ? '-right-2' : '-left-2'"
+            class="pointer-events-none absolute -bottom-1 -top-1 z-10 w-2 rounded-full border-2 border-dashed border-braPurple bg-white">
           </div>
-        </li>
-      </ol>
+          <article cdkDrag [cdkDragData]="definition" [cdkDragStartDelay]="dragDelay"
+            [cdkDragDisabled]="!canOrganizeStages"
+            (cdkDragStarted)="orderDragStarted(definition)" (cdkDragMoved)="orderDragMoved($event)"
+            (cdkDragEnded)="orderDragEnded($event,definition)"
+            tabindex="0" (keydown)="moveStageOrderByKeyboard($event,i)"
+            [attr.aria-label]="definition.name + ', posição ' + (i+1) + ' de ' + draft.length + '. Arraste ou use as setas esquerda e direita.'"
+            class="min-h-28 w-full cursor-grab rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-braPurple">
+            <ng-container *ngTemplateOutlet="columnOrderContent"></ng-container>
+            <ng-template cdkDragPlaceholder>
+              <div aria-hidden="true" class="pointer-events-none min-h-28 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 opacity-60">
+                <ng-container *ngTemplateOutlet="columnOrderContent"></ng-container>
+              </div>
+            </ng-template>
+            <ng-template #columnOrderContent>
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-xs text-gray-500">Posição {{ i + 1 }}</p>
+                  <h3 class="break-words font-amaranth text-base font-bold text-braDark">{{ definition.name }}</h3>
+                </div>
+                <svg aria-hidden="true" data-drag-indicator viewBox="0 0 16 20"
+                    class="h-5 w-4 shrink-0 fill-current text-gray-400">
+                    <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
+                    <circle cx="5" cy="10" r="1.5"/><circle cx="11" cy="10" r="1.5"/>
+                    <circle cx="5" cy="16" r="1.5"/><circle cx="11" cy="16" r="1.5"/>
+                  </svg>
+              </div>
+              <p class="mt-3 text-xs text-gray-500">{{ orderLaneTotal(definition.id) }} pedido(s)</p>
+            </ng-template>
+          </article>
+        </div>
+      </div>
       <p class="text-xs text-gray-500">A coluna “Sem etapa reutilizável” permanece no final. Sua preferência é salva neste navegador.</p>
       <div class="flex flex-wrap gap-2">
-        <button type="button" (click)="saveStageOrder()" [disabled]="!canOrganizeStages"
+        <button type="button" (click)="saveStageOrder()" [disabled]="!canOrganizeStages || orderDragId !== null"
           class="rounded-lg bg-braPurple px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Salvar ordem</button>
         <button type="button" (click)="cancelStageOrder()"
           class="rounded-lg border px-4 py-2.5 text-sm font-semibold text-gray-700">Cancelar</button>
@@ -101,9 +129,19 @@
                   </div>
                 </ng-template>
                 <ng-template #cardContent>
-                  <div>
-                    <h3 class="break-words font-amaranth font-bold text-braDark">{{ card.title }}</h3>
-                    <p class="mt-1 break-words text-xs text-gray-600">{{ card.clientName }}</p>
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <h3 class="break-words font-amaranth font-bold text-braDark">{{ card.title }}</h3>
+                      <p class="mt-1 break-words text-xs text-gray-600">{{ card.clientName }}</p>
+                    </div>
+                    <span *ngIf="canMoveCard(card)" title="Arraste para mover" class="shrink-0">
+                      <svg aria-hidden="true" data-drag-indicator viewBox="0 0 16 20"
+                    class="h-5 w-4 shrink-0 fill-current text-gray-400">
+                    <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
+                    <circle cx="5" cy="10" r="1.5"/><circle cx="11" cy="10" r="1.5"/>
+                    <circle cx="5" cy="16" r="1.5"/><circle cx="11" cy="16" r="1.5"/>
+                  </svg>
+                    </span>
                   </div>
                   <div class="text-xs text-gray-600">
                     <p>Pedido: {{ formatDate(card.requestedOn) }}</p>

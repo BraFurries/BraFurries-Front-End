@@ -34,6 +34,8 @@ interface StageLane {
 export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   @ViewChildren('boardDropZone', {read: ElementRef})
   private boardDropZones!: QueryList<ElementRef<HTMLElement>>;
+  @ViewChildren('orderDropZone', {read: ElementRef})
+  private orderDropZones!: QueryList<ElementRef<HTMLElement>>;
 
   private readonly workflowSelection$ = new BehaviorSubject<number | null>(null);
   @Input() set workflowId(value: number | null) { this.workflowSelection$.next(value); }
@@ -44,6 +46,9 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   @Output() readonly orderEditingChange = new EventEmitter<boolean>();
   @Output() readonly moveInProgressChange = new EventEmitter<boolean>();
   orderDraft: CreatorStageDefinition[] | null = null;
+  orderDragId: number | null = null;
+  orderTargetIndex: number | null = null;
+  orderSourceIndex: number | null = null;
   private sharedDefinitions: CreatorStageDefinition[] = [];
   private sharedCatalogReady = false;
   allowed = false;
@@ -228,8 +233,79 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
     this.orderEditingChange.emit(true);
   }
 
-  moveStageOrder(index: number, offset: number): void {
+  trackDefinition(_index: number, definition: CreatorStageDefinition): number {
+    return definition.id;
+  }
+
+  orderLaneTotal(id: number): number {
+    return this.columns.find(lane => lane.stageDefinitionId === id)?.total ?? 0;
+  }
+
+  private clearOrderDrag(): void {
+    this.orderDragId = null;
+    this.orderSourceIndex = null;
+    this.orderTargetIndex = null;
+  }
+
+  orderDragStarted(definition: CreatorStageDefinition): void {
     if (!this.orderDraft || !this.canOrganizeStages) return;
+    const index = this.orderDraft.findIndex(item => item.id === definition.id);
+    if (index < 0) return;
+    this.clearOrderDrag();
+    this.orderDragId = definition.id;
+    this.orderSourceIndex = index;
+  }
+
+  private orderTargetAt(event: MouseEvent | TouchEvent): number | null {
+    const point = this.pointer(event);
+    if (!point || !this.orderDraft) return null;
+    for (const item of this.orderDropZones?.toArray() ?? []) {
+      const element = item.nativeElement;
+      // Clipped columns outside the visible scroll area aren't valid targets.
+      const viewport = element.parentElement?.getBoundingClientRect();
+      if (viewport && (point.x < viewport.left || point.x > viewport.right ||
+          point.y < viewport.top || point.y > viewport.bottom)) continue;
+      const rect = element.getBoundingClientRect();
+      // Half of the 16px gap is included, so releasing directly over the
+      // dashed insertion marker is also a valid drop.
+      if (point.x < rect.left - 8 || point.x > rect.right + 8 ||
+          point.y < rect.top || point.y > rect.bottom) continue;
+      const id = Number(element.dataset['orderStageId']);
+      const index = this.orderDraft.findIndex(definition => definition.id === id);
+      return index >= 0 && index !== this.orderSourceIndex ? index : null;
+    }
+    return null;
+  }
+
+  orderDragMoved(event: CdkDragMove<CreatorStageDefinition>): void {
+    if (this.orderDragId !== event.source.data.id) return;
+    const target = this.orderTargetAt(event.event);
+    if (target !== this.orderTargetIndex) {
+      this.zone.run(() => this.orderTargetIndex = target);
+    }
+  }
+
+  orderDragEnded(event: CdkDragEnd<CreatorStageDefinition>, definition: CreatorStageDefinition): void {
+    if (this.orderDragId !== definition.id) return;
+    const target = this.orderTargetAt(event.event);
+    const source = this.orderSourceIndex;
+    this.zone.run(() => {
+      this.clearOrderDrag();
+      if (source !== null && target !== null && this.orderDraft?.[source]?.id === definition.id) {
+        this.moveStageOrder(source, target - source);
+      }
+    });
+  }
+
+  moveStageOrderByKeyboard(event: KeyboardEvent, index: number): void {
+    if (event.target !== event.currentTarget || this.orderDragId !== null ||
+        (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    event.preventDefault();
+    this.moveStageOrder(index, event.key === 'ArrowLeft' ? -1 : 1);
+  }
+
+  moveStageOrder(index: number, offset: number): void {
+    if (!this.orderDraft || !this.canOrganizeStages || this.orderDragId !== null) return;
     const next = index + offset;
     if (index < 0 || index >= this.orderDraft.length || next < 0 || next >= this.orderDraft.length) return;
     const [definition] = this.orderDraft.splice(index, 1);
@@ -237,6 +313,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   }
 
   cancelStageOrder(): void {
+    this.clearOrderDrag();
     if (!this.orderDraft) return;
     this.orderDraft = null;
     this.orderEditingChange.emit(false);
@@ -244,7 +321,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
 
   saveStageOrder(): void {
     const account = this.users.getUser()?.id;
-    if (!this.orderDraft || !this.canOrganizeStages || account == null) return;
+    if (!this.orderDraft || !this.canOrganizeStages || account == null || this.orderDragId !== null) return;
     this.sharedDefinitions = this.orderDraft.slice();
     this.cancelStageOrder();
     // Reorder already loaded lanes by ID. Never move or refetch orders for a
