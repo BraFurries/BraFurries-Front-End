@@ -9,6 +9,7 @@ import { CreatorCommission, CreatorCommissionStatus, CreatorStudioAccess, Creato
 import { UserService } from '../../../core/services/user.service';
 import { User } from '../../../shared/models/user';
 import { CreatorStudioComponent } from './creator-studio.component';
+import { CreatorStageBoardComponent } from './creator-stage-board.component';
 
 describe('CreatorStudioComponent', () => {
   let component: CreatorStudioComponent;
@@ -41,7 +42,7 @@ describe('CreatorStudioComponent', () => {
       ['myAccess', 'commissions', 'create', 'update', 'changeStatus',
         'artTypes', 'workflows', 'stageDefinitions', 'commissionSteps',
         'addCommissionStep', 'updateCommissionStep', 'deleteCommissionStep',
-        'copyWorkflowToCommission', 'retention', 'exportMyData']);
+        'copyWorkflowToCommission', 'retention', 'exportMyData', 'commissionsForBoard', 'moveCommissionToStep']);
     studio.myAccess.and.returnValue(of(pro));
     studio.commissions.and.callFake((status, page, pageSize) => of({
       items: status === 'QUEUED' || status === null ? [card] : [],
@@ -55,6 +56,7 @@ describe('CreatorStudioComponent', () => {
     studio.workflows.and.returnValue(of([]));
     studio.stageDefinitions.and.returnValue(of([]));
     studio.commissionSteps.and.returnValue(of([]));
+    studio.commissionsForBoard.and.returnValue(of({items:[],page:1,pageSize:12,total:0}));
     studio.retention.and.returnValue(of({
       policy: '12_MONTHS_AFTER_LAST_COMPLETION',
       retentionMonths: 12, advanceNoticeDays: 30, finalNoticeDays: 7,
@@ -66,7 +68,7 @@ describe('CreatorStudioComponent', () => {
     users.getUser.and.callFake(() => user$.value);
 
     await TestBed.configureTestingModule({
-      declarations: [CreatorStudioComponent],
+      declarations: [CreatorStudioComponent, CreatorStageBoardComponent],
       imports: [CommonModule, FormsModule, DragDropModule, RouterModule.forRoot([])],
       providers: [
         {provide: CreatorStudioService, useValue: studio},
@@ -98,6 +100,35 @@ describe('CreatorStudioComponent', () => {
     expect(html).toContain('12/11/2026');
     expect(html).toContain('Aguardando retorno');
     expect(html).toContain('Em pausa');
+  });
+
+  it('keeps operational modes in one selector and loads only the selected board', () => {
+    const group = fixture.nativeElement.querySelector('[aria-label="Modo de visualização"]');
+    expect(group.textContent).toContain('Quadro de filas');
+    expect(group.textContent).toContain('Lista detalhada');
+    expect(group.textContent).toContain('Quadro por processo');
+    expect(group.textContent).toContain('Quadro por etapas');
+    const model = {id:33,name:'Ícones',isDefault:false,
+      steps:[{id:1,name:'Rascunho',position:0,stageDefinitionId:7}]};
+    component.workflows = [model];
+    studio.workflows.and.returnValue(of([model]));
+    studio.stageDefinitions.and.returnValue(of([{id:7,name:'Rascunho'}]));
+    component.setViewMode('process');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('select[name="operationalWorkflowId"]')).not.toBeNull();
+    expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).toBeNull();
+    component.selectedWorkflowId = 33;
+    fixture.detectChanges();
+    expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
+    expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).not.toBeNull();
+    component.setViewMode('stages');
+    fixture.detectChanges();
+    expect(studio.commissionsForBoard).toHaveBeenCalledWith({stageDefinitionId:7},1,12);
+    expect(fixture.nativeElement.querySelector('select[name="operationalWorkflowId"]')).toBeNull();
+    component.setViewMode('board');
+    fixture.detectChanges();
+    expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).toBeNull();
+    expect(fixture.nativeElement.querySelector('[aria-label="Quadro de filas por situação"]')).not.toBeNull();
   });
 
   function mockZones(): {status: CreatorCommissionStatus; x: number; y: number}[] {
