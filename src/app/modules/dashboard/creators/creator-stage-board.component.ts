@@ -1,7 +1,6 @@
 import { CdkDragEnd, CdkDragMove, CdkDragStart } from '@angular/cdk/drag-drop';
-import { Component, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { combineLatest, distinctUntilChanged, forkJoin, Subject, takeUntil } from 'rxjs';
+import { Component, ElementRef, Input, NgZone, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
+import { BehaviorSubject, combineLatest, distinctUntilChanged, forkJoin, Subject, takeUntil } from 'rxjs';
 import {
   CreatorCommission, CreatorCommissionStep,
   CreatorStudioService, CreatorWorkflow, CreatorWorkflowStep,
@@ -36,6 +35,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   @ViewChildren('boardDropZone', {read: ElementRef})
   private boardDropZones!: QueryList<ElementRef<HTMLElement>>;
 
+  private readonly workflowSelection$ = new BehaviorSubject<number | null>(null);
+  @Input() set workflowId(value: number | null) { this.workflowSelection$.next(value); }
   mode: 'process' | 'shared' = 'shared';
   workflow: CreatorWorkflow | null = null;
   columns: StageLane[] = [];
@@ -62,22 +63,25 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   constructor(
     private readonly studio: CreatorStudioService,
     private readonly users: UserService,
-    private readonly route: ActivatedRoute,
     private readonly zone: NgZone
   ) {}
 
   ngOnInit(): void {
-    combineLatest([this.users.user$, this.route.queryParamMap])
+    combineLatest([this.users.user$, this.workflowSelection$])
       .pipe(
         distinctUntilChanged((previous, next) =>
           previous[0]?.id === next[0]?.id &&
-          previous[1].get('workflowId') === next[1].get('workflowId')),
+          previous[1] === next[1]),
         takeUntil(this.destroy$)
-      ).subscribe(([user, params]) => {
+      ).subscribe(([user, requested]) => {
         const sequence = ++this.accountSequence;
         this.dataSequence++;
         this.workflow = null;
         this.columns = [];
+        this.processItems = [];
+        this.processPage = 0;
+        this.processTotal = 0;
+        this.loadingMore = false;
         this.allowed = false;
         this.loading = !!user;
         this.loadingBoard = false;
@@ -87,10 +91,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
         this.draggedId = null;
         this.hoveredKey = null;
         this.ghostIndex = null;
-        this.error = user ? '' : 'Entre na sua conta para acessar o ateliê.';
+        this.error = user ? '' : 'Entre na sua conta para acessar o Creator Studio.';
         if (!user) return;
-        const value = params.get('workflowId');
-        const requested = value === null ? null : Number(value);
         if (requested !== null && (!Number.isSafeInteger(requested) || requested <= 0)) {
           this.loading = false;
           this.error = 'Processo inválido.';
@@ -173,6 +175,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
     this.dataSequence++;
     this.destroy$.next();
     this.destroy$.complete();
+    this.workflowSelection$.complete();
   }
 
   get visibleCount(): number { return this.processItems.length; }

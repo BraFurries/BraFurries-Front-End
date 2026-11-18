@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { CdkDragEnd, CdkDragMove, CdkDragStart, DragDropModule } from '@angular/cdk/drag-drop';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, convertToParamMap, ParamMap, RouterModule } from '@angular/router';
+import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
 import {
   CreatorCommission, CreatorCommissionStep, CreatorStudioService,
@@ -18,7 +18,6 @@ describe('CreatorStageBoardComponent', () => {
   let studio: jasmine.SpyObj<CreatorStudioService>;
   let users: jasmine.SpyObj<UserService>;
   let user$: BehaviorSubject<User | null>;
-  let params$: BehaviorSubject<ParamMap>;
 
   const user: User = {
     id:31, name:'Artista', email:'artist@example.invalid',
@@ -48,7 +47,6 @@ describe('CreatorStageBoardComponent', () => {
 
   beforeEach(async () => {
     user$ = new BehaviorSubject<User | null>(user);
-    params$ = new BehaviorSubject<ParamMap>(convertToParamMap({workflowId:'33'}));
     studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','workflows','stageDefinitions','commissionsForBoard',
         'commissionSteps','moveCommissionToStep']);
@@ -74,18 +72,17 @@ describe('CreatorStageBoardComponent', () => {
       imports:[CommonModule,FormsModule,DragDropModule,RouterModule.forRoot([])],
       providers:[
         {provide:CreatorStudioService,useValue:studio},
-        {provide:UserService,useValue:users},
-        {provide:ActivatedRoute,useValue:{queryParamMap:params$.asObservable()}}
+        {provide:UserService,useValue:users}
       ]
     }).compileComponents();
     fixture=TestBed.createComponent(CreatorStageBoardComponent);
     component=fixture.componentInstance;
+    fixture.componentRef.setInput('workflowId',33);
     fixture.detectChanges();
   });
 
   afterEach(() => {
     fixture.destroy();
-    params$.complete();
     user$.complete();
   });
 
@@ -120,7 +117,7 @@ describe('CreatorStageBoardComponent', () => {
   });
 
   it('provides a separate shared-stage board filtered by canonical IDs', () => {
-    params$.next(convertToParamMap({}));
+    fixture.componentRef.setInput('workflowId',null);
     fixture.detectChanges();
     expect(component.mode).toBe('shared');
     expect(component.columns.map(lane => lane.name)).toEqual([

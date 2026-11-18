@@ -18,7 +18,6 @@ import { CommerceArtistPortalComponent } from './commerce/commerce-artist-portal
 import { CreatorStudioComponent } from './creators/creator-studio.component';
 import { CreatorProductionComponent } from './creators/creator-production.component';
 import { CreatorCommissionDetailsComponent } from './creators/creator-commission-details.component';
-import { CreatorStageBoardComponent } from './creators/creator-stage-board.component';
 import { RecrutamentoComponent } from './recrutamento/recrutamento.component';
 import { InscricoesComponent } from './inscricoes/inscricoes.component';
 import { TriagemComponent } from './triagem/triagem.component';
@@ -36,7 +35,7 @@ const routes: Routes = [
       { path: 'creators/producao', component: CreatorProductionComponent, data: { section: 'home' } },
       { path: 'creators/producao/artes', component: CreatorProductionComponent, data: { section: 'arts' } },
       { path: 'creators/producao/processos', component: CreatorProductionComponent, data: { section: 'processes' } },
-      { path: 'creators/producao/quadro', component: CreatorStageBoardComponent },
+      { path: 'creators/producao/quadro', redirectTo: 'creators', pathMatch: 'full' },
       { path: 'creators/pedido/:id', component: CreatorCommissionDetailsComponent },
       { path: 'minhas-parcerias', component: PartnerPostingComponent },
       { path: 'gestao-comercial/financeiro', component: CommerceFinanceComponent },

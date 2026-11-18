@@ -149,6 +149,18 @@ describe('CreatorProductionComponent', () => {
     expect(component.workflow.steps[0].stageDefinitionId).toBe(7);
   });
 
+  it('keeps ateliê restricted to configuration, without operational board links', () => {
+    routeData$.next({section:'processes'});
+    component.workflows = [{id:33,name:'Ícones',isDefault:false,steps:[]}];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Editar');
+    expect(fixture.nativeElement.textContent).not.toContain('Ver quadro');
+    component.setProcessView('library');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Sua biblioteca de etapas');
+    expect(fixture.nativeElement.textContent).not.toContain('Ver quadro');
+  });
+
   it('clears draft and catalog data on account switch', () => {
     routeData$.next({section:'arts'});
     component.startType();
