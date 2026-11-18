@@ -1,4 +1,4 @@
-import { Component, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
+import { Component, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { CdkDragEnd, CdkDragMove, CdkDragStart } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subject, forkJoin, distinctUntilChanged, takeUntil } from 'rxjs';
@@ -17,6 +17,7 @@ import {
   CreatorStudioService
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
+import { CreatorStageBoardComponent } from './creator-stage-board.component';
 
 /**
  * The first private Pro workflow: a fast commission card and chronological queue.
@@ -46,7 +47,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   definitions: CreatorStageDefinition[] = [];
   workflows: CreatorWorkflow[] = [];
   // Kanban is the default; the chronological list remains available for detail work.
-  viewMode: 'board' | 'list' = 'board';
+  viewMode: 'board' | 'list' | 'process' | 'stages' = 'board';
+  selectedWorkflowId: number | null = null;
+  @ViewChild(CreatorStageBoardComponent) private stageBoard?: CreatorStageBoardComponent;
   groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
   readonly boardStatuses: CreatorCommissionStatus[] =
     ['QUEUED','IN_PROGRESS','WAITING','PAUSED'];
@@ -145,6 +148,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.artTypes = [];
         this.definitions = [];
         this.workflows = [];
+        this.selectedWorkflowId = null;
+        this.viewMode = 'board';
+        this.loading = false;
         this.loadingSteps = false;
         this.stepBusy = false;
         this.stepError = '';
@@ -248,11 +254,13 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     return this.boardColumns.reduce((sum, col) => sum + col.total, 0);
   }
 
-  setViewMode(mode: 'board' | 'list'): void {
+  setViewMode(mode: 'board' | 'list' | 'process' | 'stages'): void {
     if (mode === this.viewMode || !this.canUsePro) return;
     this.viewMode = mode;
     this.listSequence++;
     this.boardSequence++;
+    this.boardLoading = false;
+    this.loading = false;
     this.page = 1;
     this.expandedCommissionId = null;
     this.stepsSequence++;
@@ -358,6 +366,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     if (!this.canUsePro) return;
     if (this.viewMode === 'board') {
       this.loadBoard();
+      return;
+    }
+    if (this.viewMode === 'process' || this.viewMode === 'stages') {
+      this.stageBoard?.reloadBoard();
       return;
     }
     const seq = ++this.listSequence;
