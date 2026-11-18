@@ -11,6 +11,8 @@ import {
   CreatorStageDefinition,
   CreatorWorkflow,
   CreatorStudioAccess,
+  CreatorRetentionOverview,
+  CreatorRetentionWarning,
   CreatorStudioService
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
@@ -52,6 +54,12 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   newStepDefinitionId: number | null = null;
   importWorkflowId: number | null = null;
   private stepsSequence = 0;
+  retention: CreatorRetentionOverview | null = null;
+  retentionLoading = false;
+  retentionError = '';
+  exporting = false;
+  exportError = '';
+  exportSuccess = '';
 
   loadingAccess = true;
   access: CreatorStudioAccess | null = null;
@@ -107,11 +115,18 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.loadingSteps = false;
         this.stepBusy = false;
         this.stepError = '';
+        this.retention = null;
+        this.retentionLoading = false;
+        this.retentionError = '';
+        this.exporting = false;
+        this.exportError = '';
+        this.exportSuccess = '';
         if (!user) {
           this.accessError = 'Entre na sua conta para acessar o Creator Studio.';
           return;
         }
         const userId = user.id;
+        this.loadRetention(sequence, userId);
         this.creatorStudio.myAccess().pipe(takeUntil(this.destroy$)).subscribe({
           next: access => {
             if (this.accessSequence !== sequence || this.users.getUser()?.id !== userId) return;
@@ -138,6 +153,61 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   get canUsePro(): boolean {
     return this.access?.allowed === true && this.access.tier === 'PRO';
+  }
+
+  retentionWarningLabel(level: CreatorRetentionWarning): string {
+    if (level === 'OVERDUE') return 'Prazo de retenção encerrado';
+    if (level === 'FINAL_7_DAYS') return 'Até 7 dias para o vencimento';
+    return 'Até 30 dias para o vencimento';
+  }
+
+  private loadRetention(seq: number, userId: number): void {
+    this.retentionLoading = true;
+    this.creatorStudio.retention().pipe(takeUntil(this.destroy$)).subscribe({
+      next: result => {
+        if (seq !== this.accessSequence || this.users.getUser()?.id !== userId) return;
+        this.retentionLoading = false;
+        this.retention = result;
+      },
+      error: () => {
+        if (seq !== this.accessSequence || this.users.getUser()?.id !== userId) return;
+        this.retentionLoading = false;
+        this.retentionError = 'Não foi possível consultar os prazos de retenção.';
+      }
+    });
+  }
+
+  downloadMyData(): void {
+    if (!this.users.getUser() || this.exporting) return;
+    const seq = this.accessSequence;
+    const account = this.users.getUser()?.id;
+    this.exporting = true;
+    this.exportError = '';
+    this.exportSuccess = '';
+    this.creatorStudio.exportMyData().pipe(takeUntil(this.destroy$)).subscribe({
+      next: blob => {
+        if (seq !== this.accessSequence || this.users.getUser()?.id !== account) return;
+        this.exporting = false;
+        if (!blob.size) {
+          this.exportError = 'O arquivo exportado está vazio. Tente novamente.';
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'creator-studio-meus-dados.json';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        this.exportSuccess = 'Exportação disponibilizada para download.';
+      },
+      error: () => {
+        if (seq !== this.accessSequence || this.users.getUser()?.id !== account) return;
+        this.exporting = false;
+        this.exportError = 'Não foi possível exportar os dados. Tente novamente.';
+      }
+    });
   }
 
   get pageCount(): number {
