@@ -286,10 +286,16 @@
               <span *ngIf="template.isDefault" class="font-semibold text-braPurple">· Padrão</span>
             </p>
           </div>
-          <button type="button" (click)="editWorkflow(template)" [disabled]="busy"
-            class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
-            Editar
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <a routerLink="/painel/creators/producao/quadro" [queryParams]="{workflowId:template.id}"
+              class="rounded-lg border border-braPurple/30 bg-white px-3 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/5">
+              Ver quadro
+            </a>
+            <button type="button" (click)="editWorkflow(template)" [disabled]="busy"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              Editar
+            </button>
+          </div>
         </div>
       </section>
 
@@ -343,9 +349,15 @@
       </ng-container>
 
       <section *ngIf="processView === 'library'" class="space-y-5" aria-label="Biblioteca de etapas reutilizáveis">
-        <div class="space-y-1">
-          <h2 class="font-amaranth text-xl font-bold text-braDark">Sua biblioteca de etapas</h2>
-          <p class="text-sm text-gray-600">Use a mesma etapa em vários processos. Assim será possível acompanhar todos os pedidos nela em um único quadro.</p>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="space-y-1">
+            <h2 class="font-amaranth text-xl font-bold text-braDark">Sua biblioteca de etapas</h2>
+            <p class="max-w-xl text-sm text-gray-600">Use a mesma etapa em vários processos e acompanhe os pedidos em um só lugar.</p>
+          </div>
+          <a routerLink="/painel/creators/producao/quadro"
+            class="rounded-lg bg-braPurple px-4 py-2.5 text-sm font-bold text-white">
+            Ver quadro por etapas
+          </a>
         </div>
         <form (ngSubmit)="addDefinition()" class="flex flex-wrap items-end gap-2 rounded-xl border bg-white p-4">
           <label class="min-w-40 flex-1 text-sm font-semibold text-gray-700">
