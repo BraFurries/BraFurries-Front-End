@@ -281,6 +281,76 @@ describe('CreatorProductionComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Modelos prontos');
   });
 
+  it('hides other registered arts and processes while their editors are open', () => {
+    routeData$.next({section:'arts'});
+    component.artTypes=[{id:41,name:'Outra arte',workflowId:null}];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Outra arte');
+    component.startType();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label="Meus tipos de arte"]')).toBeNull();
+    component.resetType();
+    routeData$.next({section:'processes'});
+    component.workflows=[{id:33,name:'Outro processo',isDefault:false,steps:[]}];
+    fixture.detectChanges();
+    component.startWorkflow();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-labelledby="my-processes-title"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Modelos prontos');
+  });
+
+  it('links an existing process directly from an art card', () => {
+    routeData$.next({section:'arts'});
+    const art={id:41,name:'Ícone',workflowId:null};
+    component.artTypes=[art];
+    component.workflows=[{id:12,name:'Ref Sheet',isDefault:false,steps:[]}];
+    studio.updateArtType.and.returnValue(of({...art,workflowId:12}));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Vincular processo');
+    expect(fixture.nativeElement.textContent).not.toContain('Quer definir as etapas');
+    component.openTypeLink(art);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Criar novo processo');
+    expect(fixture.nativeElement.querySelector('[aria-label="Meus tipos de arte"]')).toBeNull();
+    component.typeWorkflowId=12;
+    component.saveType();
+    expect(studio.updateArtType).toHaveBeenCalledWith(41,'Ícone',12);
+  });
+
+  it('creates a workflow from the art editor and returns with the new process selected', () => {
+    routeData$.next({section:'arts'});
+    component.startType();
+    component.typeName='Ícone';
+    component.startWorkflowForType();
+    fixture.detectChanges();
+    expect(component.workflowForType).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('Novo processo para Ícone');
+    expect(fixture.nativeElement.querySelector('[aria-labelledby="art-editor-title"]')).toBeNull();
+    component.workflow.name='Ref Sheet';
+    component.nextWorkflowStep();
+    component.saveWorkflow();
+    expect(component.workflowFormOpen).toBeFalse();
+    expect(component.typeFormOpen).toBeTrue();
+    expect(component.typeName).toBe('Ícone');
+    expect(component.typeWorkflowId).toBe(12);
+    expect(studio.createArtType).not.toHaveBeenCalled();
+    component.saveType();
+    expect(studio.createArtType).toHaveBeenCalledWith('Ícone',12);
+  });
+
+  it('returns to the unchanged draft when cancelling new process creation', () => {
+    routeData$.next({section:'arts'});
+    component.startType();
+    component.typeName='Arte não salva';
+    component.startWorkflowForType();
+    component.workflow.name='Processo não salvo';
+    component.resetWorkflow();
+    expect(component.typeFormOpen).toBeTrue();
+    expect(component.typeName).toBe('Arte não salva');
+    expect(component.typeWorkflowId).toBeNull();
+    expect(studio.createWorkflow).not.toHaveBeenCalled();
+  });
+
   it('allows an art type to select a workflow without any user or Community ID', () => {
     component.typeName='Ref Sheet';
     component.typeWorkflowId=12;
