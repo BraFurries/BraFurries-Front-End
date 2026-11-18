@@ -111,6 +111,7 @@ jobs:
           --include=**/commerce-catalog.service.spec.ts
           --include=**/creator-studio.service.spec.ts
           --include=**/creator-studio.component.spec.ts
+          --include=**/creator-stage-board.component.spec.ts
           --include=**/creator-production.component.spec.ts
           --include=**/creator-commission-details.component.spec.ts
           --include=**/creator-studio-pilot-admin.service.spec.ts
