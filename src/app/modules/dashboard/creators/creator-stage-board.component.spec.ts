@@ -119,6 +119,7 @@ describe('CreatorStageBoardComponent', () => {
     expect(component.columns[2].movable).toBeFalse();
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
     expect(fixture.nativeElement.textContent).toContain('Ícone do Lupi');
+    expect(fixture.nativeElement.querySelector('article [data-drag-indicator]')).not.toBeNull();
   });
 
   it('provides a separate shared-stage board filtered by canonical IDs', () => {
@@ -186,6 +187,7 @@ describe('CreatorStageBoardComponent', () => {
     expect(drag.disabled).toBeTrue();
     expect(component.columns.every(lane=>!lane.movable)).toBeTrue();
     expect(fixture.nativeElement.querySelector('article').getAttribute('tabindex')).toBeNull();
+    expect(fixture.nativeElement.querySelector('article [data-drag-indicator]')).toBeNull();
     const target=zones().find(zone=>zone.key==='shared:20')!;
     start(card);
     component.dragEnd({event:{clientX:target.x,clientY:target.y}} as unknown as CdkDragEnd<CreatorCommission>,card,'shared:10');
@@ -194,6 +196,76 @@ describe('CreatorStageBoardComponent', () => {
       preventDefault:()=>{}} as unknown as KeyboardEvent,card,'shared:10');
     expect(studio.commissionSteps).not.toHaveBeenCalled();
     expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
+  });
+
+  function orderZones(): HTMLElement[] {
+    const elements = Array.from(fixture.nativeElement.querySelectorAll('[data-order-stage-id]')) as HTMLElement[];
+    spyOn(elements[0].parentElement!, 'getBoundingClientRect').and.returnValue({
+      left:0,right:900,top:20,bottom:180,width:900,height:160
+    } as DOMRect);
+    elements.forEach((element,i) => spyOn(element,'getBoundingClientRect').and.returnValue({
+      left:i*300,right:i*300+280,top:40,bottom:160,width:280,height:120
+    } as DOMRect));
+    return elements;
+  }
+
+  it('keeps column previews fixed while dragging, shows insertion at destination and commits only on drop', () => {
+    studio.stageDefinitions.and.returnValue(of([
+      {id:10,name:'Rascunho'},{id:20,name:'Pintura'},{id:30,name:'Finalização'}
+    ]));
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    component.openStageOrder();
+    fixture.detectChanges();
+    const elements=orderZones();
+    expect(elements.length).toBe(3);
+    const drag = fixture.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag);
+    expect(drag.disabled).toBeFalse();
+    const first=component.orderDraft![0];
+    component.orderDragStarted(first);
+    component.orderDragMoved({source:{data:first},event:{clientX:650,clientY:100}} as unknown as CdkDragMove<typeof first>);
+    fixture.detectChanges();
+    expect(component.orderTargetIndex).toBe(2);
+    expect(component.orderDraft!.map(definition=>definition.id)).toEqual([10,20,30]);
+    expect(elements[2].querySelector('[data-order-insertion]')).not.toBeNull();
+    expect(elements[2].querySelector('[data-order-insertion]')!.classList.contains('-right-2')).toBeTrue();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','shared:30','unlinked']);
+    component.orderDragEnded({event:{clientX:650,clientY:100}} as unknown as CdkDragEnd<typeof first>,first);
+    fixture.detectChanges();
+    expect(component.orderDragId).toBeNull();
+    expect(component.orderTargetIndex).toBeNull();
+    expect(component.orderDraft!.map(definition=>definition.id)).toEqual([20,30,10]);
+    expect(localStorage.getItem('brf.creator-studio.shared-stage-order.v1.31')).toBeNull();
+    component.saveStageOrder();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:20','shared:30','shared:10','unlinked']);
+    expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
+  });
+
+  it('supports moving columns backwards by drag or keyboard and ignores cancelled/outside drops', () => {
+    fixture.componentRef.setInput('workflowId',null);
+    fixture.detectChanges();
+    component.openStageOrder();
+    fixture.detectChanges();
+    const elements=orderZones();
+    const last=component.orderDraft![1];
+    component.orderDragStarted(last);
+    component.orderDragMoved({source:{data:last},event:{clientX:40,clientY:100}} as unknown as CdkDragMove<typeof last>);
+    fixture.detectChanges();
+    expect(elements[0].querySelector('[data-order-insertion]')!.classList.contains('-left-2')).toBeTrue();
+    component.orderDragEnded({event:{clientX:-10,clientY:100}} as unknown as CdkDragEnd<typeof last>,last);
+    expect(component.orderDraft!.map(definition=>definition.id)).toEqual([10,20]);
+    expect(component.orderTargetIndex).toBeNull();
+    component.orderDragStarted(last);
+    component.orderDragEnded({event:{clientX:40,clientY:100}} as unknown as CdkDragEnd<typeof last>,last);
+    expect(component.orderDraft!.map(definition=>definition.id)).toEqual([20,10]);
+    fixture.detectChanges();
+    const firstArticle=fixture.nativeElement.querySelector('[data-order-stage-id="20"] article') as HTMLElement;
+    const key = new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true});
+    firstArticle.dispatchEvent(key);
+    expect(component.orderDraft!.map(definition=>definition.id)).toEqual([10,20]);
+    component.cancelStageOrder();
+    expect(component.orderDraft).toBeNull();
+    expect(component.columns.map(lane=>lane.key)).toEqual(['shared:10','shared:20','unlinked']);
   });
 
   it('reorders only general columns, keeps loaded data, restores preference by account and ignores stale IDs', () => {
