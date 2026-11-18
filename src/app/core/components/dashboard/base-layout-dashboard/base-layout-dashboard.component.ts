@@ -31,6 +31,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   showMyPartnerPublications = false;
   showMyArtistPortal = false;
   showCreatorStudio = false;
+  showCreatorStudioData = false;
   currentUser: User | null = null;
   isUserMenuOpen = false;
   isCommunityMenuOpen = false;
@@ -102,6 +103,8 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
         this.showMyArtistPortal = false;
         this.studioAccessRequestId++;
         this.showCreatorStudio = false;
+    this.showCreatorStudioData = false;
+        this.showCreatorStudioData = false;
         this.showCommerceMenu = false;
         this.showPermissionsMenu = false;
         if (userId == null) return;
@@ -113,10 +116,13 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
           next: access => {
             if (this.lastCommerceUserId !== userId || studioRequestId !== this.studioAccessRequestId) return;
             this.showCreatorStudio = access.allowed && access.tier === 'PRO';
+            // Former subscribers retain a discoverable path to their data archive.
+            this.showCreatorStudioData = !this.showCreatorStudio && !!access.sourceKind;
           },
           error: () => {
             if (this.lastCommerceUserId === userId && studioRequestId === this.studioAccessRequestId) {
               this.showCreatorStudio = false;
+              this.showCreatorStudioData = false;
             }
           }
         });
