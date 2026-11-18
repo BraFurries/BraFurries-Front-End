@@ -53,6 +53,7 @@ export interface CreatorRetentionDryRun {
   blockedByMissingD30: number;
   blockedByMissingD7: number;
   smtpAcceptedBoth: number;
+  providerConfirmedBoth: number;
   deliveryProofSupported: boolean;
 }
 
