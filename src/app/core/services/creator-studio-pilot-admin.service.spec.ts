@@ -69,6 +69,23 @@ describe('CreatorStudioPilotAdminService', () => {
     req.flush({...req.request.body,active:true});
   });
 
+  it('loads the read-only retention inventory without community scope or mutations', () => {
+    service.retentionDryRun().subscribe(report => {
+      expect(report.expiredCommissions).toBe(4);
+      expect(report.smtpAcceptedBoth).toBe(0);
+      expect(report.deliveryProofSupported).toBeFalse();
+    });
+    const req = http.expectOne(
+      `${environment.apiBaseUrl}/user/me/creator-studio/admin/retention/dry-run`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.keys()).toEqual([]);
+    expect(req.request.body).toBeNull();
+    req.flush({
+      expiredCommissions:4,blockedByHold:1,blockedByMissingD30:2,
+      blockedByMissingD7:1,smtpAcceptedBoth:0,deliveryProofSupported:false
+    });
+  });
+
   it('releases a specific hold without deleting the commission itself', () => {
     service.releaseHold(31,105).subscribe();
     const req = http.expectOne(
