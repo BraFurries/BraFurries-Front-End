@@ -4,7 +4,7 @@ import { distinctUntilChanged, Observable, Subject, takeUntil } from 'rxjs';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import {
   CreatorPilotCandidate, CreatorPilotFilter, CreatorPilotInvitation,
-  CreatorHoldCategory, CreatorRetentionHold, CreatorStudioPilotAdminService
+  CreatorHoldCategory, CreatorRetentionHold, CreatorRetentionDryRun, CreatorStudioPilotAdminService
 } from '../../../core/services/creator-studio-pilot-admin.service';
 import { UserService } from '../../../core/services/user.service';
 
@@ -44,6 +44,11 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   holdSuccess = '';
   private holdSequence = 0;
 
+  retentionReport: CreatorRetentionDryRun | null = null;
+  retentionReportBusy = false;
+  retentionReportError = '';
+  private retentionReportSequence = 0;
+
   private accountId: number | null = null;
   private accountSequence = 0;
   private listSequence = 0;
@@ -68,6 +73,10 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
         this.listSequence++;
         this.candidateSequence++;
         this.holdSequence++;
+        this.retentionReportSequence++;
+        this.retentionReport = null;
+        this.retentionReportBusy = false;
+        this.retentionReportError = '';
         this.hold = null;
         this.holdArtistId = '';
         this.holdCommissionId = '';
@@ -226,6 +235,43 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
       'Acesso revogado. Dados das commissions preservados.', item.userId);
   }
 
+  /**
+   * Never run on behalf of a different logged-in account; stale responses
+   * are discarded after user switches or a newer report is requested.
+   */
+  loadRetentionReport(): void {
+    if (!this.owner || this.retentionReportBusy) return;
+    const seq = ++this.retentionReportSequence;
+    const account = this.accountId;
+    this.retentionReportBusy = true;
+    this.retentionReportError = '';
+    this.retentionReport = null;
+    this.studio.retentionDryRun().pipe(takeUntil(this.destroy$)).subscribe({
+      next: result => {
+        if (!this.isCurrentAccount(account) || seq !== this.retentionReportSequence) return;
+        this.retentionReportBusy = false;
+        this.retentionReport = result;
+      },
+      error: err => {
+        if (!this.isCurrentAccount(account) || seq !== this.retentionReportSequence) return;
+        this.retentionReportBusy = false;
+        this.retentionReport = null;
+        if (err instanceof HttpErrorResponse && err.status === 403) {
+          this.handleError(err, 'Acesso negado ao relatório de retenção.');
+        } else {
+          this.retentionReportError = 'Não foi possível consultar a previsão de retenção.';
+        }
+      }
+    });
+  }
+
+  private invalidateRetentionReport(): void {
+    this.retentionReportSequence++;
+    this.retentionReport = null;
+    this.retentionReportBusy = false;
+    this.retentionReportError = '';
+  }
+
   onHoldFieldsChanged(): void {
     this.holdSequence++;
     this.hold = null;
@@ -298,6 +344,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
           if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
           this.holdBusy = false;
           this.hold = result;
+          this.invalidateRetentionReport();
           this.holdSuccess = 'Retenção excepcional registrada com auditoria.';
         },
         error: err => {
@@ -328,6 +375,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
           if (!this.isCurrentAccount(account) || seq !== this.holdSequence) return;
           this.holdBusy = false;
           this.hold = {...hold,active:false};
+          this.invalidateRetentionReport();
           this.holdSuccess = 'Retenção excepcional liberada e auditada.';
         },
         error: err => {
@@ -389,6 +437,7 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
       this.candidate = null;
       this.participants = [];
       this.total = 0;
+      this.invalidateRetentionReport();
       this.errorMessage = 'Você não tem autorização para gerenciar o piloto.';
       return;
     }
