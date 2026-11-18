@@ -50,6 +50,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
   readonly boardStatuses: CreatorCommissionStatus[] =
     ['QUEUED','IN_PROGRESS','WAITING','PAUSED'];
+  readonly completedBoardStatus: CreatorCommissionStatus = 'COMPLETED';
   readonly boardPageSize = 12;
   readonly boardDragStartDelay = {touch: 200, mouse: 0};
   boardColumns: {status: CreatorCommissionStatus; items: CreatorCommission[]; total: number}[] =
