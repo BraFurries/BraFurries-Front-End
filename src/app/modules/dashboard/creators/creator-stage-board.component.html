@@ -8,31 +8,6 @@
   </section>
 
   <ng-container *ngIf="!loading && allowed">
-    <section *ngIf="canFilterShared" class="rounded-xl border border-gray-200 bg-white p-4"
-      aria-label="Filtros do quadro por etapas">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <label class="w-full max-w-sm text-sm font-semibold text-gray-700">
-          Mostrar etapas
-          <select name="sharedWorkflowId" [ngModel]="sharedWorkflowId"
-            (ngModelChange)="filterSharedStages($event)" [disabled]="orderDraft !== null"
-            class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-            <option [ngValue]="null">Todas as etapas</option>
-            <option *ngFor="let model of sharedWorkflows" [ngValue]="model.id">{{ model.name }}</option>
-          </select>
-        </label>
-        <button *ngIf="sharedWorkflowId === null && !orderDraft" type="button"
-          (click)="openStageOrder()" [disabled]="!canOrganizeStages"
-          class="rounded-lg border border-braPurple/30 bg-white px-4 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
-          Organizar etapas
-        </button>
-      </div>
-      <p class="mt-2 text-xs text-gray-500">
-        {{ sharedWorkflowId === null
-          ? 'Acompanhe as etapas reutilizáveis de todos os pedidos. Para mover pedidos entre etapas, use o quadro por processo.'
-          : 'Exibindo as etapas reutilizáveis deste processo, incluindo pedidos de outros processos que compartilham essas etapas. Etapas exclusivas aparecem no quadro por processo.' }}
-      </p>
-    </section>
-
     <section *ngIf="orderDraft as draft" class="space-y-4 rounded-xl border border-braPurple/20 bg-white p-5"
       aria-label="Organizar etapas gerais">
       <div>
@@ -78,21 +53,16 @@
       <a routerLink="/painel/creators/producao/processos"
         class="font-semibold text-braPurple underline">Meus processos</a>.
     </div>
-    <div *ngIf="mode === 'shared' && canFilterShared && sharedWorkflowId === null && columns.length === 1 && !loadingBoard"
+    <div *ngIf="mode === 'shared' && columns.length === 1 && !loadingBoard"
       class="rounded-xl border border-dashed bg-white p-5 text-sm text-gray-600">
       Cadastre e vincule etapas reutilizáveis nos seus processos para acompanhar todos os pedidos em um único lugar.
       <a routerLink="/painel/creators/producao/processos"
         class="font-semibold text-braPurple underline">Organizar minhas etapas</a>.
     </div>
 
-    <div *ngIf="canFilterShared && sharedWorkflowId !== null && !columns.length && !loadingBoard"
-      class="rounded-xl border border-dashed bg-white p-5 text-sm text-gray-600">
-      Este processo não possui etapas reutilizáveis. Consulte suas etapas exclusivas no quadro por processo.
-    </div>
-
     <div *ngIf="!orderDraft && !loadingBoard && columns.length" class="space-y-4"
       aria-label="Quadro de andamento dos pedidos">
-      <div class="flex items-stretch gap-4 overflow-x-auto pb-3">
+      <div class="flex min-w-0 items-stretch gap-4 overflow-x-auto pb-3">
         <div *ngFor="let lane of columns; trackBy: trackLane"
           #boardDropZone [attr.data-stage-target]="lane.key"
           [ngClass]="hoveredKey === lane.key ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 bg-gray-50/80'"
@@ -113,14 +83,14 @@
                 class="pointer-events-none rounded-xl border-2 border-dashed border-braPurple/40 bg-white/90">
               </div>
               <article cdkDrag [cdkDragData]="card" [cdkDragStartDelay]="dragDelay"
-                [cdkDragDisabled]="mode !== 'process' || busyId !== null || card.status === 'COMPLETED'"
+                [cdkDragDisabled]="!canMoveCard(card)"
                 (cdkDragStarted)="dragStart($event,card)"
                 (cdkDragMoved)="dragMove($event,lane.key)"
                 (cdkDragEnded)="dragEnd($event,card,lane.key)"
                 (keydown)="moveByKeyboard($event,card,lane.key)"
-                [attr.tabindex]="mode === 'process' ? 0 : null"
-                [attr.aria-label]="'Pedido ' + card.title + (mode === 'process' ? '. Arraste para outra etapa do pedido ou use as setas esquerda e direita.' : '')"
-                [ngClass]="mode === 'process' ? 'cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-braPurple' : ''"
+                [attr.tabindex]="canMoveCard(card) ? 0 : null"
+                [attr.aria-label]="'Pedido ' + card.title + (canMoveCard(card) ? '. Arraste para outra etapa do pedido ou use as setas esquerda e direita.' : '')"
+                [ngClass]="canMoveCard(card) ? 'cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-braPurple' : ''"
                 class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <ng-container *ngTemplateOutlet="cardContent"></ng-container>
                 <ng-template cdkDragPlaceholder>
