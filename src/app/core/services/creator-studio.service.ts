@@ -64,6 +64,25 @@ export interface CreatorWorkflow {
   isDefault: boolean;
   steps: CreatorWorkflowStep[];
 }
+/** Platform-published process: imported as a separate artist-owned snapshot. */
+export interface CreatorGlobalWorkflowStep {
+  id: number;
+  name: string;
+  position: number;
+}
+export interface CreatorGlobalWorkflow {
+  id: number;
+  name: string;
+  description: string;
+  active: boolean;
+  steps: CreatorGlobalWorkflowStep[];
+}
+export interface CreatorGlobalWorkflowDraft {
+  name: string;
+  description: string;
+  active: boolean;
+  steps: string[];
+}
 export type CreatorStepStatus = 'PENDING' | 'IN_PROGRESS' | 'WAITING_APPROVAL' | 'DONE';
 export interface CreatorCommissionStep extends CreatorStepDraft {
   id: number;
@@ -180,6 +199,15 @@ export class CreatorStudioService {
 
   workflows(): Observable<CreatorWorkflow[]> {
     return this.http.get<CreatorWorkflow[]>(`${this.base}/workflows`);
+  }
+
+  globalWorkflows(): Observable<CreatorGlobalWorkflow[]> {
+    return this.http.get<CreatorGlobalWorkflow[]>(`${this.base}/global-workflows`);
+  }
+
+  importGlobalWorkflow(id: number, setAsDefault: boolean): Observable<CreatorWorkflow> {
+    return this.http.post<CreatorWorkflow>(
+      `${this.base}/workflows/from-global/${id}`, {setAsDefault});
   }
 
   createWorkflow(input: CreatorWorkflowDraft): Observable<CreatorWorkflow> {
