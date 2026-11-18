@@ -135,6 +135,28 @@ describe('CreatorStudioService', () => {
     req.flush({id:91,commissionId:11,...req.request.body,createdAtUtc:'2026-11-17T23:00:00'});
   });
 
+  it('gets 30-day and 7-day retention windows without a plan or owner parameter', () => {
+    studio.retention().subscribe();
+    const req = http.expectOne(`${base}/retention`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush({
+      policy:'12_MONTHS_AFTER_LAST_COMPLETION',retentionMonths:12,
+      advanceNoticeDays:30,finalNoticeDays:7,automaticDeletionEnabled:false,
+      commissions:[]
+    });
+  });
+
+  it('downloads a private archive as a blob even when the plan is revoked', () => {
+    studio.exportMyData().subscribe(blob => {
+      expect(blob.type).toBe('application/json');
+    });
+    const req = http.expectOne(`${base}/export`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['{"schemaVersion":1}'],{type:'application/json'}));
+  });
+
   it('uses an isolated status endpoint rather than duplicating a card', () => {
     studio.changeStatus(10, 'COMPLETED').subscribe();
     const req = http.expectOne(`${base}/commissions/10/status`);
