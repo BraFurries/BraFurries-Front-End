@@ -80,6 +80,9 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
         this.workflows = [];
         this.globalWorkflows = [];
         this.importedGlobalId = null;
+        this.showStepLibrary = false;
+        this.expandedGlobalId = null;
+        this.definitionName = '';
         this.resetType();
         this.resetWorkflow();
         if (!user) {
@@ -204,6 +207,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.workflowFormOpen = true;
     this.workflowEditorStep = 1;
     this.editingWorkflowId = source.id;
+    this.showStepLibrary = source.steps.some(step => step.stageDefinitionId !== null);
     this.workflow = {
       name: source.name,
       isDefault: source.isDefault,
@@ -214,6 +218,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   resetWorkflow(): void {
     this.workflowFormOpen = false;
     this.workflowEditorStep = 1;
+    this.showStepLibrary = false;
     this.editingWorkflowId = null;
     this.workflow = this.emptyWorkflow();
   }
