@@ -34,6 +34,7 @@ const routes: Routes = [
       // Existing deep link becomes a quiet overview, with focused child pages.
       { path: 'creators/producao', component: CreatorProductionComponent, data: { section: 'home' } },
       { path: 'creators/producao/artes', component: CreatorProductionComponent, data: { section: 'arts' } },
+      { path: 'creators/producao/dados', component: CreatorStudioComponent, data: { privacyOnly: true } },
       { path: 'creators/producao/processos', component: CreatorProductionComponent, data: { section: 'processes' } },
       { path: 'creators/producao/quadro', redirectTo: 'creators', pathMatch: 'full' },
       { path: 'creators/pedido/:id', component: CreatorCommissionDetailsComponent },
