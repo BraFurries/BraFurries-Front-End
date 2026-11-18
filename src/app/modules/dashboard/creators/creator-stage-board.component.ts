@@ -478,10 +478,12 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
     if (this.mode !== 'process' || this.draggedId !== card.id) return;
     const point = this.pointer(event.event);
     const lane = point ? this.targetAt(point.x, point.y) : null;
-    this.draggedId = null;
-    this.hoveredKey = null;
-    this.ghostIndex = null;
-    if (lane?.movable && lane.key !== sourceKey) this.zone.run(() => this.moveToLane(card, lane));
+    this.zone.run(() => {
+      this.draggedId = null;
+      this.hoveredKey = null;
+      this.ghostIndex = null;
+      if (lane?.movable && lane.key !== sourceKey) this.moveToLane(card, lane);
+    });
   }
 
   moveByKeyboard(event: KeyboardEvent, card: CreatorCommission, sourceKey: string): void {
