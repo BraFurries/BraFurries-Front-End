@@ -162,17 +162,28 @@ describe('CreatorStudioComponent', () => {
     pending.error(new Error('offline'));
   });
 
-  it('can conclude via the board drop zone and move with keyboard arrows', () => {
+  it('moves between adjacent queues with keyboard arrows when the card has focus', () => {
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
     const target = {};
     const event = {target, currentTarget: target, key: 'ArrowRight',
       preventDefault: jasmine.createSpy('preventDefault')} as unknown as KeyboardEvent;
     component.moveBoardCardByKeyboard(event, card);
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(studio.changeStatus).toHaveBeenCalledWith(11,'IN_PROGRESS');
+    expect(studio.changeStatus).toHaveBeenCalledOnceWith(11,'IN_PROGRESS');
+    expect(component.boardColumns[1].items[0].id).toBe(11);
+    pending.error(new Error('offline'));
+  });
 
+  it('can conclude a card through the compact board drop zone', () => {
+    const pending = new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(pending.asObservable());
     component.dropCommission(drop(card, 'QUEUED', 'COMPLETED'));
-    expect(studio.changeStatus).toHaveBeenCalledWith(11,'COMPLETED');
+    expect(studio.changeStatus).toHaveBeenCalledOnceWith(11,'COMPLETED');
     expect(component.activeCount).toBe(0);
+    expect(component.boardColumns[0].items.length).toBe(0);
+    pending.error(new Error('offline'));
+    expect(component.boardColumns[0].items.length).toBe(1);
   });
 
   it('does not move a card after access to Pro has been revoked', () => {
