@@ -118,8 +118,13 @@
               Este pedido será posicionado mais abaixo, conforme a data.
             </p>
           </div>
-          <p *ngIf="mode === 'shared' && lane.total > lane.items.length"
-            class="mt-3 text-xs text-gray-500">Mostrando {{ lane.items.length }} de {{ lane.total }} pedidos.</p>
+          <div *ngIf="mode === 'shared' && lane.total > lane.items.length" class="mt-3 space-y-2">
+            <p class="text-xs text-gray-500">Mostrando {{ lane.items.length }} de {{ lane.total }} pedidos.</p>
+            <button type="button" (click)="loadMoreLane(lane)" [disabled]="!canLoadMoreLane(lane)"
+              class="w-full rounded-lg border border-braPurple/30 bg-white px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">
+              {{ loadingLaneKey === lane.key ? 'Carregando...' : 'Carregar mais pedidos' }}
+            </button>
+          </div>
           <p *ngIf="!lane.movable"
             class="mt-3 text-xs text-gray-500">
             {{ mode === 'process' ? 'Pedidos com etapas diferentes do modelo atual.' : 'Etapas exclusivas ou já finalizadas.' }}
