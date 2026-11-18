@@ -232,6 +232,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   setViewMode(mode: 'board' | 'list'): void {
     if (mode === this.viewMode || !this.canUsePro) return;
     this.viewMode = mode;
+    this.listSequence++;
+    this.boardSequence++;
     this.page = 1;
     this.expandedCommissionId = null;
     this.stepsSequence++;
@@ -241,6 +243,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   showStatusList(status: CreatorCommissionStatus): void {
     if (!this.canUsePro) return;
     this.viewMode = 'list';
+    this.listSequence++;
+    this.boardSequence++;
     this.selectedStatus = status;
     this.page = 1;
     this.reload();
@@ -335,13 +339,15 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       this.pageSize
     ).pipe(takeUntil(this.destroy$)).subscribe({
       next: result => {
-        if (seq !== this.listSequence || this.users.getUser()?.id !== userId) return;
+        if (seq !== this.listSequence || this.users.getUser()?.id !== userId ||
+            this.viewMode !== 'list') return;
         this.commissions = result.items;
         this.total = result.total;
         this.loading = false;
       },
       error: error => {
-        if (seq !== this.listSequence || this.users.getUser()?.id !== userId) return;
+        if (seq !== this.listSequence || this.users.getUser()?.id !== userId ||
+            this.viewMode !== 'list') return;
         this.loading = false;
         this.errorMessage = error instanceof HttpErrorResponse && error.status === 403
           ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página para verificar.'
