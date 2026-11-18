@@ -37,6 +37,7 @@ describe('CreatorStudioComponent', () => {
   };
 
   beforeEach(async () => {
+    localStorage.removeItem('brf.creator-studio.privacy-notice.v1.' + user.id);
     user$ = new BehaviorSubject<User | null>(user);
     studio = jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess', 'commissions', 'create', 'update', 'changeStatus',
@@ -83,6 +84,8 @@ describe('CreatorStudioComponent', () => {
   afterEach(() => {
     fixture.destroy();
     user$.complete();
+    localStorage.removeItem('brf.creator-studio.privacy-notice.v1.' + user.id);
+    localStorage.removeItem('brf.creator-studio.privacy-notice.v1.51');
   });
 
   it('shows four production lanes at once, each with its own server-side total', () => {
@@ -108,6 +111,9 @@ describe('CreatorStudioComponent', () => {
     expect(group.textContent).toContain('Lista detalhada');
     expect(group.textContent).toContain('Quadro por processo');
     expect(group.textContent).toContain('Quadro por etapas');
+    expect(Array.from(group.querySelectorAll('button')).map(button => (button as HTMLElement).textContent?.trim())).toEqual([
+      'Quadro de filas','Quadro por processo','Quadro por etapas','Lista detalhada'
+    ]);
     const model = {id:33,name:'Ícones',isDefault:false,
       steps:[{id:1,name:'Rascunho',position:0,stageDefinitionId:7}]};
     component.workflows = [model];
@@ -121,6 +127,8 @@ describe('CreatorStudioComponent', () => {
     fixture.detectChanges();
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
     expect(fixture.debugElement.query(By.directive(CreatorStageBoardComponent))).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-creator-stage-board').classList.contains('block')).toBeTrue();
+    expect(fixture.nativeElement.querySelector('app-creator-stage-board').classList.contains('mt-6')).toBeTrue();
     component.setViewMode('stages');
     fixture.detectChanges();
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({stageDefinitionId:7},1,12);
@@ -534,10 +542,33 @@ describe('CreatorStudioComponent', () => {
     }));
     user$.next({...user,id:51});
     fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('1 pedido(s) concluído(s) com aviso de retenção');
+    component.acknowledgePrivacy();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Consultar prazos');
+    component.privacyOnly = true;
+    fixture.detectChanges();
     const html = fixture.nativeElement.textContent as string;
     expect(html).toContain('Encomenda concluída');
     expect(html).toContain('Até 7 dias');
     expect(html).toContain('exclusão automática está desativada');
+  });
+
+  it('keeps the policy notice once per account and export off the daily view', () => {
+    expect(component.showPrivacyNotice).toBeTrue();
+    expect(fixture.nativeElement.textContent).not.toContain('Exportar meus dados (JSON)');
+    component.acknowledgePrivacy();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label="Aviso inicial de privacidade"]')).toBeNull();
+    expect(localStorage.getItem('brf.creator-studio.privacy-notice.v1.41')).toBe('1');
+    user$.next({...user,id:51});
+    expect(component.showPrivacyNotice).toBeTrue();
+    user$.next(user);
+    expect(component.showPrivacyNotice).toBeFalse();
+    component.privacyOnly = true;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Exportar meus dados (JSON)');
+    expect(fixture.nativeElement.textContent).not.toContain('Meus trabalhos');
   });
 
   it('shows data export even if a prior Pro holder no longer has access', () => {
@@ -548,7 +579,10 @@ describe('CreatorStudioComponent', () => {
     user$.next({...user,id:61});
     fixture.detectChanges();
     expect(component.canUsePro).toBeFalse();
-    expect(fixture.nativeElement.textContent).toContain('Exportar meus dados');
+    expect(fixture.nativeElement.textContent).toContain('Dados e privacidade · Exportar meus dados');
+    component.privacyOnly = true;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Exportar meus dados (JSON)');
     expect(fixture.nativeElement.textContent).not.toContain('Cliente: Theo');
     expect(studio.retention).toHaveBeenCalledTimes(2);
   });

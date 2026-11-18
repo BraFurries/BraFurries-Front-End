@@ -1,6 +1,7 @@
 import { Component, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { CdkDragEnd, CdkDragMove, CdkDragStart } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute } from '@angular/router';
 import { Subject, forkJoin, distinctUntilChanged, takeUntil } from 'rxjs';
 import {
   CreatorCommission,
@@ -76,6 +77,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   newStepDefinitionId: number | null = null;
   importWorkflowId: number | null = null;
   private stepsSequence = 0;
+  privacyOnly = false;
+  showPrivacyNotice = false;
+  private acknowledgedPrivacyAccount: number | null = null;
   retention: CreatorRetentionOverview | null = null;
   retentionLoading = false;
   retentionError = '';
@@ -113,10 +117,12 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   constructor(
     private readonly creatorStudio: CreatorStudioService,
     private readonly users: UserService,
-    private readonly zone: NgZone
+    private readonly zone: NgZone,
+    private readonly route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
+    this.privacyOnly = this.route.snapshot.data['privacyOnly'] === true;
     this.users.user$
       .pipe(
         distinctUntilChanged((a, b) => a?.id === b?.id),
@@ -154,6 +160,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.loadingSteps = false;
         this.stepBusy = false;
         this.stepError = '';
+        this.showPrivacyNotice = false;
         this.retention = null;
         this.retentionLoading = false;
         this.retentionError = '';
@@ -172,8 +179,11 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
             this.loadingAccess = false;
             this.access = access;
             if (this.canUsePro) {
-              this.reloadCatalog();
-              this.reload();
+              if (!this.privacyOnly) {
+                this.showPrivacyNotice = !this.hasAcknowledgedPrivacy(userId);
+                this.reloadCatalog();
+                this.reload();
+              }
             }
           },
           error: () => {
@@ -192,6 +202,31 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   get canUsePro(): boolean {
     return this.access?.allowed === true && this.access.tier === 'PRO';
+  }
+
+  private privacyNoticeKey(userId: number): string {
+    return 'brf.creator-studio.privacy-notice.v1.' + userId;
+  }
+
+  private hasAcknowledgedPrivacy(userId: number): boolean {
+    if (this.acknowledgedPrivacyAccount === userId) return true;
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(this.privacyNoticeKey(userId)) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  acknowledgePrivacy(): void {
+    const userId = this.users.getUser()?.id;
+    if (userId == null || !this.canUsePro) return;
+    this.acknowledgedPrivacyAccount = userId;
+    this.showPrivacyNotice = false;
+    try {
+      if (typeof window !== 'undefined') window.localStorage.setItem(this.privacyNoticeKey(userId), '1');
+    } catch {
+      // The in-memory acknowledgment still applies for this component.
+    }
   }
 
   retentionWarningLabel(level: CreatorRetentionWarning): string {
