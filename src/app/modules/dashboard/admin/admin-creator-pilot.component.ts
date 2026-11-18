@@ -21,6 +21,8 @@ import { UserService } from '../../../core/services/user.service';
 })
 export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   readonly pageSize = 25;
+  activeTab: 'participants' | 'models' = 'participants';
+
 
   checkingOwner = true;
   owner = false;
@@ -139,6 +141,11 @@ export class AdminCreatorPilotComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  showTab(tab: 'participants' | 'models'): void {
+    if (!this.owner) return;
+    this.activeTab = tab;
   }
 
   private emptyGlobalModel(): CreatorGlobalWorkflowDraft {
