@@ -266,7 +266,9 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
       if (viewport && (point.x < viewport.left || point.x > viewport.right ||
           point.y < viewport.top || point.y > viewport.bottom)) continue;
       const rect = element.getBoundingClientRect();
-      if (point.x < rect.left || point.x > rect.right ||
+      // Half of the 16px gap is included, so releasing directly over the
+      // dashed insertion marker is also a valid drop.
+      if (point.x < rect.left - 8 || point.x > rect.right + 8 ||
           point.y < rect.top || point.y > rect.bottom) continue;
       const id = Number(element.dataset['orderStageId']);
       const index = this.orderDraft.findIndex(definition => definition.id === id);
