@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -92,6 +93,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
   imports: [
     CommonModule,
     FormsModule,
+    DragDropModule,
     DashboardRoutingModule
   ]
 })
