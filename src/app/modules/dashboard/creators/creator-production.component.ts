@@ -32,6 +32,8 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   processView: 'models' | 'library' = 'models';
   typeFormOpen = false;
   typeAdvancedOpen = false;
+  linkingTypeOnly = false;
+  workflowForType = false;
   workflowFormOpen = false;
   workflowEditorStep: 1 | 2 = 1;
   expandedGlobalId: number | null = null;
@@ -174,6 +176,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   }
 
   editType(type: CreatorArtType): void {
+    this.resetType();
     this.typeFormOpen = true;
     this.typeAdvancedOpen = type.workflowId !== null;
     this.editingTypeId = type.id;
@@ -181,8 +184,27 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     this.typeWorkflowId = type.workflowId;
   }
 
+  openTypeLink(type: CreatorArtType): void {
+    if (!this.allowed || this.busy) return;
+    this.editType(type);
+    this.linkingTypeOnly = true;
+    this.typeAdvancedOpen = true;
+    this.error = '';
+    this.notice = '';
+  }
+
+  startWorkflowForType(): void {
+    if (!this.allowed || this.busy || !this.typeFormOpen) return;
+    this.startWorkflow();
+    this.workflowForType = true;
+    this.typeAdvancedOpen = true;
+    this.error = '';
+    this.notice = '';
+  }
+
   resetType(): void {
     this.typeFormOpen = false;
+    this.linkingTypeOnly = false;
     this.typeAdvancedOpen = false;
     this.editingTypeId = null;
     this.typeName = '';
@@ -191,7 +213,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
 
   saveType(): void {
     const name = this.typeName.trim();
-    if (!this.allowed || this.busy || !name) return;
+    if (!this.allowed || this.busy || !name || this.workflowFormOpen) return;
     const operation = this.editingTypeId === null
       ? () => this.studio.createArtType(name, this.typeWorkflowId)
       : () => this.studio.updateArtType(this.editingTypeId!, name, this.typeWorkflowId);
@@ -204,6 +226,8 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   startWorkflow(): void {
     this.resetWorkflow();
     this.workflowFormOpen = true;
+    this.error = '';
+    this.notice = '';
   }
 
   editWorkflow(source: CreatorWorkflow): void {
@@ -223,6 +247,7 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
   }
 
   resetWorkflow(): void {
+    this.workflowForType = false;
     this.workflowFormOpen = false;
     this.workflowEditorStep = 1;
     this.editingWorkflowId = null;
@@ -366,11 +391,18 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
       steps
     };
     const id = this.editingWorkflowId;
+    const returnToType = this.workflowForType;
     this.run(() => id === null
       ? this.studio.createWorkflow(input)
-      : this.studio.updateWorkflow(id, input), () => {
+      : this.studio.updateWorkflow(id, input), saved => {
       this.resetWorkflow();
-      this.notice = 'Processo salvo! Etapas reutilizáveis estão disponíveis nos outros processos. Pedidos existentes não foram alterados.';
+      if (returnToType && this.typeFormOpen) {
+        this.typeWorkflowId = saved.id;
+        this.typeAdvancedOpen = true;
+        this.notice = 'Processo criado e selecionado. Salve o tipo de arte para confirmar o vínculo.';
+      } else {
+        this.notice = 'Processo salvo! Etapas reutilizáveis estão disponíveis nos outros processos. Pedidos existentes não foram alterados.';
+      }
     });
   }
 
@@ -378,21 +410,22 @@ export class CreatorProductionComponent implements OnInit, OnDestroy {
     return {name:'', isDefault:false, steps:[]};
   }
 
-  private run<T>(operation: () => import('rxjs').Observable<T>, onSuccess: () => void,
+  private run<T>(operation: () => import('rxjs').Observable<T>, onSuccess: (value: T) => void,
                  onError?: () => void): void {
     const account = this.users.getUser()?.id;
+    const sequence = this.accountSequence;
     this.busy = true;
     this.error = '';
     this.notice = '';
     operation().pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
-        if (this.users.getUser()?.id !== account) return;
+      next: value => {
+        if (sequence !== this.accountSequence || this.users.getUser()?.id !== account) return;
         this.busy = false;
-        onSuccess();
+        onSuccess(value);
         this.reload();
       },
       error: () => {
-        if (this.users.getUser()?.id !== account) return;
+        if (sequence !== this.accountSequence || this.users.getUser()?.id !== account) return;
         this.busy = false;
         if (onError) onError();
         else this.error = 'Não foi possível salvar. Confira se o nome já existe e se as etapas pertencem à sua conta.';
