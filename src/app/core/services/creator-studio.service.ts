@@ -33,6 +33,8 @@ export interface CreatorCommission extends CreatorCommissionInput {
   completedAtUtc: string | null;
   currentStageName?: string | null;
   currentStageDefinitionId?: number | null;
+  sourceWorkflowId?: number | null;
+  currentStagePosition?: number | null;
 }
 
 export interface CreatorCommissionPage {
@@ -168,6 +170,25 @@ export class CreatorStudioService {
       .set('pageSize', String(pageSize));
     if (status) params = params.set('status', status);
     return this.http.get<CreatorCommissionPage>(`${this.base}/commissions`, { params });
+  }
+
+  commissionsForBoard(filter: {
+    workflowId?: number;
+    stageDefinitionId?: number;
+    unlinked?: boolean;
+  }, page = 1, pageSize = 12): Observable<CreatorCommissionPage> {
+    let params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
+    if (filter.workflowId != null) params = params.set('workflowId', String(filter.workflowId));
+    if (filter.stageDefinitionId != null)
+      params = params.set('stageDefinitionId', String(filter.stageDefinitionId));
+    if (filter.unlinked) params = params.set('unlinked', 'true');
+    return this.http.get<CreatorCommissionPage>(`${this.base}/commissions`, {params});
+  }
+
+  moveCommissionToStep(commissionId: number, stepId: number):
+    Observable<CreatorCommissionStep[]> {
+    return this.http.patch<CreatorCommissionStep[]>(
+      `${this.base}/commissions/${commissionId}/current-step`, {stepId});
   }
 
   create(input: CreatorCommissionInput): Observable<CreatorCommission> {
