@@ -82,7 +82,7 @@ describe('CreatorProductionComponent', () => {
   it('adopts global starter as artist default only when there are no personal models', () => {
     component.adoptGlobalWorkflow(component.globalWorkflows[0]);
     expect(studio.importGlobalWorkflow).toHaveBeenCalledWith(8,true);
-    expect(component.notice).toContain('cópia só sua');
+    expect(component.notice).toContain('Modelo copiado para sua conta');
     component.workflows=[{id:77,name:'Já existe',isDefault:true,steps:[]}];
     component.adoptGlobalWorkflow(component.globalWorkflows[0]);
     expect(studio.importGlobalWorkflow).toHaveBeenCalledWith(8,false);
