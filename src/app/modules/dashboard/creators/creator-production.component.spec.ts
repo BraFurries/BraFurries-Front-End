@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Data } from '@angular/router';
+import { ActivatedRoute, Data, RouterModule } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { CreatorStudioService } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
@@ -50,7 +50,7 @@ describe('CreatorProductionComponent', () => {
     users.getUser.and.callFake(() => user$.value);
     await TestBed.configureTestingModule({
       declarations:[CreatorProductionComponent],
-      imports:[CommonModule,FormsModule],
+      imports:[CommonModule,FormsModule,RouterModule.forRoot([])],
       providers:[
         {provide:CreatorStudioService,useValue:studio},
         {provide:UserService,useValue:users},
