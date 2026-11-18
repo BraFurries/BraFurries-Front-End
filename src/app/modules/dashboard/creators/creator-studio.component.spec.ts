@@ -110,6 +110,64 @@ describe('CreatorStudioComponent', () => {
     expect(component.boardColumns[0].total).toBe(1);
   });
 
+  it('opens a board lane through its actual button without recycling list form controls', () => {
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find(item => item.textContent?.includes('Abrir lista desta fila'));
+    expect(button).toBeDefined();
+    button!.click();
+    fixture.detectChanges();
+
+    expect(component.viewMode).toBe('list');
+    expect(component.selectedStatus).toBe('QUEUED');
+    expect(component.loading).toBeFalse();
+    expect(studio.commissions).toHaveBeenCalledWith('QUEUED', 1, 25);
+    expect(fixture.nativeElement.textContent).not.toContain('Carregando suas commissions...');
+
+    const groups = component.groupedCommissions;
+    const cardElement = fixture.nativeElement.querySelector(
+      'section[aria-label="Commissions da fila"] article');
+    expect(groups.length).toBe(1);
+    expect(cardElement).not.toBeNull();
+    // Angular change detection may run frequently due to ngModel. Neither the
+    // grouping objects nor their live DOM nodes should be recreated.
+    for (let i = 0; i < 10; i++) {
+      fixture.detectChanges();
+      expect(component.groupedCommissions).toBe(groups);
+      expect(fixture.nativeElement.querySelector(
+        'section[aria-label="Commissions da fila"] article')).toBe(cardElement);
+    }
+    expect(studio.commissions).toHaveBeenCalledTimes(5);
+  });
+
+  it('exits the list loading state when its HTTP response arrives and only regroups on change', () => {
+    const pending = new Subject<{items:CreatorCommission[],page:number,pageSize:number,total:number}>();
+    studio.commissions.and.returnValue(pending.asObservable());
+
+    component.showStatusList('QUEUED');
+    fixture.detectChanges();
+    expect(component.loading).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('Carregando suas commissions...');
+
+    pending.next({items:[card],page:1,pageSize:25,total:1});
+    fixture.detectChanges();
+    expect(component.loading).toBeFalse();
+    expect(component.total).toBe(1);
+    const original = component.groupedCommissions;
+    expect(component.groupedCommissions).toBe(original);
+
+    component.groupBy = 'status';
+    fixture.detectChanges();
+    const regrouped = component.groupedCommissions;
+    expect(regrouped).not.toBe(original);
+    expect(regrouped[0].label).toBe('Na fila');
+    expect(component.groupedCommissions).toBe(regrouped);
+
+    component.commissions = [{...card,id:12,title:'Outro ícone'}];
+    fixture.detectChanges();
+    expect(component.groupedCommissions).not.toBe(regrouped);
+    pending.complete();
+  });
+
   it('hides commission details when entitlement is revoked or downgraded to Free', () => {
     studio.myAccess.and.returnValue(of({
       allowed: true, tier: 'FREE', status: 'ACTIVE',

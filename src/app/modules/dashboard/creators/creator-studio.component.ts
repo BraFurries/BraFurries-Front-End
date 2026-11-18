@@ -90,6 +90,12 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   private accessSequence = 0;
   private listSequence = 0;
+  // Angular evaluates template getters on every change detection pass. Without
+  // memoization, new group object identities make *ngFor destroy/recreate every
+  // card and its ngModel controls, resulting in a render/check loop.
+  private groupedSource: CreatorCommission[] | null = null;
+  private groupedBy: typeof this.groupBy | null = null;
+  private groupedCache: { key: string; label: string; items: CreatorCommission[] }[] = [];
   private readonly destroy$ = new Subject<void>();
 
   constructor(
@@ -255,6 +261,11 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   }
 
   get groupedCommissions(): { key: string; label: string; items: CreatorCommission[] }[] {
+    // Keep the same group references as long as input data and grouping choice
+    // are unchanged. This prevents repeated DOM teardown / ngModel registration.
+    if (this.groupedSource === this.commissions && this.groupedBy === this.groupBy) {
+      return this.groupedCache;
+    }
     const groups = new Map<string, { key: string; label: string; items: CreatorCommission[] }>();
     for (const card of this.commissions) {
       let key = card.requestedOn;
@@ -274,7 +285,14 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       if (!groups.has(key)) groups.set(key, {key,label,items:[]});
       groups.get(key)!.items.push(card);
     }
-    return [...groups.values()];
+    this.groupedSource = this.commissions;
+    this.groupedBy = this.groupBy;
+    this.groupedCache = [...groups.values()];
+    return this.groupedCache;
+  }
+
+  trackByGroup(_index: number, group: {key: string}): string {
+    return group.key;
   }
 
   typeName(id: number | null): string {
