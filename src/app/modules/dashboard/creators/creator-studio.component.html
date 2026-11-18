@@ -258,11 +258,13 @@
     <p *ngIf="viewMode === 'board' && changingId !== null" role="status"
       class="text-sm text-gray-600">Atualizando a fila...</p>
     <section *ngIf="viewMode === 'board' && !boardLoading && !boardError"
-      cdkDropListGroup class="space-y-4"
+      class="space-y-4"
       aria-label="Quadro de filas por situação">
-      <div class="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 xl:grid xl:grid-cols-4 xl:overflow-visible">
+      <div class="flex items-stretch snap-x snap-mandatory gap-4 overflow-x-auto pb-2 xl:grid xl:grid-cols-4 xl:overflow-visible">
       <div *ngFor="let column of boardColumns"
-        class="w-[min(80vw,19rem)] shrink-0 snap-start rounded-2xl border border-gray-200 bg-gray-50/80 p-3 xl:w-auto">
+        #boardDropZone [attr.data-board-drop-status]="column.status"
+        [ngClass]="hoveredBoardStatus === column.status ? 'border-braPurple bg-braPurple/5' : 'border-gray-200 bg-gray-50/80'"
+        class="relative min-h-[16rem] w-[min(80vw,19rem)] shrink-0 snap-start rounded-2xl border p-3 transition-colors xl:w-auto">
         <div class="mb-3 flex items-center justify-between gap-2">
           <h3 class="font-amaranth text-lg font-bold text-braDark">
             {{ statusLabel(column.status) }}
@@ -274,33 +276,51 @@
           Nada nesta fila por enquanto.
         </p>
         <div cdkDropList cdkDropListSortingDisabled [cdkDropListData]="column.status"
-          (cdkDropListDropped)="dropCommission($event)" class="min-h-[7rem] space-y-3">
+          class="min-h-[7rem] space-y-3">
           <article *ngFor="let commission of column.items; trackBy: trackById"
             cdkDrag [cdkDragData]="commission" [cdkDragStartDelay]="boardDragStartDelay"
             [cdkDragDisabled]="changingId !== null || saving"
+            (cdkDragStarted)="boardDragStarted($event, commission)"
+            (cdkDragMoved)="boardDragMoved($event)"
+            (cdkDragEnded)="boardDragEnded($event, commission)"
             tabindex="0" (keydown)="moveBoardCardByKeyboard($event, commission)"
             [attr.aria-label]="'Pedido ' + commission.title + '. Arraste para outra fila ou use as setas esquerda e direita para mudar de fila.'"
             class="cursor-grab space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-braPurple">
-            <div>
-              <h4 class="break-words font-amaranth text-base font-bold text-braDark">
-                {{ commission.title }}
-              </h4>
-              <p class="mt-1 break-words text-xs text-gray-600">{{ commission.clientName }}</p>
-            </div>
-            <p class="text-xs text-gray-600">
-              Pedido: {{ formatCivilDate(commission.requestedOn) }}
-              <span *ngIf="commission.dueOn" class="block">
-                Prazo: {{ formatCivilDate(commission.dueOn) }}
-              </span>
-              <span *ngIf="commission.currentStageName" class="mt-1 block font-semibold text-braPurple">
-                Etapa: {{ commission.currentStageName }}
-              </span>
-            </p>
-            <a [routerLink]="['/painel/creators/pedido', commission.id]"
-              class="block rounded-lg border border-braPurple/30 px-3 py-2 text-center text-sm font-semibold text-braPurple hover:bg-braPurple/10">
-              Abrir pedido
-            </a>
+            <ng-container *ngTemplateOutlet="boardCardContent"></ng-container>
+            <!-- This card-shaped placeholder stays in the source list during dragging. -->
+            <ng-template cdkDragPlaceholder>
+              <article aria-hidden="true"
+                class="pointer-events-none space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <ng-container *ngTemplateOutlet="boardCardContent"></ng-container>
+              </article>
+            </ng-template>
+            <ng-template #boardCardContent>
+              <div>
+                <h4 class="break-words font-amaranth text-base font-bold text-braDark">
+                  {{ commission.title }}
+                </h4>
+                <p class="mt-1 break-words text-xs text-gray-600">{{ commission.clientName }}</p>
+              </div>
+              <p class="text-xs text-gray-600">
+                Pedido: {{ formatCivilDate(commission.requestedOn) }}
+                <span *ngIf="commission.dueOn" class="block">
+                  Prazo: {{ formatCivilDate(commission.dueOn) }}
+                </span>
+                <span *ngIf="commission.currentStageName" class="mt-1 block font-semibold text-braPurple">
+                  Etapa: {{ commission.currentStageName }}
+                </span>
+              </p>
+              <a [routerLink]="['/painel/creators/pedido', commission.id]"
+                class="block rounded-lg border border-braPurple/30 px-3 py-2 text-center text-sm font-semibold text-braPurple hover:bg-braPurple/10">
+                Abrir pedido
+              </a>
+            </ng-template>
           </article>
+        </div>
+        <!-- The ghost is visual only and never changes ordering or status. -->
+        <div *ngIf="hoveredBoardStatus === column.status"
+          aria-hidden="true" [style.top.px]="boardGhostTop" [style.height.px]="boardGhostHeight"
+          class="pointer-events-none absolute inset-x-3 z-10 rounded-xl border-2 border-dashed border-braPurple/40 bg-white/90 shadow-sm">
         </div>
         <button *ngIf="column.total > 0" type="button" (click)="showStatusList(column.status)"
           class="mt-3 w-full rounded-lg border border-braPurple/20 bg-white px-3 py-2 text-sm font-semibold text-braPurple hover:bg-braPurple/5">
@@ -308,12 +328,14 @@
         </button>
       </div>
       </div>
-      <div cdkDropList cdkDropListSortingDisabled [cdkDropListData]="completedBoardStatus"
-        (cdkDropListDropped)="dropCommission($event)"
-        class="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-braPurple/30 bg-braPurple/5 px-4 py-3 text-sm text-gray-700">
+      <div #boardDropZone [attr.data-board-drop-status]="completedBoardStatus"
+        [ngClass]="hoveredBoardStatus === completedBoardStatus ? 'border-braPurple bg-braPurple/10' : 'border-braPurple/30 bg-braPurple/5'"
+        class="relative flex min-h-24 flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-4 py-3 text-sm text-gray-700 transition-colors">
         <span>Arraste para cá para concluir um pedido</span>
         <button type="button" (click)="showStatusList('COMPLETED')"
           class="font-semibold text-braPurple underline underline-offset-2">Ver concluídos</button>
+        <div *ngIf="hoveredBoardStatus === completedBoardStatus" aria-hidden="true"
+          class="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-braPurple/40 bg-white/90"></div>
       </div>
     </section>
     <div *ngIf="viewMode === 'board' && !boardLoading && !activeCount && !boardError"
