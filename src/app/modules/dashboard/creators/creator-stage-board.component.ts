@@ -3,7 +3,7 @@ import { Component, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChildr
 import { ActivatedRoute } from '@angular/router';
 import { combineLatest, distinctUntilChanged, forkJoin, Subject, takeUntil } from 'rxjs';
 import {
-  CreatorCommission, CreatorCommissionPage, CreatorCommissionStep,
+  CreatorCommission, CreatorCommissionStep,
   CreatorStudioService, CreatorWorkflow, CreatorWorkflowStep,
   CreatorStageDefinition
 } from '../../../core/services/creator-studio.service';
@@ -170,6 +170,8 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
+
+  get visibleCount(): number { return this.processItems.length; }
 
   get canLoadMore(): boolean {
     return this.mode === 'process' && !this.loadingMore && !this.loadingBoard &&
