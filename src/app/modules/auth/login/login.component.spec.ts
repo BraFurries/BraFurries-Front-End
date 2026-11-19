@@ -33,6 +33,14 @@ describe('LoginComponent account consolidation recovery', () => {
     fixture.detectChanges();
   });
 
+  it('defaults to remembering the session and allows explicit opt-out', () => {
+    expect(component.loginForm.get('rememberMe')?.value).toBeTrue();
+    const checkbox = fixture.nativeElement.querySelector('#remember') as HTMLInputElement;
+    expect(checkbox.checked).toBeTrue();
+    checkbox.click();
+    expect(component.loginForm.get('rememberMe')?.value).toBeFalse();
+  });
+
   it('explains why authentication is required again after a completed merge', () => {
     expect(component.accountConsolidated).toBeTrue();
     const message: HTMLElement = fixture.nativeElement.querySelector('[role="status"]');

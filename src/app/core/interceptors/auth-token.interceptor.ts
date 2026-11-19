@@ -13,40 +13,47 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
     return next(request);
   }
 
-  const authorized = (token: string): HttpRequest<unknown> => request.clone({
-    setHeaders: { Authorization: `${userService.getTokenType()} ${token}` }
+  // Never combine a token and identity read from different storage revisions.
+  // An in-flight request must not be retried as a different login.
+  const identity = userService.getSessionIdentity();
+  const authorized = (credentials: { accessToken: string; tokenType: string }): HttpRequest<unknown> => request.clone({
+    setHeaders: { Authorization: `${credentials.tokenType} ${credentials.accessToken}` }
+  });
+  const sessionChanged = () => new HttpErrorResponse({
+    status: 401, statusText: 'Sessão alterada', url: request.url
   });
 
   return userService.ensureValidSession().pipe(
     switchMap(valid => {
+      const credentials = userService.getSessionCredentials();
+      if ((credentials?.identity ?? null) !== identity) {
+        return throwError(sessionChanged);
+      }
       if (!valid && userService.hasRecoverableSession()) {
-        // API/network failure is not revocation. Keep the session and URL;
-        // protected requests can be retried when connectivity recovers.
         return throwError(() => new HttpErrorResponse({
           status: 503, statusText: 'Renovação da sessão temporariamente indisponível',
           url: request.url
         }));
       }
+      if (!credentials) return next(request);
 
-      const token = userService.getAccessToken();
-      if (!token) return next(request);
-
-      return next(authorized(token)).pipe(
+      return next(authorized(credentials)).pipe(
         catchError((error: unknown) => {
           if (!(error instanceof HttpErrorResponse) || error.status !== 401) {
             return throwError(() => error);
           }
 
-          // Another request may already have refreshed while this one was
-          // in transit; reuse the newest token instead of rotating it again.
-          const newerToken = userService.getAccessToken();
-          if (newerToken && newerToken !== token) return next(authorized(newerToken));
+          const latest = userService.getSessionCredentials();
+          if (!latest || latest.identity !== credentials.identity) return throwError(() => error);
 
-          return userService.refreshToken().pipe(
+          // Another request or tab may have already refreshed.
+          if (latest.accessToken !== credentials.accessToken) return next(authorized(latest));
+
+          return userService.refreshToken(credentials.identity).pipe(
             switchMap(refreshed => {
-              const freshToken = userService.getAccessToken();
-              return refreshed && freshToken
-                ? next(authorized(freshToken))
+              const fresh = userService.getSessionCredentials();
+              return refreshed && fresh && fresh.identity === credentials.identity
+                ? next(authorized(fresh))
                 : throwError(() => error);
             })
           );

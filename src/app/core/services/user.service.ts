@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { UserReliability } from '../models/user-reliability.model';
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
+import { Injectable, InjectionToken, OnDestroy, inject } from '@angular/core';
+import { BehaviorSubject, Observable, catchError, defer, finalize, firstValueFrom, from, map, of, shareReplay, tap, throwError, timer } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse } from '../../shared/models/api/auth/authResponse';
 import { User } from '../../shared/models/user';
@@ -40,12 +40,25 @@ interface LogoutRequest {
 }
 
 interface UserSession {
+  /** Stable per login, not per token rotation. Optional for pre-existing sessions. */
+  sessionId?: string;
   user: User;
   accessToken: string;
   refreshToken: string | null;
   tokenType: string;
   expiresAt: string;
 }
+
+interface CachedSessionProfile {
+  identity: string;
+  user: User;
+}
+
+/** Native origin-scoped lock, shared by all tabs in secure browser contexts. */
+export const BROWSER_SESSION_LOCKS = new InjectionToken<LockManager | null>('Browser session locks', {
+  providedIn: 'root',
+  factory: () => typeof navigator !== 'undefined' && navigator.locks ? navigator.locks : null
+});
 
 type RefreshTokenResponse = Omit<AuthResponse, 'user'> & Partial<Pick<AuthResponse, 'user'>>;
 export type SocialAuthProvider = 'google' | 'discord';
@@ -96,16 +109,33 @@ export interface DiscordConsolidationResult {
 @Injectable({
   providedIn: 'root'
 })
-export class UserService {
+export class UserService implements OnDestroy {
   private readonly storageKey = 'logged_user';
+  private readonly profileKey = 'logged_user_profile';
+  private readonly locks = inject(BROWSER_SESSION_LOCKS);
+  private lastStoredSession: string | null = null;
+  private lastStoredProfile: string | null = null;
   private readonly socialLoginReturnUrlKey = 'social_login_return_url';
   private readonly accountConsolidatedNoticeKey = 'account_consolidated_notice';
   private session: UserSession | null = this.loadUserFromStorage();
   private refreshInFlight$: Observable<boolean> | null = null;
+  private refreshingIdentity: string | null = null;
   private readonly currentUserSubject = new BehaviorSubject<User | null>(this.session?.user ?? null);
   readonly user$ = this.currentUserSubject.asObservable();
 
-  constructor(private http: HttpClient) { }
+  private readonly onStorage = (event: StorageEvent): void => {
+    if (event.key === null || event.key === this.storageKey || event.key === this.profileKey) {
+      this.syncSession();
+    }
+  };
+
+  constructor(private http: HttpClient) {
+    if (typeof window !== 'undefined') window.addEventListener('storage', this.onStorage);
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') window.removeEventListener('storage', this.onStorage);
+  }
 
   login(email: string, password: string, rememberMe: boolean): Observable<User> {
     const endpoint = `${environment.apiBaseUrl}/auth/login`;
@@ -320,6 +350,7 @@ export class UserService {
 
     if (accessToken) {
       const session: UserSession = {
+        sessionId: this.newSessionId(),
         user: this.getUserFromCallback(params),
         accessToken,
         refreshToken,
@@ -366,82 +397,121 @@ export class UserService {
   }
 
   logout(): Observable<boolean> {
-    const endpoint = `${environment.apiBaseUrl}/auth/logout`;
-    const currentSession = this.session;
-
-    if (!currentSession?.refreshToken) {
+    const requestedIdentity = this.getSessionIdentity();
+    if (!requestedIdentity) return of(true);
+    // Serialize logout with a rotation so the API revokes the latest token.
+    return this.withSessionLock(() => {
+      this.syncSession();
+      const current = this.session;
+      if (!current || this.identity(current) !== requestedIdentity) return of(true);
       this.clearSession();
-      return of(true);
-    }
-
-    const payload: LogoutRequest = { refresh_token: currentSession.refreshToken };
-
-    return this.http.post(endpoint, payload).pipe(
-      map(() => true),
-      catchError(() => of(false)),
-      tap(() => this.clearSession())
-    );
+      if (!current.refreshToken) return of(true);
+      const payload: LogoutRequest = { refresh_token: current.refreshToken };
+      return this.http.post(`${environment.apiBaseUrl}/auth/logout`, payload).pipe(
+        map(() => true),
+        catchError(() => of(false))
+      );
+    });
   }
 
-  refreshToken(): Observable<boolean> {
-    // Refresh tokens are rotated on the API: parallel callers must share one
-    // request, or the second refresh will fail with a revoked old token.
-    if (this.refreshInFlight$) return this.refreshInFlight$;
-
-    const currentSession = this.session;
-    if (!currentSession?.refreshToken) {
-      this.clearSession();
+  refreshToken(expectedIdentity?: string): Observable<boolean> {
+    this.syncSession();
+    const requested = this.session;
+    if (expectedIdentity && (!requested || this.identity(requested) !== expectedIdentity)) return of(false);
+    if (!requested?.refreshToken) {
+      if (requested) this.clearSession();
       return of(false);
     }
+    const identity = this.identity(requested);
+    if (this.refreshInFlight$ && this.refreshingIdentity === identity) return this.refreshInFlight$;
 
-    const endpoint = `${environment.apiBaseUrl}/auth/refresh`;
-    const refresh$ = this.http.post<RefreshTokenResponse>(
-      endpoint, { refresh_token: currentSession.refreshToken }
-    ).pipe(
-      map(response => {
-        // Logout or a new login may have replaced the session while in flight.
-        // Never resurrect an old session with a late refresh response.
-        if (this.session?.refreshToken !== currentSession.refreshToken) return false;
-        this.setSession(this.mapAuthResponseToSession(response, currentSession.user));
-        return true;
-      }),
-      catchError((error: unknown) => {
-        // Only definitive credential rejection ends the session. Network loss,
-        // throttling and 5xx responses must leave it available for a retry.
-        const transient = error instanceof HttpErrorResponse && (
-          error.status === 0 || error.status === 408 ||
-          error.status === 429 || error.status >= 500
-        );
-        if (!transient && this.session?.refreshToken === currentSession.refreshToken) {
-          this.clearSession();
+    // In addition to sharing the single-tab request, coordinate with other
+    // tabs before sending a rotating credential. Always reread storage inside
+    // the lock: a tab that waited may already have fresh credentials.
+    const refresh$ = this.withSessionLock(() => this.refreshCurrentSession(requested)).pipe(
+      catchError(() => of(false)),
+      finalize(() => {
+        if (this.refreshInFlight$ === refresh$) {
+          this.refreshInFlight$ = null;
+          this.refreshingIdentity = null;
         }
-        return of(false);
       }),
-      finalize(() => { this.refreshInFlight$ = null; }),
       shareReplay({ bufferSize: 1, refCount: false })
     );
+    this.refreshingIdentity = identity;
     this.refreshInFlight$ = refresh$;
     return refresh$;
   }
 
+  private withSessionLock<T>(action: () => Observable<T>): Observable<T> {
+    if (!this.locks) return defer(action);
+    return defer(() => from(this.locks!.request('brf.auth.session.v1',
+      () => firstValueFrom(action()))));
+  }
+
+  private refreshCurrentSession(requested: UserSession): Observable<boolean> {
+    this.syncSession();
+    const current = this.session;
+    if (!current?.refreshToken || this.identity(current) !== this.identity(requested)) return of(false);
+    if (current.refreshToken !== requested.refreshToken && this.hasValidToken(current)) return of(true);
+
+    return this.http.post<RefreshTokenResponse>(
+      `${environment.apiBaseUrl}/auth/refresh`, { refresh_token: current.refreshToken }
+    ).pipe(
+      map(response => {
+        this.syncSession();
+        if (!this.session || this.identity(this.session) !== this.identity(current) ||
+            this.session.refreshToken !== current.refreshToken) {
+          // A logout/new login or another rotation won. Never revive old
+          // credentials or replace a newly authenticated account.
+          return !!this.session && this.identity(this.session) === this.identity(current) &&
+            this.hasValidToken(this.session);
+        }
+        const next = this.mapAuthResponseToSession(response, this.session.user);
+        if (!next.refreshToken) throw new Error('Refresh response missing rotated credential.');
+        this.setSession({ ...next, sessionId: current.sessionId });
+        return true;
+      }),
+      catchError((error: unknown) => {
+        // Only the refresh endpoint's explicit credential rejection ends a
+        // session. Connectivity, throttling, server/protocol errors do not.
+        if (!(error instanceof HttpErrorResponse) || ![400, 401, 403].includes(error.status)) {
+          return of(false);
+        }
+        const resolveRejection = (): boolean => {
+          this.syncSession();
+          if (!this.session || this.identity(this.session) !== this.identity(current)) return false;
+          if (this.session.refreshToken !== current.refreshToken) return this.hasValidToken(this.session);
+          this.clearSession();
+          return false;
+        };
+        // Older browsers lack an atomic cross-tab lock. Allow a competing
+        // successful rotation a short opportunity to publish before treating
+        // the stale token as rejected. Never retry a consumed credential.
+        return this.locks ? of(resolveRejection()) : timer(1500).pipe(map(resolveRejection));
+      })
+    );
+  }
+
   getUserDetails(): Observable<User | null> {
-    const currentSession = this.session;
+    this.syncSession();
+    const current = this.session;
+    if (!current?.accessToken) return of(null);
 
-    if (!currentSession?.accessToken) {
-      return of(null);
-    }
-
-    const endpoint = `${environment.apiBaseUrl}/user`;
-    return this.http.get<User>(endpoint).pipe(
-      tap((userDetails) => {
-        // The refresh token may have rotated while /user was in flight.
-        // Retain the newest credentials instead of restoring stale tokens.
-        if (this.session?.user.id === currentSession.user.id) {
-          this.setSession({ ...this.session, user: userDetails });
+    const currentUserForRequest = (): User | null => {
+      this.syncSession();
+      return this.session && this.identity(this.session) === this.identity(current) ? this.session.user : null;
+    };
+    return this.http.get<User>(`${environment.apiBaseUrl}/user`).pipe(
+      tap(userDetails => {
+        this.syncSession();
+        if (this.session && this.identity(this.session) === this.identity(current) &&
+            userDetails.id === current.user.id) {
+          this.cacheProfile(userDetails);
         }
       }),
-      map(() => this.session?.user ?? null),
-      catchError(() => of(this.session?.user ?? null))
+      map(currentUserForRequest),
+      catchError(() => of(currentUserForRequest()))
     );
   }
 
@@ -460,32 +530,51 @@ export class UserService {
   }
 
   getUser(): User | null {
+    this.syncSession();
     return this.session?.user ?? null;
   }
 
+  getSessionIdentity(): string | null {
+    return this.getSessionCredentials()?.identity ?? null;
+  }
+
+  /** Atomic in-memory snapshot: callers must not mix credentials read from
+   * distinct storage revisions while another tab changes accounts. */
+  getSessionCredentials(): { identity: string; accessToken: string; tokenType: string } | null {
+    this.syncSession();
+    const session = this.session;
+    return session ? { identity: this.identity(session), accessToken: session.accessToken,
+      tokenType: session.tokenType } : null;
+  }
+
   updateCachedUser(patch: Partial<Pick<User, 'name' | 'profileImageUrl'>>): User {
+    this.syncSession();
     if (!this.session) {
       throw new Error('Não há sessão ativa para atualizar o perfil.');
     }
 
     const user: User = { ...this.session.user, ...patch };
-    this.setSession({ ...this.session, user });
+    this.cacheProfile(user);
     return user;
   }
 
   getAccessToken(): string | null {
+    this.syncSession();
     return this.session?.accessToken ?? null;
   }
 
   hasRecoverableSession(): boolean {
+    this.syncSession();
     return Boolean(this.session?.refreshToken);
   }
 
   getTokenType(): string {
+    this.syncSession();
     return this.session?.tokenType ?? 'Bearer';
   }
 
   ensureValidSession(): Observable<boolean> {
+    this.syncSession();
     if (!this.session) {
       return of(false);
     }
@@ -504,15 +593,58 @@ export class UserService {
     return `${environment.apiBaseUrl}/auth/oauth2/${provider}?frontend_origin=${frontendOrigin}`;
   }
 
+  private newSessionId(): string {
+    // An opaque client-side correlation ID, never an authorization credential.
+    return globalThis.crypto.randomUUID?.() ??
+      Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),
+        byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  private identity(session: UserSession): string {
+    return session.sessionId
+      ? `login:${session.user.id}:${session.sessionId}`
+      : `legacy:${session.user.id}`;
+  }
+
   private setSession(session: UserSession): void {
+    const raw = JSON.stringify(session);
+    localStorage.setItem(this.storageKey, raw);
+    this.lastStoredSession = raw;
     this.session = session;
-    localStorage.setItem(this.storageKey, JSON.stringify(session));
     this.currentUserSubject.next(session.user);
+  }
+
+  private cacheProfile(user: User): void {
+    if (!this.session) return;
+    // Profile writes never touch the credential bundle. A stale tab cannot
+    // overwrite a refresh token even if it updates a user at the same time.
+    const raw = JSON.stringify({ identity: this.identity(this.session), user });
+    localStorage.setItem(this.profileKey, raw);
+    this.lastStoredProfile = raw;
+    this.session = { ...this.session, user };
+    this.currentUserSubject.next(user);
+  }
+
+  private syncSession(): void {
+    const raw = localStorage.getItem(this.storageKey);
+    const profile = localStorage.getItem(this.profileKey);
+    if (raw === this.lastStoredSession && profile === this.lastStoredProfile) return;
+    this.lastStoredSession = raw;
+    this.lastStoredProfile = profile;
+    const previous = this.session;
+    this.session = this.parseStoredSession(raw, profile);
+    if ((previous ? this.identity(previous) : null) !== (this.session ? this.identity(this.session) : null) ||
+        JSON.stringify(previous?.user ?? null) !== JSON.stringify(this.session?.user ?? null)) {
+      this.currentUserSubject.next(this.session?.user ?? null);
+    }
   }
 
   private clearSession(): void {
     this.session = null;
     localStorage.removeItem(this.storageKey);
+    localStorage.removeItem(this.profileKey);
+    this.lastStoredSession = null;
+    this.lastStoredProfile = null;
     localStorage.removeItem('hideDiscordWarning');
     this.currentUserSubject.next(null);
   }
@@ -537,6 +669,7 @@ export class UserService {
     }
 
     return {
+      sessionId: this.newSessionId(),
       user,
       accessToken,
       refreshToken,
@@ -567,17 +700,30 @@ export class UserService {
   }
 
   private loadUserFromStorage(): UserSession | null {
-    const rawSession = localStorage.getItem(this.storageKey);
+    this.lastStoredSession = localStorage.getItem(this.storageKey);
+    this.lastStoredProfile = localStorage.getItem(this.profileKey);
+    return this.parseStoredSession(this.lastStoredSession, this.lastStoredProfile);
+  }
 
-    if (!rawSession) {
-      return null;
-    }
-
+  private parseStoredSession(raw: string | null, profile: string | null): UserSession | null {
+    if (!raw) return null;
+    let session: UserSession;
     try {
-      return JSON.parse(rawSession) as UserSession;
+      session = JSON.parse(raw) as UserSession;
+      if (!session?.user || !session.accessToken) return null;
     } catch {
-      localStorage.removeItem(this.storageKey);
       return null;
     }
+    if (profile) {
+      try {
+        const cached = JSON.parse(profile) as CachedSessionProfile;
+        if (cached.identity === this.identity(session) && cached.user?.id === session.user.id) {
+          session = { ...session, user: cached.user };
+        }
+      } catch {
+        // Invalid cached profile must not invalidate otherwise valid tokens.
+      }
+    }
+    return session;
   }
 }

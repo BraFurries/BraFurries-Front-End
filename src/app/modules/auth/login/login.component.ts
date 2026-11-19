@@ -56,7 +56,7 @@ export class LoginComponent implements OnDestroy {
     this.loginForm = new FormGroup({
       email: new FormControl('', [Validators.required]),
       password: new FormControl('', [Validators.required]),
-      rememberMe: new FormControl(false)
+      rememberMe: new FormControl(true)
     });
   }
 

@@ -1,8 +1,8 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 import { User } from '../../shared/models/user';
-import { UserService } from './user.service';
+import { BROWSER_SESSION_LOCKS, UserService } from './user.service';
 
 describe('UserService cached user state', () => {
   let service: UserService;
@@ -11,7 +11,9 @@ describe('UserService cached user state', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({ providers: [UserService, provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({ providers: [UserService, provideHttpClient(), provideHttpClientTesting(),
+      { provide: BROWSER_SESSION_LOCKS, useValue: null }
+    ] });
     service = TestBed.inject(UserService);
     http = TestBed.inject(HttpTestingController);
   });
@@ -116,7 +118,7 @@ describe('UserService cached user state', () => {
     expect(service.getUser()?.name).toBe('Luna atualizado');
   });
 
-  it('discards refresh credentials when the server rejects them as invalid', () => {
+  it('discards refresh credentials when the server rejects them as invalid', fakeAsync(() => {
     service.login('luna@example.com', 'password', false).subscribe();
     http.expectOne((request) => request.url.endsWith('/auth/login')).flush({
       access_token: 'old-access', refresh_token: 'revoked-refresh', expires_in: 0, user
@@ -126,9 +128,104 @@ describe('UserService cached user state', () => {
     http.expectOne((request) => request.url.endsWith('/auth/refresh'))
       .flush({ message: 'invalid refresh token' }, { status: 401, statusText: 'Unauthorized' });
 
+    tick(1500);
     expect(refreshed).toBeFalse();
     expect(service.getAccessToken()).toBeNull();
     expect(localStorage.getItem('logged_user')).toBeNull();
+  }));
+
+  function loginForTabs(): void {
+    service.login('luna@example.com', 'password', true).subscribe();
+    http.expectOne(request => request.url.endsWith('/auth/login')).flush({
+      access_token: 'old-access', refresh_token: 'old-refresh', expires_in: 0, user
+    });
+  }
+
+  function publishOtherTabSession(patch: Record<string, unknown>): void {
+    const current = JSON.parse(localStorage.getItem('logged_user')!);
+    const next = JSON.stringify({ ...current, ...patch });
+    localStorage.setItem('logged_user', next);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'logged_user', newValue: next }));
+  }
+
+  it('adopts another tab rotation before making any authenticated request', () => {
+    loginForTabs();
+    publishOtherTabSession({ accessToken: 'other-access', refreshToken: 'other-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    let valid: boolean | undefined;
+    service.ensureValidSession().subscribe(result => valid = result);
+    expect(valid).toBeTrue();
+    expect(service.getAccessToken()).toBe('other-access');
+    http.expectNone(request => request.url.endsWith('/auth/refresh'));
+  });
+
+  it('does not erase another tab rotation after a stale refresh rejection', fakeAsync(() => {
+    loginForTabs();
+    let result: boolean | undefined;
+    service.refreshToken().subscribe(value => result = value);
+    http.expectOne(request => request.url.endsWith('/auth/refresh')).flush({}, {
+      status: 401, statusText: 'Unauthorized'
+    });
+    publishOtherTabSession({ accessToken: 'winner-access', refreshToken: 'winner-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    tick(1500);
+    expect(result).toBeTrue();
+    expect(service.getAccessToken()).toBe('winner-access');
+    expect(JSON.parse(localStorage.getItem('logged_user')!).refreshToken).toBe('winner-refresh');
+  }));
+
+  it('does not put obsolete tokens back in storage when a profile response arrives', () => {
+    loginForTabs();
+    service.getUserDetails().subscribe();
+    const details = http.expectOne(request => request.url.endsWith('/user'));
+    publishOtherTabSession({ accessToken: 'other-access', refreshToken: 'other-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    const credentials = localStorage.getItem('logged_user');
+    details.flush({ ...user, name: 'Nome atualizado' });
+    service.updateCachedUser({ name: 'Nome editado' });
+    expect(localStorage.getItem('logged_user')).toBe(credentials);
+    expect(service.getUser()?.name).toBe('Nome editado');
+    expect(JSON.parse(localStorage.getItem('logged_user_profile')!).user.name).toBe('Nome editado');
+  });
+
+  it('discards an old user-details response after a new login for the same user', () => {
+    loginForTabs();
+    let details: User | null | undefined;
+    service.getUserDetails().subscribe(value => details = value);
+    const pending = http.expectOne(request => request.url.endsWith('/user'));
+    publishOtherTabSession({ sessionId: 'new-session', user: { ...user, name: 'Novo login' },
+      accessToken: 'new-access', refreshToken: 'new-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    pending.flush({ ...user, name: 'Resposta antiga' });
+    expect(details).toBeNull();
+    expect(service.getUser()?.name).toBe('Novo login');
+    expect(service.getAccessToken()).toBe('new-access');
+    expect(localStorage.getItem('logged_user_profile')).toBeNull();
+  });
+
+  it('propagates logout from another tab and drops delayed refresh results', () => {
+    loginForTabs();
+    let result: boolean | undefined;
+    service.refreshToken().subscribe(value => result = value);
+    const pending = http.expectOne(request => request.url.endsWith('/auth/refresh'));
+    localStorage.removeItem('logged_user');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'logged_user', newValue: null }));
+    pending.flush({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 900 });
+    expect(result).toBeFalse();
+    expect(service.getUser()).toBeNull();
+    expect(localStorage.getItem('logged_user')).toBeNull();
+  });
+
+  it('does not replace a newer login for the same user after a delayed rotation', () => {
+    loginForTabs();
+    let result: boolean | undefined;
+    service.refreshToken().subscribe(value => result = value);
+    const pending = http.expectOne(request => request.url.endsWith('/auth/refresh'));
+    publishOtherTabSession({ sessionId: 'distinct-login', accessToken: 'new-login',
+      refreshToken: 'new-login-refresh', expiresAt: new Date(Date.now() + 900000).toISOString() });
+    pending.flush({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 900 });
+    expect(result).toBeFalse();
+    expect(service.getAccessToken()).toBe('new-login');
   });
 
   it('builds social login URL with the current frontend origin', () => {
@@ -219,4 +316,75 @@ describe('UserService cached user state', () => {
     service.logout().subscribe();
     expect(emitted.at(-1)).toBeNull();
   });
+});
+
+describe('UserService origin-wide session lock', () => {
+  let first: UserService;
+  let second: UserService;
+  let http: HttpTestingController;
+  const user: User = { id: 7, name: 'Artista', email: 'artist@example.invalid',
+    profileImageUrl: null, roles: [], permissions: [] };
+
+  beforeEach(() => {
+    localStorage.clear();
+    let queue: Promise<unknown> = Promise.resolve();
+    // A deterministic, shared exclusive lock models two independently
+    // constructed services/tabs sharing the browser's lock manager.
+    const locks = {
+      request: (_name: string, action: () => Promise<unknown>) => {
+        const result = queue.then(action);
+        queue = result.then(() => undefined, () => undefined);
+        return result;
+      }
+    };
+    TestBed.configureTestingModule({ providers: [UserService, provideHttpClient(),
+      provideHttpClientTesting(), { provide: BROWSER_SESSION_LOCKS, useValue: locks }] });
+    first = TestBed.inject(UserService);
+    http = TestBed.inject(HttpTestingController);
+    first.login('artist@example.invalid', 'password', true).subscribe();
+    http.expectOne(request => request.url.endsWith('/auth/login')).flush({
+      access_token: 'expired', refresh_token: 'original', expires_in: 0, user
+    });
+    second = TestBed.runInInjectionContext(() => new UserService(TestBed.inject(HttpClient)));
+  });
+
+  afterEach(() => {
+    second.ngOnDestroy();
+    http.verify();
+    localStorage.clear();
+  });
+
+  it('rotates only once across two tabs and keeps both authenticated', fakeAsync(() => {
+    const results: boolean[] = [];
+    first.ensureValidSession().subscribe(value => results.push(value));
+    second.ensureValidSession().subscribe(value => results.push(value));
+    flushMicrotasks();
+    const pending = http.match(request => request.url.endsWith('/auth/refresh'));
+    expect(pending.length).toBe(1);
+    expect(pending[0].request.body.refresh_token).toBe('original');
+    pending[0].flush({ access_token: 'fresh', refresh_token: 'rotated', expires_in: 900 });
+    flushMicrotasks();
+    expect(results).toEqual([true, true]);
+    expect(first.getAccessToken()).toBe('fresh');
+    expect(second.getAccessToken()).toBe('fresh');
+    http.expectNone(request => request.url.endsWith('/auth/refresh'));
+  }));
+
+  it('waits for the rotation before revoking the newly issued token on logout', fakeAsync(() => {
+    // A subscription to refresh queues the lock before the other tab logs out.
+    first.refreshToken().subscribe();
+    second.logout().subscribe();
+    flushMicrotasks();
+    http.expectNone(request => request.url.endsWith('/auth/logout'));
+    http.expectOne(request => request.url.endsWith('/auth/refresh'))
+      .flush({ access_token: 'fresh', refresh_token: 'rotated', expires_in: 900 });
+    flushMicrotasks();
+    const logout = http.expectOne(request => request.url.endsWith('/auth/logout'));
+    expect(logout.request.body.refresh_token).toBe('rotated');
+    logout.flush({ message: 'ok' });
+    flushMicrotasks();
+    expect(first.getUser()).toBeNull();
+    expect(second.getUser()).toBeNull();
+    expect(localStorage.getItem('logged_user')).toBeNull();
+  }));
 });
