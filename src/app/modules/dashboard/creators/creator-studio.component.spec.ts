@@ -121,7 +121,7 @@ describe('CreatorStudioComponent', () => {
   it('uses one stage view with its process selector inside the main card and restores drag per scope', () => {
     const group = fixture.nativeElement.querySelector('[aria-label="Modo de visualização"]');
     expect(Array.from(group.querySelectorAll('button')).map(button => (button as HTMLElement).textContent?.trim())).toEqual([
-      'Situação dos pedidos','Etapas da produção','Lista de pedidos'
+      'Situação dos pedidos','Etapas da produção','Calendário','Lista de pedidos'
     ]);
     const model = {id:33,name:'Ícones',isDefault:false,
       steps:[{id:1,name:'Rascunho',position:0,stageDefinitionId:7},
