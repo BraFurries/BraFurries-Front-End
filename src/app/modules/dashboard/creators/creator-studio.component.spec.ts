@@ -10,6 +10,7 @@ import { UserService } from '../../../core/services/user.service';
 import { User } from '../../../shared/models/user';
 import { CreatorStudioComponent } from './creator-studio.component';
 import { CreatorStageBoardComponent } from './creator-stage-board.component';
+import { CreatorCalendarComponent } from './creator-calendar.component';
 
 describe('CreatorStudioComponent', () => {
   let component: CreatorStudioComponent;
@@ -43,7 +44,7 @@ describe('CreatorStudioComponent', () => {
       ['myAccess', 'commissions', 'create', 'update', 'changeStatus',
         'artTypes', 'workflows', 'stageDefinitions', 'commissionSteps',
         'addCommissionStep', 'updateCommissionStep', 'deleteCommissionStep',
-        'copyWorkflowToCommission', 'retention', 'exportMyData', 'commissionsForBoard', 'moveCommissionToStep']);
+        'copyWorkflowToCommission', 'retention', 'exportMyData', 'commissionsForBoard', 'moveCommissionToStep','calendar','unplannedCalendar','setPlanningDate']);
     studio.myAccess.and.returnValue(of(pro));
     studio.commissions.and.callFake((status, page, pageSize) => of({
       items: status === 'QUEUED' || status === null ? [card] : [],
@@ -53,6 +54,8 @@ describe('CreatorStudioComponent', () => {
     studio.create.and.returnValue(of(card));
     studio.update.and.returnValue(of(card));
     studio.changeStatus.and.returnValue(of({...card,status:'COMPLETED'}));
+    studio.calendar.and.returnValue(of({items:[],hasMore:false}));
+    studio.unplannedCalendar.and.returnValue(of({items:[],hasMore:false}));
     studio.artTypes.and.returnValue(of([]));
     studio.workflows.and.returnValue(of([]));
     studio.stageDefinitions.and.returnValue(of([]));
@@ -70,7 +73,7 @@ describe('CreatorStudioComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [CreatorStudioComponent, CreatorStageBoardComponent],
-      imports: [CommonModule, FormsModule, DragDropModule, RouterModule.forRoot([])],
+      imports: [CommonModule, FormsModule, DragDropModule, CreatorCalendarComponent, RouterModule.forRoot([])],
       providers: [
         {provide: CreatorStudioService, useValue: studio},
         {provide: UserService, useValue: users}
@@ -86,6 +89,15 @@ describe('CreatorStudioComponent', () => {
     user$.complete();
     localStorage.removeItem('brf.creator-studio.privacy-notice.v1.' + user.id);
     localStorage.removeItem('brf.creator-studio.privacy-notice.v1.51');
+  });
+
+  it('opens calendar as a fourth operational view with bounded date queries', () => {
+    component.setViewMode('calendar');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Sem planejamento');
+    expect(studio.calendar).toHaveBeenCalledTimes(1);
+    expect(studio.unplannedCalendar).toHaveBeenCalledWith(1,40);
+    expect(fixture.debugElement.query(By.directive(CreatorCalendarComponent))).not.toBeNull();
   });
 
   it('shows four production lanes at once, each with its own server-side total', () => {
