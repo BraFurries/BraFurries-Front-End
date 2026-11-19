@@ -30,12 +30,13 @@
   </section>
 
   <ng-container *ngIf="!loadingAccess && allowed">
-    <p *ngIf="loading" role="status" class="rounded-xl bg-white p-4 text-sm text-gray-600">
-      Carregando referências e histórico...
+    <p *ngIf="loading && !commission" role="status" class="rounded-xl bg-white p-4 text-sm text-gray-600">
+      Carregando pedido...
     </p>
     <p *ngIf="error" role="alert"
       class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
       {{ error }}
+      <button type="button" (click)="load()" [disabled]="loading || busy" class="ml-2 font-semibold underline">Tentar novamente</button>
     </p>
     <p *ngIf="actionError" role="alert"
       class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -46,10 +47,126 @@
       {{ notice }}
     </p>
 
-    <app-creator-calendar *ngIf="commission" [commissionId]="commission.id" class="block min-w-0"></app-creator-calendar>
+    <ng-container *ngIf="commission as c">
+      <nav aria-label="Conteúdo do pedido" class="flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-1">
+        <button type="button" (click)="tab='overview'" [attr.aria-pressed]="tab==='overview'" [ngClass]="tab==='overview'?'bg-braPurple text-white':'text-gray-600 hover:bg-gray-50'" class="rounded-lg px-4 py-2 text-sm font-semibold">Pedido e produção</button>
+        <button type="button" (click)="tab='references'" [attr.aria-pressed]="tab==='references'" [ngClass]="tab==='references'?'bg-braPurple text-white':'text-gray-600 hover:bg-gray-50'" class="rounded-lg px-4 py-2 text-sm font-semibold">Referências <span class="opacity-70">({{ references.length }})</span></button>
+        <button type="button" (click)="tab='history'" [attr.aria-pressed]="tab==='history'" [ngClass]="tab==='history'?'bg-braPurple text-white':'text-gray-600 hover:bg-gray-50'" class="rounded-lg px-4 py-2 text-sm font-semibold">Histórico <span class="opacity-70">({{ totalActivity }})</span></button>
+      </nav>
+      <div *ngIf="tab==='overview'" class="space-y-5">
+        <section class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Situação do pedido</p>
+              <p class="mt-1 font-amaranth text-xl font-bold text-braDark">{{ statusName(c.status) }}</p>
+            </div>
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <select aria-label="Nova situação do pedido" [(ngModel)]="statusDraft" [disabled]="!canManage" class="min-w-0 rounded-lg border bg-white px-3 py-2 text-sm">
+                <option *ngFor="let status of statuses" [ngValue]="status.value">{{ status.label }}</option>
+              </select>
+              <button type="button" (click)="saveStatus()" [disabled]="!canManage || statusDraft===c.status" class="rounded-lg bg-braPurple px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">Alterar situação</button>
+            </div>
+          </div>
+          <p *ngIf="statusDraft==='COMPLETED' && c.status!=='COMPLETED'" class="mt-3 text-xs text-gray-600">Concluir retira o pedido da fila ativa e inicia a política de retenção do Studio. Você pode reabrir o pedido enquanto ele estiver disponível.</p>
+        </section>
+        <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="font-amaranth text-xl font-bold text-braDark">Dados do pedido</h2>
+            <button *ngIf="!orderDraft" type="button" (click)="startOrderEdit()" [disabled]="!canManage" class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-40">Editar dados</button>
+          </div>
+          <ng-container *ngIf="orderDraft as draft; else orderSummary">
+            <form (ngSubmit)="saveOrder()" class="space-y-4">
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="block text-sm font-semibold">Título *<input name="title" [(ngModel)]="draft.title" required maxlength="160" [disabled]="!canManage" class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></label>
+                <label class="block text-sm font-semibold">Cliente *<input name="clientName" [(ngModel)]="draft.clientName" required maxlength="120" [disabled]="!canManage" class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></label>
+                <label class="block text-sm font-semibold">Data do pedido *<input type="date" name="requestedOn" [(ngModel)]="draft.requestedOn" required [disabled]="!canManage" class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></label>
+                <label class="block text-sm font-semibold">Prazo de entrega<input type="date" name="dueOn" [(ngModel)]="draft.dueOn" [disabled]="!canManage" class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></label>
+                <label class="block text-sm font-semibold sm:col-span-2">Tipo de arte<select name="artTypeId" [(ngModel)]="draft.artTypeId" [disabled]="!canManage" class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal"><option [ngValue]="null">Não definido</option><option *ngFor="let type of artTypes" [ngValue]="type.id">{{ type.name }}</option></select></label>
+              </div>
+              <label class="block text-sm font-semibold">Descrição<textarea name="description" [(ngModel)]="draft.description" maxlength="8000" rows="4" [disabled]="!canManage" class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></textarea></label>
+              <label class="block text-sm font-semibold">Anotações privadas<textarea name="privateNotes" [(ngModel)]="draft.privateNotes" maxlength="8000" rows="3" [disabled]="!canManage" class="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"></textarea></label>
+              <p class="text-xs text-gray-500">Alterar o tipo de arte não substitui as etapas existentes.</p>
+              <div class="flex flex-wrap gap-2">
+                <button type="submit" [disabled]="!canManage || !draft.title.trim() || !draft.clientName.trim() || !draft.requestedOn" class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Salvar dados</button>
+                <button type="button" (click)="cancelOrderEdit()" [disabled]="busy || loading" class="rounded-lg border px-4 py-2 text-sm">Cancelar</button>
+              </div>
+            </form>
+          </ng-container>
+          <ng-template #orderSummary>
+            <dl class="grid gap-4 sm:grid-cols-3">
+              <div><dt class="text-xs text-gray-500">Data do pedido</dt><dd class="mt-1 text-sm font-medium">{{ formatCivilDate(c.requestedOn) }}</dd></div>
+              <div><dt class="text-xs text-gray-500">Prazo de entrega</dt><dd class="mt-1 text-sm font-medium">{{ formatCivilDate(c.dueOn)||'Sem prazo' }}</dd></div>
+              <div><dt class="text-xs text-gray-500">Tipo de arte</dt><dd class="mt-1 text-sm font-medium">{{ artTypeName(c.artTypeId) }}</dd></div>
+            </dl>
+            <div class="border-t border-gray-100 pt-3"><h3 class="text-xs font-semibold text-gray-500">Descrição</h3><p class="mt-1 whitespace-pre-wrap break-words text-sm">{{ c.description||'Nenhuma descrição.' }}</p></div>
+            <div class="border-t border-gray-100 pt-3"><h3 class="text-xs font-semibold text-gray-500">Anotações privadas</h3><p class="mt-1 whitespace-pre-wrap break-words text-sm">{{ c.privateNotes||'Nenhuma anotação.' }}</p></div>
+          </ng-template>
+        </section>
+        <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="font-amaranth text-xl font-bold text-braDark">Produção</h2>
+            <span *ngIf="steps.length" class="text-xs font-semibold text-gray-500">{{ completedSteps }} de {{ steps.length }} etapas finalizadas</span>
+          </div>
+          <div *ngIf="steps.length" class="h-1.5 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-braPurple transition-all" [style.width.%]="completedSteps/steps.length*100"></div></div>
+          <div *ngIf="steps.length" class="space-y-2 rounded-xl bg-gray-50 p-3">
+            <p class="text-xs font-semibold text-gray-500">Etapa atual</p>
+            <p class="font-semibold text-braDark">{{ c.currentStageName || (completedSteps===steps.length?'Todas finalizadas':'Não definida') }}</p>
+            <div *ngIf="c.status!=='COMPLETED'" class="flex flex-wrap gap-2">
+              <select aria-label="Etapa de destino" [(ngModel)]="targetStepId" [disabled]="!canManageProduction" class="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm">
+                <option [ngValue]="null">Mover para outra etapa</option>
+                <option *ngFor="let step of steps" [ngValue]="step.id">{{ step.position }} · {{ step.name }}</option>
+              </select>
+              <button type="button" (click)="moveToStep()" [disabled]="!canManageProduction || targetStepId===null" class="rounded-lg bg-braPurple px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">Mover pedido</button>
+            </div>
+            <p *ngIf="targetStepId!==null" class="text-xs text-gray-600">As etapas anteriores serão finalizadas, a escolhida ficará em execução e as posteriores voltarão a pendente. A situação do pedido não muda.</p>
+          </div>
+          <p *ngIf="c.status==='COMPLETED'" class="text-sm text-gray-500">Reabra o pedido para alterar a produção ou o planejamento.</p>
+          <p *ngIf="!steps.length" class="text-sm text-gray-500">Este pedido ainda não possui etapas. Você pode planejar a produção geral.</p>
+          <div *ngIf="generalPlanning as plan" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 p-3">
+            <div><p class="text-sm font-semibold text-braDark">Produção geral</p><p *ngIf="steps.length" class="text-xs text-gray-500">Planejamento anterior às etapas</p></div>
+            <ng-container *ngTemplateOutlet="planningControl; context: {$implicit:plan}"></ng-container>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <article *ngFor="let step of steps; let index=index" class="py-3">
+              <div class="flex flex-wrap items-start gap-3">
+                <span [ngClass]="step.status==='DONE'?'bg-braPurple text-white':'bg-gray-100 text-gray-600'" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">{{ step.status==='DONE'?'✓':index+1 }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="break-words text-sm font-semibold text-braDark">{{ step.name }} <span *ngIf="isCurrentStep(step)" class="ml-1 text-xs font-normal text-braPurple">· Atual</span></p>
+                  <p *ngIf="step.notes" class="mt-1 whitespace-pre-wrap break-words text-xs text-gray-500">{{ step.notes }}</p>
+                  <div *ngIf="planForStep(step) as plan" class="mt-2">
+                    <ng-container *ngTemplateOutlet="planningControl; context: {$implicit:plan}"></ng-container>
+                  </div>
+                </div>
+                <div class="flex max-w-full flex-wrap items-center gap-1.5">
+                  <select [attr.aria-label]="'Andamento de '+step.name" [(ngModel)]="stepStatusDrafts[step.id]" [disabled]="!canManageProduction" class="max-w-full rounded-lg border bg-white px-2 py-1.5 text-xs">
+                    <option *ngFor="let status of stepStatuses" [ngValue]="status.value">{{ status.label }}</option>
+                  </select>
+                  <button *ngIf="stepStatusDrafts[step.id]!==step.status" type="button" (click)="changeStepStatus(step.id,stepStatusDrafts[step.id])" [disabled]="!canManageProduction" class="rounded-md bg-braPurple px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Salvar etapa</button>
+                </div>
+              </div>
+            </article>
+          </div>
+          <p class="text-xs text-gray-500">Datas planejadas são dias de trabalho, independentes do prazo de entrega e da situação do pedido. Apenas uma etapa pode ficar em execução ou aguardando aprovação.</p>
+        </section>
+      </div>
 
-    <div *ngIf="commission" class="grid gap-5 lg:grid-cols-2">
-      <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <ng-template #planningControl let-plan>
+        <div *ngIf="planningKey!==planKey(plan); else planningEditor" class="flex flex-wrap items-center gap-2 text-xs">
+          <span [ngClass]="plan.date?'text-gray-700':'text-gray-500'">{{ plan.date ? formatCivilDate(plan.date) : 'Sem data planejada' }}</span>
+          <button *ngIf="canPlan(plan)" type="button" (click)="startPlanning(plan)" class="rounded-md border border-braPurple/20 px-2 py-1 font-semibold text-braPurple">{{ plan.date?'Alterar data':'Planejar' }}</button>
+          <span *ngIf="plan.stepStatus==='DONE' || c.status==='COMPLETED'" class="text-gray-400">· Histórico</span>
+        </div>
+        <ng-template #planningEditor>
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="date" aria-label="Data planejada" [(ngModel)]="planningDate" min="1900-01-01" max="9999-12-31" [disabled]="!canPlan(plan)" class="min-w-0 rounded-lg border bg-white px-2 py-1.5 text-sm">
+            <button type="button" (click)="savePlanning(plan)" [disabled]="!canPlan(plan) || !planningDate" class="rounded-lg bg-braPurple px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Salvar</button>
+            <button *ngIf="plan.date" type="button" (click)="savePlanning(plan,true)" [disabled]="!canPlan(plan)" class="text-xs font-semibold text-braPurple hover:underline">Retirar data</button>
+            <button type="button" (click)="cancelPlanning()" [disabled]="busy || loading" class="text-xs text-gray-600 hover:underline">Cancelar</button>
+          </div>
+        </ng-template>
+      </ng-template>
+
+      <section *ngIf="tab==='references'" class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div>
           <h2 class="font-amaranth text-xl font-bold text-braDark">Referências do pedido</h2>
           <p class="mt-1 text-sm text-gray-600">
@@ -72,11 +189,11 @@
             </a>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button type="button" (click)="editReference(ref)" [disabled]="busy"
+            <button type="button" (click)="editReference(ref)" [disabled]="busy || loading"
               class="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
               Editar
             </button>
-            <button type="button" (click)="deleteReference(ref)" [disabled]="busy"
+            <button type="button" (click)="deleteReference(ref)" [disabled]="busy || loading"
               class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">
               Excluir
             </button>
@@ -100,12 +217,12 @@
               class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal">
           </label>
           <div class="flex flex-wrap gap-2">
-            <button type="submit" [disabled]="busy || !referenceDraft.url.trim()"
+            <button type="submit" [disabled]="!canManage || !referenceDraft.url.trim()"
               class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
               {{ busy ? 'Salvando...' : 'Salvar referência' }}
             </button>
             <button *ngIf="editingReferenceId !== null" type="button"
-              (click)="cancelReference()" [disabled]="busy"
+              (click)="cancelReference()" [disabled]="busy || loading"
               class="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
               Cancelar
             </button>
@@ -114,7 +231,7 @@
         </form>
       </section>
 
-      <section class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section *ngIf="tab==='history'" class="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div>
           <h2 class="font-amaranth text-xl font-bold text-braDark">Histórico de revisões e atualizações</h2>
           <p class="mt-1 text-sm text-gray-600">
@@ -148,7 +265,7 @@
             não confirma que o cliente aprovou pela plataforma.
           </p>
           <button type="submit"
-            [disabled]="busy || !activityDraft.description.trim() || !activityDraft.occurredOn"
+            [disabled]="!canManage || !activityDraft.description.trim() || !activityDraft.occurredOn"
             class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {{ busy ? 'Registrando...' : 'Registrar atualização' }}
           </button>
@@ -192,6 +309,6 @@
           </p>
         </div>
       </section>
-    </div>
+    </ng-container>
   </ng-container>
 </section>
