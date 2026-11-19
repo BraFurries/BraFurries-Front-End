@@ -188,6 +188,21 @@ describe('UserService cached user state', () => {
     expect(JSON.parse(localStorage.getItem('logged_user_profile')!).user.name).toBe('Nome editado');
   });
 
+  it('discards an old user-details response after a new login for the same user', () => {
+    loginForTabs();
+    let details: User | null | undefined;
+    service.getUserDetails().subscribe(value => details = value);
+    const pending = http.expectOne(request => request.url.endsWith('/user'));
+    publishOtherTabSession({ sessionId: 'new-session', user: { ...user, name: 'Novo login' },
+      accessToken: 'new-access', refreshToken: 'new-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    pending.flush({ ...user, name: 'Resposta antiga' });
+    expect(details).toBeNull();
+    expect(service.getUser()?.name).toBe('Novo login');
+    expect(service.getAccessToken()).toBe('new-access');
+    expect(localStorage.getItem('logged_user_profile')).toBeNull();
+  });
+
   it('propagates logout from another tab and drops delayed refresh results', () => {
     loginForTabs();
     let result: boolean | undefined;
