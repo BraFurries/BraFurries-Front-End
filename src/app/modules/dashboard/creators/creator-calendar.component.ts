@@ -124,7 +124,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   trackDay(_index:number,day:CalendarDay):string { return day.date; }
-  trackItem(_index:number,item:CreatorCalendarItem):string { return this.key(item); }
+  readonly trackItem = (_index:number,item:CreatorCalendarItem):string => this.key(item);
   trackGroup(_index:number,group:UnplannedGroup):number { return group.id; }
   key(item:CreatorCalendarItem):string {return item.kind+':'+item.commissionId+':'+(item.stepId??'');}
   label(item:CreatorCalendarItem):string {
