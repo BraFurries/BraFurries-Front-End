@@ -1,17 +1,21 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { User } from '../../shared/models/user';
-import { UserService } from './user.service';
+import { BROWSER_SESSION_LOCKS, UserService } from './user.service';
 
 describe('UserService cached user state', () => {
   let service: UserService;
   let http: HttpTestingController;
+  let locks: LockManager | null;
   const user: User = { id: 1, name: 'Luna', email: 'luna@example.com', profileImageUrl: null, roles: ['member'], permissions: ['events:view'] };
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({ providers: [UserService, provideHttpClient(), provideHttpClientTesting()] });
+    locks = null;
+    TestBed.configureTestingModule({ providers: [UserService, provideHttpClient(), provideHttpClientTesting(),
+      { provide: BROWSER_SESSION_LOCKS, useFactory: () => locks }
+    ] });
     service = TestBed.inject(UserService);
     http = TestBed.inject(HttpTestingController);
   });
@@ -116,7 +120,7 @@ describe('UserService cached user state', () => {
     expect(service.getUser()?.name).toBe('Luna atualizado');
   });
 
-  it('discards refresh credentials when the server rejects them as invalid', () => {
+  it('discards refresh credentials when the server rejects them as invalid', fakeAsync(() => {
     service.login('luna@example.com', 'password', false).subscribe();
     http.expectOne((request) => request.url.endsWith('/auth/login')).flush({
       access_token: 'old-access', refresh_token: 'revoked-refresh', expires_in: 0, user
@@ -126,9 +130,89 @@ describe('UserService cached user state', () => {
     http.expectOne((request) => request.url.endsWith('/auth/refresh'))
       .flush({ message: 'invalid refresh token' }, { status: 401, statusText: 'Unauthorized' });
 
+    tick(1500);
     expect(refreshed).toBeFalse();
     expect(service.getAccessToken()).toBeNull();
     expect(localStorage.getItem('logged_user')).toBeNull();
+  }));
+
+  function loginForTabs(): void {
+    service.login('luna@example.com', 'password', true).subscribe();
+    http.expectOne(request => request.url.endsWith('/auth/login')).flush({
+      access_token: 'old-access', refresh_token: 'old-refresh', expires_in: 0, user
+    });
+  }
+
+  function publishOtherTabSession(patch: Record<string, unknown>): void {
+    const current = JSON.parse(localStorage.getItem('logged_user')!);
+    const next = JSON.stringify({ ...current, ...patch });
+    localStorage.setItem('logged_user', next);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'logged_user', newValue: next }));
+  }
+
+  it('adopts another tab rotation before making any authenticated request', () => {
+    loginForTabs();
+    publishOtherTabSession({ accessToken: 'other-access', refreshToken: 'other-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    let valid: boolean | undefined;
+    service.ensureValidSession().subscribe(result => valid = result);
+    expect(valid).toBeTrue();
+    expect(service.getAccessToken()).toBe('other-access');
+    http.expectNone(request => request.url.endsWith('/auth/refresh'));
+  });
+
+  it('does not erase another tab rotation after a stale refresh rejection', fakeAsync(() => {
+    loginForTabs();
+    let result: boolean | undefined;
+    service.refreshToken().subscribe(value => result = value);
+    http.expectOne(request => request.url.endsWith('/auth/refresh')).flush({}, {
+      status: 401, statusText: 'Unauthorized'
+    });
+    publishOtherTabSession({ accessToken: 'winner-access', refreshToken: 'winner-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    tick(1500);
+    expect(result).toBeTrue();
+    expect(service.getAccessToken()).toBe('winner-access');
+    expect(JSON.parse(localStorage.getItem('logged_user')!).refreshToken).toBe('winner-refresh');
+  }));
+
+  it('does not put obsolete tokens back in storage when a profile response arrives', () => {
+    loginForTabs();
+    service.getUserDetails().subscribe();
+    const details = http.expectOne(request => request.url.endsWith('/user'));
+    publishOtherTabSession({ accessToken: 'other-access', refreshToken: 'other-refresh',
+      expiresAt: new Date(Date.now() + 900000).toISOString() });
+    const credentials = localStorage.getItem('logged_user');
+    details.flush({ ...user, name: 'Nome atualizado' });
+    service.updateCachedUser({ name: 'Nome editado' });
+    expect(localStorage.getItem('logged_user')).toBe(credentials);
+    expect(service.getUser()?.name).toBe('Nome editado');
+    expect(JSON.parse(localStorage.getItem('logged_user_profile')!).user.name).toBe('Nome editado');
+  });
+
+  it('propagates logout from another tab and drops delayed refresh results', () => {
+    loginForTabs();
+    let result: boolean | undefined;
+    service.refreshToken().subscribe(value => result = value);
+    const pending = http.expectOne(request => request.url.endsWith('/auth/refresh'));
+    localStorage.removeItem('logged_user');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'logged_user', newValue: null }));
+    pending.flush({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 900 });
+    expect(result).toBeFalse();
+    expect(service.getUser()).toBeNull();
+    expect(localStorage.getItem('logged_user')).toBeNull();
+  });
+
+  it('does not replace a newer login for the same user after a delayed rotation', () => {
+    loginForTabs();
+    let result: boolean | undefined;
+    service.refreshToken().subscribe(value => result = value);
+    const pending = http.expectOne(request => request.url.endsWith('/auth/refresh'));
+    publishOtherTabSession({ sessionId: 'distinct-login', accessToken: 'new-login',
+      refreshToken: 'new-login-refresh', expiresAt: new Date(Date.now() + 900000).toISOString() });
+    pending.flush({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 900 });
+    expect(result).toBeFalse();
+    expect(service.getAccessToken()).toBe('new-login');
   });
 
   it('builds social login URL with the current frontend origin', () => {
