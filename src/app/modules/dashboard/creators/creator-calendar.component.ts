@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { CdkDragEnd, CdkDragMove, DragDropModule } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, Input, NgZone, OnChanges, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, Input, NgZone, OnChanges, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { distinctUntilChanged, forkJoin, Subject, takeUntil } from 'rxjs';
@@ -26,11 +26,15 @@ interface UnplannedGroup { id: number; title: string; clientName: string; items:
   templateUrl: './creator-calendar.component.html',
   styleUrls: ['./creator-calendar.component.css']
 })
-export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
+export class CreatorCalendarComponent implements OnInit, OnChanges, AfterViewChecked, OnDestroy {
   @Input() commissionId: number | null = null;
   @ViewChildren('calendarTarget', { read: ElementRef }) private targets!: QueryList<ElementRef<HTMLElement>>;
 
-  @ViewChild('dayDetails') private dayDetails?: ElementRef<HTMLElement>;
+  @ViewChild('dayDialog') private dayDialog?: ElementRef<HTMLDialogElement>;
+  @ViewChildren('agendaHeading', {read: ElementRef}) private agendaHeadings?: QueryList<ElementRef<HTMLElement>>;
+  dayModalOpen = false;
+  agendaFocusDay: string | null = null;
+  private pendingAgendaFocus: string | null = null;
   @ViewChild('calendarToolbar') private calendarToolbar?: ElementRef<HTMLElement>;
   readonly visibleItemsPerDay = 2;
   viewMode: 'month' | 'agenda' = 'month';
@@ -85,6 +89,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
         this.plannedExpanded = false;
         this.filter = 'ALL';
         this.viewMode = 'month';
+        this.agendaFocusDay=null;this.pendingAgendaFocus=null;
         this.month = this.today.slice(0,7)+'-01';
         this.selectedDay = this.today;
         this.reload();
@@ -95,7 +100,18 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     if (this.initialized) this.reload();
   }
 
+  ngAfterViewChecked(): void {
+    if(this.viewMode!=='agenda' || this.loading || !this.pendingAgendaFocus)return;
+    const date=this.pendingAgendaFocus;
+    const heading=this.agendaHeadings?.find(ref=>ref.nativeElement.dataset['agendaHeading']===date)?.nativeElement;
+    if(!heading)return;
+    this.pendingAgendaFocus=null;
+    heading.focus({preventScroll:true});
+    heading.scrollIntoView({block:'nearest'});
+  }
+
   ngOnDestroy(): void {
+    this.closeDayModal(true);
     this.sequence++;
     this.destroy$.next();
     this.destroy$.complete();
@@ -142,24 +158,49 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get agendaDays(): CalendarDay[] {
-    return this.days.filter(day=>day.inMonth && day.items.length>0);
+    return this.days.filter(day=>day.inMonth && (day.items.length>0 || day.date===this.agendaFocusDay));
   }
 
   setViewMode(mode:'month'|'agenda'):void {
     if(this.busy || this.draggedKey!==null || this.viewMode===mode)return;
+    this.closeDayModal();
+    this.agendaFocusDay=null;this.pendingAgendaFocus=null;
     this.viewMode=mode;
     this.monthMotion=null;
     this.cancelEdit();
   }
 
-  selectDay(date:string,showDetails=false):void {
-    if(this.loading || this.draggedKey!==null || !this.days.some(day=>day.date===date))return;
+  selectDay(date:string):void {
+    if(this.owner===null || this.viewMode!=='month' || this.loading || this.busy ||
+       this.draggedKey!==null || !this.days.some(day=>day.date===date))return;
+    const dialog=this.dayDialog?.nativeElement;
+    if(!dialog || dialog.open)return;
     this.selectedDay=date;
-    if(showDetails && this.dayDetails){
-      const heading=this.dayDetails.nativeElement;
-      heading.focus({preventScroll:true});
-      heading.scrollIntoView({block:'nearest'});
-    }
+    this.cancelEdit();
+    this.dayModalOpen=true;
+    dialog.showModal();
+  }
+
+  closeDayModal(force=false):void {
+    if(!force && this.busy)return;
+    if(this.dayModalOpen)this.cancelEdit();
+    this.dayModalOpen=false;
+    const dialog=this.dayDialog?.nativeElement;
+    if(dialog?.open)dialog.close();
+  }
+
+  cancelDayModal(event:Event):void {
+    event.preventDefault();
+    this.closeDayModal();
+  }
+
+  openDayInAgenda():void {
+    if(!this.dayModalOpen || this.monthNavigationDisabled || this.loading)return;
+    const date=this.selectedDay, month=date.slice(0,7)+'-01';
+    this.setViewMode('agenda');
+    // Adjacent-month cells belong to their actual month in the agenda.
+    if(month!==this.month)this.navigateMonth(month,date);
+    this.agendaFocusDay=date;this.pendingAgendaFocus=date;
   }
 
   itemStatus(item:CreatorCalendarItem):string {
@@ -205,7 +246,9 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     return seq===this.sequence && this.owner===owner && this.users.getUser()?.id===owner;
   }
 
-  private resetData():void {
+  private resetData(preserveDayModal=false):void {
+    if(!preserveDayModal)this.closeDayModal(true);
+    this.agendaFocusDay=null;this.pendingAgendaFocus=null;
     this.monthMotion=null;this.unplannedReady=false;
     this.events=[];this.unplanned=[];this.groups=[];this.detail=[];
     this.eventPage=1;this.unplannedPage=1;
@@ -214,9 +257,11 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     this.clearDrag();this.cancelEdit();this.buildDays();
   }
 
-  reload():void {
+  reload(preserveDayModal=false):void {
     const seq=++this.sequence, owner=this.owner;
-    this.resetData();
+    const focus=this.agendaFocusDay;
+    this.resetData(preserveDayModal && owner!==null);
+    if(this.viewMode==='agenda' && owner!==null)this.agendaFocusDay=focus;
     this.loading=owner!==null;
     if (owner===null) return;
     if (this.commissionId!==null) {
@@ -312,6 +357,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   private navigateMonth(month:string,selectedDay:string):void {
     const owner=this.owner;
     if(owner===null || this.monthNavigationDisabled)return;
+    this.closeDayModal();
+    this.agendaFocusDay=null;this.pendingAgendaFocus=null;
     if(month===this.month){this.selectedDay=selectedDay;return;}
     if(!this.unplannedReady){
       this.month=month;this.selectedDay=selectedDay;this.reload();return;
@@ -357,7 +404,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     if(!this.movable(item)||this.draggedKey!==null)return;
     this.editing=item;this.draftDate=item.date||this.selectedDay;this.error='';
     // Day details and agenda may be far below the shared editor.
-    if(this.commissionId===null)this.calendarToolbar?.nativeElement.parentElement?.scrollIntoView({block:'start'});
+    if(this.commissionId===null && !this.dayModalOpen)this.calendarToolbar?.nativeElement.parentElement?.scrollIntoView({block:'start'});
   }
   saveEditor(remove=false):void {
     const item=this.editing;
@@ -381,13 +428,13 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     if(date===item.date){this.cancelEdit();return;}
     this.busy=true;this.error='';
     this.studio.setPlanningDate(item.commissionId,item.stepId,date).pipe(takeUntil(this.destroy$)).subscribe({
-      next:()=>{if(this.current(seq,owner))this.reload();},
+      next:()=>{if(this.current(seq,owner))this.reload(this.dayModalOpen);},
       error:err=>this.fail(seq,owner,err)
     });
   }
 
   dragStart(item:CreatorCalendarItem):void {
-    if(this.viewMode==='month' && this.movable(item)){
+    if(this.viewMode==='month' && !this.dayModalOpen && this.movable(item)){
       this.cancelEdit();this.draggedKey=this.key(item);this.hoveredDate=null;
     }
   }

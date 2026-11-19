@@ -3,12 +3,16 @@
     <h2 class="font-amaranth text-xl font-bold text-braDark">Planejamento da produção</h2>
     <p class="mt-1 text-sm text-gray-600">Datas pessoais de trabalho, independentes do prazo de entrega e do andamento.</p>
   </div>
-  <p *ngIf="error" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+  <p *ngIf="error && !dayModalOpen" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
     {{ error }}
     <button type="button" (click)="reload()" [disabled]="busy" class="ml-2 font-semibold underline">Tentar novamente</button>
   </p>
   <p *ngIf="commissionId !== null && (loading || busy)" role="status" class="text-sm text-gray-600">{{ busy ? 'Salvando planejamento...' : 'Carregando planejamento...' }}</p>
 
+  <ng-container *ngIf="!dayModalOpen">
+    <ng-container *ngTemplateOutlet="planningEditor"></ng-container>
+  </ng-container>
+  <ng-template #planningEditor>
   <div *ngIf="editing as item" class="space-y-3 rounded-xl border border-braPurple/30 bg-braPurple/5 p-4">
     <div>
       <h3 class="font-bold text-braDark">{{ label(item) }}</h3>
@@ -27,6 +31,7 @@
         class="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600">Cancelar</button>
     </div>
   </div>
+  </ng-template>
 
   <ng-container *ngIf="commissionId !== null; else monthView">
     <div *ngIf="!loading && detail.length" class="divide-y divide-gray-100">
@@ -111,7 +116,7 @@
           <div *ngFor="let day of days; trackBy: trackDay" #calendarTarget [attr.data-calendar-date]="day.date"
             [ngClass]="[hoveredDate===day.date ? 'border-dashed border-braPurple bg-braPurple/10' : selectedDay===day.date ? 'border-braPurple bg-braPurple/5' : 'border-gray-200', day.inMonth ? '' : 'bg-gray-50']"
             class="calendar-day min-w-0 rounded-lg border p-1">
-            <button type="button" (click)="selectDay(day.date)" [disabled]="loading" [attr.aria-pressed]="selectedDay===day.date"
+            <button type="button" (click)="selectDay(day.date)" [disabled]="loading || busy" [attr.aria-pressed]="selectedDay===day.date" aria-haspopup="dialog"
               [attr.aria-label]="day.date + ', ' + day.items.length + ' itens'"
               [ngClass]="day.date===today ? 'bg-braPurple text-white' : day.inMonth ? 'text-braDark' : 'text-gray-400'"
               class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold">{{ day.number }}</button>
@@ -119,18 +124,18 @@
               <ng-container *ngTemplateOutlet="daySkeleton"></ng-container>
             </ng-container>
             <ng-template #loadedDay>
-            <button *ngIf="day.items.length" type="button" (click)="selectDay(day.date,true)" class="mt-1 block w-full truncate text-center text-[10px] font-semibold text-braPurple lg:hidden"
+            <button *ngIf="day.items.length" type="button" (click)="selectDay(day.date)" class="mt-1 block w-full truncate text-center text-[10px] font-semibold text-braPurple lg:hidden"
               [attr.aria-label]="'Ver '+day.items.length+' itens de '+day.date">{{ day.items.length }} item(ns)</button>
             <div cdkDropList cdkDropListSortingDisabled class="hidden space-y-1 lg:block">
               <div *ngFor="let item of day.items | slice:0:visibleItemsPerDay; trackBy: trackItem" cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="!movable(item)"
                 (cdkDragStarted)="dragStart(item)" (cdkDragMoved)="dragMove($event)" (cdkDragEnded)="dragEnd($event,item)"
                 [ngClass]="[color(item),historical(item)?'opacity-60':'',movable(item)?'cursor-grab active:cursor-grabbing':'']"
                 class="calendar-chip min-w-0 rounded border-l-2">
-                <button type="button" (click)="selectDay(day.date,true)" [title]="label(item)+' · '+item.title+' · '+item.clientName"
+                <button type="button" (click)="selectDay(day.date)" [title]="label(item)+' · '+item.title+' · '+item.clientName"
                   class="block w-full cursor-inherit truncate px-1 text-left font-medium">{{ label(item) }} · {{ item.title }}</button>
                 <ng-template cdkDragPlaceholder><div class="calendar-chip rounded bg-gray-100"></div></ng-template>
               </div>
-              <button *ngIf="day.items.length>visibleItemsPerDay" type="button" (click)="selectDay(day.date,true)"
+              <button *ngIf="day.items.length>visibleItemsPerDay" type="button" (click)="selectDay(day.date)"
                 [attr.aria-label]="'Ver todos os '+day.items.length+' itens de '+day.date" class="calendar-more block w-full truncate text-left font-semibold text-braPurple hover:underline">
                 +{{ day.items.length-visibleItemsPerDay }} mais
               </button>
@@ -139,20 +144,7 @@
           </div>
           </div>
         </div>
-        <section class="space-y-2 rounded-xl border border-gray-200 p-3" aria-label="Detalhes do dia">
-          <h3 #dayDetails tabindex="-1" class="font-semibold text-braDark">Detalhes de {{ selectedDay + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }}</h3>
-          <div class="min-h-10">
-            <div *ngIf="loading; else selectedDayContent" aria-hidden="true" class="calendar-skeleton h-10 w-full rounded-md bg-gray-100"></div>
-            <ng-template #selectedDayContent>
-              <div cdkDropList cdkDropListSortingDisabled class="space-y-2">
-                <ng-container *ngFor="let item of selectedItems; trackBy: trackItem">
-                  <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
-                </ng-container>
-              </div>
-              <p *ngIf="!selectedItems.length && !error" class="flex h-10 items-center text-sm text-gray-500">Nada planejado neste dia.</p>
-            </ng-template>
-          </div>
-        </section>
+
         </ng-container>
         <ng-template #agendaView>
           <section aria-label="Agenda do mês" [attr.aria-busy]="loading" class="min-h-[12rem] space-y-4">
@@ -164,14 +156,16 @@
               </div>
             </div>
             <p *ngIf="!loading && !agendaDays.length && !error" class="rounded-xl border border-dashed p-5 text-center text-sm text-gray-500">Nenhum item neste mês{{ hasMoreEvents ? ' entre os itens carregados' : '' }}.</p>
-            <section *ngFor="let day of agendaDays; trackBy: trackDay" [attr.data-agenda-date]="day.date" class="space-y-2 rounded-xl border border-gray-200 p-3">
+            <section *ngFor="let day of agendaDays; trackBy: trackDay" [attr.data-agenda-date]="day.date"
+              [class.agenda-focused]="day.date===agendaFocusDay" class="space-y-2 rounded-xl border border-gray-200 p-3">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="font-amaranth text-base font-bold text-braDark">{{ day.date + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }} <span *ngIf="day.date===today" class="ml-1 text-xs font-normal text-braPurple">Hoje</span></h3>
+                <h3 #agendaHeading tabindex="-1" [attr.data-agenda-heading]="day.date" class="font-amaranth text-base font-bold text-braDark">{{ day.date + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }} <span *ngIf="day.date===today" class="ml-1 text-xs font-normal text-braPurple">Hoje</span></h3>
                 <span class="text-xs text-gray-500">{{ day.items.length }} {{ day.items.length===1?'item':'itens' }}</span>
               </div>
               <ng-container *ngFor="let item of day.items; trackBy: trackItem">
                 <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
               </ng-container>
+              <p *ngIf="!day.items.length && !loading && !error" class="text-sm text-gray-500">{{ hasMoreEvents ? 'Nenhum item entre os dados já carregados.' : 'Nada planejado neste dia.' }}</p>
             </section>
           </section>
         </ng-template>
@@ -265,11 +259,47 @@
       <div class="h-2 w-3/4 rounded bg-gray-200 lg:h-3"></div>
       <div class="hidden h-2 w-1/2 rounded bg-gray-100 lg:block"></div>
     </div>
+    <dialog #dayDialog class="calendar-day-dialog rounded-2xl border border-gray-200 bg-white p-0 text-gray-800 shadow-xl"
+      aria-labelledby="creator-calendar-dialog-title" (cancel)="cancelDayModal($event)">
+      <div class="flex max-h-[80dvh] flex-col" *ngIf="dayModalOpen">
+        <header class="flex items-start justify-between gap-3 border-b border-gray-100 p-4 md:p-5">
+          <div>
+            <p class="text-xs font-medium text-gray-500">Detalhes do dia</p>
+            <h3 id="creator-calendar-dialog-title" class="font-amaranth text-xl font-bold capitalize text-braDark">{{ selectedDay + 'T12:00:00Z' | date:"EEEE, dd/MM/yyyy":'UTC' }}</h3>
+            <p class="mt-1 text-xs text-gray-500">{{ selectedItems.length }} {{ selectedItems.length===1?'atividade':'atividades' }}{{ hasMoreEvents?' carregadas':'' }}</p>
+          </div>
+          <button type="button" (click)="closeDayModal()" [disabled]="busy" aria-label="Fechar detalhes do dia" class="rounded-lg p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50">
+            <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+          </button>
+        </header>
+        <div class="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 md:p-5">
+          <p *ngIf="error" role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ error }} <button type="button" (click)="reload(true)" [disabled]="busy || loading" class="font-semibold underline">Atualizar</button></p>
+          <p *ngIf="busy" role="status" class="text-sm text-gray-600">Salvando planejamento...</p>
+          <ng-container *ngTemplateOutlet="planningEditor"></ng-container>
+          <div *ngIf="loading; else dayItems" aria-hidden="true" class="calendar-skeleton h-12 rounded-lg bg-gray-100"></div>
+          <ng-template #dayItems>
+            <div class="space-y-2">
+              <ng-container *ngFor="let item of selectedItems; trackBy: trackItem">
+                <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
+              </ng-container>
+            </div>
+            <p *ngIf="!selectedItems.length && !error" class="py-4 text-sm text-gray-500">{{ hasMoreEvents ? 'Nenhuma atividade entre os itens carregados.' : 'Nada planejado neste dia.' }}</p>
+            <button *ngIf="hasMoreEvents" type="button" (click)="loadMore('events')" [disabled]="loadingMore || busy" class="text-sm font-semibold text-braPurple hover:underline disabled:opacity-50">{{ loadingMore?'Carregando...':'Carregar mais itens' }}</button>
+          </ng-template>
+        </div>
+        <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3 md:px-5">
+          <button type="button" (click)="closeDayModal()" [disabled]="busy" class="rounded-lg border px-3 py-2 text-sm font-medium text-gray-600 disabled:opacity-50">Fechar</button>
+          <button type="button" (click)="openDayInAgenda()" [disabled]="monthNavigationDisabled || loading" class="flex items-center gap-1.5 text-sm font-semibold text-braPurple hover:underline disabled:opacity-50">
+            Ver na agenda <span aria-hidden="true">→</span>
+          </button>
+        </footer>
+      </div>
+    </dialog>
   </ng-template>
   <ng-template #eventCard let-item>
-    <article cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="viewMode==='agenda' || !movable(item)"
+    <article cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="dayModalOpen || viewMode==='agenda' || !movable(item)"
       (cdkDragStarted)="dragStart(item)" (cdkDragMoved)="dragMove($event)" (cdkDragEnded)="dragEnd($event,item)"
-      [ngClass]="[color(item),historical(item)?'opacity-60':'',viewMode==='month' && movable(item)?'cursor-grab active:cursor-grabbing':'']"
+      [ngClass]="[color(item),historical(item)?'opacity-60':'',viewMode==='month' && !dayModalOpen && movable(item)?'cursor-grab active:cursor-grabbing':'']"
       class="calendar-detail-row flex flex-wrap items-center gap-2 rounded-lg border-l-4 px-3 py-2">
       <div class="min-w-0 flex-1">
         <p class="break-words text-sm font-semibold">{{ label(item) }}</p>

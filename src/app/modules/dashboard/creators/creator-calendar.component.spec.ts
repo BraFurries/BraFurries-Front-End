@@ -240,7 +240,68 @@ describe('CreatorCalendarComponent',()=>{
     expect(busy.querySelector('.calendar-more')?.textContent).toContain('+6 mais');
     (busy.querySelector('.calendar-more') as HTMLButtonElement).click();fixture.detectChanges();
     expect(component.selectedDay).toBe(date);
-    expect(root.querySelectorAll('.calendar-detail-row').length).toBe(8);
+    const dialog=root.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.open).toBeTrue();
+    expect(dialog.querySelectorAll('.calendar-detail-row').length).toBe(8);
+    expect(root.querySelector('.calendar-layout .calendar-detail-row')).toBeNull();
+  });
+
+  it('opens a modal for empty and busy days without changing calendar height, then focuses the date in agenda',()=>{
+    const root=fixture.nativeElement as HTMLElement;
+    const viewport=root.querySelector('.calendar-viewport')!;
+    const height=viewport.getBoundingClientRect().height;
+    const calls=studio.calendar.calls.count();
+    (root.querySelector('[data-calendar-date="2026-11-19"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const dialog=root.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.open).toBeTrue();
+    expect(dialog.textContent).toContain('Nada planejado neste dia.');
+    expect(viewport.getBoundingClientRect().height).toBe(height);
+    const link=Array.from(dialog.querySelectorAll('button')).find(button=>button.textContent?.includes('Ver na agenda'))!;
+    link.click();fixture.detectChanges();
+    expect(dialog.open).toBeFalse();
+    expect(component.viewMode).toBe('agenda');
+    expect(component.agendaFocusDay).toBe('2026-11-19');
+    const focused=root.querySelector('[data-agenda-date="2026-11-19"]');
+    expect(focused?.classList.contains('agenda-focused')).toBeTrue();
+    expect(focused?.textContent).toContain('Nada planejado neste dia.');
+    expect(studio.calendar.calls.count()).toBe(calls);
+  });
+
+  it('focuses adjacent-month days in their actual agenda month',()=>{
+    const root=fixture.nativeElement as HTMLElement;
+    studio.calendar.and.returnValue(of({items:[{...step,date:'2026-12-01'}],hasMore:false}));
+    component.reload();fixture.detectChanges();
+    component.selectDay('2026-12-01');fixture.detectChanges();
+    component.openDayInAgenda();fixture.detectChanges();
+    expect(component.month).toBe('2026-12-01');
+    expect(component.agendaFocusDay).toBe('2026-12-01');
+    expect(root.querySelector('[data-agenda-date="2026-12-01"].agenda-focused')).not.toBeNull();
+    expect(studio.calendar).toHaveBeenCalledWith('2026-11-29','2027-01-09',1,100);
+  });
+
+  it('keeps editing in the modal, refreshes after saving and closes on account change',()=>{
+    const scheduled={...step,date:'2026-11-20'};
+    studio.calendar.and.returnValue(of({items:[scheduled,delivery],hasMore:false}));
+    component.reload();fixture.detectChanges();
+    component.selectDay('2026-11-20');fixture.detectChanges();
+    const dialog=fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
+    (dialog.querySelector('.calendar-detail-row button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(dialog.querySelector('input[type="date"]')).not.toBeNull();
+    component.draftDate='2026-11-23';component.saveEditor();fixture.detectChanges();
+    expect(studio.setPlanningDate).toHaveBeenCalledOnceWith(80,81,'2026-11-23');
+    expect(dialog.open).toBeTrue();
+    expect(component.editing).toBeNull();
+    const cancel=new Event('cancel',{cancelable:true});
+    dialog.dispatchEvent(cancel);fixture.detectChanges();
+    expect(cancel.defaultPrevented).toBeTrue();
+    expect(dialog.open).toBeFalse();
+    component.selectDay('2026-11-20');fixture.detectChanges();
+    users$.next(null);fixture.detectChanges();
+    expect(dialog.open).toBeFalse();
+    expect(dialog.textContent).not.toContain('Ref sheet');
+    expect(component.dayModalOpen).toBeFalse();
   });
 
   it('shows a chronological agenda of the selected month with the same filters and dates, without fetching again',()=>{
