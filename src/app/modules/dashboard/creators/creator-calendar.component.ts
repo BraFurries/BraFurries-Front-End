@@ -40,6 +40,9 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   events: CreatorCalendarItem[] = [];
   unplanned: CreatorCalendarItem[] = [];
   groups: UnplannedGroup[] = [];
+  plannedGroups: UnplannedGroup[] = [];
+  unplannedExpanded = true;
+  plannedExpanded = false;
   detail: CreatorCalendarItem[] = [];
   filter: 'ALL' | 'PRODUCTION' | 'DELIVERY' = 'ALL';
   loading = false;
@@ -73,6 +76,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     this.users.user$.pipe(distinctUntilChanged((a,b)=>a?.id===b?.id), takeUntil(this.destroy$))
       .subscribe(user => {
         this.owner = user?.id ?? null;
+        this.unplannedExpanded = true;
+        this.plannedExpanded = false;
         this.filter = 'ALL';
         this.month = this.today.slice(0,7)+'-01';
         this.selectedDay = this.today;
@@ -121,6 +126,9 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
         items:byDate.get(date) || []};
     });
     if (!this.days.some(day=>day.date===this.selectedDay)) this.selectedDay=this.month;
+    // Only production in the selected month, not deadlines or spillover dates.
+    this.plannedGroups=this.groupItems(this.events.filter(item=>item.kind!=='DELIVERY' &&
+      item.date?.startsWith(this.month.slice(0,7))));
   }
 
   get selectedItems(): CreatorCalendarItem[] {
@@ -197,14 +205,26 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     }else this.error='Não foi possível carregar ou salvar o planejamento. Tente novamente.';
   }
 
-  private buildGroups():void {
+  toggleSidebar(section:'unplanned'|'planned'):void {
+    if(this.draggedKey!==null)return;
+    if(section==='unplanned')this.unplannedExpanded=!this.unplannedExpanded;
+    else this.plannedExpanded=!this.plannedExpanded;
+  }
+
+  get plannedCount():number {
+    return this.plannedGroups.reduce((total,group)=>total+group.items.length,0);
+  }
+
+  private buildGroups():void { this.groups=this.groupItems(this.unplanned); }
+
+  private groupItems(items:CreatorCalendarItem[]):UnplannedGroup[] {
     const groups=new Map<number,UnplannedGroup>();
-    for(const item of this.unplanned){
+    for(const item of items){
       if(!groups.has(item.commissionId))groups.set(item.commissionId,{id:item.commissionId,
         title:item.title,clientName:item.clientName,items:[]});
       groups.get(item.commissionId)!.items.push(item);
     }
-    this.groups=[...groups.values()];
+    return [...groups.values()];
   }
 
   private mergeItems(old:CreatorCalendarItem[],extra:CreatorCalendarItem[]):CreatorCalendarItem[]{

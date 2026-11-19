@@ -1,7 +1,10 @@
 /* Keep the calendar footprint and weekday header stable while the month slides. */
-.calendar-viewport { display: grid; overflow: hidden; }
-.calendar-current, .calendar-outgoing { grid-area: 1 / 1; min-width: 0; }
-.calendar-outgoing { pointer-events: none; }
+.calendar-viewport { position: relative; display: grid; overflow: hidden; align-items: start; }
+.calendar-current, .calendar-outgoing { grid-area: 1 / 1; min-width: 0; align-content: start; }
+/* The outgoing snapshot is visual only; never let its height stretch the
+   incoming skeleton or change the layout of the weekday header/sidebar. */
+.calendar-outgoing { position: absolute; inset: 0 0 auto; pointer-events: none; }
+.calendar-toolbar .sr-only { margin: 0; }
 .calendar-enter-next { animation: creator-calendar-enter-next 260ms ease-out both; }
 .calendar-enter-previous { animation: creator-calendar-enter-previous 260ms ease-out both; }
 .calendar-exit-next { animation: creator-calendar-exit-next 260ms ease-out both; }
