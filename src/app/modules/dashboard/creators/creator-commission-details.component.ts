@@ -6,6 +6,7 @@ import {
   CreatorActivity, CreatorActivityDraft, CreatorActivityKind,
   CreatorArtType, CreatorCalendarItem, CreatorCommission, CreatorCommissionInput, CreatorCommissionStatus,
   CreatorCommissionStep, CreatorStepStatus, CreatorReference, CreatorReferenceDraft,
+  CreatorStageDefinition, CreatorWorkflow,
   CreatorStudioService
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
@@ -42,6 +43,11 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   tab: 'overview'|'references'|'history' = 'overview';
   artTypes: CreatorArtType[] = [];
   steps: CreatorCommissionStep[] = [];
+  definitions: CreatorStageDefinition[] = [];
+  workflows: CreatorWorkflow[] = [];
+  stepsExpanded = false;
+  stepEditor: {id:number|null;name:string;stageDefinitionId:number|null;notes:string|null} | null = null;
+  importWorkflowId: number | null = null;
   stepStatusDrafts: Record<number,CreatorStepStatus> = {};
   planning: CreatorCalendarItem[] = [];
   orderDraft: CreatorCommissionInput | null = null;
@@ -139,6 +145,59 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
 
   get canManageProduction(): boolean {
     return this.canManage && this.commission?.status !== 'COMPLETED';
+  }
+
+  get currentStep(): CreatorCommissionStep | undefined {
+    return this.steps.find(step=>this.isCurrentStep(step));
+  }
+  get visibleSteps(): CreatorCommissionStep[] {
+    const current=this.currentStep;
+    return this.stepsExpanded?this.steps:current?[current]:[];
+  }
+  toggleSteps(): void {
+    if(this.busy || this.loading)return;
+    this.stepsExpanded=!this.stepsExpanded;
+    if(!this.stepsExpanded && this.stepEditor?.id !== null)this.stepEditor=null;
+  }
+  openStepEditor(step?:CreatorCommissionStep):void {
+    if(!this.canManageProduction || (step && !this.steps.some(row=>row.id===step.id && row.commissionId===this.commissionId)))return;
+    this.stepEditor=step?{id:step.id,name:step.name,stageDefinitionId:step.stageDefinitionId,notes:step.notes}:
+      {id:null,name:'',stageDefinitionId:null,notes:null};
+    this.actionError='';this.notice='';
+  }
+  chooseStepDefinition(id:number|null):void {
+    if(!this.stepEditor || !this.canManageProduction)return;
+    this.stepEditor.stageDefinitionId=id;
+    if(this.stepEditor.id===null && id!==null){
+      const definition=this.definitions.find(row=>row.id===id);
+      if(definition)this.stepEditor.name=definition.name;
+    }
+  }
+  saveStepEditor():void {
+    const draft=this.stepEditor,c=this.commission;
+    if(!draft || !c || !this.canManageProduction || !draft.name.trim() ||
+       draft.name.trim().length>100 || (draft.notes?.length??0)>8000)return;
+    if(draft.stageDefinitionId!==null && !this.definitions.some(row=>row.id===draft.stageDefinitionId))return;
+    if(draft.id===null){
+      this.mutate(this.studio.addCommissionStep(c.id,{name:draft.name.trim(),stageDefinitionId:draft.stageDefinitionId}),
+        'Etapa adicionada.',()=>{this.stepEditor=null;});
+    }else{
+      const step=this.steps.find(row=>row.id===draft.id && row.commissionId===c.id);
+      if(!step)return;
+      this.mutate(this.studio.updateCommissionStep(c.id,step.id,{name:draft.name.trim(),stageDefinitionId:draft.stageDefinitionId,status:step.status,notes:draft.notes}),
+        'Etapa atualizada.',()=>this.stepEditor=null);
+    }
+  }
+  removeEditedStep():void {
+    const c=this.commission,step=this.steps.find(row=>row.id===this.stepEditor?.id && row.commissionId===this.commissionId);
+    if(!c || !step || !this.canManageProduction ||
+       !window.confirm('Excluir esta etapa, suas anotações e sua data planejada deste pedido?'))return;
+    this.mutate(this.studio.deleteCommissionStep(c.id,step.id),'Etapa excluída.',()=>this.stepEditor=null);
+  }
+  copyWorkflow():void {
+    const c=this.commission,id=this.importWorkflowId;
+    if(!c || !this.canManageProduction || this.steps.length || id===null || !this.workflows.some(row=>row.id===id))return;
+    this.mutate(this.studio.copyWorkflowToCommission(c.id,id),'Etapas copiadas.',()=>{this.importWorkflowId=null;});
   }
 
   get completedSteps(): number { return this.steps.filter(step=>step.status==='DONE').length; }
@@ -246,6 +305,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     this.commissionId = null;
     this.commission = null;
     this.artTypes=[];this.steps=[];this.planning=[];this.stepStatusDrafts={};
+    this.definitions=[];this.workflows=[];this.stepsExpanded=false;this.stepEditor=null;this.importWorkflowId=null;
     this.tab='overview';this.orderDraft=null;this.statusDraft=null;this.targetStepId=null;
     this.cancelPlanning();
     this.references = [];
@@ -273,6 +333,8 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     forkJoin({
       commission: this.studio.findCommission(id),
       artTypes: this.studio.artTypes(),
+      definitions: this.studio.stageDefinitions(),
+      workflows: this.studio.workflows(),
       steps: this.studio.commissionSteps(id),
       planning: this.studio.commissionPlanning(id),
       references: this.studio.references(id),
@@ -282,6 +344,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
         if (!this.isCurrent(seq, userId, id) || loadSeq !== this.loadSequence) return;
         this.commission = result.commission;
         this.artTypes=result.artTypes;
+        this.definitions=result.definitions;this.workflows=result.workflows;
         this.steps=result.steps;
         this.stepStatusDrafts=Object.fromEntries(this.steps.map(step=>[step.id,step.status]));
         this.planning=result.planning;
