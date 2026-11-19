@@ -102,7 +102,7 @@
       </div>
       <aside *ngIf="filter !== 'DELIVERY'" #calendarTarget data-calendar-date="unplanned"
         [ngClass]="hoveredDate==='unplanned' ? 'border-dashed border-braPurple bg-braPurple/5' : 'border-gray-200 bg-gray-50'"
-        class="min-w-0 self-start space-y-3 rounded-xl border p-3 xl:sticky xl:top-4">
+        class="min-w-0 self-start space-y-3 rounded-xl border p-3 xl:sticky xl:top-4 xl:max-h-[70vh] xl:overflow-y-auto">
         <div>
           <h3 class="font-amaranth text-lg font-bold text-braDark">Sem planejamento</h3>
           <p class="text-xs text-gray-500">Escolha o dia de trabalho de cada etapa.</p>
