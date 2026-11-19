@@ -46,7 +46,7 @@
   </ng-container>
 
   <ng-template #monthView>
-    <div class="calendar-toolbar relative flex flex-wrap items-center justify-between gap-3">
+    <div #calendarToolbar class="calendar-toolbar relative flex flex-wrap items-center justify-between gap-3">
       <span role="status" class="sr-only">{{ busy ? 'Salvando planejamento...' : loading ? 'Carregando planejamento...' : '' }}</span>
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" (click)="changeMonth(-1)" [disabled]="monthNavigationDisabled" aria-label="Mês anterior"
@@ -127,7 +127,7 @@
                 [ngClass]="[color(item),historical(item)?'opacity-60':'',movable(item)?'cursor-grab active:cursor-grabbing':'']"
                 class="calendar-chip min-w-0 rounded border-l-2">
                 <button type="button" (click)="selectDay(day.date,true)" [title]="label(item)+' · '+item.title+' · '+item.clientName"
-                  class="block w-full truncate px-1 text-left font-medium">{{ label(item) }} · {{ item.title }}</button>
+                  class="block w-full cursor-inherit truncate px-1 text-left font-medium">{{ label(item) }} · {{ item.title }}</button>
                 <ng-template cdkDragPlaceholder><div class="calendar-chip rounded bg-gray-100"></div></ng-template>
               </div>
               <button *ngIf="day.items.length>visibleItemsPerDay" type="button" (click)="selectDay(day.date,true)"
@@ -267,15 +267,22 @@
     </div>
   </ng-template>
   <ng-template #eventCard let-item>
-    <article [ngClass]="[color(item),historical(item)?'opacity-60':'']" class="calendar-detail-row flex flex-wrap items-center gap-2 rounded-lg border-l-4 px-3 py-2">
+    <article cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="viewMode==='agenda' || !movable(item)"
+      (cdkDragStarted)="dragStart(item)" (cdkDragMoved)="dragMove($event)" (cdkDragEnded)="dragEnd($event,item)"
+      [ngClass]="[color(item),historical(item)?'opacity-60':'',viewMode==='month' && movable(item)?'cursor-grab active:cursor-grabbing':'']"
+      class="calendar-detail-row flex flex-wrap items-center gap-2 rounded-lg border-l-4 px-3 py-2">
       <div class="min-w-0 flex-1">
         <p class="break-words text-sm font-semibold">{{ label(item) }}</p>
         <a [routerLink]="['/painel/creators/pedido',item.commissionId]" class="block break-words text-sm hover:underline">{{ item.title }}</a>
         <p class="break-words text-xs opacity-80">{{ item.clientName }}</p>
       </div>
-      <span class="text-xs font-medium">{{ itemStatus(item) }}</span>
+      <div class="flex flex-col gap-0.5 text-xs">
+        <span class="font-medium">{{ itemStatus(item) }}</span>
+        <span *ngIf="item.kind==='STEP' && item.commissionStatus==='PAUSED' && !historical(item)" class="opacity-80">Pedido em pausa</span>
+      </div>
       <button *ngIf="movable(item)" type="button" (click)="openEditor(item)" [attr.aria-label]="'Alterar data de '+label(item)+' de '+item.title"
         class="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/70">Alterar data</button>
+      <ng-template cdkDragPlaceholder><div aria-hidden="true" class="min-h-12 rounded-lg border border-dashed border-gray-300 bg-gray-50"></div></ng-template>
     </article>
   </ng-template>
 </section>

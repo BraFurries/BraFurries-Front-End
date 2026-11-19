@@ -31,6 +31,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   @ViewChildren('calendarTarget', { read: ElementRef }) private targets!: QueryList<ElementRef<HTMLElement>>;
 
   @ViewChild('dayDetails') private dayDetails?: ElementRef<HTMLElement>;
+  @ViewChild('calendarToolbar') private calendarToolbar?: ElementRef<HTMLElement>;
   readonly visibleItemsPerDay = 2;
   viewMode: 'month' | 'agenda' = 'month';
 
@@ -164,7 +165,6 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   itemStatus(item:CreatorCalendarItem):string {
     if(item.kind==='DELIVERY')return 'Prazo de entrega';
     if(this.historical(item))return 'Finalizado';
-    if(item.commissionStatus==='PAUSED')return 'Pedido em pausa';
     if(item.kind==='STEP'){
       switch(item.stepStatus){
         case 'IN_PROGRESS': return 'Em execução';
@@ -175,6 +175,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     switch(item.commissionStatus){
       case 'IN_PROGRESS': return 'Em produção';
       case 'WAITING': return 'Aguardando retorno';
+      case 'PAUSED': return 'Em pausa';
       default: return 'Na fila';
     }
   }
@@ -355,6 +356,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   openEditor(item:CreatorCalendarItem):void {
     if(!this.movable(item)||this.draggedKey!==null)return;
     this.editing=item;this.draftDate=item.date||this.selectedDay;this.error='';
+    // Day details and agenda may be far below the shared editor.
+    if(this.commissionId===null)this.calendarToolbar?.nativeElement.parentElement?.scrollIntoView({block:'start'});
   }
   saveEditor(remove=false):void {
     const item=this.editing;

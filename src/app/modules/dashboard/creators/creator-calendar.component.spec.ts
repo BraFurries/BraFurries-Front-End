@@ -256,13 +256,20 @@ describe('CreatorCalendarComponent',()=>{
     expect(root.querySelector('.calendar-viewport')).toBeNull();
     expect(root.querySelectorAll('.calendar-detail-row').length).toBe(3);
     expect(root.textContent).toContain('Pedido em pausa');
+    expect(root.textContent).toContain('Pendente');
     expect(studio.calendar.calls.count()).toBe(calls);
+    const edit=root.querySelector('.calendar-detail-row button') as HTMLButtonElement;
+    edit.click();
+    expect(component.editing).toEqual(scheduled);
+    component.draftDate='2026-11-25';component.saveEditor();
+    expect(studio.setPlanningDate).toHaveBeenCalledOnceWith(80,81,'2026-11-25');
+    const refreshedCalls=studio.calendar.calls.count();
     component.setFilter('DELIVERY');fixture.detectChanges();
     expect(root.querySelectorAll('.calendar-detail-row').length).toBe(1);
     expect(root.querySelector('.calendar-detail-row button')).toBeNull();
     component.setFilter('ALL');component.setViewMode('month');fixture.detectChanges();
     expect(root.querySelector('.calendar-viewport')).not.toBeNull();
-    expect(studio.calendar.calls.count()).toBe(calls);
+    expect(studio.calendar.calls.count()).toBe(refreshedCalls);
   });
 
   it('navigates in agenda mode without retaining outgoing private snapshots',()=>{
