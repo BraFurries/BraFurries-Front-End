@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { environment } from '../../../environments/environment';
 import { User } from '../../shared/models/user';
-import { UserService } from '../services/user.service';
+import { BROWSER_SESSION_LOCKS, UserService } from '../services/user.service';
 import { authTokenInterceptor } from './auth-token.interceptor';
 
 describe('authTokenInterceptor', () => {
@@ -23,7 +23,8 @@ describe('authTokenInterceptor', () => {
       providers: [
         provideHttpClient(withInterceptors([authTokenInterceptor])),
         provideHttpClientTesting(),
-        UserService
+        UserService,
+        { provide: BROWSER_SESSION_LOCKS, useValue: null }
       ]
     });
     http = TestBed.inject(HttpTestingController);
@@ -110,6 +111,24 @@ describe('authTokenInterceptor', () => {
     const publicRequest = http.expectOne(`${environment.apiBaseUrl}/public/community`);
     expect(publicRequest.request.headers.has('Authorization')).toBeFalse();
     publicRequest.flush({});
+  });
+
+  it('never retries a request with credentials from another login', () => {
+    login();
+    let failedStatus = 0;
+    client.get(`${environment.apiBaseUrl}/user`).subscribe({
+      error: (error: HttpErrorResponse) => failedStatus = error.status
+    });
+    const original = http.expectOne(`${environment.apiBaseUrl}/user`);
+    userService.login('another@example.com', 'password', true).subscribe();
+    http.expectOne(`${environment.apiBaseUrl}/auth/login`).flush({
+      access_token: 'different-access', refresh_token: 'different-refresh',
+      expires_in: 900, user: { ...user, id: 6 }
+    });
+    original.flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(failedStatus).toBe(401);
+    http.expectNone(`${environment.apiBaseUrl}/auth/refresh`);
+    http.expectNone(`${environment.apiBaseUrl}/user`);
   });
 
   it('never tries to refresh authorization failures unrelated to expiration', () => {
