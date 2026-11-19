@@ -13,12 +13,20 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
     return next(request);
   }
 
+  // A delayed request must never carry the credentials of another login,
+  // even if the new login happens to have the same account ID.
+  const identity = userService.getSessionIdentity();
   const authorized = (token: string): HttpRequest<unknown> => request.clone({
     setHeaders: { Authorization: `${userService.getTokenType()} ${token}` }
   });
 
   return userService.ensureValidSession().pipe(
     switchMap(valid => {
+      if (userService.getSessionIdentity() !== identity && userService.getSessionIdentity() !== null) {
+        return throwError(() => new HttpErrorResponse({
+          status: 401, statusText: 'Sessão alterada', url: request.url
+        }));
+      }
       if (!valid && userService.hasRecoverableSession()) {
         // API/network failure is not revocation. Keep the session and URL;
         // protected requests can be retried when connectivity recovers.
@@ -37,6 +45,8 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
             return throwError(() => error);
           }
 
+          if (userService.getSessionIdentity() !== identity) return throwError(() => error);
+
           // Another request may already have refreshed while this one was
           // in transit; reuse the newest token instead of rotating it again.
           const newerToken = userService.getAccessToken();
@@ -45,7 +55,7 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
           return userService.refreshToken().pipe(
             switchMap(refreshed => {
               const freshToken = userService.getAccessToken();
-              return refreshed && freshToken
+              return refreshed && freshToken && userService.getSessionIdentity() === identity
                 ? next(authorized(freshToken))
                 : throwError(() => error);
             })
