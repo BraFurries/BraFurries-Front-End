@@ -38,7 +38,6 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   private orderDropZones!: QueryList<ElementRef<HTMLElement>>;
 
   private readonly workflowSelection$ = new BehaviorSubject<number | null>(null);
-  @Input() readOnly = true;
   @Input() set workflowId(value: number | null) { this.workflowSelection$.next(value); }
   mode: 'process' | 'shared' = 'shared';
   workflow: CreatorWorkflow | null = null;
@@ -514,7 +513,7 @@ export class CreatorStageBoardComponent implements OnInit, OnDestroy {
   }
 
   canMoveCard(card: CreatorCommission): boolean {
-    return !this.readOnly && this.mode === 'process' && this.allowed && this.busyId === null &&
+    return this.mode === 'process' && this.allowed && this.busyId === null &&
       !this.loadingBoard && !this.loadingMore && !!this.workflow &&
       card.sourceWorkflowId === this.workflow.id && card.status !== 'COMPLETED' &&
       this.processItems.some(item => item.id === card.id);

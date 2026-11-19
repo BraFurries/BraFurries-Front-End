@@ -118,7 +118,7 @@ describe('CreatorStudioComponent', () => {
     expect(fixture.nativeElement.querySelector('article [data-drag-indicator]')).not.toBeNull();
   });
 
-  it('uses a read-only stage view while keeping status board movement', () => {
+  it('uses one stage view with its process selector inside the main card and restores drag per scope', () => {
     const group = fixture.nativeElement.querySelector('[aria-label="Modo de visualização"]');
     expect(Array.from(group.querySelectorAll('button')).map(button => (button as HTMLElement).textContent?.trim())).toEqual([
       'Situação dos pedidos','Etapas da produção','Calendário','Lista de pedidos'
@@ -147,8 +147,8 @@ describe('CreatorStudioComponent', () => {
     component.selectStageProcess(33);
     fixture.detectChanges();
     expect(studio.commissionsForBoard).toHaveBeenCalledWith({workflowId:33},1,100);
-    expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeTrue();
-    expect(child.nativeElement.querySelector('article [data-drag-indicator]')).toBeNull();
+    expect(child.query(By.directive(CdkDrag)).injector.get(CdkDrag).disabled).toBeFalse();
+    expect(child.nativeElement.querySelector('article [data-drag-indicator]')).not.toBeNull();
     expect(child.nativeElement.textContent).toContain('Pintura');
     expect(child.nativeElement.classList.contains('block')).toBeTrue();
     expect(child.nativeElement.classList.contains('mt-6')).toBeTrue();
@@ -405,7 +405,7 @@ describe('CreatorStudioComponent', () => {
     expect(component.viewMode).toBe('list');
     expect(component.selectedStatus).toBe('QUEUED');
     expect(studio.commissions).toHaveBeenCalledWith('QUEUED', 1, 25);
-    expect(fixture.nativeElement.textContent).toContain('Editar pedido');
+    expect(fixture.nativeElement.textContent).toContain('Abrir pedido');
     component.setViewMode('board');
     fixture.detectChanges();
     expect(component.boardColumns[0].total).toBe(1);

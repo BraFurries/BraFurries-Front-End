@@ -80,7 +80,6 @@ describe('CreatorStageBoardComponent', () => {
     }).compileComponents();
     fixture=TestBed.createComponent(CreatorStageBoardComponent);
     component=fixture.componentInstance;
-    fixture.componentRef.setInput('readOnly',false);
     fixture.componentRef.setInput('workflowId',33);
     fixture.detectChanges();
   });
@@ -111,15 +110,6 @@ describe('CreatorStageBoardComponent', () => {
       source:{getPlaceholderElement:() => ({getBoundingClientRect:() => ({height:145})})}
     } as unknown as CdkDragStart<CreatorCommission>,cardData);
   }
-
-  it('blocks order movement in read-only mode even when a process is selected',()=>{
-    fixture.componentRef.setInput('readOnly',true);fixture.detectChanges();
-    expect(component.canMoveCard(card)).toBeFalse();
-    start(card);
-    expect(studio.commissionSteps).not.toHaveBeenCalled();
-    expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.querySelector('article [data-drag-indicator]')).toBeNull();
-  });
 
   it('only shows commissions whose stored process matches the selected workflow', () => {
     expect(component.mode).toBe('process');

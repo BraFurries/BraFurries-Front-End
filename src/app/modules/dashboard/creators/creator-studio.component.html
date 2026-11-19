@@ -137,7 +137,7 @@
           <h2 class="font-amaranth text-2xl font-bold text-braDark">Meus trabalhos</h2>
           <p class="text-sm text-gray-600">
             {{ viewMode === 'board' ? 'Arraste os pedidos entre as filas para atualizar a situação de cada trabalho.' :
-            viewMode === 'stages' ? 'Consulte as etapas por processo e abra o pedido para atualizar a produção.' :
+            viewMode === 'stages' ? 'Consulte todas as etapas ou escolha um processo para acompanhar e avançar seus pedidos.' :
             viewMode === 'calendar' ? 'Planeje as etapas dos pedidos no calendário, sem assumir novos prazos de entrega.' :
             'Consulte, filtre e organize os detalhes dos seus pedidos.' }}
           </p>
@@ -201,8 +201,8 @@
         </div>
         <p class="text-xs text-gray-500">
           {{ selectedWorkflowId === null
-            ? 'Visão geral para consulta. Selecione um processo para acompanhar as etapas.'
-            : 'Somente pedidos deste processo. Abra um pedido para alterar sua etapa.' }}
+            ? 'Visão geral para consulta. Selecione um processo acima para mover pedidos entre etapas.'
+            : 'Somente pedidos deste processo. Arraste os cartões entre as etapas ou use as setas do teclado.' }}
         </p>
       </div>
       <div *ngIf="viewMode === 'list'" class="flex flex-wrap items-end gap-3 border-t pt-3">
@@ -318,7 +318,6 @@
     <app-creator-stage-board *ngIf="viewMode === 'stages'"
       class="block mt-6 min-w-0"
       [workflowId]="selectedWorkflowId"
-      [readOnly]="true"
       (orderAvailableChange)="stageOrderAvailable = $event"
       (orderEditingChange)="organizingStageColumns = $event"
       (moveInProgressChange)="stageMoveInProgress = $event">
