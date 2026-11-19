@@ -28,7 +28,7 @@ describe('CreatorCommissionDetailsComponent', () => {
     privateNotes:'Privado',requestedOn:'2026-11-12',dueOn:null,
     artTypeId:null,status:'IN_PROGRESS',
     createdAtUtc:'2026-11-17T12:00:00',updatedAtUtc:'2026-11-17T12:00:00',
-    completedAtUtc:null
+    completedAtUtc:null,currentStageName:'Rascunho',currentStagePosition:1
   };
 
   const step: CreatorCommissionStep={id:90,commissionId:85,position:1,name:'Rascunho',
@@ -45,7 +45,8 @@ describe('CreatorCommissionDetailsComponent', () => {
     studio=jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','findCommission','references','activity',
        'createReference','updateReference','deleteReference','createActivity','commissionPlanning','setPlanningDate',
-       'artTypes','commissionSteps','update','changeStatus','moveCommissionToStep','updateCommissionStep']);
+       'artTypes','commissionSteps','update','changeStatus','moveCommissionToStep','updateCommissionStep',
+       'stageDefinitions','workflows','addCommissionStep','deleteCommissionStep','copyWorkflowToCommission']);
     studio.myAccess.and.returnValue(of({
       allowed:true,tier:'PRO',status:'ACTIVE',sourceKind:'PILOT',expiresAtUtc:null
     }));
@@ -54,6 +55,11 @@ describe('CreatorCommissionDetailsComponent', () => {
     studio.commissionPlanning.and.returnValue(of([plan]));
     studio.artTypes.and.returnValue(of([{id:7,name:'Reference Sheet',workflowId:null}]));
     studio.commissionSteps.and.returnValue(of([step]));
+    studio.stageDefinitions.and.returnValue(of([{id:7,name:'Rascunho'}]));
+    studio.workflows.and.returnValue(of([{id:8,name:'Modelo',isDefault:false,steps:[]}]));
+    studio.addCommissionStep.and.returnValue(of(step));
+    studio.deleteCommissionStep.and.returnValue(of(undefined));
+    studio.copyWorkflowToCommission.and.returnValue(of([step]));
     studio.update.and.returnValue(of(commission));
     studio.changeStatus.and.returnValue(of(commission));
     studio.moveCommissionToStep.and.returnValue(of([step]));
@@ -167,6 +173,31 @@ describe('CreatorCommissionDetailsComponent', () => {
     expect(studio.changeStatus).not.toHaveBeenCalled();
     expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
     expect(component.orderDraft).toBeNull();
+  });
+
+  it('shows only the current step by default and reveals others on demand',()=>{
+    studio.commissionSteps.and.returnValue(of([step,{...step,id:91,position:2,name:'Pintura'}]));
+    component.load();fixture.detectChanges();
+    expect(component.visibleSteps.map(row=>row.id)).toEqual([90]);
+    expect(fixture.nativeElement.querySelectorAll('[data-step-id]').length).toBe(1);
+    component.toggleSteps();fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('[data-step-id]').length).toBe(2);
+  });
+
+  it('edits, adds, deletes and copies steps only for the current order',()=>{
+    component.openStepEditor(step);
+    component.stepEditor!.name='Novo rascunho';
+    component.saveStepEditor();
+    expect(studio.updateCommissionStep).toHaveBeenCalledOnceWith(85,90,{name:'Novo rascunho',stageDefinitionId:7,status:'PENDING',notes:'Manter pose'});
+    component.openStepEditor();component.chooseStepDefinition(7);component.saveStepEditor();
+    expect(studio.addCommissionStep).toHaveBeenCalledOnceWith(85,{name:'Rascunho',stageDefinitionId:7});
+    spyOn(window,'confirm').and.returnValue(true);
+    component.openStepEditor(step);component.removeEditedStep();
+    expect(studio.deleteCommissionStep).toHaveBeenCalledOnceWith(85,90);
+    component.importWorkflowId=8;component.copyWorkflow();
+    expect(studio.copyWorkflowToCommission).not.toHaveBeenCalled();
+    studio.commissionSteps.and.returnValue(of([]));component.load();component.importWorkflowId=8;component.copyWorkflow();
+    expect(studio.copyWorkflowToCommission).toHaveBeenCalledOnceWith(85,8);
   });
 
   it('changes situation independently and moves only to an actual step of the current order',()=>{

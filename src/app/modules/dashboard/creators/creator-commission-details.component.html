@@ -108,9 +108,9 @@
             <span *ngIf="steps.length" class="text-xs font-semibold text-gray-500">{{ completedSteps }} de {{ steps.length }} etapas finalizadas</span>
           </div>
           <div *ngIf="steps.length" class="h-1.5 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-braPurple transition-all" [style.width.%]="completedSteps/steps.length*100"></div></div>
-          <div *ngIf="steps.length" class="space-y-2 rounded-xl bg-gray-50 p-3">
+          <div *ngIf="steps.length" class="space-y-2 rounded-xl border border-braPurple/20 bg-braPurple/5 p-4">
             <p class="text-xs font-semibold text-gray-500">Etapa atual</p>
-            <p class="font-semibold text-braDark">{{ c.currentStageName || (completedSteps===steps.length?'Todas finalizadas':'Não definida') }}</p>
+            <p class="break-words font-amaranth text-xl font-bold text-braPurple">{{ c.status==='COMPLETED'?'Pedido concluído':(c.currentStageName || (completedSteps===steps.length?'Todas finalizadas':'Não definida')) }}</p>
             <div *ngIf="c.status!=='COMPLETED'" class="flex flex-wrap gap-2">
               <select aria-label="Etapa de destino" [(ngModel)]="targetStepId" [disabled]="!canManageProduction" class="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm">
                 <option [ngValue]="null">Mover para outra etapa</option>
@@ -126,12 +126,32 @@
             <div><p class="text-sm font-semibold text-braDark">Produção geral</p><p *ngIf="steps.length" class="text-xs text-gray-500">Planejamento anterior às etapas</p></div>
             <ng-container *ngTemplateOutlet="planningControl; context: {$implicit:plan}"></ng-container>
           </div>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <button *ngIf="steps.length" type="button" (click)="toggleSteps()" [attr.aria-expanded]="stepsExpanded" class="text-sm font-semibold text-braPurple hover:underline" [disabled]="busy || loading">{{ stepsExpanded?'Recolher etapas':'Ver todas as etapas ('+steps.length+')' }}</button>
+            <button *ngIf="canManageProduction" type="button" (click)="openStepEditor()" class="rounded-lg border border-braPurple/30 px-3 py-2 text-xs font-semibold text-braPurple">+ Adicionar etapa</button>
+          </div>
+          <div *ngIf="!steps.length && workflows.length && c.status!=='COMPLETED'" class="flex flex-wrap gap-2">
+            <select aria-label="Modelo de produção" [(ngModel)]="importWorkflowId" [disabled]="!canManageProduction" class="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"><option [ngValue]="null">Selecione um modelo</option><option *ngFor="let model of workflows" [ngValue]="model.id">{{ model.name }}</option></select>
+            <button type="button" (click)="copyWorkflow()" [disabled]="!canManageProduction || importWorkflowId===null" class="rounded-lg border border-braPurple/30 px-3 py-2 text-xs font-semibold text-braPurple disabled:opacity-40">Copiar etapas</button>
+          </div>
+          <div *ngIf="stepEditor as draft" class="space-y-3 rounded-xl border border-braPurple/20 bg-gray-50 p-3">
+            <h3 class="font-semibold text-braDark">{{ draft.id===null?'Adicionar etapa':'Editar etapa' }}</h3>
+            <label class="block text-xs font-semibold">Nome<input [(ngModel)]="draft.name" maxlength="100" [disabled]="!canManageProduction" class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal"></label>
+            <label class="block text-xs font-semibold">Etapa reutilizável (opcional)<select [ngModel]="draft.stageDefinitionId" (ngModelChange)="chooseStepDefinition($event)" [disabled]="!canManageProduction" class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal"><option [ngValue]="null">Exclusiva deste pedido</option><option *ngFor="let def of definitions" [ngValue]="def.id">{{ def.name }}</option></select></label>
+            <label *ngIf="draft.id!==null" class="block text-xs font-semibold">Anotações e correções<textarea [(ngModel)]="draft.notes" maxlength="8000" rows="3" [disabled]="!canManageProduction" class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal"></textarea></label>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" (click)="saveStepEditor()" [disabled]="!canManageProduction || !draft.name.trim()" class="rounded-lg bg-braPurple px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Salvar etapa</button>
+              <button type="button" (click)="stepEditor=null" [disabled]="busy" class="rounded-lg border px-3 py-2 text-xs">Cancelar</button>
+              <button *ngIf="draft.id!==null" type="button" (click)="removeEditedStep()" [disabled]="!canManageProduction" class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-40">Excluir etapa</button>
+            </div>
+          </div>
           <div class="divide-y divide-gray-100">
-            <article *ngFor="let step of steps; let index=index" class="py-3">
+            <article *ngFor="let step of visibleSteps" class="py-3" [attr.data-step-id]="step.id">
               <div class="flex flex-wrap items-start gap-3">
-                <span [ngClass]="step.status==='DONE'?'bg-braPurple text-white':'bg-gray-100 text-gray-600'" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">{{ step.status==='DONE'?'✓':index+1 }}</span>
+                <span [ngClass]="step.status==='DONE'?'bg-braPurple text-white':'bg-gray-100 text-gray-600'" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">{{ step.status==='DONE'?'✓':step.position+1 }}</span>
                 <div class="min-w-0 flex-1">
                   <p class="break-words text-sm font-semibold text-braDark">{{ step.name }} <span *ngIf="isCurrentStep(step)" class="ml-1 text-xs font-normal text-braPurple">· Atual</span></p>
+                  <button *ngIf="canManageProduction" type="button" (click)="openStepEditor(step)" class="mt-1 text-xs font-semibold text-braPurple hover:underline">Editar etapa</button>
                   <p *ngIf="step.notes" class="mt-1 whitespace-pre-wrap break-words text-xs text-gray-500">{{ step.notes }}</p>
                   <div *ngIf="planForStep(step) as plan" class="mt-2">
                     <ng-container *ngTemplateOutlet="planningControl; context: {$implicit:plan}"></ng-container>

@@ -405,7 +405,7 @@ describe('CreatorStudioComponent', () => {
     expect(component.viewMode).toBe('list');
     expect(component.selectedStatus).toBe('QUEUED');
     expect(studio.commissions).toHaveBeenCalledWith('QUEUED', 1, 25);
-    expect(fixture.nativeElement.textContent).toContain('Editar pedido');
+    expect(fixture.nativeElement.textContent).toContain('Abrir pedido');
     component.setViewMode('board');
     fixture.detectChanges();
     expect(component.boardColumns[0].total).toBe(1);
@@ -508,12 +508,6 @@ describe('CreatorStudioComponent', () => {
     expect(studio.commissions).toHaveBeenCalledTimes(8);
   });
 
-  it('uses the explicit status endpoint to conclude instead of deleting', () => {
-    component.changeStatus(card,'COMPLETED');
-    expect(studio.changeStatus).toHaveBeenCalledWith(11,'COMPLETED');
-    expect(studio.commissions).toHaveBeenCalledTimes(8);
-  });
-
   it('does not leak queued data from a previous account while a board request is delayed', () => {
     const delayed = new Subject<{items:CreatorCommission[],page:number,pageSize:number,total:number}>();
     studio.commissions.and.returnValue(delayed.asObservable());
@@ -543,12 +537,17 @@ describe('CreatorStudioComponent', () => {
     expect(component.groupedCommissions.length).toBe(1);
   });
 
-  it('loads existing stages only for a Pro-authorized commission', () => {
-    component.toggleSteps(card);
-    expect(studio.commissionSteps).toHaveBeenCalledWith(11);
-    expect(component.expandedCommissionId).toBe(11);
-    component.toggleSteps(card);
-    expect(component.expandedCommissionId).toBeNull();
+  it('shows a concise order card with one detail link and no inline mutations or step requests', () => {
+    studio.commissions.and.returnValue(of({items:[{...card,currentStageName:'Rascunho'}],page:1,pageSize:25,total:1}));
+    component.setViewMode('list');fixture.detectChanges();
+    const element=fixture.nativeElement.querySelector('section[aria-label="Commissions da fila"] article') as HTMLElement;
+    expect(element.querySelector('[data-current-stage]')?.textContent).toContain('Rascunho');
+    expect(element.querySelectorAll('a').length).toBe(1);
+    expect(element.querySelector('a')?.textContent).toContain('Abrir pedido');
+    expect(element.querySelector('a')?.getAttribute('href')).toBe('/painel/creators/pedido/11');
+    expect(element.querySelector('button,select,input,textarea')).toBeNull();
+    expect(studio.commissionSteps).not.toHaveBeenCalled();
+    expect(studio.changeStatus).not.toHaveBeenCalled();
   });
 
   it('shows 30/7-day notices while keeping automatic deletion disabled', () => {
