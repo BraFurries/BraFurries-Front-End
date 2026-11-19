@@ -46,7 +46,7 @@
   </ng-container>
 
   <ng-template #monthView>
-    <div class="calendar-toolbar relative flex flex-wrap items-center justify-between gap-3">
+    <div #calendarToolbar class="calendar-toolbar relative flex flex-wrap items-center justify-between gap-3">
       <span role="status" class="sr-only">{{ busy ? 'Salvando planejamento...' : loading ? 'Carregando planejamento...' : '' }}</span>
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" (click)="changeMonth(-1)" [disabled]="monthNavigationDisabled" aria-label="Mês anterior"
@@ -57,14 +57,22 @@
         <button type="button" (click)="goToday()" [disabled]="monthNavigationDisabled"
           class="rounded-lg border px-3 py-2 text-sm font-semibold text-braPurple">Hoje</button>
       </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="Visualização do calendário" class="flex gap-1 rounded-lg border border-gray-200 p-1">
+          <button type="button" (click)="setViewMode('month')" [attr.aria-pressed]="viewMode==='month'" [disabled]="busy || draggedKey!==null"
+            [ngClass]="viewMode==='month'?'bg-braPurple text-white':'text-gray-600 hover:bg-gray-50'" class="rounded-md px-3 py-1.5 text-xs font-semibold">Mês</button>
+          <button type="button" (click)="setViewMode('agenda')" [attr.aria-pressed]="viewMode==='agenda'" [disabled]="busy || draggedKey!==null"
+            [ngClass]="viewMode==='agenda'?'bg-braPurple text-white':'text-gray-600 hover:bg-gray-50'" class="rounded-md px-3 py-1.5 text-xs font-semibold">Agenda</button>
+        </div>
       <label class="flex items-center gap-2 text-sm text-gray-600">Mostrar
         <select [ngModel]="filter" (ngModelChange)="setFilter($event)" [disabled]="busy || draggedKey !== null"
           class="rounded-lg border border-gray-300 bg-white p-2 text-sm">
           <option value="ALL">Tudo</option><option value="PRODUCTION">Produção planejada</option><option value="DELIVERY">Prazos de entrega</option>
         </select>
       </label>
+      </div>
     </div>
-    <p class="text-xs text-gray-500">Arraste uma etapa para um dia ou escolha a data no cartão. Só o planejamento será alterado. Os prazos de entrega são apenas para consulta.</p>
+    <p class="text-xs text-gray-500">{{ viewMode==='month' ? 'Arraste uma etapa para um dia ou selecione o dia para ver os detalhes.' : 'Confira sua produção em ordem de data e altere o planejamento quando precisar.' }} Os prazos de entrega são apenas para consulta.</p>
     <div class="flex flex-wrap gap-3 text-xs text-gray-600">
       <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-full bg-violet-400"></span> Produção (cor por pedido)</span>
       <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span> Prazo de entrega</span>
@@ -72,6 +80,7 @@
     </div>
     <div class="calendar-layout grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_15rem]">
       <div class="min-w-0 space-y-3">
+        <ng-container *ngIf="viewMode==='month'; else agendaView">
         <div class="grid grid-cols-7 gap-1">
           <div *ngFor="let weekday of weekdays" class="py-1 text-center text-xs font-semibold text-gray-500">{{ weekday }}</div>
         </div>
@@ -79,7 +88,7 @@
           <div *ngFor="let motion of monthMotion ? [monthMotion] : []" aria-hidden="true" class="calendar-outgoing grid grid-cols-7 gap-1"
             [class.calendar-exit-next]="motion.direction === 'next'" [class.calendar-exit-previous]="motion.direction === 'previous'">
             <div *ngFor="let day of motion.days; trackBy: trackDay"
-              class="min-w-0 min-h-[3.5rem] rounded-lg border border-gray-200 p-1 lg:min-h-[7rem]" [class.bg-gray-50]="!day.inMonth">
+              class="calendar-day min-w-0 rounded-lg border border-gray-200 p-1" [class.bg-gray-50]="!day.inMonth">
               <span class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold" [class.text-gray-400]="!day.inMonth">{{ day.number }}</span>
               <ng-container *ngIf="motion.loading; else outgoingEvents">
                 <ng-container *ngTemplateOutlet="daySkeleton"></ng-container>
@@ -87,11 +96,10 @@
               <ng-template #outgoingEvents>
                 <span *ngIf="day.items.length" class="mt-1 block truncate text-center text-[10px] font-semibold text-braPurple lg:hidden">{{ day.items.length }} item(ns)</span>
                 <div class="hidden space-y-1 lg:block">
-                  <div *ngFor="let item of day.items; trackBy: trackItem" [ngClass]="[color(item),historical(item)?'opacity-60':'']" class="rounded-md border-l-2 p-1.5 text-xs">
-                    <p class="break-words font-semibold">{{ label(item) }}</p>
-                    <p class="truncate">{{ item.title }}</p>
-                    <p class="truncate text-[10px]">{{ item.clientName }}</p>
+                  <div *ngFor="let item of day.items | slice:0:visibleItemsPerDay; trackBy: trackItem" [ngClass]="[color(item),historical(item)?'opacity-60':'']" class="calendar-chip truncate rounded border-l-2 px-1 font-medium">
+                    {{ label(item) }} · {{ item.title }}
                   </div>
+                  <span *ngIf="day.items.length>visibleItemsPerDay" class="calendar-more block truncate font-semibold text-gray-500">+{{ day.items.length-visibleItemsPerDay }} mais</span>
                 </div>
               </ng-template>
             </div>
@@ -102,8 +110,8 @@
             (animationend)="finishMonthMotion($event,renderedMonth)">
           <div *ngFor="let day of days; trackBy: trackDay" #calendarTarget [attr.data-calendar-date]="day.date"
             [ngClass]="[hoveredDate===day.date ? 'border-dashed border-braPurple bg-braPurple/10' : selectedDay===day.date ? 'border-braPurple bg-braPurple/5' : 'border-gray-200', day.inMonth ? '' : 'bg-gray-50']"
-            class="min-w-0 min-h-[3.5rem] rounded-lg border p-1 lg:min-h-[7rem]">
-            <button type="button" (click)="selectedDay=day.date" [disabled]="loading" [attr.aria-pressed]="selectedDay===day.date"
+            class="calendar-day min-w-0 rounded-lg border p-1">
+            <button type="button" (click)="selectDay(day.date)" [disabled]="loading" [attr.aria-pressed]="selectedDay===day.date"
               [attr.aria-label]="day.date + ', ' + day.items.length + ' itens'"
               [ngClass]="day.date===today ? 'bg-braPurple text-white' : day.inMonth ? 'text-braDark' : 'text-gray-400'"
               class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold">{{ day.number }}</button>
@@ -111,20 +119,28 @@
               <ng-container *ngTemplateOutlet="daySkeleton"></ng-container>
             </ng-container>
             <ng-template #loadedDay>
-            <span *ngIf="day.items.length" class="mt-1 block truncate text-center text-[10px] font-semibold text-braPurple lg:hidden">{{ day.items.length }} item(ns)</span>
+            <button *ngIf="day.items.length" type="button" (click)="selectDay(day.date,true)" class="mt-1 block w-full truncate text-center text-[10px] font-semibold text-braPurple lg:hidden"
+              [attr.aria-label]="'Ver '+day.items.length+' itens de '+day.date">{{ day.items.length }} item(ns)</button>
             <div cdkDropList cdkDropListSortingDisabled class="hidden space-y-1 lg:block">
-              <ng-container *ngFor="let item of day.items; trackBy: trackItem">
-                <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
-              </ng-container>
+              <div *ngFor="let item of day.items | slice:0:visibleItemsPerDay; trackBy: trackItem" cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="!movable(item)"
+                (cdkDragStarted)="dragStart(item)" (cdkDragMoved)="dragMove($event)" (cdkDragEnded)="dragEnd($event,item)"
+                [ngClass]="[color(item),historical(item)?'opacity-60':'',movable(item)?'cursor-grab active:cursor-grabbing':'']"
+                class="calendar-chip min-w-0 rounded border-l-2">
+                <button type="button" (click)="selectDay(day.date,true)" [title]="label(item)+' · '+item.title+' · '+item.clientName"
+                  class="block w-full cursor-inherit truncate px-1 text-left font-medium">{{ label(item) }} · {{ item.title }}</button>
+                <ng-template cdkDragPlaceholder><div class="calendar-chip rounded bg-gray-100"></div></ng-template>
+              </div>
+              <button *ngIf="day.items.length>visibleItemsPerDay" type="button" (click)="selectDay(day.date,true)"
+                [attr.aria-label]="'Ver todos os '+day.items.length+' itens de '+day.date" class="calendar-more block w-full truncate text-left font-semibold text-braPurple hover:underline">
+                +{{ day.items.length-visibleItemsPerDay }} mais
+              </button>
             </div>
             </ng-template>
           </div>
           </div>
         </div>
-        <button *ngIf="hasMoreEvents" type="button" (click)="loadMore('events')" [disabled]="loadingMore || busy || draggedKey !== null"
-          class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple">Carregar mais itens do calendário</button>
-        <div class="space-y-2 lg:hidden">
-          <h3 class="font-semibold text-braDark">{{ selectedDay + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }}</h3>
+        <section class="space-y-2 rounded-xl border border-gray-200 p-3" aria-label="Detalhes do dia">
+          <h3 #dayDetails tabindex="-1" class="font-semibold text-braDark">Detalhes de {{ selectedDay + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }}</h3>
           <div class="min-h-10">
             <div *ngIf="loading; else selectedDayContent" aria-hidden="true" class="calendar-skeleton h-10 w-full rounded-md bg-gray-100"></div>
             <ng-template #selectedDayContent>
@@ -136,7 +152,31 @@
               <p *ngIf="!selectedItems.length && !error" class="flex h-10 items-center text-sm text-gray-500">Nada planejado neste dia.</p>
             </ng-template>
           </div>
-        </div>
+        </section>
+        </ng-container>
+        <ng-template #agendaView>
+          <section aria-label="Agenda do mês" [attr.aria-busy]="loading" class="min-h-[12rem] space-y-4">
+            <div *ngIf="loading" aria-hidden="true" class="agenda-loading space-y-3">
+              <div *ngFor="let placeholder of [1,2,3]" class="calendar-skeleton space-y-2 rounded-xl border border-gray-200 p-3">
+                <div class="h-4 w-28 rounded bg-gray-200"></div>
+                <div class="h-12 rounded bg-gray-100"></div>
+                <div class="h-12 rounded bg-gray-100"></div>
+              </div>
+            </div>
+            <p *ngIf="!loading && !agendaDays.length && !error" class="rounded-xl border border-dashed p-5 text-center text-sm text-gray-500">Nenhum item neste mês{{ hasMoreEvents ? ' entre os itens carregados' : '' }}.</p>
+            <section *ngFor="let day of agendaDays; trackBy: trackDay" [attr.data-agenda-date]="day.date" class="space-y-2 rounded-xl border border-gray-200 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-amaranth text-base font-bold text-braDark">{{ day.date + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }} <span *ngIf="day.date===today" class="ml-1 text-xs font-normal text-braPurple">Hoje</span></h3>
+                <span class="text-xs text-gray-500">{{ day.items.length }} {{ day.items.length===1?'item':'itens' }}</span>
+              </div>
+              <ng-container *ngFor="let item of day.items; trackBy: trackItem">
+                <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
+              </ng-container>
+            </section>
+          </section>
+        </ng-template>
+        <button *ngIf="hasMoreEvents" type="button" (click)="loadMore('events')" [disabled]="loading || loadingMore || busy || draggedKey !== null"
+          class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple disabled:opacity-50">Carregar mais itens do calendário</button>
       </div>
       <aside *ngIf="filter !== 'DELIVERY'"
         class="min-w-0 self-start space-y-2 xl:sticky xl:top-4 xl:max-h-[70vh] xl:overflow-y-auto">
@@ -163,11 +203,11 @@
             <p *ngIf="group.clientName" class="break-words text-xs text-gray-500">{{ group.clientName }}</p>
           </div>
           <div cdkDropList cdkDropListSortingDisabled class="space-y-1">
-            <article *ngFor="let item of group.items; trackBy: trackItem" cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="!movable(item)"
+            <article *ngFor="let item of group.items; trackBy: trackItem" cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="viewMode==='agenda' || !movable(item)"
               (cdkDragStarted)="dragStart(item)" (cdkDragMoved)="dragMove($event)" (cdkDragEnded)="dragEnd($event,item)"
-              [ngClass]="[color(item),busy || loading ? 'opacity-70' : '',movable(item)?'cursor-grab active:cursor-grabbing':'']"
+              [ngClass]="[color(item),busy || loading ? 'opacity-70' : '',viewMode==='month' && movable(item)?'cursor-grab active:cursor-grabbing':'']"
               class="flex min-w-0 items-center gap-2 rounded-md border-l-2 px-2 py-1.5 text-xs">
-              <svg aria-hidden="true" viewBox="0 0 16 20" class="h-3.5 w-2.5 shrink-0 fill-current opacity-50">
+              <svg *ngIf="viewMode==='month'" aria-hidden="true" viewBox="0 0 16 20" class="h-3.5 w-2.5 shrink-0 fill-current opacity-50">
                 <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/><circle cx="5" cy="10" r="1.5"/><circle cx="11" cy="10" r="1.5"/><circle cx="5" cy="16" r="1.5"/><circle cx="11" cy="16" r="1.5"/>
               </svg>
               <span class="min-w-0 flex-1 break-words font-medium">{{ label(item) }}</span>
@@ -227,26 +267,22 @@
     </div>
   </ng-template>
   <ng-template #eventCard let-item>
-    <article cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="!movable(item)"
+    <article cdkDrag [cdkDragData]="item" [cdkDragStartDelay]="dragDelay" [cdkDragDisabled]="viewMode==='agenda' || !movable(item)"
       (cdkDragStarted)="dragStart(item)" (cdkDragMoved)="dragMove($event)" (cdkDragEnded)="dragEnd($event,item)"
-      [ngClass]="[color(item), historical(item) ? 'opacity-60' : '', movable(item) ? 'cursor-grab active:cursor-grabbing' : '']"
-      class="min-w-0 overflow-hidden rounded-md border-l-2 p-1.5 text-xs">
-      <div class="flex items-start gap-1">
-        <div class="min-w-0 flex-1 space-y-0.5">
-          <p class="break-words font-semibold">{{ label(item) }}</p>
-          <a [routerLink]="['/painel/creators/pedido',item.commissionId]" [title]="item.title + ' · ' + item.clientName"
-            class="block truncate hover:underline">{{ item.title }}</a>
-          <p class="truncate text-[10px]">{{ item.clientName }}</p>
-        </div>
-        <svg *ngIf="movable(item)" aria-hidden="true" viewBox="0 0 16 20" class="h-4 w-3 shrink-0 fill-current opacity-50">
-          <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
-          <circle cx="5" cy="10" r="1.5"/><circle cx="11" cy="10" r="1.5"/>
-          <circle cx="5" cy="16" r="1.5"/><circle cx="11" cy="16" r="1.5"/>
-        </svg>
+      [ngClass]="[color(item),historical(item)?'opacity-60':'',viewMode==='month' && movable(item)?'cursor-grab active:cursor-grabbing':'']"
+      class="calendar-detail-row flex flex-wrap items-center gap-2 rounded-lg border-l-4 px-3 py-2">
+      <div class="min-w-0 flex-1">
+        <p class="break-words text-sm font-semibold">{{ label(item) }}</p>
+        <a [routerLink]="['/painel/creators/pedido',item.commissionId]" class="block break-words text-sm hover:underline">{{ item.title }}</a>
+        <p class="break-words text-xs opacity-80">{{ item.clientName }}</p>
       </div>
-      <button *ngIf="movable(item)" type="button" (click)="openEditor(item)"
-        class="mt-1 block max-w-full text-left text-[10px] font-semibold underline">{{ item.date ? 'Alterar data' : 'Planejar' }}</button>
-      <ng-template cdkDragPlaceholder><div aria-hidden="true" class="min-h-[3.5rem] rounded-md border border-gray-200 bg-gray-50 p-1.5 text-xs text-gray-500">{{ label(item) }} · {{ item.title }}</div></ng-template>
+      <div class="flex flex-col gap-0.5 text-xs">
+        <span class="font-medium">{{ itemStatus(item) }}</span>
+        <span *ngIf="item.kind==='STEP' && item.commissionStatus==='PAUSED' && !historical(item)" class="opacity-80">Pedido em pausa</span>
+      </div>
+      <button *ngIf="movable(item)" type="button" (click)="openEditor(item)" [attr.aria-label]="'Alterar data de '+label(item)+' de '+item.title"
+        class="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/70">Alterar data</button>
+      <ng-template cdkDragPlaceholder><div aria-hidden="true" class="min-h-12 rounded-lg border border-dashed border-gray-300 bg-gray-50"></div></ng-template>
     </article>
   </ng-template>
 </section>

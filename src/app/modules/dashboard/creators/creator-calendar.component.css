@@ -5,6 +5,13 @@
    incoming skeleton or change the layout of the weekday header/sidebar. */
 .calendar-outgoing { position: absolute; inset: 0 0 auto; pointer-events: none; }
 .calendar-toolbar .sr-only { margin: 0; }
+/* A busy day must never enlarge its week or the month viewport. */
+.calendar-day { box-sizing: border-box; height: 3.5rem; overflow: hidden; }
+.calendar-chip { box-sizing: border-box; height: 1.25rem; font-size: 0.625rem; line-height: 1.25rem; }
+.calendar-more { height: 1rem; font-size: 0.625rem; line-height: 1rem; }
+@media (min-width: 1024px) {
+  .calendar-day { height: 7rem; }
+}
 .calendar-enter-next { animation: creator-calendar-enter-next 260ms ease-out both; }
 .calendar-enter-previous { animation: creator-calendar-enter-previous 260ms ease-out both; }
 .calendar-exit-next { animation: creator-calendar-exit-next 260ms ease-out both; }

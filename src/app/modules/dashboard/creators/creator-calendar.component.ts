@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { CdkDragEnd, CdkDragMove, DragDropModule } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, Input, NgZone, OnChanges, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
+import { Component, ElementRef, Input, NgZone, OnChanges, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { distinctUntilChanged, forkJoin, Subject, takeUntil } from 'rxjs';
@@ -29,6 +29,11 @@ interface UnplannedGroup { id: number; title: string; clientName: string; items:
 export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   @Input() commissionId: number | null = null;
   @ViewChildren('calendarTarget', { read: ElementRef }) private targets!: QueryList<ElementRef<HTMLElement>>;
+
+  @ViewChild('dayDetails') private dayDetails?: ElementRef<HTMLElement>;
+  @ViewChild('calendarToolbar') private calendarToolbar?: ElementRef<HTMLElement>;
+  readonly visibleItemsPerDay = 2;
+  viewMode: 'month' | 'agenda' = 'month';
 
   readonly weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   readonly dragDelay = { touch: 200, mouse: 0 };
@@ -79,6 +84,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
         this.unplannedExpanded = true;
         this.plannedExpanded = false;
         this.filter = 'ALL';
+        this.viewMode = 'month';
         this.month = this.today.slice(0,7)+'-01';
         this.selectedDay = this.today;
         this.reload();
@@ -133,6 +139,45 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
 
   get selectedItems(): CreatorCalendarItem[] {
     return this.days.find(day=>day.date===this.selectedDay)?.items || [];
+  }
+
+  get agendaDays(): CalendarDay[] {
+    return this.days.filter(day=>day.inMonth && day.items.length>0);
+  }
+
+  setViewMode(mode:'month'|'agenda'):void {
+    if(this.busy || this.draggedKey!==null || this.viewMode===mode)return;
+    this.viewMode=mode;
+    this.monthMotion=null;
+    this.cancelEdit();
+  }
+
+  selectDay(date:string,showDetails=false):void {
+    if(this.loading || this.draggedKey!==null || !this.days.some(day=>day.date===date))return;
+    this.selectedDay=date;
+    if(showDetails && this.dayDetails){
+      const heading=this.dayDetails.nativeElement;
+      heading.focus({preventScroll:true});
+      heading.scrollIntoView({block:'nearest'});
+    }
+  }
+
+  itemStatus(item:CreatorCalendarItem):string {
+    if(item.kind==='DELIVERY')return 'Prazo de entrega';
+    if(this.historical(item))return 'Finalizado';
+    if(item.kind==='STEP'){
+      switch(item.stepStatus){
+        case 'IN_PROGRESS': return 'Em execução';
+        case 'WAITING_APPROVAL': return 'Aguardando aprovação';
+        default: return 'Pendente';
+      }
+    }
+    switch(item.commissionStatus){
+      case 'IN_PROGRESS': return 'Em produção';
+      case 'WAITING': return 'Aguardando retorno';
+      case 'PAUSED': return 'Em pausa';
+      default: return 'Na fila';
+    }
   }
 
   trackDay(_index:number,day:CalendarDay):string { return day.date; }
@@ -274,7 +319,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     // The unplanned queue is independent of the visible month. Keep its
     // loaded pages and scroll position, but disable writes during navigation.
     const seq=++this.sequence;
-    this.monthMotion={direction:month>this.month?'next':'previous',month,days:this.days,loading:this.loading};
+    this.monthMotion=this.viewMode==='month'?{direction:month>this.month?'next':'previous',month,days:this.days,loading:this.loading}:null;
     this.month=month;this.selectedDay=selectedDay;
     this.events=[];this.eventPage=1;this.hasMoreEvents=false;
     this.error='';this.cancelEdit();this.clearDrag();this.loading=true;this.buildDays();
@@ -311,6 +356,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   openEditor(item:CreatorCalendarItem):void {
     if(!this.movable(item)||this.draggedKey!==null)return;
     this.editing=item;this.draftDate=item.date||this.selectedDay;this.error='';
+    // Day details and agenda may be far below the shared editor.
+    if(this.commissionId===null)this.calendarToolbar?.nativeElement.parentElement?.scrollIntoView({block:'start'});
   }
   saveEditor(remove=false):void {
     const item=this.editing;
@@ -340,7 +387,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   dragStart(item:CreatorCalendarItem):void {
-    if(this.movable(item)){
+    if(this.viewMode==='month' && this.movable(item)){
       this.cancelEdit();this.draggedKey=this.key(item);this.hoveredDate=null;
     }
   }
