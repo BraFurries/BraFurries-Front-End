@@ -14,6 +14,7 @@ interface CalendarDay {
   inMonth: boolean;
   items: CreatorCalendarItem[];
 }
+interface MonthMotion { direction: 'next' | 'previous'; month: string; days: CalendarDay[]; loading: boolean; }
 interface UnplannedGroup { id: number; title: string; clientName: string; items: CreatorCalendarItem[]; }
 
 /** One private calendar and the commission-specific planning editor use the
@@ -22,7 +23,8 @@ interface UnplannedGroup { id: number; title: string; clientName: string; items:
   selector: 'app-creator-calendar',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, DragDropModule],
-  templateUrl: './creator-calendar.component.html'
+  templateUrl: './creator-calendar.component.html',
+  styleUrls: ['./creator-calendar.component.css']
 })
 export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   @Input() commissionId: number | null = null;
@@ -41,6 +43,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   detail: CreatorCalendarItem[] = [];
   filter: 'ALL' | 'PRODUCTION' | 'DELIVERY' = 'ALL';
   loading = false;
+  monthMotion: MonthMotion | null = null;
+  private unplannedReady = false;
   busy = false;
   loadingMore = false;
   error = '';
@@ -149,6 +153,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private resetData():void {
+    this.monthMotion=null;this.unplannedReady=false;
     this.events=[];this.unplanned=[];this.groups=[];this.detail=[];
     this.eventPage=1;this.unplannedPage=1;
     this.hasMoreEvents=false;this.hasMoreUnplanned=false;
@@ -176,6 +181,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
         if(!this.current(seq,owner))return;
         this.events=result.month.items;this.hasMoreEvents=result.month.hasMore;
         this.unplanned=result.unplanned.items;this.hasMoreUnplanned=result.unplanned.hasMore;
+        this.unplannedReady=true;
         this.buildDays();this.buildGroups();this.loading=false;
       },
       error:err=>this.fail(seq,owner,err)
@@ -231,15 +237,49 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     });
   }
 
+  get monthNavigationDisabled():boolean {
+    return this.owner===null || this.busy || this.draggedKey!==null || this.loadingMore ||
+      (this.loading && !this.unplannedReady);
+  }
+
+  private navigateMonth(month:string,selectedDay:string):void {
+    const owner=this.owner;
+    if(owner===null || this.monthNavigationDisabled)return;
+    if(month===this.month){this.selectedDay=selectedDay;return;}
+    if(!this.unplannedReady){
+      this.month=month;this.selectedDay=selectedDay;this.reload();return;
+    }
+    // The unplanned queue is independent of the visible month. Keep its
+    // loaded pages and scroll position, but disable writes during navigation.
+    const seq=++this.sequence;
+    this.monthMotion={direction:month>this.month?'next':'previous',month,days:this.days,loading:this.loading};
+    this.month=month;this.selectedDay=selectedDay;
+    this.events=[];this.eventPage=1;this.hasMoreEvents=false;
+    this.error='';this.cancelEdit();this.clearDrag();this.loading=true;this.buildDays();
+    this.studio.calendar(this.days[0].date,this.days[41].date,1,100)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next:page=>{
+          if(!this.current(seq,owner))return;
+          this.events=page.items;this.hasMoreEvents=page.hasMore;
+          this.buildDays();this.loading=false;
+        },error:err=>this.fail(seq,owner,err)
+      });
+  }
+
+  finishMonthMotion(event:AnimationEvent,month:string):void {
+    if(event.target===event.currentTarget && this.monthMotion?.month===month &&
+       event.animationName.startsWith('creator-calendar-enter-'))this.monthMotion=null;
+  }
+
   changeMonth(delta:number):void {
-    if(this.busy||this.draggedKey!==null)return;
+    if(this.monthNavigationDisabled)return;
     const first=this.utcDate(this.month);first.setUTCMonth(first.getUTCMonth()+delta);
     if(first.getUTCFullYear()<1901||first.getUTCFullYear()>9998)return;
-    this.month=this.civil(first);this.selectedDay=this.month;this.reload();
+    const month=this.civil(first);
+    this.navigateMonth(month,month);
   }
   goToday():void {
-    if(this.busy||this.draggedKey!==null)return;
-    this.month=this.today.slice(0,7)+'-01';this.selectedDay=this.today;this.reload();
+    this.navigateMonth(this.today.slice(0,7)+'-01',this.today);
   }
   setFilter(filter:'ALL'|'PRODUCTION'|'DELIVERY'):void {
     if(this.busy||this.draggedKey!==null)return;
