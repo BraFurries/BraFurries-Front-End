@@ -237,6 +237,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
     });
   }
 
+  get unplannedLoading():boolean { return this.loading && !this.unplannedReady; }
+
   get monthNavigationDisabled():boolean {
     return this.owner===null || this.busy || this.draggedKey!==null || this.loadingMore ||
       (this.loading && !this.unplannedReady);
@@ -268,7 +270,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, OnDestroy {
 
   finishMonthMotion(event:AnimationEvent,month:string):void {
     if(event.target===event.currentTarget && this.monthMotion?.month===month &&
-       event.animationName.startsWith('creator-calendar-enter-'))this.monthMotion=null;
+       (event.animationName.endsWith('creator-calendar-enter-next') ||
+        event.animationName.endsWith('creator-calendar-enter-previous')))this.monthMotion=null;
   }
 
   changeMonth(delta:number):void {

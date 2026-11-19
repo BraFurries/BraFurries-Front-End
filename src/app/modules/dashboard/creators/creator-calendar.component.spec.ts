@@ -1,4 +1,5 @@
 import { CdkDragEnd, CdkDragMove } from '@angular/cdk/drag-drop';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
@@ -134,6 +135,9 @@ describe('CreatorCalendarComponent',()=>{
     expect(fixture.nativeElement.querySelectorAll('.calendar-current .calendar-skeleton').length).toBe(0);
     expect(component.groups[0].items).toEqual([step]);
     expect(component.movable(step)).toBeTrue();
+    const grid=fixture.nativeElement.querySelector('.calendar-current');
+    component.finishMonthMotion({target:grid,currentTarget:grid,animationName:'scoped_creator-calendar-enter-next'} as AnimationEvent,component.month);
+    expect(component.monthMotion).toBeNull();
   });
 
   it('keeps only the latest month when navigation is rapid and clears the outgoing snapshot on account change',()=>{
@@ -152,6 +156,19 @@ describe('CreatorCalendarComponent',()=>{
     expect(component.monthMotion).toBeNull();
     expect(component.groups).toEqual([]);
     expect(component.events).toEqual([]);
+  });
+
+  it('clears the old month and unplanned queue when access is revoked during navigation',()=>{
+    const pending=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(pending);
+    component.changeMonth(1);
+    pending.error(new HttpErrorResponse({status:403}));
+    fixture.detectChanges();
+    expect(component.monthMotion).toBeNull();
+    expect(component.events).toEqual([]);
+    expect(component.groups).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.calendar-outgoing')).toBeNull();
+    expect(fixture.nativeElement.querySelector('aside').textContent).not.toContain('Ref sheet');
   });
 
   it('shows each order title and client only once in the compact sidebar and keeps planning accessible',()=>{
