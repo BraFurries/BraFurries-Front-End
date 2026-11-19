@@ -185,6 +185,49 @@ describe('CreatorCalendarComponent',()=>{
     expect(component.editing).toEqual(step);
   });
 
+  it('collapses both sidebar sections independently and keeps their state while navigating',()=>{
+    const aside=fixture.nativeElement.querySelector('aside') as HTMLElement;
+    const unplanned=aside.querySelector('[data-sidebar-toggle="unplanned"]') as HTMLButtonElement;
+    const planned=aside.querySelector('[data-sidebar-toggle="planned"]') as HTMLButtonElement;
+    expect(unplanned.getAttribute('aria-expanded')).toBe('true');
+    expect(planned.getAttribute('aria-expanded')).toBe('false');
+    expect(component.plannedCount).toBe(1);
+    unplanned.click();planned.click();fixture.detectChanges();
+    expect(aside.querySelector('[data-sidebar-body="unplanned"]')).toBeNull();
+    expect(aside.querySelector('[data-calendar-date="unplanned"]')).not.toBeNull();
+    expect(aside.querySelector('[data-sidebar-body="planned"]')?.textContent).toContain('21/11');
+    expect(aside.querySelector('[data-sidebar-body="planned"]')?.textContent).not.toContain('Prazo de entrega');
+    const pending=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(pending);
+    component.changeMonth(1);fixture.detectChanges();
+    expect(unplanned.getAttribute('aria-expanded')).toBe('false');
+    expect(planned.getAttribute('aria-expanded')).toBe('true');
+    expect(aside.querySelector('[data-sidebar-body="planned"] .calendar-skeleton')).not.toBeNull();
+    pending.next({items:[delivery,done],hasMore:false});pending.complete();fixture.detectChanges();
+    expect(component.plannedCount).toBe(0);
+    expect(aside.textContent).toContain('Nenhuma produção planejada neste mês.');
+  });
+
+  it('keeps toolbar, calendar and sidebar top positions stable through initial reload and month loading',()=>{
+    const root=fixture.nativeElement as HTMLElement;
+    const positions=()=>['.calendar-toolbar','.calendar-viewport','aside'].map(selector=>
+      root.querySelector(selector)!.getBoundingClientRect().top-root.getBoundingClientRect().top);
+    const before=positions();
+    const pending=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(pending);
+    component.reload();fixture.detectChanges();
+    expect(positions()).toEqual(before);
+    expect(root.querySelector('.calendar-toolbar [role="status"]')?.textContent).toContain('Carregando');
+    pending.next({items:[delivery,done],hasMore:false});pending.complete();fixture.detectChanges();
+    expect(positions()).toEqual(before);
+    const next=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(next);
+    component.changeMonth(1);fixture.detectChanges();
+    expect(positions()).toEqual(before);
+    next.next({items:[],hasMore:false});next.complete();fixture.detectChanges();
+    expect(positions()).toEqual(before);
+  });
+
   it('keeps paginated results without duplicating the same event',()=>{
     studio.calendar.and.returnValue(of({items:[delivery],hasMore:true}));
     component.reload();
