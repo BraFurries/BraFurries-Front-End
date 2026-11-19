@@ -1,4 +1,5 @@
 import { CdkDragEnd, CdkDragMove } from '@angular/cdk/drag-drop';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
@@ -109,6 +110,79 @@ describe('CreatorCalendarComponent',()=>{
     users$.next(null);
     expect(component.events).toEqual([]);
     expect(component.detail).toEqual([]);
+  });
+
+  it('slides in a dated skeleton without reloading or removing the unplanned queue',()=>{
+    const pending=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(pending);
+    const originalAside=fixture.nativeElement.querySelector('aside');
+    const unplannedCalls=studio.unplannedCalendar.calls.count();
+    component.changeMonth(1);
+    fixture.detectChanges();
+    expect(component.monthMotion?.direction).toBe('next');
+    expect(component.monthMotion?.days.some(day=>day.items.includes(delivery))).toBeTrue();
+    expect(component.loading).toBeTrue();
+    expect(component.days[0].date).toBe('2026-11-29');
+    expect(fixture.nativeElement.querySelectorAll('.calendar-current .calendar-skeleton').length).toBe(42);
+    expect(fixture.nativeElement.querySelector('.calendar-outgoing').getAttribute('aria-hidden')).toBe('true');
+    expect(fixture.nativeElement.querySelector('aside')).toBe(originalAside);
+    expect(originalAside.textContent).toContain('Rascunho');
+    expect(component.movable(step)).toBeFalse();
+    expect(studio.unplannedCalendar.calls.count()).toBe(unplannedCalls);
+    pending.next({items:[],hasMore:false});pending.complete();
+    fixture.detectChanges();
+    expect(component.loading).toBeFalse();
+    expect(fixture.nativeElement.querySelectorAll('.calendar-current .calendar-skeleton').length).toBe(0);
+    expect(component.groups[0].items).toEqual([step]);
+    expect(component.movable(step)).toBeTrue();
+    const grid=fixture.nativeElement.querySelector('.calendar-current');
+    component.finishMonthMotion({target:grid,currentTarget:grid,animationName:'scoped_creator-calendar-enter-next'} as AnimationEvent,component.month);
+    expect(component.monthMotion).toBeNull();
+  });
+
+  it('keeps only the latest month when navigation is rapid and clears the outgoing snapshot on account change',()=>{
+    const first=new Subject<CreatorCalendarPage>(), second=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(first);
+    component.changeMonth(1);
+    studio.calendar.and.returnValue(second);
+    component.changeMonth(-1);
+    expect(component.monthMotion?.direction).toBe('previous');
+    second.next({items:[done],hasMore:false});second.complete();
+    first.next({items:[delivery],hasMore:false});first.complete();
+    expect(component.events).toEqual([done]);
+    studio.calendar.and.returnValue(of({items:[],hasMore:false}));
+    studio.unplannedCalendar.and.returnValue(of({items:[],hasMore:false}));
+    users$.next({...user,id:99});
+    expect(component.monthMotion).toBeNull();
+    expect(component.groups).toEqual([]);
+    expect(component.events).toEqual([]);
+  });
+
+  it('clears the old month and unplanned queue when access is revoked during navigation',()=>{
+    const pending=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(pending);
+    component.changeMonth(1);
+    pending.error(new HttpErrorResponse({status:403}));
+    fixture.detectChanges();
+    expect(component.monthMotion).toBeNull();
+    expect(component.events).toEqual([]);
+    expect(component.groups).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.calendar-outgoing')).toBeNull();
+    expect(fixture.nativeElement.querySelector('aside').textContent).not.toContain('Ref sheet');
+  });
+
+  it('shows each order title and client only once in the compact sidebar and keeps planning accessible',()=>{
+    studio.unplannedCalendar.and.returnValue(of({items:[step,{...step,stepId:83,stepName:'Pintura'}],hasMore:false}));
+    component.reload();
+    fixture.detectChanges();
+    const aside=fixture.nativeElement.querySelector('aside') as HTMLElement;
+    expect(aside.querySelectorAll('a').length).toBe(1);
+    expect(aside.textContent?.match(/Ref sheet/g)?.length).toBe(1);
+    expect(aside.textContent?.match(/Client/g)?.length).toBe(1);
+    const button=aside.querySelector('button[aria-label="Planejar Rascunho de Ref sheet"]') as HTMLButtonElement;
+    expect(button).not.toBeNull();
+    button.click();
+    expect(component.editing).toEqual(step);
   });
 
   it('keeps paginated results without duplicating the same event',()=>{

@@ -1,0 +1,18 @@
+/* Keep the calendar footprint and weekday header stable while the month slides. */
+.calendar-viewport { display: grid; overflow: hidden; }
+.calendar-current, .calendar-outgoing { grid-area: 1 / 1; min-width: 0; }
+.calendar-outgoing { pointer-events: none; }
+.calendar-enter-next { animation: creator-calendar-enter-next 260ms ease-out both; }
+.calendar-enter-previous { animation: creator-calendar-enter-previous 260ms ease-out both; }
+.calendar-exit-next { animation: creator-calendar-exit-next 260ms ease-out both; }
+.calendar-exit-previous { animation: creator-calendar-exit-previous 260ms ease-out both; }
+.calendar-skeleton { animation: creator-calendar-pulse 1.3s ease-in-out infinite; }
+@keyframes creator-calendar-enter-next { from { transform: translateX(102%); } to { transform: translateX(0); } }
+@keyframes creator-calendar-enter-previous { from { transform: translateX(-102%); } to { transform: translateX(0); } }
+@keyframes creator-calendar-exit-next { from { transform: translateX(0); } to { transform: translateX(-102%); } }
+@keyframes creator-calendar-exit-previous { from { transform: translateX(0); } to { transform: translateX(102%); } }
+@keyframes creator-calendar-pulse { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .calendar-enter-next, .calendar-enter-previous, .calendar-exit-next, .calendar-exit-previous { animation-duration: 1ms; }
+  .calendar-skeleton { animation: none; }
+}
