@@ -228,6 +228,57 @@ describe('CreatorCalendarComponent',()=>{
     expect(positions()).toEqual(before);
   });
 
+  it('keeps every day the same height, truncates busy days, and exposes every item in day details',()=>{
+    const date='2026-11-20';
+    const entries=Array.from({length:8},(_,i)=>({...step,stepId:100+i,stepName:'Etapa longa '+i+' com texto muito comprido',date}));
+    studio.calendar.and.returnValue(of({items:entries,hasMore:false}));component.reload();fixture.detectChanges();
+    const root=fixture.nativeElement as HTMLElement;
+    const busy=root.querySelector('[data-calendar-date="2026-11-20"]') as HTMLElement;
+    const empty=root.querySelector('[data-calendar-date="2026-11-19"]') as HTMLElement;
+    expect(busy.getBoundingClientRect().height).toBe(empty.getBoundingClientRect().height);
+    expect(busy.querySelectorAll('.calendar-chip').length).toBe(2);
+    expect(busy.querySelector('.calendar-more')?.textContent).toContain('+6 mais');
+    (busy.querySelector('.calendar-more') as HTMLButtonElement).click();fixture.detectChanges();
+    expect(component.selectedDay).toBe(date);
+    expect(root.querySelectorAll('.calendar-detail-row').length).toBe(8);
+  });
+
+  it('shows a chronological agenda of the selected month with the same filters and dates, without fetching again',()=>{
+    const scheduled={...step,date:'2026-11-19'};
+    const spillover={...step,stepId:99,date:'2026-12-01'};
+    studio.calendar.and.returnValue(of({items:[done,spillover,delivery,scheduled],hasMore:false}));
+    component.reload();fixture.detectChanges();
+    const calls=studio.calendar.calls.count();
+    component.setViewMode('agenda');fixture.detectChanges();
+    const root=fixture.nativeElement as HTMLElement;
+    expect(Array.from(root.querySelectorAll('[data-agenda-date]')).map(el=>el.getAttribute('data-agenda-date')))
+      .toEqual(['2026-11-19','2026-11-20','2026-11-21']);
+    expect(root.querySelector('.calendar-viewport')).toBeNull();
+    expect(root.querySelectorAll('.calendar-detail-row').length).toBe(3);
+    expect(root.textContent).toContain('Pedido em pausa');
+    expect(studio.calendar.calls.count()).toBe(calls);
+    component.setFilter('DELIVERY');fixture.detectChanges();
+    expect(root.querySelectorAll('.calendar-detail-row').length).toBe(1);
+    expect(root.querySelector('.calendar-detail-row button')).toBeNull();
+    component.setFilter('ALL');component.setViewMode('month');fixture.detectChanges();
+    expect(root.querySelector('.calendar-viewport')).not.toBeNull();
+    expect(studio.calendar.calls.count()).toBe(calls);
+  });
+
+  it('navigates in agenda mode without retaining outgoing private snapshots',()=>{
+    component.setViewMode('agenda');
+    const pending=new Subject<CreatorCalendarPage>();
+    studio.calendar.and.returnValue(pending);
+    component.changeMonth(1);fixture.detectChanges();
+    expect(component.monthMotion).toBeNull();
+    expect(fixture.nativeElement.querySelector('.agenda-loading')).not.toBeNull();
+    pending.next({items:[{...step,date:'2026-12-03'}],hasMore:false});pending.complete();fixture.detectChanges();
+    expect(component.agendaDays.map(day=>day.date)).toEqual(['2026-12-03']);
+    users$.next(null);fixture.detectChanges();
+    expect(component.agendaDays).toEqual([]);
+    expect(component.viewMode).toBe('month');
+  });
+
   it('keeps paginated results without duplicating the same event',()=>{
     studio.calendar.and.returnValue(of({items:[delivery],hasMore:true}));
     component.reload();
