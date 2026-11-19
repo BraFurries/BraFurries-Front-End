@@ -22,7 +22,7 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
 
   return userService.ensureValidSession().pipe(
     switchMap(valid => {
-      if (userService.getSessionIdentity() !== identity && userService.getSessionIdentity() !== null) {
+      if (userService.getSessionIdentity() !== identity) {
         return throwError(() => new HttpErrorResponse({
           status: 401, statusText: 'Sessão alterada', url: request.url
         }));
