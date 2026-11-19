@@ -35,6 +35,8 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, AfterViewChe
   dayModalOpen = false;
   agendaFocusDay: string | null = null;
   private pendingAgendaFocus: string | null = null;
+  private pendingDialogFocus = false;
+  @ViewChild('dayDialogClose') private dayDialogClose?: ElementRef<HTMLButtonElement>;
   @ViewChild('calendarToolbar') private calendarToolbar?: ElementRef<HTMLElement>;
   readonly visibleItemsPerDay = 2;
   viewMode: 'month' | 'agenda' = 'month';
@@ -101,6 +103,10 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, AfterViewChe
   }
 
   ngAfterViewChecked(): void {
+    if(this.pendingDialogFocus && this.dayDialogClose){
+      this.pendingDialogFocus=false;
+      this.dayDialogClose.nativeElement.focus({preventScroll:true});
+    }
     if(this.viewMode!=='agenda' || this.loading || !this.pendingAgendaFocus)return;
     const date=this.pendingAgendaFocus;
     const heading=this.agendaHeadings?.find(ref=>ref.nativeElement.dataset['agendaHeading']===date)?.nativeElement;
@@ -178,6 +184,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, AfterViewChe
     this.selectedDay=date;
     this.cancelEdit();
     this.dayModalOpen=true;
+    this.pendingDialogFocus=true;
     dialog.showModal();
   }
 
@@ -185,6 +192,7 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, AfterViewChe
     if(!force && this.busy)return;
     if(this.dayModalOpen)this.cancelEdit();
     this.dayModalOpen=false;
+    this.pendingDialogFocus=false;
     const dialog=this.dayDialog?.nativeElement;
     if(dialog?.open)dialog.close();
   }
@@ -200,7 +208,13 @@ export class CreatorCalendarComponent implements OnInit, OnChanges, AfterViewChe
     this.setViewMode('agenda');
     // Adjacent-month cells belong to their actual month in the agenda.
     if(month!==this.month)this.navigateMonth(month,date);
+    if(this.error)return;
     this.agendaFocusDay=date;this.pendingAgendaFocus=date;
+  }
+
+  get selectedDayLabel(): string {
+    return new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'})
+      .format(this.utcDate(this.selectedDay));
   }
 
   itemStatus(item:CreatorCalendarItem):string {

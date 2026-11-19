@@ -255,7 +255,10 @@ describe('CreatorCalendarComponent',()=>{
     fixture.detectChanges();
     const dialog=root.querySelector('dialog') as HTMLDialogElement;
     expect(dialog.open).toBeTrue();
+    expect(root.querySelectorAll('dialog').length).toBe(1);
+    expect(dialog.textContent).toContain('19 de novembro');
     expect(dialog.textContent).toContain('Nada planejado neste dia.');
+    expect(document.activeElement).toBe(dialog.querySelector('[aria-label="Fechar detalhes do dia"]'));
     expect(viewport.getBoundingClientRect().height).toBe(height);
     const link=Array.from(dialog.querySelectorAll('button')).find(button=>button.textContent?.includes('Ver na agenda'))!;
     link.click();fixture.detectChanges();
@@ -264,6 +267,7 @@ describe('CreatorCalendarComponent',()=>{
     expect(component.agendaFocusDay).toBe('2026-11-19');
     const focused=root.querySelector('[data-agenda-date="2026-11-19"]');
     expect(focused?.classList.contains('agenda-focused')).toBeTrue();
+    expect(document.activeElement).toBe(focused?.querySelector('h3') as HTMLElement);
     expect(focused?.textContent).toContain('Nada planejado neste dia.');
     expect(studio.calendar.calls.count()).toBe(calls);
   });
