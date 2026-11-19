@@ -26,3 +26,7 @@
   .calendar-enter-next, .calendar-enter-previous, .calendar-exit-next, .calendar-exit-previous { animation-duration: 1ms; }
   .calendar-skeleton { animation: none; }
 }
+
+.calendar-day-dialog { width: min(36rem, calc(100% - 2rem)); max-height: 82dvh; margin: auto; }
+.calendar-day-dialog::backdrop { background: rgb(15 23 42 / 0.46); }
+.agenda-focused { border-color: #9470c4; box-shadow: 0 0 0 2px rgb(148 112 196 / 0.18); scroll-margin-top: 1rem; }
