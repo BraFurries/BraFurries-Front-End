@@ -32,6 +32,7 @@ import { CreatorStudioComponent } from './creators/creator-studio.component';
 import { CreatorProductionComponent } from './creators/creator-production.component';
 import { CreatorCommissionDetailsComponent } from './creators/creator-commission-details.component';
 import { CreatorStageBoardComponent } from './creators/creator-stage-board.component';
+import { CreatorCalendarComponent } from './creators/creator-calendar.component';
 import { CommunitiesComponent } from './communities/communities.component';
 import { CommunityActivityComponent } from './community-activity/community-activity.component';
 import { CommunityContextLayoutComponent } from './community-context/community-context-layout.component';
@@ -96,6 +97,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     CommonModule,
     FormsModule,
     DragDropModule,
+    CreatorCalendarComponent,
     DashboardRoutingModule
   ]
 })

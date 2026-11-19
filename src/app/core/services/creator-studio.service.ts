@@ -104,6 +104,23 @@ export interface CreatorStepUpdate extends CreatorStepDraft {
   notes: string | null;
 }
 
+export type CreatorCalendarKind = 'STEP' | 'PRODUCTION' | 'DELIVERY';
+export interface CreatorCalendarItem {
+  kind: CreatorCalendarKind;
+  commissionId: number;
+  stepId: number | null;
+  title: string;
+  clientName: string;
+  stepName: string | null;
+  commissionStatus: CreatorCommissionStatus;
+  stepStatus: CreatorStepStatus | null;
+  date: string | null; // Civil date YYYY-MM-DD, independent of timezone.
+}
+export interface CreatorCalendarPage {
+  items: CreatorCalendarItem[];
+  hasMore: boolean;
+}
+
 export interface CreatorReferenceDraft {
   label: string | null;
   url: string;
@@ -267,6 +284,26 @@ export class CreatorStudioService {
 
   deleteCommissionStep(commissionId: number, id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/commissions/${commissionId}/steps/${id}`);
+  }
+
+  calendar(start: string, end: string, page = 1, pageSize = 100): Observable<CreatorCalendarPage> {
+    const params = new HttpParams().set('start', start).set('end', end)
+      .set('page', String(page)).set('pageSize', String(pageSize));
+    return this.http.get<CreatorCalendarPage>(`${this.base}/calendar`, {params});
+  }
+
+  unplannedCalendar(page = 1, pageSize = 40): Observable<CreatorCalendarPage> {
+    const params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
+    return this.http.get<CreatorCalendarPage>(`${this.base}/calendar/unplanned`, {params});
+  }
+
+  commissionPlanning(id: number): Observable<CreatorCalendarItem[]> {
+    return this.http.get<CreatorCalendarItem[]>(`${this.base}/commissions/${id}/planning`);
+  }
+
+  setPlanningDate(commissionId: number, stepId: number | null, plannedOn: string | null): Observable<void> {
+    const target = stepId === null ? '' : `/steps/${stepId}`;
+    return this.http.put<void>(`${this.base}/commissions/${commissionId}${target}/planning`, {plannedOn});
   }
 
   findCommission(id: number): Observable<CreatorCommission> {

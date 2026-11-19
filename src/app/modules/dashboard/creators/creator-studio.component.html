@@ -138,6 +138,7 @@
           <p class="text-sm text-gray-600">
             {{ viewMode === 'board' ? 'Arraste os pedidos entre as filas para atualizar a situação de cada trabalho.' :
             viewMode === 'stages' ? 'Consulte todas as etapas ou escolha um processo para acompanhar e avançar seus pedidos.' :
+            viewMode === 'calendar' ? 'Planeje as etapas dos pedidos no calendário, sem assumir novos prazos de entrega.' :
             'Consulte, filtre e organize os detalhes dos seus pedidos.' }}
           </p>
         </div>
@@ -159,6 +160,12 @@
             [ngClass]="viewMode === 'stages' ? 'bg-braPurple text-white' : 'text-braPurple'"
             class="rounded-lg px-4 py-2 text-sm font-bold">
             Etapas da produção
+          </button>
+          <button type="button" (click)="setViewMode('calendar')" [disabled]="changingId !== null || stageMoveInProgress"
+            [attr.aria-pressed]="viewMode === 'calendar'"
+            [ngClass]="viewMode === 'calendar' ? 'bg-braPurple text-white' : 'text-braPurple'"
+            class="rounded-lg px-4 py-2 text-sm font-bold">
+            Calendário
           </button>
           <button type="button" (click)="setViewMode('list')" [disabled]="changingId !== null || stageMoveInProgress"
             [attr.aria-pressed]="viewMode === 'list'"
@@ -315,6 +322,7 @@
       (orderEditingChange)="organizingStageColumns = $event"
       (moveInProgressChange)="stageMoveInProgress = $event">
     </app-creator-stage-board>
+    <app-creator-calendar *ngIf="viewMode === 'calendar'" class="block mt-6 min-w-0"></app-creator-calendar>
 
     <p *ngIf="viewMode === 'board' && boardLoading" role="status"
       class="rounded-xl bg-white p-5 text-sm text-gray-600">

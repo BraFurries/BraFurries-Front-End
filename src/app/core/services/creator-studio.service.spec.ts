@@ -37,6 +37,36 @@ describe('CreatorStudioService', () => {
   });
 
 
+  it('queries bounded private calendar pages and writes only the selected planning date', () => {
+    studio.calendar('2026-11-01','2026-12-12',2,100).subscribe();
+    const month=http.expectOne(r=>r.url===`${base}/calendar`);
+    expect(month.request.params.get('start')).toBe('2026-11-01');
+    expect(month.request.params.get('end')).toBe('2026-12-12');
+    expect(month.request.params.get('page')).toBe('2');
+    expect(month.request.params.get('pageSize')).toBe('100');
+    expect(month.request.params.keys().sort()).toEqual(['end','page','pageSize','start']);
+    month.flush({items:[],hasMore:false});
+
+    studio.unplannedCalendar(3,40).subscribe();
+    const backlog=http.expectOne(r=>r.url===`${base}/calendar/unplanned`);
+    expect(backlog.request.params.get('page')).toBe('3');
+    backlog.flush({items:[],hasMore:false});
+
+    studio.commissionPlanning(80).subscribe();
+    http.expectOne(`${base}/commissions/80/planning`).flush([]);
+    studio.setPlanningDate(80,81,'2026-11-19').subscribe();
+    const step=http.expectOne(`${base}/commissions/80/steps/81/planning`);
+    expect(step.request.method).toBe('PUT');
+    expect(step.request.body).toEqual({plannedOn:'2026-11-19'});
+    step.flush(null,{status:204,statusText:'No Content'});
+
+    studio.setPlanningDate(80,null,null).subscribe();
+    const general=http.expectOne(`${base}/commissions/80/planning`);
+    expect(general.request.method).toBe('PUT');
+    expect(general.request.body).toEqual({plannedOn:null});
+    general.flush(null,{status:204,statusText:'No Content'});
+  });
+
   it('asks the API for the entitlement of the authenticated account, never an artist ID', () => {
     studio.myAccess().subscribe();
     const req = http.expectOne(`${base}/access`);

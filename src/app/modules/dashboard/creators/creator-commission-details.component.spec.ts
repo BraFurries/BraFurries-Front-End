@@ -9,6 +9,7 @@ import {
 import { UserService } from '../../../core/services/user.service';
 import { User } from '../../../shared/models/user';
 import { CreatorCommissionDetailsComponent } from './creator-commission-details.component';
+import { CreatorCalendarComponent } from './creator-calendar.component';
 
 describe('CreatorCommissionDetailsComponent', () => {
   let fixture: ComponentFixture<CreatorCommissionDetailsComponent>;
@@ -37,12 +38,13 @@ describe('CreatorCommissionDetailsComponent', () => {
     users.getUser.and.callFake(() => user$.value);
     studio=jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','findCommission','references','activity',
-       'createReference','updateReference','deleteReference','createActivity']);
+       'createReference','updateReference','deleteReference','createActivity','commissionPlanning','setPlanningDate']);
     studio.myAccess.and.returnValue(of({
       allowed:true,tier:'PRO',status:'ACTIVE',sourceKind:'PILOT',expiresAtUtc:null
     }));
     studio.findCommission.and.returnValue(of(commission));
     studio.references.and.returnValue(of([]));
+    studio.commissionPlanning.and.returnValue(of([]));
     studio.activity.and.returnValue(of({items:[],page:1,pageSize:20,total:0}));
     studio.createReference.and.returnValue(of({
       id:5,commissionId:85,label:'Pose',url:'https://example.com/pose',position:0
@@ -55,7 +57,7 @@ describe('CreatorCommissionDetailsComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations:[CreatorCommissionDetailsComponent],
-      imports:[CommonModule,FormsModule,RouterModule.forRoot([])],
+      imports:[CommonModule,FormsModule,CreatorCalendarComponent,RouterModule.forRoot([])],
       providers:[
         {provide:UserService,useValue:users},
         {provide:CreatorStudioService,useValue:studio},
@@ -76,6 +78,7 @@ describe('CreatorCommissionDetailsComponent', () => {
   it('shows only the current Pro owner’s commission details', () => {
     expect(component.allowed).toBeTrue();
     expect(studio.findCommission).toHaveBeenCalledWith(85);
+    expect(studio.commissionPlanning).toHaveBeenCalledWith(85);
     expect(studio.references).toHaveBeenCalledWith(85);
     expect(studio.activity).toHaveBeenCalledWith(85,1,20);
     expect(fixture.nativeElement.textContent).toContain('Ref Sheet');
