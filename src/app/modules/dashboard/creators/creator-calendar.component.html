@@ -125,13 +125,17 @@
           class="rounded-lg border border-braPurple/30 px-3 py-2 text-sm font-semibold text-braPurple">Carregar mais itens do calendário</button>
         <div class="space-y-2 lg:hidden">
           <h3 class="font-semibold text-braDark">{{ selectedDay + 'T12:00:00Z' | date:'dd/MM/yyyy':'UTC' }}</h3>
-          <div cdkDropList cdkDropListSortingDisabled class="space-y-2">
-            <ng-container *ngFor="let item of selectedItems; trackBy: trackItem">
-              <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
-            </ng-container>
+          <div class="min-h-10">
+            <div *ngIf="loading; else selectedDayContent" aria-hidden="true" class="calendar-skeleton h-10 w-full rounded-md bg-gray-100"></div>
+            <ng-template #selectedDayContent>
+              <div cdkDropList cdkDropListSortingDisabled class="space-y-2">
+                <ng-container *ngFor="let item of selectedItems; trackBy: trackItem">
+                  <ng-container *ngTemplateOutlet="eventCard; context: {$implicit:item}"></ng-container>
+                </ng-container>
+              </div>
+              <p *ngIf="!selectedItems.length && !error" class="flex h-10 items-center text-sm text-gray-500">Nada planejado neste dia.</p>
+            </ng-template>
           </div>
-          <div *ngIf="loading" aria-hidden="true" class="h-10 w-full animate-pulse rounded-md bg-gray-100"></div>
-          <p *ngIf="!loading && !selectedItems.length && !error" class="text-sm text-gray-500">Nada planejado neste dia.</p>
         </div>
       </div>
       <aside *ngIf="filter !== 'DELIVERY'"
@@ -142,7 +146,7 @@
             <button type="button" data-sidebar-toggle="unplanned" (click)="toggleSidebar('unplanned')" [disabled]="draggedKey !== null"
               [attr.aria-expanded]="unplannedExpanded" class="flex w-full items-center gap-2 text-left font-amaranth text-base font-bold text-braDark">
               <span class="flex-1">Sem planejamento</span>
-              <span *ngIf="!unplannedLoading" class="text-xs font-normal text-gray-500">{{ unplanned.length }}{{ hasMoreUnplanned ? '+' : '' }}</span>
+              <span [class.invisible]="unplannedLoading" class="min-w-[2ch] text-right text-xs font-normal text-gray-500">{{ unplanned.length }}{{ hasMoreUnplanned ? '+' : '' }}</span>
               <svg aria-hidden="true" viewBox="0 0 20 20" class="h-4 w-4 shrink-0 fill-none stroke-current transition-transform" [class.rotate-180]="unplannedExpanded" stroke-width="1.7" stroke-linecap="round"><path d="m5 7 5 5 5-5"/></svg>
             </button>
           </h3>
@@ -184,7 +188,7 @@
             <button type="button" data-sidebar-toggle="planned" (click)="toggleSidebar('planned')" [disabled]="draggedKey !== null"
               [attr.aria-expanded]="plannedExpanded" class="flex w-full items-center gap-2 text-left font-amaranth text-base font-bold text-braDark">
               <span class="flex-1">Planejados</span>
-              <span *ngIf="!loading" class="text-xs font-normal text-gray-500">{{ plannedCount }}{{ hasMoreEvents ? '+' : '' }}</span>
+              <span [class.invisible]="loading" class="min-w-[2ch] text-right text-xs font-normal text-gray-500">{{ plannedCount }}{{ hasMoreEvents ? '+' : '' }}</span>
               <svg aria-hidden="true" viewBox="0 0 20 20" class="h-4 w-4 shrink-0 fill-none stroke-current transition-transform" [class.rotate-180]="plannedExpanded" stroke-width="1.7" stroke-linecap="round"><path d="m5 7 5 5 5-5"/></svg>
             </button>
           </h3>
