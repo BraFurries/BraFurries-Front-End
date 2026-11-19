@@ -7,10 +7,7 @@ import {
   CreatorCommission,
   CreatorCommissionInput,
   CreatorCommissionStatus,
-  CreatorCommissionStep,
-  CreatorStepStatus,
   CreatorArtType,
-  CreatorStageDefinition,
   CreatorWorkflow,
   CreatorStudioAccess,
   CreatorRetentionOverview,
@@ -39,14 +36,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     { value: 'COMPLETED', label: 'Concluída' }
   ];
   readonly pageSize = 25;
-  readonly stepStatuses: {value: CreatorStepStatus; label: string}[] = [
-    {value: 'PENDING', label: 'Pendente'},
-    {value: 'IN_PROGRESS', label: 'Em execução'},
-    {value: 'WAITING_APPROVAL', label: 'Aguardando aprovação'},
-    {value: 'DONE', label: 'Finalizada'}
-  ];
   artTypes: CreatorArtType[] = [];
-  definitions: CreatorStageDefinition[] = [];
   workflows: CreatorWorkflow[] = [];
   // Kanban is the default; the chronological list remains available for detail work.
   viewMode: 'board' | 'list' | 'stages' | 'calendar' = 'board';
@@ -73,15 +63,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   @ViewChildren('boardDropZone', {read: ElementRef})
   private boardDropZones!: QueryList<ElementRef<HTMLElement>>;
   private boardSequence = 0;
-  expandedCommissionId: number | null = null;
-  steps: CreatorCommissionStep[] = [];
-  loadingSteps = false;
-  stepBusy = false;
-  stepError = '';
-  newStepName = '';
-  newStepDefinitionId: number | null = null;
-  importWorkflowId: number | null = null;
-  private stepsSequence = 0;
   privacyOnly = false;
   showPrivacyNotice = false;
   private acknowledgedPrivacyAccount: number | null = null;
@@ -106,7 +87,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   selectedStatus: CreatorCommissionStatus | 'ACTIVE' = 'ACTIVE';
 
   formOpen = false;
-  editingId: number | null = null;
   form: CreatorCommissionInput = this.emptyForm();
 
   private accessSequence = 0;
@@ -150,14 +130,9 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.total = 0;
         this.page = 1;
         this.formOpen = false;
-        this.editingId = null;
         this.saving = false;
         this.changingId = null;
-        this.stepsSequence++;
-        this.expandedCommissionId = null;
-        this.steps = [];
         this.artTypes = [];
-        this.definitions = [];
         this.workflows = [];
         this.selectedWorkflowId = null;
         this.organizingStageColumns = false;
@@ -165,9 +140,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
         this.stageMoveInProgress = false;
         this.viewMode = 'board';
         this.loading = false;
-        this.loadingSteps = false;
-        this.stepBusy = false;
-        this.stepError = '';
         this.showPrivacyNotice = false;
         this.retention = null;
         this.retentionLoading = false;
@@ -311,8 +283,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     this.boardLoading = false;
     this.loading = false;
     this.page = 1;
-    this.expandedCommissionId = null;
-    this.stepsSequence++;
     this.errorMessage = '';
     // The embedded stage board reacts to its workflow input and loads
     // itself. Do not reload the previous board while switching modes.
@@ -408,13 +378,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
       },
       error: () => this.reportCatalogError(seq, userId)
     });
-    this.creatorStudio.stageDefinitions().pipe(takeUntil(this.destroy$)).subscribe({
-      next: rows => {
-        if (seq === this.accessSequence && this.users.getUser()?.id === userId)
-          this.definitions = rows;
-      },
-      error: () => this.reportCatalogError(seq, userId)
-    });
   }
 
 
@@ -504,8 +467,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   filterChanged(): void {
     this.page = 1;
-    this.expandedCommissionId = null;
-    this.stepsSequence++;
     this.reload();
   }
 
@@ -523,25 +484,7 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
 
   newCommission(): void {
     if (!this.canUsePro) return;
-    this.editingId = null;
     this.form = this.emptyForm();
-    this.formOpen = true;
-    this.saveError = '';
-  }
-
-  editCommission(commission: CreatorCommission): void {
-    if (!this.canUsePro) return;
-    this.editingId = commission.id;
-    this.form = {
-      title: commission.title,
-      clientName: commission.clientName,
-      description: commission.description ?? '',
-      privateNotes: commission.privateNotes ?? '',
-      requestedOn: commission.requestedOn,
-      dueOn: commission.dueOn,
-      artTypeId: commission.artTypeId,
-      workflowId: null
-    };
     this.formOpen = true;
     this.saveError = '';
   }
@@ -549,7 +492,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   closeForm(): void {
     if (this.saving) return;
     this.formOpen = false;
-    this.editingId = null;
     this.saveError = '';
   }
 
@@ -571,16 +513,13 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     };
     this.saving = true;
     this.saveError = '';
-    const operation = this.editingId === null
-      ? this.creatorStudio.create(data)
-      : this.creatorStudio.update(this.editingId, data);
+    const operation = this.creatorStudio.create(data);
     const userId = this.users.getUser()?.id;
     operation.pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         if (this.users.getUser()?.id !== userId) return;
         this.saving = false;
         this.formOpen = false;
-        this.editingId = null;
         this.page = 1;
         this.reload();
       },
@@ -721,165 +660,6 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
           this.errorMessage = error.status === 403
             ? 'Seu acesso ao Pro não está mais ativo. Recarregue a página.'
             : 'Não foi possível mover o pedido. Ele continua na fila anterior.';
-        }
-      });
-  }
-
-  changeStatus(commission: CreatorCommission, status: CreatorCommissionStatus): void {
-    if (!this.canUsePro || this.changingId !== null || commission.status === status) return;
-    this.changingId = commission.id;
-    this.errorMessage = '';
-    const userId = this.users.getUser()?.id;
-    this.creatorStudio.changeStatus(commission.id, status)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          if (this.users.getUser()?.id !== userId) return;
-          this.changingId = null;
-          // Completion is not deletion: the server excludes it from the active queue.
-          this.reload();
-        },
-        error: () => {
-          if (this.users.getUser()?.id !== userId) return;
-          this.changingId = null;
-          this.errorMessage = 'Não foi possível atualizar o status. Tente novamente.';
-        }
-      });
-  }
-
-  toggleSteps(commission: CreatorCommission): void {
-    if (!this.canUsePro) return;
-    if (this.expandedCommissionId === commission.id) {
-      this.stepsSequence++;
-      this.expandedCommissionId = null;
-      this.steps = [];
-      return;
-    }
-    this.expandedCommissionId = commission.id;
-    this.steps = [];
-    this.newStepName = '';
-    this.newStepDefinitionId = null;
-    this.importWorkflowId = null;
-    this.loadSteps(commission.id);
-  }
-
-  private loadSteps(commissionId: number): void {
-    const seq = ++this.stepsSequence;
-    const account = this.users.getUser()?.id;
-    this.loadingSteps = true;
-    this.stepError = '';
-    this.creatorStudio.commissionSteps(commissionId)
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next: rows => {
-          if (seq !== this.stepsSequence || this.users.getUser()?.id !== account ||
-              this.expandedCommissionId !== commissionId) return;
-          this.steps = rows;
-          this.loadingSteps = false;
-        },
-        error: () => {
-          if (seq !== this.stepsSequence || this.users.getUser()?.id !== account) return;
-          this.loadingSteps = false;
-          this.stepError = 'Não conseguimos carregar as etapas deste pedido.';
-        }
-      });
-  }
-
-  setDefinition(id: number | null): void {
-    this.newStepDefinitionId = id;
-    const found = this.definitions.find(d => d.id === id);
-    if (found) this.newStepName = found.name;
-  }
-
-  addStep(commissionId: number): void {
-    if (!this.canUsePro || this.stepBusy || !this.newStepName.trim()) return;
-    const account = this.users.getUser()?.id;
-    this.stepBusy = true;
-    this.stepError = '';
-    this.creatorStudio.addCommissionStep(commissionId, {
-      name: this.newStepName.trim(),
-      stageDefinitionId: this.newStepDefinitionId
-    }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
-        if (this.users.getUser()?.id !== account) return;
-        this.stepBusy = false;
-        this.newStepName = '';
-        this.newStepDefinitionId = null;
-        this.loadSteps(commissionId);
-        this.reload();
-      },
-      error: () => {
-        if (this.users.getUser()?.id !== account) return;
-        this.stepBusy = false;
-        this.stepError = 'Não foi possível adicionar a etapa.';
-      }
-    });
-  }
-
-  copyWorkflow(commissionId: number): void {
-    if (!this.canUsePro || this.stepBusy || this.importWorkflowId == null ||
-        this.steps.length > 0) return;
-    const account = this.users.getUser()?.id;
-    this.stepBusy = true;
-    this.stepError = '';
-    this.creatorStudio.copyWorkflowToCommission(commissionId, this.importWorkflowId)
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next: () => {
-          if (this.users.getUser()?.id !== account) return;
-          this.stepBusy = false;
-          this.importWorkflowId = null;
-          this.loadSteps(commissionId);
-          this.reload();
-        },
-        error: () => {
-          if (this.users.getUser()?.id !== account) return;
-          this.stepBusy = false;
-          this.stepError = 'Não foi possível aplicar o modelo. Ele só pode ser copiado antes de criar etapas.';
-        }
-      });
-  }
-
-  saveStep(step: CreatorCommissionStep): void {
-    if (!this.canUsePro || this.stepBusy || !step.name.trim()) return;
-    const account = this.users.getUser()?.id;
-    this.stepBusy = true;
-    this.stepError = '';
-    this.creatorStudio.updateCommissionStep(step.commissionId, step.id, {
-      name: step.name.trim(),
-      stageDefinitionId: step.stageDefinitionId,
-      status: step.status,
-      notes: step.notes
-    }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
-        if (this.users.getUser()?.id !== account) return;
-        this.stepBusy = false;
-        this.loadSteps(step.commissionId);
-        this.reload();
-      },
-      error: () => {
-        if (this.users.getUser()?.id !== account) return;
-        this.stepBusy = false;
-        this.stepError = 'Não foi possível salvar o andamento da etapa.';
-      }
-    });
-  }
-
-  removeStep(step: CreatorCommissionStep): void {
-    if (!this.canUsePro || this.stepBusy ||
-        !window.confirm('Excluir esta etapa e suas anotações deste pedido?')) return;
-    const account = this.users.getUser()?.id;
-    this.stepBusy = true;
-    this.creatorStudio.deleteCommissionStep(step.commissionId, step.id)
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next: () => {
-          if (this.users.getUser()?.id !== account) return;
-          this.stepBusy = false;
-          this.loadSteps(step.commissionId);
-          this.reload();
-        },
-        error: () => {
-          if (this.users.getUser()?.id !== account) return;
-          this.stepBusy = false;
-          this.stepError = 'Não foi possível excluir esta etapa.';
         }
       });
   }
