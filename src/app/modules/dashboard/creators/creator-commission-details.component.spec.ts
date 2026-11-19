@@ -3,8 +3,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, convertToParamMap, ParamMap, RouterModule } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
-  CreatorCommission, CreatorStudioService
+  CreatorCalendarItem, CreatorCommission, CreatorCommissionStep, CreatorStudioService
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
 import { User } from '../../../shared/models/user';
@@ -30,6 +31,11 @@ describe('CreatorCommissionDetailsComponent', () => {
     completedAtUtc:null
   };
 
+  const step: CreatorCommissionStep={id:90,commissionId:85,position:1,name:'Rascunho',
+    stageDefinitionId:7,status:'PENDING',notes:'Manter pose',completedAtUtc:null};
+  const plan: CreatorCalendarItem={kind:'STEP',commissionId:85,stepId:90,title:'Ref Sheet',
+    clientName:'Cliente',stepName:'Rascunho',commissionStatus:'IN_PROGRESS',stepStatus:'PENDING',date:null};
+
   beforeEach(async () => {
     user$ = new BehaviorSubject<User | null>(user);
     routeParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({id:'85'}));
@@ -38,13 +44,21 @@ describe('CreatorCommissionDetailsComponent', () => {
     users.getUser.and.callFake(() => user$.value);
     studio=jasmine.createSpyObj<CreatorStudioService>('CreatorStudioService',
       ['myAccess','findCommission','references','activity',
-       'createReference','updateReference','deleteReference','createActivity','commissionPlanning','setPlanningDate']);
+       'createReference','updateReference','deleteReference','createActivity','commissionPlanning','setPlanningDate',
+       'artTypes','commissionSteps','update','changeStatus','moveCommissionToStep','updateCommissionStep']);
     studio.myAccess.and.returnValue(of({
       allowed:true,tier:'PRO',status:'ACTIVE',sourceKind:'PILOT',expiresAtUtc:null
     }));
     studio.findCommission.and.returnValue(of(commission));
     studio.references.and.returnValue(of([]));
-    studio.commissionPlanning.and.returnValue(of([]));
+    studio.commissionPlanning.and.returnValue(of([plan]));
+    studio.artTypes.and.returnValue(of([{id:7,name:'Reference Sheet',workflowId:null}]));
+    studio.commissionSteps.and.returnValue(of([step]));
+    studio.update.and.returnValue(of(commission));
+    studio.changeStatus.and.returnValue(of(commission));
+    studio.moveCommissionToStep.and.returnValue(of([step]));
+    studio.updateCommissionStep.and.returnValue(of(step));
+    studio.setPlanningDate.and.returnValue(of(undefined));
     studio.activity.and.returnValue(of({items:[],page:1,pageSize:20,total:0}));
     studio.createReference.and.returnValue(of({
       id:5,commissionId:85,label:'Pose',url:'https://example.com/pose',position:0
@@ -139,6 +153,75 @@ describe('CreatorCommissionDetailsComponent', () => {
     old$.complete();
 
     expect(component.commission?.title).toBe('Atualizada');
+  });
+
+  it('edits only order metadata and never replaces the materialized workflow',()=>{
+    component.startOrderEdit();
+    component.orderDraft!.title='  Novo título  ';
+    component.orderDraft!.dueOn='2026-12-03';
+    component.saveOrder();
+    expect(studio.update).toHaveBeenCalledOnceWith(85,{
+      title:'Novo título',clientName:'Cliente',description:'Detalhes',privateNotes:'Privado',
+      requestedOn:'2026-11-12',dueOn:'2026-12-03',artTypeId:null
+    });
+    expect(studio.changeStatus).not.toHaveBeenCalled();
+    expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
+    expect(component.orderDraft).toBeNull();
+  });
+
+  it('changes situation independently and moves only to an actual step of the current order',()=>{
+    component.statusDraft='PAUSED';component.saveStatus();
+    expect(studio.changeStatus).toHaveBeenCalledOnceWith(85,'PAUSED');
+    component.targetStepId=999;component.moveToStep();
+    expect(studio.moveCommissionToStep).not.toHaveBeenCalled();
+    component.targetStepId=90;component.moveToStep();
+    expect(studio.moveCommissionToStep).toHaveBeenCalledOnceWith(85,90);
+    component.changeStepStatus(90,'WAITING_APPROVAL');
+    expect(studio.updateCommissionStep).toHaveBeenCalledOnceWith(85,90,{
+      name:'Rascunho',stageDefinitionId:7,notes:'Manter pose',status:'WAITING_APPROVAL'
+    });
+  });
+
+  it('plans one step without changing status, supports clearing and blocks completed planning',()=>{
+    component.startPlanning(plan);component.planningDate='2026-12-01';component.savePlanning(plan);
+    expect(studio.setPlanningDate).toHaveBeenCalledWith(85,90,'2026-12-01');
+    const dated={...plan,date:'2026-12-01'};
+    studio.commissionPlanning.and.returnValue(of([dated]));component.load();
+    component.startPlanning(dated);component.savePlanning(dated,true);
+    expect(studio.setPlanningDate).toHaveBeenCalledWith(85,90,null);
+    expect(studio.changeStatus).not.toHaveBeenCalled();
+    const finished={...dated,stepStatus:'DONE' as const};
+    studio.commissionPlanning.and.returnValue(of([finished]));component.load();
+    component.startPlanning(finished);component.savePlanning(finished,true);
+    expect(studio.setPlanningDate.calls.count()).toBe(2);
+  });
+
+  it('clears production, drafts and private details on route or account changes',()=>{
+    component.startOrderEdit();component.startPlanning(plan);
+    studio.myAccess.and.returnValue(of({allowed:false,tier:null,status:'INACTIVE',sourceKind:null,expiresAtUtc:null}));
+    user$.next({...user,id:99});fixture.detectChanges();
+    expect(component.orderDraft).toBeNull();
+    expect(component.planningKey).toBeNull();
+    expect(component.steps).toEqual([]);
+    expect(component.planning).toEqual([]);
+  });
+
+  it('prevents stale mutations from applying to a different route and clears data on denial',()=>{
+    const pending=new Subject<CreatorCommission>();
+    studio.update.and.returnValue(pending);
+    component.startOrderEdit();component.saveOrder();
+    routeParams$.next(convertToParamMap({id:'86'}));
+    pending.next(commission);pending.complete();
+    expect(component.notice).toBe('');
+    expect(component.commissionId).toBe(86);
+    routeParams$.next(convertToParamMap({id:'85'}));
+    const denied=new Subject<CreatorCommission>();
+    studio.changeStatus.and.returnValue(denied);
+    component.statusDraft='PAUSED';component.saveStatus();
+    denied.error(new HttpErrorResponse({status:403}));fixture.detectChanges();
+    expect(component.allowed).toBeFalse();
+    expect(component.planning).toEqual([]);
+    expect(component.steps).toEqual([]);
   });
 
   it('refuses to submit http links client-side before asking the API', () => {

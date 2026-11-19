@@ -4,7 +4,8 @@ import { ActivatedRoute } from '@angular/router';
 import { combineLatest, forkJoin, Observable, Subject, takeUntil } from 'rxjs';
 import {
   CreatorActivity, CreatorActivityDraft, CreatorActivityKind,
-  CreatorCommission, CreatorReference, CreatorReferenceDraft,
+  CreatorArtType, CreatorCalendarItem, CreatorCommission, CreatorCommissionInput, CreatorCommissionStatus,
+  CreatorCommissionStep, CreatorStepStatus, CreatorReference, CreatorReferenceDraft,
   CreatorStudioService
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
@@ -29,6 +30,24 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     { value: 'DELIVERY_RECORDED', label: 'Entrega registrada' }
   ];
   readonly activityPageSize = 20;
+  readonly statuses: {value: CreatorCommissionStatus; label: string}[] = [
+    {value:'QUEUED',label:'Na fila'}, {value:'IN_PROGRESS',label:'Em produção'},
+    {value:'WAITING',label:'Aguardando retorno'}, {value:'PAUSED',label:'Em pausa'},
+    {value:'COMPLETED',label:'Concluída'}
+  ];
+  readonly stepStatuses: {value: CreatorStepStatus; label: string}[] = [
+    {value:'PENDING',label:'Pendente'}, {value:'IN_PROGRESS',label:'Em execução'},
+    {value:'WAITING_APPROVAL',label:'Aguardando aprovação'}, {value:'DONE',label:'Finalizada'}
+  ];
+  tab: 'overview'|'references'|'history' = 'overview';
+  artTypes: CreatorArtType[] = [];
+  steps: CreatorCommissionStep[] = [];
+  planning: CreatorCalendarItem[] = [];
+  orderDraft: CreatorCommissionInput | null = null;
+  statusDraft: CreatorCommissionStatus | null = null;
+  targetStepId: number | null = null;
+  planningKey: string | null = null;
+  planningDate = '';
 
   loadingAccess = true;
   allowed = false;
@@ -112,6 +131,105 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     return year && month && day ? `${day}/${month}/${year}` : value;
   }
 
+  get canManage(): boolean {
+    return this.allowed && !!this.commission && !this.loading && !this.busy &&
+      this.commissionId === this.commission.id;
+  }
+
+  get canManageProduction(): boolean {
+    return this.canManage && this.commission?.status !== 'COMPLETED';
+  }
+
+  get completedSteps(): number { return this.steps.filter(step=>step.status==='DONE').length; }
+  get generalPlanning(): CreatorCalendarItem | undefined { return this.planning.find(item=>item.kind==='PRODUCTION'); }
+
+  statusName(status: CreatorCommissionStatus): string {
+    return this.statuses.find(item=>item.value===status)?.label || status;
+  }
+  stepStatusName(status: CreatorStepStatus): string {
+    return this.stepStatuses.find(item=>item.value===status)?.label || status;
+  }
+  artTypeName(id: number | null): string {
+    return this.artTypes.find(type=>type.id===id)?.name || (id===null?'Não definido':'Tipo indisponível');
+  }
+  planForStep(step: CreatorCommissionStep): CreatorCalendarItem | undefined {
+    return this.planning.find(item=>item.kind==='STEP' && item.stepId===step.id);
+  }
+  isCurrentStep(step: CreatorCommissionStep): boolean {
+    return this.commission?.status !== 'COMPLETED' && step.status !== 'DONE' &&
+      this.commission?.currentStagePosition === step.position;
+  }
+
+  startOrderEdit(): void {
+    const c=this.commission;
+    if(!this.canManage || !c)return;
+    this.orderDraft={title:c.title,clientName:c.clientName,description:c.description,
+      privateNotes:c.privateNotes,requestedOn:c.requestedOn,dueOn:c.dueOn,artTypeId:c.artTypeId};
+    this.actionError='';this.notice='';
+  }
+  cancelOrderEdit(): void { if(!this.busy)this.orderDraft=null; }
+
+  saveOrder(): void {
+    const d=this.orderDraft,id=this.commissionId;
+    if(!this.canManage || !d || id===null)return;
+    const title=d.title.trim(),clientName=d.clientName.trim();
+    if(!title || !clientName || !d.requestedOn){
+      this.actionError='Informe o título, o cliente e a data do pedido.';return;
+    }
+    this.mutate(this.studio.update(id,{
+      title,clientName,description:d.description?.trim()||null,
+      privateNotes:d.privateNotes?.trim()||null,requestedOn:d.requestedOn,
+      dueOn:d.dueOn||null,artTypeId:d.artTypeId
+    }), 'Dados do pedido atualizados.',()=>this.orderDraft=null);
+  }
+
+  saveStatus(): void {
+    const c=this.commission,status=this.statusDraft;
+    if(!this.canManage || !c || !status || status===c.status)return;
+    this.mutate(this.studio.changeStatus(c.id,status),'Situação do pedido atualizada.');
+  }
+
+  moveToStep(): void {
+    const c=this.commission, target=this.steps.find(s=>s.id===this.targetStepId);
+    if(!this.canManageProduction || !c || !target || target.commissionId!==c.id)return;
+    this.mutate(this.studio.moveCommissionToStep(c.id,target.id),'Etapa atualizada.',()=>this.targetStepId=null);
+  }
+
+  changeStepStatus(stepId: number, status: CreatorStepStatus): void {
+    const c=this.commission,step=this.steps.find(s=>s.id===stepId);
+    if(!this.canManageProduction || !c || !step || step.commissionId!==c.id || step.status===status ||
+       !this.stepStatuses.some(item=>item.value===status))return;
+    // Preserve name, library linkage and notes. API alone reconciles active stages.
+    this.mutate(this.studio.updateCommissionStep(c.id,step.id,{
+      name:step.name,stageDefinitionId:step.stageDefinitionId,status,notes:step.notes
+    }),'Andamento da etapa atualizado.');
+  }
+
+  planKey(item: CreatorCalendarItem): string { return item.kind+':'+(item.stepId??'general'); }
+  canPlan(item: CreatorCalendarItem): boolean {
+    return this.canManageProduction && item.commissionId===this.commissionId &&
+      item.kind!=='DELIVERY' && item.commissionStatus!=='COMPLETED' && item.stepStatus!=='DONE';
+  }
+  startPlanning(item: CreatorCalendarItem): void {
+    if(!this.canPlan(item))return;
+    this.planningKey=this.planKey(item);this.planningDate=item.date||'';
+    this.actionError='';this.notice='';
+  }
+  cancelPlanning(): void { this.planningKey=null;this.planningDate=''; }
+  savePlanning(item: CreatorCalendarItem,remove=false): void {
+    const actual=this.planning.find(row=>this.planKey(row)===this.planKey(item));
+    if(!actual || !this.canPlan(actual) || this.planningKey!==this.planKey(actual))return;
+    // A historical general date can be removed but must not be recreated
+    // after the order gains steps; server enforces the authoritative rule.
+    const date=remove?null:this.planningDate;
+    if(!remove && (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))){
+      this.actionError='Informe uma data válida.';return;
+    }
+    if(date===actual.date){this.cancelPlanning();return;}
+    this.mutate(this.studio.setPlanningDate(actual.commissionId,actual.stepId,date),
+      'Planejamento atualizado.',()=>this.cancelPlanning());
+  }
+
   private clearPrivateState(): void {
     this.loadSequence++;
     this.loadingAccess = false;
@@ -123,6 +241,9 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     this.notice = '';
     this.commissionId = null;
     this.commission = null;
+    this.artTypes=[];this.steps=[];this.planning=[];
+    this.tab='overview';this.orderDraft=null;this.statusDraft=null;this.targetStepId=null;
+    this.cancelPlanning();
     this.references = [];
     this.activity = [];
     this.totalActivity = 0;
@@ -147,12 +268,21 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     this.error = '';
     forkJoin({
       commission: this.studio.findCommission(id),
+      artTypes: this.studio.artTypes(),
+      steps: this.studio.commissionSteps(id),
+      planning: this.studio.commissionPlanning(id),
       references: this.studio.references(id),
       activity: this.studio.activity(id, this.activityPage, this.activityPageSize)
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: result => {
         if (!this.isCurrent(seq, userId, id) || loadSeq !== this.loadSequence) return;
         this.commission = result.commission;
+        this.artTypes=result.artTypes;
+        this.steps=result.steps;
+        this.planning=result.planning;
+        this.statusDraft=result.commission.status;
+        this.targetStepId=null;
+        this.cancelPlanning();
         this.references = result.references;
         this.activity = result.activity.items;
         this.totalActivity = result.activity.total;
@@ -162,11 +292,8 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
         if (!this.isCurrent(seq, userId, id) || loadSeq !== this.loadSequence) return;
         this.loading = false;
         if (err instanceof HttpErrorResponse &&
-            (err.status === 403 || err.status === 404)) {
-          this.allowed = false;
-          this.commission = null;
-          this.references = [];
-          this.activity = [];
+            [401,403,404].includes(err.status)) {
+          this.clearPrivateState();
           this.error = 'Acesso indisponível ou pedido não encontrado.';
         } else {
           this.error = 'Falha ao carregar os detalhes. Tente novamente.';
@@ -229,13 +356,13 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
 
   changeActivityPage(delta: number): void {
     const next = this.activityPage + delta;
-    if (!this.allowed || this.loading || next < 1 || next > this.activityPageCount) return;
+    if (!this.allowed || this.loading || this.busy || next < 1 || next > this.activityPageCount) return;
     this.activityPage = next;
     this.load();
   }
 
   private mutate<T>(call: Observable<T>, success: string, reset?: () => void): void {
-    if (!this.allowed || this.busy || this.commissionId === null) return;
+    if (!this.canManage || this.commissionId === null) return;
     const userId = this.users.getUser()?.id;
     const id = this.commissionId;
     const seq = this.requestSequence;
@@ -254,15 +381,15 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
       error: err => {
         if (!this.isCurrent(seq, userId, id)) return;
         this.busy = false;
-        if (err instanceof HttpErrorResponse && err.status === 403) {
-          this.allowed = false;
-          this.commission = null;
-          this.references = [];
-          this.activity = [];
-          this.error = 'Seu acesso Pro não está ativo.';
+        if (err instanceof HttpErrorResponse && [401,403,404].includes(err.status)) {
+          this.clearPrivateState();
+          this.error = 'Acesso indisponível ou pedido não encontrado.';
           return;
         }
-        this.actionError = 'Não foi possível salvar. Confira os dados e tente novamente.';
+        this.actionError = err instanceof HttpErrorResponse && err.status===409
+          ? 'O pedido ou a etapa mudou. Atualize os dados antes de tentar novamente.'
+          : 'Não foi possível salvar. Confira os dados e tente novamente.';
+        this.statusDraft=this.commission?.status??null;
       }
     });
   }
