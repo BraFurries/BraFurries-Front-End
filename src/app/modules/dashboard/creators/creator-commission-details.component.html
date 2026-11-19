@@ -36,6 +36,7 @@
     <p *ngIf="error" role="alert"
       class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
       {{ error }}
+      <button type="button" (click)="load()" [disabled]="loading || busy" class="ml-2 font-semibold underline">Tentar novamente</button>
     </p>
     <p *ngIf="actionError" role="alert"
       class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -87,7 +88,7 @@
               <p class="text-xs text-gray-500">Alterar o tipo de arte não substitui as etapas existentes.</p>
               <div class="flex flex-wrap gap-2">
                 <button type="submit" [disabled]="!canManage || !draft.title.trim() || !draft.clientName.trim() || !draft.requestedOn" class="rounded-lg bg-braPurple px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Salvar dados</button>
-                <button type="button" (click)="cancelOrderEdit()" [disabled]="busy" class="rounded-lg border px-4 py-2 text-sm">Cancelar</button>
+                <button type="button" (click)="cancelOrderEdit()" [disabled]="busy || loading" class="rounded-lg border px-4 py-2 text-sm">Cancelar</button>
               </div>
             </form>
           </ng-container>
@@ -136,13 +137,16 @@
                     <ng-container *ngTemplateOutlet="planningControl; context: {$implicit:plan}"></ng-container>
                   </div>
                 </div>
-                <select [attr.aria-label]="'Andamento de '+step.name" [ngModel]="step.status" (ngModelChange)="changeStepStatus(step.id,$event)" [disabled]="!canManageProduction" class="max-w-full rounded-lg border bg-white px-2 py-1.5 text-xs">
-                  <option *ngFor="let status of stepStatuses" [ngValue]="status.value">{{ status.label }}</option>
-                </select>
+                <div class="flex max-w-full flex-wrap items-center gap-1.5">
+                  <select [attr.aria-label]="'Andamento de '+step.name" [(ngModel)]="stepStatusDrafts[step.id]" [disabled]="!canManageProduction" class="max-w-full rounded-lg border bg-white px-2 py-1.5 text-xs">
+                    <option *ngFor="let status of stepStatuses" [ngValue]="status.value">{{ status.label }}</option>
+                  </select>
+                  <button *ngIf="stepStatusDrafts[step.id]!==step.status" type="button" (click)="changeStepStatus(step.id,stepStatusDrafts[step.id])" [disabled]="!canManageProduction" class="rounded-md bg-braPurple px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Salvar etapa</button>
+                </div>
               </div>
             </article>
           </div>
-          <p class="text-xs text-gray-500">Datas planejadas são dias de trabalho, independentes do prazo de entrega e da situação do pedido.</p>
+          <p class="text-xs text-gray-500">Datas planejadas são dias de trabalho, independentes do prazo de entrega e da situação do pedido. Apenas uma etapa pode ficar em execução ou aguardando aprovação.</p>
         </section>
       </div>
 
@@ -157,7 +161,7 @@
             <input type="date" aria-label="Data planejada" [(ngModel)]="planningDate" min="1900-01-01" max="9999-12-31" [disabled]="!canPlan(plan)" class="min-w-0 rounded-lg border bg-white px-2 py-1.5 text-sm">
             <button type="button" (click)="savePlanning(plan)" [disabled]="!canPlan(plan) || !planningDate" class="rounded-lg bg-braPurple px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Salvar</button>
             <button *ngIf="plan.date" type="button" (click)="savePlanning(plan,true)" [disabled]="!canPlan(plan)" class="text-xs font-semibold text-braPurple hover:underline">Retirar data</button>
-            <button type="button" (click)="cancelPlanning()" [disabled]="busy" class="text-xs text-gray-600 hover:underline">Cancelar</button>
+            <button type="button" (click)="cancelPlanning()" [disabled]="busy || loading" class="text-xs text-gray-600 hover:underline">Cancelar</button>
           </div>
         </ng-template>
       </ng-template>
@@ -185,11 +189,11 @@
             </a>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button type="button" (click)="editReference(ref)" [disabled]="busy"
+            <button type="button" (click)="editReference(ref)" [disabled]="busy || loading"
               class="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
               Editar
             </button>
-            <button type="button" (click)="deleteReference(ref)" [disabled]="busy"
+            <button type="button" (click)="deleteReference(ref)" [disabled]="busy || loading"
               class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">
               Excluir
             </button>
@@ -213,12 +217,12 @@
               class="mt-1 block w-full rounded-lg border bg-white px-3 py-2 font-normal">
           </label>
           <div class="flex flex-wrap gap-2">
-            <button type="submit" [disabled]="busy || !referenceDraft.url.trim()"
+            <button type="submit" [disabled]="!canManage || !referenceDraft.url.trim()"
               class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
               {{ busy ? 'Salvando...' : 'Salvar referência' }}
             </button>
             <button *ngIf="editingReferenceId !== null" type="button"
-              (click)="cancelReference()" [disabled]="busy"
+              (click)="cancelReference()" [disabled]="busy || loading"
               class="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
               Cancelar
             </button>
@@ -261,7 +265,7 @@
             não confirma que o cliente aprovou pela plataforma.
           </p>
           <button type="submit"
-            [disabled]="busy || !activityDraft.description.trim() || !activityDraft.occurredOn"
+            [disabled]="!canManage || !activityDraft.description.trim() || !activityDraft.occurredOn"
             class="rounded-xl bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {{ busy ? 'Registrando...' : 'Registrar atualização' }}
           </button>

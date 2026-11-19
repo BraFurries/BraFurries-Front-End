@@ -42,6 +42,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   tab: 'overview'|'references'|'history' = 'overview';
   artTypes: CreatorArtType[] = [];
   steps: CreatorCommissionStep[] = [];
+  stepStatusDrafts: Record<number,CreatorStepStatus> = {};
   planning: CreatorCalendarItem[] = [];
   orderDraft: CreatorCommissionInput | null = null;
   statusDraft: CreatorCommissionStatus | null = null;
@@ -132,7 +133,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   }
 
   get canManage(): boolean {
-    return this.allowed && !!this.commission && !this.loading && !this.busy &&
+    return this.allowed && !!this.commission && !this.loading && !this.busy && !this.error &&
       this.commissionId === this.commission.id;
   }
 
@@ -145,9 +146,6 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
 
   statusName(status: CreatorCommissionStatus): string {
     return this.statuses.find(item=>item.value===status)?.label || status;
-  }
-  stepStatusName(status: CreatorStepStatus): string {
-    return this.stepStatuses.find(item=>item.value===status)?.label || status;
   }
   artTypeName(id: number | null): string {
     return this.artTypes.find(type=>type.id===id)?.name || (id===null?'Não definido':'Tipo indisponível');
@@ -222,12 +220,18 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     // A historical general date can be removed but must not be recreated
     // after the order gains steps; server enforces the authoritative rule.
     const date=remove?null:this.planningDate;
-    if(!remove && (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))){
+    if(!remove && (!date || !this.validPlanningDate(date))){
       this.actionError='Informe uma data válida.';return;
     }
     if(date===actual.date){this.cancelPlanning();return;}
     this.mutate(this.studio.setPlanningDate(actual.commissionId,actual.stepId,date),
       'Planejamento atualizado.',()=>this.cancelPlanning());
+  }
+
+  private validPlanningDate(date: string): boolean {
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || date<'1900-01-01' || date>'9999-12-31')return false;
+    const value=new Date(date+'T00:00:00Z');
+    return Number.isFinite(value.getTime()) && value.toISOString().slice(0,10)===date;
   }
 
   private clearPrivateState(): void {
@@ -241,7 +245,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
     this.notice = '';
     this.commissionId = null;
     this.commission = null;
-    this.artTypes=[];this.steps=[];this.planning=[];
+    this.artTypes=[];this.steps=[];this.planning=[];this.stepStatusDrafts={};
     this.tab='overview';this.orderDraft=null;this.statusDraft=null;this.targetStepId=null;
     this.cancelPlanning();
     this.references = [];
@@ -259,7 +263,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
 
   load(): void {
     const id = this.commissionId;
-    if (!this.allowed || id === null) return;
+    if (!this.allowed || id === null || this.busy) return;
     const seq = this.requestSequence;
     const loadSeq = ++this.loadSequence;
     const userId = this.users.getUser()?.id;
@@ -279,6 +283,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
         this.commission = result.commission;
         this.artTypes=result.artTypes;
         this.steps=result.steps;
+        this.stepStatusDrafts=Object.fromEntries(this.steps.map(step=>[step.id,step.status]));
         this.planning=result.planning;
         this.statusDraft=result.commission.status;
         this.targetStepId=null;
@@ -303,7 +308,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   }
 
   editReference(ref: CreatorReference): void {
-    if (!this.allowed || this.busy) return;
+    if (!this.canManage) return;
     this.editingReferenceId = ref.id;
     this.referenceDraft = { label: ref.label || '', url: ref.url };
     this.actionError = '';
@@ -317,7 +322,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   saveReference(): void {
     const id = this.commissionId;
     const url = this.referenceDraft.url.trim();
-    if (!this.allowed || id === null || this.busy || !url) return;
+    if (!this.canManage || id === null || !url) return;
     if (!/^https:\/\/[^\s]+$/i.test(url)) {
       this.actionError = 'A referência precisa começar com https://';
       return;
@@ -334,7 +339,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
 
   deleteReference(ref: CreatorReference): void {
     const id = this.commissionId;
-    if (!this.allowed || id === null || this.busy ||
+    if (!this.canManage || id === null ||
         !window.confirm('Excluir este link de referência?')) return;
     this.mutate(this.studio.deleteReference(id, ref.id), 'Referência removida.');
   }
@@ -342,7 +347,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
   saveActivity(): void {
     const id = this.commissionId;
     const description = this.activityDraft.description.trim();
-    if (!this.allowed || id === null || this.busy || !description ||
+    if (!this.canManage || id === null || !description ||
         !this.activityDraft.occurredOn) {
       this.actionError = 'Informe a data e descreva a atualização.';
       return;
@@ -390,6 +395,7 @@ export class CreatorCommissionDetailsComponent implements OnInit, OnDestroy {
           ? 'O pedido ou a etapa mudou. Atualize os dados antes de tentar novamente.'
           : 'Não foi possível salvar. Confira os dados e tente novamente.';
         this.statusDraft=this.commission?.status??null;
+        this.stepStatusDrafts=Object.fromEntries(this.steps.map(step=>[step.id,step.status]));
       }
     });
   }

@@ -183,7 +183,9 @@ describe('CreatorCommissionDetailsComponent', () => {
   });
 
   it('plans one step without changing status, supports clearing and blocks completed planning',()=>{
-    component.startPlanning(plan);component.planningDate='2026-12-01';component.savePlanning(plan);
+    component.startPlanning(plan);component.planningDate='2026-02-30';component.savePlanning(plan);
+    expect(studio.setPlanningDate).not.toHaveBeenCalled();
+    component.planningDate='2026-12-01';component.savePlanning(plan);
     expect(studio.setPlanningDate).toHaveBeenCalledWith(85,90,'2026-12-01');
     const dated={...plan,date:'2026-12-01'};
     studio.commissionPlanning.and.returnValue(of([dated]));component.load();
@@ -194,6 +196,22 @@ describe('CreatorCommissionDetailsComponent', () => {
     studio.commissionPlanning.and.returnValue(of([finished]));component.load();
     component.startPlanning(finished);component.savePlanning(finished,true);
     expect(studio.setPlanningDate.calls.count()).toBe(2);
+  });
+
+  it('shows the editable workspace and preserves the order after a failed refresh',()=>{
+    const root=fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Dados do pedido');
+    expect(root.textContent).toContain('Rascunho');
+    expect(root.textContent).not.toContain('Adicionar referência');
+    component.tab='references';fixture.detectChanges();
+    expect(root.textContent).toContain('Adicionar referência');
+    const failing=new Subject<CreatorCommission>();
+    studio.findCommission.and.returnValue(failing);
+    component.load();failing.error(new HttpErrorResponse({status:500}));
+    expect(component.canManage).toBeFalse();
+    expect(component.commission?.id).toBe(85);
+    component.statusDraft='PAUSED';component.saveStatus();
+    expect(studio.changeStatus).not.toHaveBeenCalled();
   });
 
   it('clears production, drafts and private details on route or account changes',()=>{
