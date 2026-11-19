@@ -19,6 +19,7 @@ import {
 } from '../../../core/services/creator-studio.service';
 import { UserService } from '../../../core/services/user.service';
 import { CreatorStageBoardComponent } from './creator-stage-board.component';
+import { CreatorCalendarComponent } from './creator-calendar.component';
 
 /**
  * The first private Pro workflow: a fast commission card and chronological queue.
@@ -48,12 +49,13 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
   definitions: CreatorStageDefinition[] = [];
   workflows: CreatorWorkflow[] = [];
   // Kanban is the default; the chronological list remains available for detail work.
-  viewMode: 'board' | 'list' | 'stages' = 'board';
+  viewMode: 'board' | 'list' | 'stages' | 'calendar' = 'board';
   selectedWorkflowId: number | null = null;
   organizingStageColumns = false;
   stageOrderAvailable = false;
   stageMoveInProgress = false;
   @ViewChild(CreatorStageBoardComponent) private stageBoard?: CreatorStageBoardComponent;
+  @ViewChild(CreatorCalendarComponent) private calendar?: CreatorCalendarComponent;
   groupBy: 'date' | 'type' | 'status' | 'stage' = 'date';
   readonly boardStatuses: CreatorCommissionStatus[] =
     ['QUEUED','IN_PROGRESS','WAITING','PAUSED'];
@@ -295,8 +297,8 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     return this.boardColumns.reduce((sum, col) => sum + col.total, 0);
   }
 
-  setViewMode(mode: 'board' | 'list' | 'stages'): void {
-    if (mode === this.viewMode || !this.canUsePro || this.changingId !== null || this.stageMoveInProgress) return;
+  setViewMode(mode: 'board' | 'list' | 'stages' | 'calendar'): void {
+    if (mode === this.viewMode || !this.canUsePro || this.changingId !== null || this.stageMoveInProgress || this.calendar?.busy) return;
     this.selectedWorkflowId = null;
     this.organizingStageColumns = false;
     this.stageOrderAvailable = false;
@@ -430,6 +432,10 @@ export class CreatorStudioComponent implements OnInit, OnDestroy {
     if (!this.canUsePro) return;
     if (this.viewMode === 'board') {
       this.loadBoard();
+      return;
+    }
+    if (this.viewMode === 'calendar') {
+      this.calendar?.reload();
       return;
     }
     if (this.viewMode === 'stages') {
