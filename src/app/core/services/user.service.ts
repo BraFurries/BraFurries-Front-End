@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { UserReliability } from '../models/user-reliability.model';
 import { Injectable, InjectionToken, OnDestroy, inject } from '@angular/core';
-import { BehaviorSubject, Observable, catchError, defer, finalize, firstValueFrom, from, map, of, shareReplay, switchMap, tap, throwError, timer } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, defer, finalize, firstValueFrom, from, map, of, shareReplay, tap, throwError, timer } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse } from '../../shared/models/api/auth/authResponse';
 import { User } from '../../shared/models/user';
@@ -414,9 +414,10 @@ export class UserService implements OnDestroy {
     });
   }
 
-  refreshToken(): Observable<boolean> {
+  refreshToken(expectedIdentity?: string): Observable<boolean> {
     this.syncSession();
     const requested = this.session;
+    if (expectedIdentity && (!requested || this.identity(requested) !== expectedIdentity)) return of(false);
     if (!requested?.refreshToken) {
       if (requested) this.clearSession();
       return of(false);
@@ -497,6 +498,10 @@ export class UserService implements OnDestroy {
     const current = this.session;
     if (!current?.accessToken) return of(null);
 
+    const currentUserForRequest = (): User | null => {
+      this.syncSession();
+      return this.session && this.identity(this.session) === this.identity(current) ? this.session.user : null;
+    };
     return this.http.get<User>(`${environment.apiBaseUrl}/user`).pipe(
       tap(userDetails => {
         this.syncSession();
@@ -505,8 +510,8 @@ export class UserService implements OnDestroy {
           this.cacheProfile(userDetails);
         }
       }),
-      map(() => this.getUser()),
-      catchError(() => of(this.getUser()))
+      map(currentUserForRequest),
+      catchError(() => of(currentUserForRequest()))
     );
   }
 
@@ -530,8 +535,16 @@ export class UserService implements OnDestroy {
   }
 
   getSessionIdentity(): string | null {
+    return this.getSessionCredentials()?.identity ?? null;
+  }
+
+  /** Atomic in-memory snapshot: callers must not mix credentials read from
+   * distinct storage revisions while another tab changes accounts. */
+  getSessionCredentials(): { identity: string; accessToken: string; tokenType: string } | null {
     this.syncSession();
-    return this.session ? this.identity(this.session) : null;
+    const session = this.session;
+    return session ? { identity: this.identity(session), accessToken: session.accessToken,
+      tokenType: session.tokenType } : null;
   }
 
   updateCachedUser(patch: Partial<Pick<User, 'name' | 'profileImageUrl'>>): User {
@@ -620,7 +633,8 @@ export class UserService implements OnDestroy {
     this.lastStoredProfile = profile;
     const previous = this.session;
     this.session = this.parseStoredSession(raw, profile);
-    if (JSON.stringify(previous?.user ?? null) !== JSON.stringify(this.session?.user ?? null)) {
+    if ((previous ? this.identity(previous) : null) !== (this.session ? this.identity(this.session) : null) ||
+        JSON.stringify(previous?.user ?? null) !== JSON.stringify(this.session?.user ?? null)) {
       this.currentUserSubject.next(this.session?.user ?? null);
     }
   }
