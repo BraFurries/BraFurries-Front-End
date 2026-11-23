@@ -13,17 +13,25 @@ export class DashboardGuard implements CanActivate, CanLoad {
   ) {}
 
   canActivate(route: ActivatedRouteSnapshot): Observable<boolean | UrlTree> {
-    const returnUrl = `/${route.pathFromRoot
+    const fallbackUrl = `/${route.pathFromRoot
       .flatMap((snapshot) => snapshot.url)
       .map((segment) => segment.path)
       .join('/')}`;
 
-    return this.authorizeAccess(route.data?.['guardMode'], returnUrl !== '/' ? returnUrl : undefined);
+    return this.authorizeAccess(route.data?.['guardMode'],
+      this.requestedDashboardUrl(fallbackUrl !== '/' ? fallbackUrl : undefined));
   }
 
   canLoad(route: Route, segments: UrlSegment[]): Observable<boolean | UrlTree> {
     const returnUrl = segments.length > 0 ? `/${segments.map((segment) => segment.path).join('/')}` : undefined;
-    return this.authorizeAccess(route.data?.['guardMode'], returnUrl);
+    return this.authorizeAccess(route.data?.['guardMode'], this.requestedDashboardUrl(returnUrl));
+  }
+
+  private requestedDashboardUrl(fallback?: string): string | undefined {
+    // At /painel's top-level guard, pathFromRoot and canLoad segments do not
+    // yet contain the lazy-loaded child route or its query/fragment.
+    const target = this.router.getCurrentNavigation()?.extractedUrl?.toString();
+    return target && /^\/painel(?:\/|[?#]|$)/.test(target) ? target : fallback;
   }
 
   private authorizeAccess(
