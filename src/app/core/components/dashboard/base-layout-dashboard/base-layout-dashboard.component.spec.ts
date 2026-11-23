@@ -119,6 +119,25 @@ describe('BaseLayoutDashboardComponent', () => {
     fixture.detectChanges();
   });
 
+  it('redirects an invalidated dashboard session to login, preserving the current deep link', async () => {
+    await router.navigateByUrl('/painel/perfil?aba=seguranca#sessoes');
+    const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+    user$.next(null);
+
+    expect(navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/painel/perfil?aba=seguranca#sessoes' },
+      replaceUrl: true
+    });
+  });
+
+  it('does not override the explicit logout navigation when the session clears', async () => {
+    await router.navigateByUrl('/painel/perfil');
+    const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+    component.isLoggingOut = true;
+    user$.next(null);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('hides Minhas Parcerias for users with no eligible published partnerships', () => {
     expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
     component.toggleUserMenu();
