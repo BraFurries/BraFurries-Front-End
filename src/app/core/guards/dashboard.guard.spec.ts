@@ -10,7 +10,7 @@ describe('DashboardGuard', () => {
   let userService: jasmine.SpyObj<UserService>;
 
   beforeEach(() => {
-    router = jasmine.createSpyObj<Router>('Router', ['createUrlTree']);
+    router = jasmine.createSpyObj<Router>('Router', ['createUrlTree', 'getCurrentNavigation']);
     userService = jasmine.createSpyObj<UserService>('UserService', ['ensureValidSession', 'hasRecoverableSession']);
     userService.hasRecoverableSession.and.returnValue(false);
     TestBed.configureTestingModule({
@@ -55,6 +55,24 @@ describe('DashboardGuard', () => {
     expect(result).toBe(loginTree);
     expect(router.createUrlTree).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/painel/comunidades/42/coddy' }
+    });
+  });
+
+  it('preserves the complete internal deep link with query and fragment on initial navigation', async () => {
+    const loginTree = {} as UrlTree;
+    router.createUrlTree.and.returnValue(loginTree);
+    router.getCurrentNavigation.and.returnValue({
+      extractedUrl: { toString: () => '/painel/comunidades/42/coddy?aba=logs#detalhes' }
+    } as any);
+    userService.ensureValidSession.and.returnValue(of(false));
+
+    const result = await firstValueFrom(guard.canLoad({
+      data: { guardMode: 'authenticatedOnly' }
+    }, [new UrlSegment('painel', {})]));
+
+    expect(result).toBe(loginTree);
+    expect(router.createUrlTree).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/painel/comunidades/42/coddy?aba=logs#detalhes' }
     });
   });
 

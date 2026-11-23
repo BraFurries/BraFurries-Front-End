@@ -90,7 +90,18 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     this.userService.user$
       .pipe(takeUntil(this.destroy$))
       .subscribe(user => {
+        const hadActiveUser = this.currentUser !== null;
         this.currentUser = user;
+        // Route guards only run on navigation. A revoked refresh token or
+        // logout from another tab can invalidate an already open dashboard.
+        // Keep the full deep link so login returns to the same feature.
+        if (!user && hadActiveUser && !this.isLoggingOut &&
+            /^\/painel(?:\/|[?#]|$)/.test(this.router.url)) {
+          void this.router.navigate(['/login'], {
+            queryParams: { returnUrl: this.router.url },
+            replaceUrl: true
+          });
+        }
         this.showAdminMenu = this.userPermissionsService.isAdmin(user);
         this.showPartnersMenu = this.showAdminMenu;
         const userId = user?.id ?? null;

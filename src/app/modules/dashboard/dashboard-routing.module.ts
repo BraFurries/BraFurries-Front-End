@@ -1,6 +1,7 @@
-import { NgModule } from '@angular/core';
+import { NgModule, inject } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { BaseLayoutDashboardComponent } from '../../core/components/dashboard/base-layout-dashboard/base-layout-dashboard.component';
+import { UserService } from '../../core/services/user.service';
 import { InicioComponent } from './inicio/inicio.component';
 import { PerfilComponent } from './perfil/perfil.component';
 import { ServidoresComponent } from './servidores/servidores.component';
@@ -52,7 +53,8 @@ const routes: Routes = [
           { path: 'recrutamento', component: RecrutamentoComponent, data: { communityFeature: 'recrutamento' } },
           { path: 'inscricoes', component: InscricoesComponent, data: { communityFeature: 'inscricoes' } },
           { path: 'triagem', component: TriagemComponent, data: { communityFeature: 'triagem' } },
-          { path: 'acessos', component: CommunityAccessComponent, canDeactivate: [(component: CommunityAccessComponent) => component.canDeactivate()], data: { communityFeature: 'acessos' } },
+          { path: 'acessos', component: CommunityAccessComponent, canDeactivate: [(component: CommunityAccessComponent) =>
+            !inject(UserService).getUser() || component.canDeactivate()], data: { communityFeature: 'acessos' } },
           { path: 'atividade', component: CommunityActivityComponent, data: { communityFeature: 'atividade' } },
           { path: 'coddy', component: ServidoresComponent, data: { communityFeature: 'coddy' } },
           { path: 'coddy/:guildId', component: ServidoresComponent, data: { communityFeature: 'coddy' } },
