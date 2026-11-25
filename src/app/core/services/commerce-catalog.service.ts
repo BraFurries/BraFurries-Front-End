@@ -11,7 +11,7 @@ export interface CommerceContractTemplate {
 export interface CommerceArtist { id: number; name: string; }
 export interface CommerceArtwork {
   id: number; title: string; description: string | null; artistUserId: number;
-  artistName: string; creationCost: number; status: string;
+  artistName: string; creationCost: number; status: string; previewFileId?: number | null;
 }
 export interface CommerceArtworkFile {
   id: number; artworkId: number;
@@ -178,6 +178,14 @@ export class CommerceCatalogService {
     form.append('file',file,file.name);
     return this.http.post<CreatedCommerceEntity>(
       `${this.base}/artworks/${artworkId}/files`,form);
+  }
+
+  artworkPreview(artworkId: number, fileId: number): Observable<Blob> {
+    return this.http.get(`${this.base}/artworks/${artworkId}/files/${fileId}/preview`, {responseType: 'blob'});
+  }
+
+  setArtworkPreview(artworkId: number, fileId: number, selected: boolean): Observable<void> {
+    return this.http.put<void>(`${this.base}/artworks/${artworkId}/files/${fileId}/preview`, {}, {params: {selected}});
   }
 
   downloadArtworkFile(artworkId: number, fileId: number): Observable<Blob> {
