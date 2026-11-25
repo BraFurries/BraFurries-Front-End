@@ -24,6 +24,7 @@ export class CommerceArtworkPreviewComponent implements AfterViewInit, OnChanges
   url: string | null = null;
   failed = false;
   private visible = false;
+  private destroyed = false;
   private observer?: IntersectionObserver;
   private request?: Subscription;
 
@@ -41,7 +42,7 @@ export class CommerceArtworkPreviewComponent implements AfterViewInit, OnChanges
       return;
     }
     this.observer = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
+      if (this.destroyed || !entries.some(entry => entry.isIntersecting)) return;
       this.observer?.disconnect();
       this.zone.run(() => { this.visible = true; this.load(); });
     });
@@ -81,6 +82,7 @@ export class CommerceArtworkPreviewComponent implements AfterViewInit, OnChanges
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.visible = false;
     this.observer?.disconnect();
     this.clear();
