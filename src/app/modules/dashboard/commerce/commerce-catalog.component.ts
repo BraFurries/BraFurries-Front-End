@@ -872,6 +872,19 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       });
   }
 
+  canPreviewArtworkFile(file: CommerceArtworkFile): boolean {
+    return file.status === 'ACTIVE' && ['png','jpg','jpeg','webp'].includes(file.extension)
+      && ['image/png','image/jpeg','image/webp'].includes(file.mediaType)
+      && file.sizeBytes <= 4 * 1024 * 1024;
+  }
+
+  setArtworkPreview(file: CommerceArtworkFile, selected: boolean): void {
+    if (!this.can('ARTWORKS_MANAGE') || file.artworkId !== this.selectedArtworkId ||
+        this.saving || (selected && !this.canPreviewArtworkFile(file))) return;
+    this.mutate(this.catalog.setArtworkPreview(file.artworkId, file.id, selected),
+      selected ? 'Prévia da arte definida.' : 'Prévia da arte removida.');
+  }
+
   archiveArtworkFile(file: CommerceArtworkFile): void {
     if (!this.can('ARTWORKS_MANAGE') || file.artworkId !== this.selectedArtworkId ||
         file.status !== 'ACTIVE') return;
