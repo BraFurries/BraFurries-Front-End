@@ -8,6 +8,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
 import { CommerceArtistService } from '../../../core/services/commerce-artist.service';
+import { CommerceArtworkPreviewComponent } from './commerce-artwork-preview.component';
 import { CommerceCatalogComponent } from './commerce-catalog.component';
 
 describe('CommerceCatalogComponent', () => {
@@ -29,7 +30,7 @@ describe('CommerceCatalogComponent', () => {
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
       'searchArtists','downloadContract','terminateContract',
-      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
+      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile','setArtworkPreview','artworkPreview',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
       'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
       'updateTemplate','setTemplateActive','deleteTemplate','unlinkArtwork'
@@ -77,6 +78,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.artworkFiles.and.returnValue(of([]));
     catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
+    catalog.setArtworkPreview.and.returnValue(of(void 0));
     catalog.productArtworks.and.returnValue(of([]));
     catalog.searchArtists.and.returnValue(of([{ id: 31, name: 'Artista' }]));
     catalog.createTemplate.and.returnValue(of({id: 60}));
@@ -87,7 +89,7 @@ describe('CommerceCatalogComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [CommerceCatalogComponent, CommerceNavigationComponent],
-      imports: [CommonModule, FormsModule, RouterTestingModule],
+      imports: [CommonModule, FormsModule, RouterTestingModule, CommerceArtworkPreviewComponent],
       providers: [
         { provide: PlatformAccessService, useValue: access },
         { provide: CommerceCatalogService, useValue: catalog },
