@@ -19,7 +19,7 @@ export interface CommerceArtworkFile {
   originalName: string; extension: string; mediaType: string;
   description: string | null; sha256: string; sizeBytes: number;
   status: 'ACTIVE' | 'ARCHIVED'; uploadedByUserId: number;
-  createdAt: string; archivedAt: string | null;
+  createdAt: string; archivedAt: string | null; previewGeneratedAt?: string | null;
 }
 
 export interface CommerceSupplierOption { id: number; name: string; }

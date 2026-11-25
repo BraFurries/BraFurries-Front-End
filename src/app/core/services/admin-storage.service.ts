@@ -8,7 +8,7 @@ export type StorageCategory = 'CONTRACT_DOCUMENT' | 'ARTWORK_FILE' | 'OTHER_PRIV
 export type StorageReferenceStatus = 'LINKED' | 'ORPHAN' | 'RECENT' | 'UNVERIFIED';
 
 export interface StorageObjectReference {
-  source: 'CONTRACT' | 'PREPARATION' | 'ARTWORK_FILE';
+  source: 'CONTRACT' | 'PREPARATION' | 'ARTWORK_FILE' | 'ARTWORK_PREVIEW';
   recordId: number;
   artworkId: number;
   status: string;

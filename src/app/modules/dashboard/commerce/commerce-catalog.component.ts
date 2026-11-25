@@ -877,7 +877,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   canPreviewArtworkFile(file: CommerceArtworkFile): boolean {
     return file.status === 'ACTIVE' && ['png','jpg','jpeg','webp'].includes(file.extension)
       && ['image/png','image/jpeg','image/webp'].includes(file.mediaType)
-      && file.sizeBytes <= 4 * 1024 * 1024;
+      && file.sizeBytes <= 25 * 1024 * 1024;
   }
 
   setArtworkPreview(file: CommerceArtworkFile, selected: boolean): void {
