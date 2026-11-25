@@ -520,6 +520,28 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Artes cadastradas');
   });
 
+  it('allows only active supported small images to be selected as the artwork preview', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    catalog.artworkFiles.and.returnValue(of([{
+      id: 51, artworkId: 12, kind: 'EXPORT', originalName: 'mascote.png',
+      extension: 'png', mediaType: 'image/png', description: null,
+      sha256: 'abc', sizeBytes: 4096, status: 'ACTIVE', uploadedByUserId: 1,
+      createdAt: '2026-11-11T13:00:00', archivedAt: null
+    }]));
+    component.selectArtwork(12);
+    fixture.detectChanges();
+    const file = component.artworkFiles[0];
+    expect(component.canPreviewArtworkFile(file)).toBeTrue();
+    expect(component.canPreviewArtworkFile({...file, extension: 'svg', mediaType: 'image/svg+xml'})).toBeFalse();
+    expect(component.canPreviewArtworkFile({...file, status: 'ARCHIVED'})).toBeFalse();
+    expect(component.canPreviewArtworkFile({...file, sizeBytes: 4194305})).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Definir como prévia');
+    component.setArtworkPreview({...file, artworkId: 23}, true);
+    expect(catalog.setArtworkPreview).not.toHaveBeenCalled();
+    component.setArtworkPreview(file, true);
+    expect(catalog.setArtworkPreview).toHaveBeenCalledWith(12, 51, true);
+  });
+
   it('starts product artwork links collapsed even when a product is selected', async () => {
     await create(['PRODUCTS_MANAGE']);
     const root = fixture.nativeElement as HTMLElement;
