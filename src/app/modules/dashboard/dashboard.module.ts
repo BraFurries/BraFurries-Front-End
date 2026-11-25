@@ -24,6 +24,7 @@ import { TeamOrgChartComponent } from './equipes/team-org-chart/team-org-chart.c
 import { MembrosComponent } from './membros/membros.component';
 import { CommunityAccessComponent } from './community-access/community-access.component';
 import { CommerceAccessComponent } from './commerce/commerce-access.component';
+import { CommerceArtworkPreviewComponent } from './commerce/commerce-artwork-preview.component';
 import { CommerceCatalogComponent } from './commerce/commerce-catalog.component';
 import { CommerceFinanceComponent } from './commerce/commerce-finance.component';
 import { CommerceNavigationComponent } from './commerce/commerce-navigation.component';
@@ -94,6 +95,7 @@ import { RecruitmentExamReviewComponent } from './recrutamento/recruitment-exam-
     CommunitiesComponent
   ],
   imports: [
+    CommerceArtworkPreviewComponent,
     CommonModule,
     FormsModule,
     DragDropModule,
