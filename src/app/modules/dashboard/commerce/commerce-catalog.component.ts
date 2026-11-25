@@ -872,6 +872,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       });
   }
 
+  trackArtwork(_index: number, item: CommerceArtwork): number { return item.id; }
+
   canPreviewArtworkFile(file: CommerceArtworkFile): boolean {
     return file.status === 'ACTIVE' && ['png','jpg','jpeg','webp'].includes(file.extension)
       && ['image/png','image/jpeg','image/webp'].includes(file.mediaType)
