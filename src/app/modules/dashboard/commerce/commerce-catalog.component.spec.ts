@@ -520,7 +520,7 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Artes cadastradas');
   });
 
-  it('allows only active supported small images to be selected as the artwork preview', async () => {
+  it('allows active supported images up to the original upload limit to be selected as the artwork preview', async () => {
     await create(['ARTWORKS_MANAGE']);
     catalog.artworkFiles.and.returnValue(of([{
       id: 51, artworkId: 12, kind: 'EXPORT', originalName: 'mascote.png',
@@ -534,7 +534,8 @@ describe('CommerceCatalogComponent', () => {
     expect(component.canPreviewArtworkFile(file)).toBeTrue();
     expect(component.canPreviewArtworkFile({...file, extension: 'svg', mediaType: 'image/svg+xml'})).toBeFalse();
     expect(component.canPreviewArtworkFile({...file, status: 'ARCHIVED'})).toBeFalse();
-    expect(component.canPreviewArtworkFile({...file, sizeBytes: 4194305})).toBeFalse();
+    expect(component.canPreviewArtworkFile({...file, sizeBytes: 6010000})).toBeTrue();
+    expect(component.canPreviewArtworkFile({...file, sizeBytes: 26214401})).toBeFalse();
     expect(fixture.nativeElement.textContent).toContain('Definir como prévia');
     component.setArtworkPreview({...file, artworkId: 23}, true);
     expect(catalog.setArtworkPreview).not.toHaveBeenCalled();
