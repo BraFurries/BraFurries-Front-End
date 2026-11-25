@@ -97,6 +97,7 @@ export class AdminStorageComponent implements OnInit, OnDestroy {
       case 'CONTRACT': return 'Contrato assinado';
       case 'PREPARATION': return 'Minuta de contrato';
       case 'ARTWORK_FILE': return 'Arquivo de arte';
+      case 'ARTWORK_PREVIEW': return 'Miniatura de arte';
       default: return 'Registro de origem desconhecida';
     }
   }
