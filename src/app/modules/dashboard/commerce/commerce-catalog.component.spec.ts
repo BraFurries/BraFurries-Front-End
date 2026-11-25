@@ -8,6 +8,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { PlatformAccessService } from '../../../core/services/platform-access.service';
 import { CommerceCatalogService } from '../../../core/services/commerce-catalog.service';
 import { CommerceArtistService } from '../../../core/services/commerce-artist.service';
+import { CommerceArtworkPreviewComponent } from './commerce-artwork-preview.component';
 import { CommerceCatalogComponent } from './commerce-catalog.component';
 
 describe('CommerceCatalogComponent', () => {
@@ -29,7 +30,7 @@ describe('CommerceCatalogComponent', () => {
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
       'correctProductionBatch','productionBatchHistory',
       'searchArtists','downloadContract','terminateContract',
-      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile',
+      'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile','setArtworkPreview','artworkPreview',
       'updateArtwork','setArtworkArchived','deleteArtwork','updateSupplier',
       'setSupplierActive','deleteSupplier','updateProduct','setProductActive','deleteProduct',
       'updateTemplate','setTemplateActive','deleteTemplate','unlinkArtwork'
@@ -77,6 +78,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.artworkFiles.and.returnValue(of([]));
     catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
+    catalog.setArtworkPreview.and.returnValue(of(void 0));
     catalog.productArtworks.and.returnValue(of([]));
     catalog.searchArtists.and.returnValue(of([{ id: 31, name: 'Artista' }]));
     catalog.createTemplate.and.returnValue(of({id: 60}));
@@ -87,7 +89,7 @@ describe('CommerceCatalogComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [CommerceCatalogComponent, CommerceNavigationComponent],
-      imports: [CommonModule, FormsModule, RouterTestingModule],
+      imports: [CommonModule, FormsModule, RouterTestingModule, CommerceArtworkPreviewComponent],
       providers: [
         { provide: PlatformAccessService, useValue: access },
         { provide: CommerceCatalogService, useValue: catalog },
@@ -516,6 +518,28 @@ describe('CommerceCatalogComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Enviar arquivo privado');
     expect(fixture.nativeElement.textContent).not.toContain('Artes cadastradas');
+  });
+
+  it('allows only active supported small images to be selected as the artwork preview', async () => {
+    await create(['ARTWORKS_MANAGE']);
+    catalog.artworkFiles.and.returnValue(of([{
+      id: 51, artworkId: 12, kind: 'EXPORT', originalName: 'mascote.png',
+      extension: 'png', mediaType: 'image/png', description: null,
+      sha256: 'abc', sizeBytes: 4096, status: 'ACTIVE', uploadedByUserId: 1,
+      createdAt: '2026-11-11T13:00:00', archivedAt: null
+    }]));
+    component.selectArtwork(12);
+    fixture.detectChanges();
+    const file = component.artworkFiles[0];
+    expect(component.canPreviewArtworkFile(file)).toBeTrue();
+    expect(component.canPreviewArtworkFile({...file, extension: 'svg', mediaType: 'image/svg+xml'})).toBeFalse();
+    expect(component.canPreviewArtworkFile({...file, status: 'ARCHIVED'})).toBeFalse();
+    expect(component.canPreviewArtworkFile({...file, sizeBytes: 4194305})).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Definir como prévia');
+    component.setArtworkPreview({...file, artworkId: 23}, true);
+    expect(catalog.setArtworkPreview).not.toHaveBeenCalled();
+    component.setArtworkPreview(file, true);
+    expect(catalog.setArtworkPreview).toHaveBeenCalledWith(12, 51, true);
   });
 
   it('starts product artwork links collapsed even when a product is selected', async () => {
