@@ -8,6 +8,7 @@ import { GoogleDrivePickerBrowser, PickerConfig, isConfiguredRoot } from './goog
 interface ConnectionStatus {
   configured: boolean; connected: boolean; accountEmail: string|null; reconnectRequired: boolean;
 }
+interface ManagedFolder {folderId:string;parentFolderId:string;name:string;verifiedAt:string;}
 type RootStatus='ACCESSIBLE'|'NOT_AUTHORIZED'|'ACCESS_DENIED'|'NOT_FOLDER'|'TRASHED'|'NOT_OWNED'|'CANNOT_SHARE'|'RECONNECT_REQUIRED'|'UNAVAILABLE';
 
 export function readDriveCallback(fragment:string): {state:string;code:string}|null {
@@ -73,6 +74,23 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
         <p *ngIf="rootStatus==='RECONNECT_REQUIRED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">A autorização não está mais utilizável. Reconecte a conta.</p>
         <p *ngIf="rootStatus==='UNAVAILABLE'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">Não foi possível consultar o Google. Tente novamente.</p>
       </ng-container>
+      <section *ngIf="status?.connected" class="border-t pt-4 space-y-3">
+        <h3 class="font-amaranth text-lg font-bold">Pastas gerenciadas</h3>
+        <p class="text-sm text-gray-600">Selecione subpastas da raiz institucional. A API verifica a propriedade e o caminho no Google antes de cadastrar. Nenhum compartilhamento será alterado.</p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" (click)="authorizeFolder()" [disabled]="busy || rootPreparing || rootPickerOpen" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">Cadastrar ou revalidar pasta</button>
+          <button type="button" (click)="loadFolders()" [disabled]="busy || rootPickerOpen" class="rounded-lg border px-4 py-2 font-semibold">Consultar pastas cadastradas</button>
+        </div>
+        <p *ngIf="folderError" role="alert" class="rounded-lg bg-amber-50 p-3 text-sm">{{ folderError }}</p>
+        <p *ngIf="folderNotice" role="status" class="rounded-lg bg-green-50 p-3 text-sm">{{ folderNotice }}</p>
+        <p *ngIf="foldersLoaded && !folders.length" class="text-sm text-gray-600">Nenhuma pasta cadastrada.</p>
+        <ul *ngIf="folders.length" class="divide-y rounded-lg border">
+          <li *ngFor="let folder of folders" class="p-3 break-words">
+            <a [href]="'https://drive.google.com/drive/folders/'+folder.folderId" target="_blank" rel="noopener noreferrer" class="font-semibold text-braPurple underline">{{ folder.name }}</a>
+            <p class="text-xs text-gray-600">Verificada em {{ folder.verifiedAt | date:'dd/MM/yyyy HH:mm':'UTC' }} UTC · não representa acesso atual</p>
+          </li>
+        </ul>
+      </section>
       <p class="text-xs text-gray-500">Nesta etapa não há concessão automática de permissões. O Picker individual continua separado.</p>
     </section>
   `
@@ -89,6 +107,10 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
   rootPreparing=false;
   rootPickerOpen=false;
   rootError='';
+  folders:ManagedFolder[]=[];
+  foldersLoaded=false;
+  folderError='';
+  folderNotice='';
   private rootGeneration=0;
   private closeRootPicker:(()=>void)|null=null;
   constructor(private readonly http:HttpClient,private readonly browser:GoogleDrivePickerBrowser) {}
@@ -135,6 +157,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
     this.rootGeneration++;
     this.closeRootPicker?.();this.closeRootPicker=null;
     this.rootConfig=null;this.rootPreparing=false;this.rootPickerOpen=false;this.rootError='';
+    this.folders=[];this.foldersLoaded=false;this.folderError='';this.folderNotice='';
   }
   prepareRoot():void {
     if(!this.status?.connected||this.rootPreparing||this.rootConfig)return;
@@ -169,6 +192,42 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
       },
       canceled:()=>{if(attempt===this.rootGeneration)this.rootPickerOpen=false;},
       failed:message=>{if(attempt===this.rootGeneration){this.rootPickerOpen=false;this.rootError=message;}}
+    });
+  }
+  loadFolders():void {
+    if(this.busy||this.rootPickerOpen||!this.status?.connected)return;
+    this.busy=true;this.folderError='';this.folderNotice='';
+    this.http.get<ManagedFolder[]>(this.endpoint+'/folders').pipe(takeUntil(this.destroyed$)).subscribe({
+      next:folders=>{this.folders=folders;this.foldersLoaded=true;this.busy=false;},
+      error:()=>{this.busy=false;this.folders=[];this.foldersLoaded=false;this.folderError='Não foi possível consultar as pastas cadastradas.';}
+    });
+  }
+  authorizeFolder():void {
+    if(this.busy||this.rootPickerOpen||this.rootPreparing||!this.status?.connected)return;
+    const config=this.rootConfig;
+    if(!config){this.prepareRoot();return;}
+    const attempt=++this.rootGeneration;
+    this.folderError='';this.folderNotice='';this.rootPickerOpen=true;
+    this.closeRootPicker=this.browser.open(config,'managed-folder',{
+      picked:file=>{
+        if(attempt!==this.rootGeneration)return;
+        this.rootPickerOpen=false;
+        if(!file.id||file.id===config.folderId||file.mimeType!=='application/vnd.google-apps.folder'){
+          this.folderError='Selecione uma subpasta institucional.';return;
+        }
+        this.busy=true;
+        this.http.post<ManagedFolder>(this.endpoint+'/folders',{folderId:file.id})
+          .pipe(takeUntil(this.destroyed$)).subscribe({
+            next:folder=>{
+              this.busy=false;
+              this.loadFolders();
+              this.folderNotice='Pasta cadastrada ou revalidada com sucesso.';
+            },
+            error:()=>{this.busy=false;this.folderError='Não foi possível verificar a pasta. Autorize também as pastas ancestrais, se necessário, e tente novamente.';}
+          });
+      },
+      canceled:()=>{if(attempt===this.rootGeneration)this.rootPickerOpen=false;},
+      failed:message=>{if(attempt===this.rootGeneration){this.rootPickerOpen=false;this.folderError=message;}}
     });
   }
   checkRoot():void {
