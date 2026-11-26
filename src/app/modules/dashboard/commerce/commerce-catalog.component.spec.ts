@@ -407,6 +407,9 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.variantStatistics).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).not.toContain('Desempenho por variação');
     expect(fixture.nativeElement.textContent).toContain('Nova combinação');
+    expect(fixture.nativeElement.textContent).toContain('Característica');
+    expect(fixture.nativeElement.textContent).toContain('Opção');
+    expect(fixture.nativeElement.textContent).toContain('cadastre uma combinação por vez');
   });
 
   it('does not submit a production correction without justification', async () => {
