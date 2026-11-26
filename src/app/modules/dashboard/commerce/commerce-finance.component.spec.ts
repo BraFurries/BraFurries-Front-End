@@ -140,6 +140,28 @@ describe('CommerceFinanceComponent', () => {
     expect(finance.orderProductChoices).toHaveBeenCalled();
   });
 
+  it('requires a configured variant and applies its suggested price without free text', async () => {
+    await init(['SALES_MANAGE']);
+    component.orderProductChoices=[{id:5,name:'Camiseta',suggestedPrice:65,variantRequired:true,
+      variants:[{id:17,label:'Tamanho: M · Cor: Preta',suggestedPrice:70,active:true}]}];
+    component.orderBuyer='Comprador';
+    component.orderRequestKey=ORDER_KEY;
+    component.orderDate='2026-11-03';
+    component.addOrderLine();
+    const line=component.orderDraftLines[0];
+    line.productId=5;
+    component.onOrderProductSelected(line);
+    component.createOrder();
+    expect(finance.createOrder).not.toHaveBeenCalled();
+    line.variantId=17;
+    component.onOrderVariantSelected(line);
+    expect(line.unitPrice).toBe(70);
+    component.createOrder();
+    expect(finance.createOrder).toHaveBeenCalledWith(jasmine.objectContaining({
+      items:[{productId:5,label:'Camiseta',size:null,quantity:1,unitPrice:70,variantId:17}]
+    }));
+  });
+
   it('creates a custom preorder without creating a financial sale', async () => {
     await init(['SALES_MANAGE']);
     component.orderBuyer = 'Kéti';

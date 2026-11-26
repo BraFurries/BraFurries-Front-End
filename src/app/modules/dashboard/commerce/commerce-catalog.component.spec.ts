@@ -28,6 +28,7 @@ describe('CommerceCatalogComponent', () => {
       'deleteUnsignedPreparation',
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
+      'productVariants','createVariant','updateVariant','variantStatistics',
       'correctProductionBatch','productionBatchHistory',
       'searchArtists','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile','setArtworkPreview','artworkPreview',
@@ -76,6 +77,10 @@ describe('CommerceCatalogComponent', () => {
     catalog.cancelPreparation.and.returnValue(of(void 0));
     catalog.deleteUnsignedPreparation.and.returnValue(of(void 0));
     catalog.artworkFiles.and.returnValue(of([]));
+    catalog.productVariants.and.returnValue(of([]));
+    catalog.variantStatistics.and.returnValue(of([]));
+    catalog.createVariant.and.returnValue(of({id:71}));
+    catalog.updateVariant.and.returnValue(of(void 0));
     catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
     catalog.setArtworkPreview.and.returnValue(of(void 0));
@@ -376,6 +381,19 @@ describe('CommerceCatalogComponent', () => {
       }),'Referência fiscal incorreta');
     expect(catalog.createProductionBatch).not.toHaveBeenCalled();
     expect(component.editingBatchId).toBeNull();
+  });
+
+  it('manages combinations and sends only structured catalog attributes', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    const product=component.products[0];
+    component.toggleVariants(product.id);
+    component.variantAttributes=[{name:'Tamanho',value:'M'},{name:'Cor',value:'Preta'}];
+    component.variantSuggestedPrice=70;
+    component.saveVariant(product);
+    expect(catalog.createVariant).toHaveBeenCalledWith(product.id,{
+      attributes:[{name:'Tamanho',value:'M'},{name:'Cor',value:'Preta'}],
+      suggestedPrice:70,estimatedUnitCost:null
+    });
   });
 
   it('does not submit a production correction without justification', async () => {

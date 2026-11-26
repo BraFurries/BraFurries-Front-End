@@ -27,13 +27,30 @@ export interface CommerceSupplier {
   id: number; name: string; contactName: string | null; email: string | null;
   phone: string | null; notes: string | null; active: boolean;
 }
+export interface CommerceVariantAttribute { name: string; value: string; }
+export interface CommerceVariantChoice {
+  id: number; productId: number; label: string; active: boolean;
+  suggestedPrice: number; estimatedUnitCost?: number;
+}
+export interface CommerceProductVariant {
+  id: number; productId: number; label: string; active: boolean;
+  suggestedPrice: number | null; estimatedUnitCost: number | null;
+  attributes: CommerceVariantAttribute[];
+}
+export interface CommerceVariantStatistics {
+  variantId: number | null; label: string; active: boolean;
+  orderedUnits: number; soldUnits: number; availableUnits: number;
+  grossAmount: number; productionCost: number; soldPerDay: number;
+}
 export interface CommerceProduct {
   id: number; sku: string; name: string; description: string | null;
   estimatedUnitCost: number; suggestedPrice: number; active: boolean;
   preferredSupplierId: number | null; preferredSupplierName: string | null;
+  variantRequired?: boolean; variants?: CommerceVariantChoice[];
 }
 export interface CommerceBatch {
   id: number; productId: number; productName: string; supplierId: number; supplierName: string;
+  variantId?: number | null; variantLabel?: string | null; soldQuantity?: number;
   quantity: number; unitCost: number; additionalCost: number; totalCost: number;
   producedOn: string; reference: string | null;
 }
@@ -81,7 +98,7 @@ export interface CommerceBatchRevision {
   actorUserId: number; createdAt: string;
 }
 export interface CreateBatchInput {
-  productId: number; supplierId: number; quantity: number; unitCost: number;
+  variantId?: number | null; productId: number; supplierId: number; quantity: number; unitCost: number;
   additionalCost: number; producedOn: string; reference: string | null;
 }
 
@@ -216,6 +233,25 @@ export class CommerceCatalogService {
 
   createProduct(input: CreateProductInput): Observable<CreatedCommerceEntity> {
     return this.http.post<CreatedCommerceEntity>(`${this.base}/products`,input);
+  }
+
+  productVariants(productId: number): Observable<CommerceProductVariant[]> {
+    return this.http.get<CommerceProductVariant[]>(`${this.base}/products/${productId}/variants`);
+  }
+
+  createVariant(productId: number, data: {attributes: CommerceVariantAttribute[]; suggestedPrice: number | null; estimatedUnitCost: number | null}): Observable<{id: number}> {
+    return this.http.post<{id: number}>(`${this.base}/products/${productId}/variants`,data);
+  }
+
+  updateVariant(productId: number, variantId: number, data: {active: boolean; suggestedPrice: number | null; estimatedUnitCost: number | null}): Observable<void> {
+    return this.http.put<void>(`${this.base}/products/${productId}/variants/${variantId}`,data);
+  }
+
+  variantStatistics(productId: number, from?: string, to?: string): Observable<CommerceVariantStatistics[]> {
+    const params: Record<string,string> = {};
+    if(from) params['from']=from;
+    if(to) params['to']=to;
+    return this.http.get<CommerceVariantStatistics[]>(`${this.base}/products/${productId}/variants/statistics`,{params});
   }
 
   productArtworks(productId: number): Observable<CommerceProductArtwork[]> {

@@ -16,7 +16,8 @@ import {
 import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch, CommerceBatchRevision,
   CommerceCatalogService, CommerceContractTemplate, CommerceContractPreparation, CommerceProduct,
-  CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption
+  CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption,
+  CommerceProductVariant, CommerceVariantAttribute, CommerceVariantStatistics
 } from '../../../core/services/commerce-catalog.service';
 
 type CatalogTab = 'artworks' | 'artists' | 'files' | 'templates' | 'contracts' |
@@ -107,8 +108,21 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   supplierForm = { name: '', contactName: '', email: '', phone: '', notes: '' };
   productForm = { sku: '', name: '', description: '', estimatedUnitCost: 0,
     suggestedPrice: 0, preferredSupplierId: null as number | null };
+  expandedVariantProductId: number | null = null;
+  productVariants: CommerceProductVariant[] = [];
+  variantStats: CommerceVariantStatistics[] = [];
+  variantStatsFrom = '';
+  variantStatsTo = '';
+  variantStatsLoading = false;
+  variantStatsError = '';
+  private variantStatsRequest=0;
+  variantsLoading = false;
+  variantAttributes: CommerceVariantAttribute[] = [{name:'',value:''}];
+  variantSuggestedPrice: number | null = null;
+  variantEstimatedCost: number | null = null;
+  editingVariantId: number | null = null;
   productionForm = {
-    productId: null as number | null, supplierId: null as number | null,
+    productId: null as number | null, supplierId: null as number | null, variantId: null as number | null,
     quantity: 1, unitCost: 0, additionalCost: 0,
     producedOn: new Date().toLocaleDateString('en-CA'), reference: ''
   };
@@ -680,13 +694,138 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     ), 'Vínculo entre produto e arte atualizado.');
   }
 
+  toggleVariants(productId: number): void {
+    if (!this.can('PRODUCTS_MANAGE')) return;
+    if (this.expandedVariantProductId === productId) {
+      this.expandedVariantProductId=null;
+      this.productVariants=[];
+      this.variantStats=[];
+      this.variantsLoading=false;
+      return;
+    }
+    this.expandedVariantProductId=productId;
+    this.variantStatsFrom='';
+    this.variantStatsTo='';
+    this.productVariants=[];
+    this.variantStats=[];
+    this.resetVariantForm();
+    this.loadVariants(productId);
+  }
+
+  private loadVariants(productId: number): void {
+    this.variantsLoading=true;
+    this.refreshVariantStats(productId);
+    this.catalog.productVariants(productId).pipe(takeUntil(this.destroy$)).subscribe({
+      next:variants=>{
+        if(this.expandedVariantProductId!==productId) return;
+        this.productVariants=variants;
+        this.variantsLoading=false;
+        this.resetVariantForm();
+      },
+      error:()=>{
+        if(this.expandedVariantProductId!==productId) return;
+        this.variantsLoading=false;
+        this.errorMessage='Não foi possível carregar as variações.';
+      }
+    });
+  }
+
+  refreshVariantStats(productId: number): void {
+    if(!this.can('FINANCE_VIEW')||this.expandedVariantProductId!==productId) return;
+    if(this.variantStatsFrom && this.variantStatsTo && this.variantStatsFrom>this.variantStatsTo) {
+      this.variantStatsError='A data inicial deve ser anterior à final.';
+      return;
+    }
+    const request=++this.variantStatsRequest;
+    this.variantStatsLoading=true;
+    this.variantStatsError='';
+    this.variantStats=[];
+    this.catalog.variantStatistics(productId,this.variantStatsFrom,this.variantStatsTo)
+      .pipe(takeUntil(this.destroy$)).subscribe({
+        next:stats=>{
+          if(this.expandedVariantProductId!==productId||request!==this.variantStatsRequest) return;
+          this.variantStats=stats;
+          this.variantStatsLoading=false;
+        },
+        error:()=>{
+          if(this.expandedVariantProductId!==productId||request!==this.variantStatsRequest) return;
+          this.variantStatsLoading=false;
+          this.variantStatsError='Não foi possível consultar o período informado.';
+        }
+      });
+  }
+
+  resetVariantForm(): void {
+    this.editingVariantId=null;
+    this.variantAttributes=this.productVariants.length
+      ? this.productVariants[0].attributes.map(a=>({name:a.name,value:''}))
+      : [{name:'',value:''}];
+    this.variantSuggestedPrice=null;
+    this.variantEstimatedCost=null;
+  }
+
+  knownVariantValues(name: string): string[] {
+    return [...new Set(this.productVariants.flatMap(v=>v.attributes.filter(a=>a.name===name).map(a=>a.value)))];
+  }
+
+  addVariantAttribute(): void {
+    if(!this.productVariants.length && this.variantAttributes.length<8)
+      this.variantAttributes.push({name:'',value:''});
+  }
+
+  editVariant(variant: CommerceProductVariant): void {
+    this.editingVariantId=variant.id;
+    this.variantSuggestedPrice=variant.suggestedPrice;
+    this.variantEstimatedCost=variant.estimatedUnitCost;
+  }
+
+  saveVariant(product: CommerceProduct): void {
+    if(!this.can('PRODUCTS_MANAGE')||this.expandedVariantProductId!==product.id||this.saving||this.variantsLoading) return;
+    const prices={suggestedPrice:this.variantSuggestedPrice,estimatedUnitCost:this.variantEstimatedCost};
+    const current=this.productVariants.find(v=>v.id===this.editingVariantId);
+    if(current) {
+      this.mutate(this.catalog.updateVariant(product.id,current.id,{...prices,active:current.active}),
+        'Valores da variação atualizados.',()=>this.loadVariants(product.id));
+      return;
+    }
+    const attributes=this.variantAttributes.map(a=>({name:a.name.trim(),value:a.value.trim()}));
+    if(attributes.some(a=>!a.name||!a.value)) {
+      this.errorMessage='Preencha os atributos e valores da variação.';
+      return;
+    }
+    this.mutate(this.catalog.createVariant(product.id,{...prices,attributes}),
+      'Variação cadastrada.',()=>this.loadVariants(product.id));
+  }
+
+  toggleVariantActive(product: CommerceProduct,variant: CommerceProductVariant): void {
+    if(!this.can('PRODUCTS_MANAGE')||this.expandedVariantProductId!==product.id||this.saving) return;
+    this.mutate(this.catalog.updateVariant(product.id,variant.id,{
+      active:!variant.active,suggestedPrice:variant.suggestedPrice,estimatedUnitCost:variant.estimatedUnitCost
+    }),variant.active?'Variação desativada.':'Variação reativada.',()=>this.loadVariants(product.id));
+  }
+
+  get productionProduct(): CommerceProduct | undefined {
+    return this.products.find(p=>p.id===this.productionForm.productId);
+  }
+
+  onProductionProductSelected(): void {
+    this.productionForm.variantId=null;
+    const product=this.productionProduct;
+    if(product) this.productionForm.unitCost=product.estimatedUnitCost;
+  }
+
+  onProductionVariantSelected(): void {
+    const variant=this.productionProduct?.variants?.find(v=>v.id===this.productionForm.variantId);
+    if(variant?.estimatedUnitCost!=null) this.productionForm.unitCost=variant.estimatedUnitCost;
+  }
+
   startEditBatch(batch: CommerceBatch): void {
     if(!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')) return;
     this.activeTab='production';
     this.screen='form';
     this.editingBatchId=batch.id;
     this.productionForm={
-      productId:batch.productId,supplierId:batch.supplierId,quantity:batch.quantity,
+      productId:batch.productId,supplierId:batch.supplierId,variantId:batch.variantId ?? null,quantity:batch.quantity,
       unitCost:batch.unitCost,additionalCost:batch.additionalCost,
       producedOn:batch.producedOn,reference:batch.reference || ''
     };
@@ -697,7 +836,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   cancelEditBatch(): void {
     this.editingBatchId=null;
     this.batchCorrectionReason='';
-    this.productionForm={productId:null,supplierId:null,quantity:1,
+    this.productionForm={productId:null,supplierId:null,variantId:null,quantity:1,
       unitCost:0,additionalCost:0,
       producedOn:new Date().toLocaleDateString('en-CA'),reference:''};
   }
@@ -730,11 +869,11 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   describeBatchSnapshot(json: string): string {
     try {
       const snapshot=JSON.parse(json) as {
-        productId:number;supplierId:number;quantity:number;
+        productId:number;supplierId:number;quantity:number;variantLabel?:string;
         unitCost:number;additionalCost:number;producedOn:string;reference:string|null;
       };
       return `${snapshot.quantity} un. · produto #${snapshot.productId} · ` +
-        `fornecedor #${snapshot.supplierId} · ` +
+        `${snapshot.variantLabel ? snapshot.variantLabel + " · " : ""}fornecedor #${snapshot.supplierId} · ` +
         `custo R$ ${Number(snapshot.unitCost).toFixed(2)} + R$ ${Number(snapshot.additionalCost).toFixed(2)} · ` +
         `${snapshot.producedOn} · ref.: ${snapshot.reference || 'sem referência'}`;
     } catch {
@@ -746,6 +885,10 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     if (!this.can('PRODUCTS_MANAGE') || !this.can('SUPPLIERS_MANAGE')
       || this.productionForm.productId == null || this.productionForm.supplierId == null) {
       this.errorMessage='Selecione o produto e o fornecedor do lote.';
+      return;
+    }
+    if(this.editingBatchId==null && this.productionProduct?.variantRequired && this.productionForm.variantId==null) {
+      this.errorMessage='Selecione a variação do produto.';
       return;
     }
     const payload={
