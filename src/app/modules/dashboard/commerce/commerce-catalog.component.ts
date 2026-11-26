@@ -754,7 +754,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     }
     const attributes=this.variantAttributes.map(a=>({name:a.name.trim(),value:a.value.trim()}));
     if(attributes.some(a=>!a.name||!a.value)) {
-      this.errorMessage='Preencha os atributos e valores da variação.';
+      this.errorMessage='Preencha as características e opções da variação.';
       return;
     }
     this.mutate(this.catalog.createVariant(product.id,{...prices,attributes}),
