@@ -654,8 +654,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     if(action==='production'&&order.status!=='OPEN'||
        action==='ready'&&order.status!=='IN_PRODUCTION'||
        action==='delivery'&&order.status!=='READY'||
-       action==='cancel'&&!['OPEN','IN_PRODUCTION','READY'].includes(order.status)||
-       action==='receipt'&&order.status==='CANCELLED') return;
+       action==='cancel'&&!['OPEN','IN_PRODUCTION','READY'].includes(order.status)) return;
     this.orderActionOrderId=order.id;
     this.orderAction=action;
     this.errorMessage='';
