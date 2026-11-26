@@ -875,6 +875,12 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     return [...groups.values()];
   }
 
+  trackProductionGroup(_index: number, group: {key: string}): string { return group.key; }
+
+  get canAddProductionLine(): boolean {
+    return this.productionLines.length<100 && !!this.productionProduct?.variants?.some(v=>v.active && !this.productionLines.some(l=>l.variantId===v.id));
+  }
+
   addProductionLine(): void {
     if(this.productionLines.length>=100) return;
     const available=this.productionProduct?.variants?.find(v=>v.active && !this.productionLines.some(l=>l.variantId===v.id));
