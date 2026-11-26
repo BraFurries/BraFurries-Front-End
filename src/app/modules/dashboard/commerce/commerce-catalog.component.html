@@ -826,7 +826,7 @@
               <p *ngIf="variantsLoading" class="text-sm text-gray-600">Carregando variações...</p>
               <ng-container *ngIf="!variantsLoading">
                 <p class="text-xs text-gray-600">Cadastre somente as combinações que realmente existem.
-                  Os atributos da primeira variação serão usados nas demais. Variações antigas podem ser desativadas, sem perder o histórico.</p>
+                  As características da primeira variação serão usadas nas demais. Para oferecer mais opções (por exemplo, P, M e G), cadastre uma combinação por vez. Variações antigas podem ser desativadas, sem perder o histórico.</p>
                 <p *ngIf="!productVariants.length" class="text-sm text-gray-500">Produto sem variações cadastradas.</p>
                 <article *ngFor="let variant of productVariants" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3 text-sm">
                   <div>
@@ -846,11 +846,11 @@
                   <h4 class="font-bold">{{ editingVariantId == null ? 'Nova combinação' : 'Editar valores da variação' }}</h4>
                   <ng-container *ngIf="editingVariantId == null">
                     <div *ngFor="let attribute of variantAttributes; let ai=index" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <label class="text-xs font-semibold">Atributo
+                      <label class="text-xs font-semibold">Característica
                         <input [(ngModel)]="attribute.name" maxlength="60" [readonly]="productVariants.length > 0"
                           placeholder="Ex.: Tamanho" class="mt-1 w-full rounded-lg border px-3 py-2">
                       </label>
-                      <label class="text-xs font-semibold">Valor
+                      <label class="text-xs font-semibold">Opção
                         <input [(ngModel)]="attribute.value" maxlength="60" [attr.list]="'variant-values-'+product.id+'-'+ai"
                           placeholder="Ex.: G" class="mt-1 w-full rounded-lg border px-3 py-2">
                         <datalist [id]="'variant-values-'+product.id+'-'+ai">
@@ -859,9 +859,9 @@
                       </label>
                     </div>
                     <button *ngIf="!productVariants.length && variantAttributes.length < 8" type="button"
-                      (click)="addVariantAttribute()" class="text-xs font-semibold text-braPurple">+ Adicionar atributo</button>
+                      (click)="addVariantAttribute()" class="text-xs font-semibold text-braPurple">+ Adicionar característica</button>
                     <button *ngIf="!productVariants.length && variantAttributes.length > 1" type="button"
-                      (click)="variantAttributes.pop()" class="ml-3 text-xs font-semibold text-red-700">Remover último atributo</button>
+                      (click)="variantAttributes.pop()" class="ml-3 text-xs font-semibold text-red-700">Remover última característica</button>
                   </ng-container>
                   <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label class="text-xs font-semibold">Preço sugerido (opcional)
