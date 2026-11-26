@@ -16,6 +16,15 @@
     ],
     "headers": [
       {
+        "source": "/{painel,painel/**}",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin-allow-popups"
+          }
+        ]
+      },
+      {
         "source": "/",
         "headers": [
           {
