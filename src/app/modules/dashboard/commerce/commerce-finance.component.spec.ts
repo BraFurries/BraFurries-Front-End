@@ -404,6 +404,53 @@ describe('CommerceFinanceComponent', () => {
     expect(finance.reverseArtistPayment).not.toHaveBeenCalled();
   });
 
+  it('automatically loads missing item snapshots for every order without opening details', async () => {
+    await init(['SALES_MANAGE']);
+    component.selectTab('orders');
+    const order={
+      id:25,buyerLabel:'Zippo',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN' as const,
+      totalAmount:55,paidAmount:0,notes:null,readyAt:null,deliveredOn:null,cancellationReason:null
+    };
+    const shirt={id:1,productId:5,label:'Camiseta',size:null,variantId:2,variantLabel:'Tamanho: G · Cor: Preta',quantity:1,unitPrice:55,lineAmount:55};
+    const mug={id:2,productId:6,label:'Caneca',size:null,variantId:3,variantLabel:'Capacidade: 325 ml',quantity:2,unitPrice:30,lineAmount:60};
+    finance.orders.and.returnValue(of([order,{...order,id:26,buyerLabel:'Outro cliente'},{...order,id:27,items:[mug]}]));
+    finance.orderItems.withArgs(25).and.returnValue(of([shirt]));
+    finance.orderItems.withArgs(26).and.returnValue(of([mug]));
+    component.reload();
+    fixture.detectChanges();
+    expect(component.selectedOrderId).toBeNull();
+    expect(finance.orderItems.calls.allArgs()).toEqual([[25],[26]]);
+    const cards=fixture.nativeElement.querySelectorAll('article');
+    expect(cards[0].textContent).toContain('Tamanho: G · Cor: Preta');
+    expect(cards[1].textContent).toContain('Capacidade: 325 ml');
+    expect(cards[2].textContent).toContain('Capacidade: 325 ml');
+    expect(cards[0].textContent).not.toContain('Capacidade: 325 ml');
+    component.selectOrder(component.orders[0]);
+    component.selectOrder(component.orders[0]);
+    fixture.detectChanges();
+    expect(cards[0].textContent).toContain('Tamanho: G · Cor: Preta');
+    expect(finance.orderItems.calls.count()).toBe(2);
+  });
+
+  it('shows a per-order error if automatic item loading fails without hiding other orders', async () => {
+    await init(['SALES_MANAGE']);
+    component.selectTab('orders');
+    const order={
+      id:25,buyerLabel:'Zippo',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN' as const,
+      totalAmount:55,paidAmount:0,notes:null,readyAt:null,deliveredOn:null,cancellationReason:null
+    };
+    finance.orders.and.returnValue(of([order,{...order,id:26,items:[{id:2,productId:6,label:'Caneca',size:null,quantity:1,unitPrice:55,lineAmount:55}]}]));
+    finance.orderItems.withArgs(25).and.returnValue(throwError(()=>new Error('timeout')));
+    component.reload();
+    fixture.detectChanges();
+    expect(component.selectedOrderId).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Não foi possível carregar os itens');
+    expect(fixture.nativeElement.textContent).toContain('Caneca');
+    expect(fixture.nativeElement.textContent).not.toContain('Abra os detalhes para consultar os itens');
+  });
+
   it('shows item snapshots without expanding and toggles details closed', async () => {
     await init(['SALES_MANAGE']);
     component.selectTab('orders');
