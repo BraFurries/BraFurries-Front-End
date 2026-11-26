@@ -444,7 +444,7 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Desempenho por variação');
     expect(fixture.nativeElement.textContent).toContain('Cadastrar combinações');
     expect(fixture.nativeElement.textContent).toContain('Característica');
-    expect(fixture.nativeElement.textContent).toContain('Opção');
+    expect(fixture.nativeElement.textContent).toContain('Opções (uma por linha)');
     expect(fixture.nativeElement.textContent).toContain('uma opção por linha');
   });
 
