@@ -27,6 +27,7 @@ const routes: Routes = [
       { path: 'permissoes', component: AdminPermissionsComponent },
       { path: 'creators-piloto', component: AdminCreatorPilotComponent },
       { path: 'armazenamento', component: AdminStorageComponent },
+      { path: 'google-drive', loadComponent: () => import('./pages/drive/google-drive-pilot.component').then(m => m.GoogleDrivePilotComponent) },
       { path: 'usuarios', component: AdminUsersComponent },
       { path: 'usuarios/:id', component: AdminUserProfileComponent },
       { path: 'parceiros/novo', component: NovoParceiroComponent },
