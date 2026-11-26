@@ -28,7 +28,7 @@ describe('CommerceCatalogComponent', () => {
       'deleteUnsignedPreparation',
       'createArtwork','createTemplate',
       'createSupplier','createProduct','linkArtwork','createProductionBatch',
-      'productVariants','createVariant','updateVariant','variantStatistics',
+      'productVariants','createVariant','createVariants','updateVariant','variantStatistics',
       'correctProductionBatch','productionBatchHistory',
       'searchArtists','downloadContract','terminateContract',
       'artworkFiles','uploadArtworkFile','downloadArtworkFile','archiveArtworkFile','setArtworkPreview','artworkPreview',
@@ -80,6 +80,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.productVariants.and.returnValue(of([]));
     catalog.variantStatistics.and.returnValue(of([]));
     catalog.createVariant.and.returnValue(of({id:71}));
+    catalog.createVariants.and.returnValue(of({ids:[71,72]}));
     catalog.updateVariant.and.returnValue(of(void 0));
     catalog.uploadArtworkFile.and.returnValue(of({ id: 51 }));
     catalog.archiveArtworkFile.and.returnValue(of(void 0));
@@ -383,17 +384,52 @@ describe('CommerceCatalogComponent', () => {
     expect(component.editingBatchId).toBeNull();
   });
 
-  it('manages combinations and sends only structured catalog attributes', async () => {
+  it('generates combinations and sends only selected catalog combinations in a single request', async () => {
     await create(['PRODUCTS_MANAGE']);
     const product=component.products[0];
     component.toggleVariants(product.id);
-    component.variantAttributes=[{name:'Tamanho',value:'M'},{name:'Cor',value:'Preta'}];
+    component.variantAttributes=[{name:'Tamanho',value:'P\nM'},{name:'Cor',value:'Preta\nBranca'}];
     component.variantSuggestedPrice=70;
+    component.generateVariantCombinations();
+    expect(component.selectedVariantCount).toBe(4);
+    component.variantCombinations[1].selected=false;
+    component.variantCombinations[2].selected=false;
     component.saveVariant(product);
-    expect(catalog.createVariant).toHaveBeenCalledWith(product.id,{
-      attributes:[{name:'Tamanho',value:'M'},{name:'Cor',value:'Preta'}],
-      suggestedPrice:70,estimatedUnitCost:null
-    });
+    expect(catalog.createVariants).toHaveBeenCalledWith(product.id,[
+      {attributes:[{name:'Tamanho',value:'P'},{name:'Cor',value:'Preta'}],suggestedPrice:70,estimatedUnitCost:null},
+      {attributes:[{name:'Tamanho',value:'M'},{name:'Cor',value:'Branca'}],suggestedPrice:70,estimatedUnitCost:null}
+    ]);
+    expect(catalog.createVariant).not.toHaveBeenCalled();
+  });
+
+  it('does not select existing combinations or duplicate options, even inactive variants', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    const product=component.products[0];
+    catalog.productVariants.and.returnValue(of([{
+      id:10,productId:product.id,label:'Tamanho: M',active:false,suggestedPrice:null,estimatedUnitCost:null,
+      attributes:[{name:'Tamanho',value:'M'}]
+    }]));
+    component.toggleVariants(product.id);
+    component.variantAttributes[0].value='M\nm\nG';
+    component.generateVariantCombinations();
+    expect(component.variantCombinations.length).toBe(2);
+    expect(component.variantCombinations[0].existing).toBeTrue();
+    expect(component.selectedVariantCount).toBe(1);
+    component.selectVariantCombinations(true);
+    expect(component.selectedVariantCount).toBe(1);
+    component.invalidateVariantCombinations();
+    expect(component.selectedVariantCount).toBe(0);
+  });
+
+  it('bounds generated combinations before expanding the Cartesian product', async () => {
+    await create(['PRODUCTS_MANAGE']);
+    component.variantAttributes=[
+      {name:'Tamanho',value:Array.from({length:11},(_,i)=>String(i)).join('\n')},
+      {name:'Cor',value:Array.from({length:10},(_,i)=>String(i)).join('\n')}
+    ];
+    component.generateVariantCombinations();
+    expect(component.variantCombinations.length).toBe(0);
+    expect(component.errorMessage).toContain('100 combinações');
   });
 
   it('opens variant management without loading or showing performance even with finance access', async () => {
@@ -406,10 +442,10 @@ describe('CommerceCatalogComponent', () => {
     expect(catalog.productVariants).toHaveBeenCalledWith(product.id);
     expect(catalog.variantStatistics).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).not.toContain('Desempenho por variação');
-    expect(fixture.nativeElement.textContent).toContain('Nova combinação');
+    expect(fixture.nativeElement.textContent).toContain('Cadastrar combinações');
     expect(fixture.nativeElement.textContent).toContain('Característica');
     expect(fixture.nativeElement.textContent).toContain('Opção');
-    expect(fixture.nativeElement.textContent).toContain('cadastre uma combinação por vez');
+    expect(fixture.nativeElement.textContent).toContain('uma opção por linha');
   });
 
   it('does not submit a production correction without justification', async () => {
