@@ -40,7 +40,7 @@ export interface CommerceProductVariant {
 export interface CommerceVariantStatistics {
   variantId: number | null; label: string; active: boolean;
   orderedUnits: number; soldUnits: number; availableUnits: number;
-  grossAmount: number; productionCost: number;
+  grossAmount: number; productionCost: number; soldPerDay: number;
 }
 export interface CommerceProduct {
   id: number; sku: string; name: string; description: string | null;
@@ -247,8 +247,11 @@ export class CommerceCatalogService {
     return this.http.put<void>(`${this.base}/products/${productId}/variants/${variantId}`,data);
   }
 
-  variantStatistics(productId: number): Observable<CommerceVariantStatistics[]> {
-    return this.http.get<CommerceVariantStatistics[]>(`${this.base}/products/${productId}/variants/statistics`);
+  variantStatistics(productId: number, from?: string, to?: string): Observable<CommerceVariantStatistics[]> {
+    const params: Record<string,string> = {};
+    if(from) params['from']=from;
+    if(to) params['to']=to;
+    return this.http.get<CommerceVariantStatistics[]>(`${this.base}/products/${productId}/variants/statistics`,{params});
   }
 
   productArtworks(productId: number): Observable<CommerceProductArtwork[]> {
