@@ -74,4 +74,24 @@ describe('GoogleDriveConnectionComponent',()=>{
     check.flush({status:'ACCESSIBLE'});
     expect(fixture.componentInstance.rootStatus).toBe('ACCESSIBLE');
   });
+
+  it('registers only a subfolder and displays the server-verified registry',async()=>{
+    fixture.detectChanges();
+    http.expectOne(url+'/connection').flush(connected);
+    http.expectOne(url+'/connection/root-picker').flush(pickerConfig);
+    await fixture.whenStable();
+    fixture.componentInstance.authorizeFolder();
+    expect(browser.open).toHaveBeenCalledWith(pickerConfig,'managed-folder',jasmine.any(Object));
+    browser.open.calls.mostRecent().args[2].picked({id:'fixture_folder',mimeType:'application/vnd.google-apps.folder'});
+    http.expectNone(url+'/folders');
+    fixture.componentInstance.authorizeFolder();
+    browser.open.calls.mostRecent().args[2].picked({id:'child_folder',mimeType:'application/vnd.google-apps.folder'});
+    const req=http.expectOne(url+'/folders');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({folderId:'child_folder'});
+    const folder={folderId:'child_folder',parentFolderId:'fixture_folder',name:'Eventos',verifiedAt:'2026-11-26T22:00:00Z'};
+    req.flush(folder);
+    http.expectOne(url+'/folders').flush([folder]);
+    expect(fixture.componentInstance.folders).toEqual([folder]);
+  });
 });
