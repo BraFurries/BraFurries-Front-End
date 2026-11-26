@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, Input, OnChanges, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output } from '@angular/core';
 import { forkJoin, Subject, takeUntil } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 
@@ -29,7 +29,7 @@ interface Option {key:string;type:Principal;id:number;name:string;}
   imports:[CommonModule],
   template:`
     <section class="rounded-xl border p-4 space-y-3">
-      <h3 class="font-bold">Permissões da pasta</h3>
+      <div class="flex items-center justify-between gap-2"><h3 class="font-bold">Permissões da pasta</h3><button type="button" [disabled]="busy || dirty" (click)="closed.emit()" class="rounded border px-3 py-1 text-sm">Fechar</button></div>
       <p class="text-sm text-gray-600">A pessoa precisa estar aprovada e possuir um cargo ativo com as mesmas permissões. Nenhuma alteração é enviada ao Google nesta etapa.</p>
       <p *ngIf="error" role="alert" class="rounded bg-red-50 p-2 text-sm text-red-800">{{error}}</p>
       <p *ngIf="notice" role="status" class="text-sm text-green-700">{{notice}}</p>
@@ -63,6 +63,7 @@ interface Option {key:string;type:Principal;id:number;name:string;}
 })
 export class GoogleDriveFolderAccessComponent implements OnChanges,OnDestroy {
   @Input({required:true}) folderId='';
+  @Output() readonly closed=new EventEmitter<void>();
   readonly internal=INTERNAL_PERMISSIONS;
   readonly external=EXTERNAL_PERMISSIONS;
   private readonly cancel$=new Subject<void>();
