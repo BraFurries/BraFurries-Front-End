@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { Subject, distinctUntilChanged, map, of, switchMap, takeUntil, catchError } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { UserService } from '../../../../../core/services/user.service';
+import { GoogleDriveConnectionComponent } from './google-drive-connection.component';
 
 interface PilotConfig {
   enabled: boolean; linked: boolean;
@@ -83,9 +84,10 @@ export function safeGoogleDocumentUrl(raw: string | undefined): string | null {
 @Component({
   selector:'app-google-drive-pilot',
   standalone:true,
-  imports:[CommonModule,RouterModule],
+  imports:[CommonModule,RouterModule,GoogleDriveConnectionComponent],
   template:`
-    <section class="rounded-2xl border bg-white p-5 space-y-4 max-w-3xl">
+    <app-google-drive-connection *ngIf="config"></app-google-drive-connection>
+    <section class="rounded-2xl border bg-white p-5 space-y-4 max-w-3xl mt-4">
       <h2 class="font-amaranth text-xl font-bold">Google Drive · Piloto privado</h2>
       <p class="text-sm text-gray-600">Navegue pelo seletor oficial do Google e abra documentos com a sua conta vinculada. A pasta inicial deve ser compartilhada com você no próprio Drive.</p>
       <p *ngIf="loading" role="status" class="text-sm">Verificando disponibilidade...</p>
