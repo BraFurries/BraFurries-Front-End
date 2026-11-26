@@ -334,7 +334,7 @@
               <select [(ngModel)]="item.batchId" (ngModelChange)="onBatchSelected(item)"
                 class="mt-1 w-full rounded-lg border px-3 py-2">
                 <option *ngFor="let batch of batches" [ngValue]="batch.batchId">
-                  {{ batch.productName }}{{ batch.variantLabel ? ' — ' + batch.variantLabel : (batch.variantRequired ? ' — legado sem classificação' : '') }} — lote #{{ batch.batchId }}
+                  {{ batch.productName }}{{ batch.variantLabel ? ' — ' + batch.variantLabel : (batch.variantRequired ? ' — legado sem classificação' : '') }} — {{ batch.lotGroupId != null ? 'lote agrupado #' + batch.lotGroupId : 'lote #' + batch.batchId }}
                   ({{ batch.availableUnits }} disponíveis)
                 </option>
               </select>
