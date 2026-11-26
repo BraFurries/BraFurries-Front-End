@@ -16,7 +16,7 @@
     ],
     "headers": [
       {
-        "source": "/{painel,painel/**}",
+        "source": "**",
         "headers": [
           {
             "key": "Cross-Origin-Opener-Policy",
