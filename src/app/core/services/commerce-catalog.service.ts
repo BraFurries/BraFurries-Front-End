@@ -49,6 +49,7 @@ export interface CommerceProduct {
   variantRequired?: boolean; variants?: CommerceVariantChoice[];
 }
 export interface CommerceBatch {
+  lotGroupId?: number | null;
   id: number; productId: number; productName: string; supplierId: number; supplierName: string;
   variantId?: number | null; variantLabel?: string | null; soldQuantity?: number;
   quantity: number; unitCost: number; additionalCost: number; totalCost: number;
@@ -100,6 +101,11 @@ export interface CommerceBatchRevision {
 export interface CreateBatchInput {
   variantId?: number | null; productId: number; supplierId: number; quantity: number; unitCost: number;
   additionalCost: number; producedOn: string; reference: string | null;
+}
+
+export interface CreateProductionLotInput {
+  productId: number; supplierId: number; producedOn: string; reference: string | null;
+  additionalCost: number; lines: {variantId: number; quantity: number; unitCost: number}[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -274,6 +280,10 @@ export class CommerceCatalogService {
 
   createProductionBatch(input: CreateBatchInput): Observable<CreatedCommerceEntity> {
     return this.http.post<CreatedCommerceEntity>(`${this.base}/production-batches`,input);
+  }
+
+  createProductionLot(input: CreateProductionLotInput): Observable<{lotGroupId: number; batchIds: number[]}> {
+    return this.http.post<{lotGroupId: number; batchIds: number[]}>(`${this.base}/production-lots`,input);
   }
 
   correctProductionBatch(id: number,input: CreateBatchInput,reason: string): Observable<void> {
