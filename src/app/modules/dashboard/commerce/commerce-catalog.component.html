@@ -877,28 +877,6 @@
                     class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{{ editingVariantId == null ? 'Cadastrar variação' : 'Salvar valores' }}</button>
                   <button *ngIf="editingVariantId != null" type="button" (click)="resetVariantForm()" class="ml-2 text-xs font-semibold">Cancelar</button>
                 </div>
-                <div *ngIf="can('FINANCE_VIEW')" class="space-y-2">
-                  <h4 class="font-bold">Desempenho por variação</h4>
-                  <p class="text-xs text-gray-600">Por padrão, últimos 30 dias. Estoque é atual. Encomendas não canceladas e vendas confirmadas são contadas separadamente. Margem bruta antes de taxas e repasses.</p>
-                  <div class="flex flex-wrap items-end gap-2">
-                    <label class="text-xs font-semibold">De <input type="date" [(ngModel)]="variantStatsFrom" class="block rounded border px-2 py-1"></label>
-                    <label class="text-xs font-semibold">Até <input type="date" [(ngModel)]="variantStatsTo" class="block rounded border px-2 py-1"></label>
-                    <button type="button" (click)="refreshVariantStats(product.id)" [disabled]="variantStatsLoading" class="rounded border px-3 py-1 text-xs font-semibold">Consultar</button>
-                  </div>
-                  <p *ngIf="variantStatsLoading" class="text-xs">Carregando indicadores...</p>
-                  <p *ngIf="variantStatsError" class="text-xs text-red-700">{{ variantStatsError }}</p>
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                      <thead><tr class="border-b"><th class="p-2">Variação</th><th class="p-2">Encomendadas</th><th class="p-2">Vendidas</th><th class="p-2">Estoque</th><th class="p-2">Vendas/dia</th><th class="p-2">Receita bruta</th><th class="p-2">Margem bruta</th></tr></thead>
-                      <tbody><tr *ngFor="let stat of variantStats" class="border-b bg-white">
-                        <td class="p-2 font-semibold">{{ stat.label }}</td><td class="p-2">{{ stat.orderedUnits }}</td>
-                        <td class="p-2">{{ stat.soldUnits }}</td><td class="p-2">{{ stat.availableUnits }}</td><td class="p-2">{{ stat.soldPerDay | number:'1.0-2' }}</td>
-                        <td class="p-2">{{ stat.grossAmount | currency:'BRL' }}</td>
-                        <td class="p-2">{{ (stat.grossAmount - stat.productionCost) | currency:'BRL' }}</td>
-                      </tr></tbody>
-                    </table>
-                  </div>
-                </div>
               </ng-container>
             </div>
           </div>
