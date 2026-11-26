@@ -5,9 +5,11 @@ import { provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { UserService } from '../../../../../core/services/user.service';
 import { environment } from '../../../../../../environments/environment';
+import { GoogleDrivePickerBrowser } from './google-drive-picker-browser';
 import { GoogleDrivePilotComponent, safeGoogleDocumentUrl } from './google-drive-pilot.component';
 
 describe('GoogleDrivePilotComponent',()=>{
+  let browser:jasmine.SpyObj<GoogleDrivePickerBrowser>;
   let fixture:ComponentFixture<GoogleDrivePilotComponent>;
   let http:HttpTestingController;
   let user:BehaviorSubject<{id:number}|null>;
@@ -17,10 +19,12 @@ describe('GoogleDrivePilotComponent',()=>{
     folderId:'private_test_folder',googleSubject:'linked-subject',googleEmail:'owner@example.invalid'};
 
   beforeEach(async()=>{
+    browser=jasmine.createSpyObj('GoogleDrivePickerBrowser',['prepare','open']);
+    browser.prepare.and.resolveTo();browser.open.and.returnValue(()=>{});
     user=new BehaviorSubject<{id:number}|null>({id:7});
     await TestBed.configureTestingModule({imports:[GoogleDrivePilotComponent],
       providers:[provideHttpClient(),provideHttpClientTesting(),provideRouter([]),
-        {provide:UserService,useValue:{user$:user.asObservable()}}]}).compileComponents();
+        {provide:UserService,useValue:{user$:user.asObservable()}},{provide:GoogleDrivePickerBrowser,useValue:browser}]}).compileComponents();
     http=TestBed.inject(HttpTestingController);
     fixture=TestBed.createComponent(GoogleDrivePilotComponent);
     fixture.detectChanges();
@@ -30,10 +34,10 @@ describe('GoogleDrivePilotComponent',()=>{
   it('never shows a Picker or private folder on a forbidden response',()=>{
     http.expectOne(url).flush({}, {status:403,statusText:'Forbidden'});
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Piloto restrito');
+    expect(fixture.nativeElement.textContent).toContain('Acesso restrito');
     expect(fixture.nativeElement.querySelector('a[href*="drive.google.com"]')).toBeNull();
   });
-  it('shows the linked account and private folder without loading Google scripts automatically',()=>{
+  it('prepares the Picker and opens with one click for the linked account',async()=>{
     http.expectOne(url).flush(config);
     fixture.detectChanges();
     http.expectOne(environment.apiBaseUrl+'/user/me/platform-drive/connection')
@@ -41,7 +45,11 @@ describe('GoogleDrivePilotComponent',()=>{
     expect(fixture.nativeElement.textContent).toContain('owner@example.invalid');
     expect(fixture.nativeElement.querySelector('a[href*="drive.google.com"]').getAttribute('href'))
       .toBe('https://drive.google.com/drive/folders/private_test_folder');
-    expect(fixture.componentInstance.readyToAuthorize).toBeFalse();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.readyToAuthorize).toBeTrue();
+    fixture.componentInstance.openPicker();
+    expect(browser.open).toHaveBeenCalledWith(jasmine.objectContaining({googleSubject:'linked-subject'}),'files',jasmine.any(Object));
   });
   it('clears private links and selection on account switch',()=>{
     http.expectOne(url).flush(config);
