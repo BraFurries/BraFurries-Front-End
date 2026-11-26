@@ -466,10 +466,23 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
 
   onOrderProductSelected(line: CommerceOrderLineInput): void {
     const product = this.orderProductChoices.find(item => item.id === line.productId);
+    line.variantId=null;
+    line.size=null;
     if (product) {
       line.label = product.name;
       line.unitPrice = product.suggestedPrice;
     }
+  }
+
+  orderProduct(line: CommerceOrderLineInput): CommerceOrderProductChoice | undefined {
+    return this.orderProductChoices.find(p=>p.id===line.productId);
+  }
+
+  onOrderVariantSelected(line: CommerceOrderLineInput): void {
+    const product=this.orderProduct(line);
+    const variant=product?.variants?.find(v=>v.id===line.variantId);
+    if(variant) line.unitPrice=variant.suggestedPrice;
+    line.size=null;
   }
 
   removeOrderLine(index: number): void {
@@ -482,10 +495,16 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Informe comprador, data e pelo menos um item.';
       return;
     }
+    if(this.orderDraftLines.some(line=>line.productId!=null && this.orderProduct(line)?.variantRequired &&
+        !this.orderProduct(line)?.variants?.some(v=>v.id===line.variantId))) {
+      this.errorMessage='Selecione uma variação ativa para cada produto com variações.';
+      return;
+    }
     const lines = this.orderDraftLines.map(item => ({
       productId: item.productId || null,
       label: item.label.trim(),
-      size: item.size?.trim() || null,
+      size: item.productId==null ? item.size?.trim() || null : null,
+      ...(item.variantId!=null?{variantId:item.variantId}:{}),
       quantity: item.quantity,
       unitPrice: item.unitPrice
     }));
@@ -538,7 +557,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
         this.orderDueDate=order.expectedDeliveryOn || '';
         this.orderNotes=order.notes || '';
         this.orderDraftLines=items.map(item=>({
-          productId:item.productId,label:item.label,size:item.size,
+          productId:item.productId,label:item.label,size:item.size,variantId:item.variantId ?? null,
           quantity:item.quantity,unitPrice:item.unitPrice
         }));
         this.activeTab = 'orders';
