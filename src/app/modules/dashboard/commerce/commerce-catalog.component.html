@@ -826,7 +826,7 @@
               <p *ngIf="variantsLoading" class="text-sm text-gray-600">Carregando variações...</p>
               <ng-container *ngIf="!variantsLoading">
                 <p class="text-xs text-gray-600">Cadastre somente as combinações que realmente existem.
-                  Os atributos da primeira variação serão usados nas demais. Variações antigas podem ser desativadas, sem perder o histórico.</p>
+                  As características da primeira variação serão usadas nas demais. Informe várias opções e escolha as combinações comercializadas. Variações antigas podem ser desativadas, sem perder o histórico.</p>
                 <p *ngIf="!productVariants.length" class="text-sm text-gray-500">Produto sem variações cadastradas.</p>
                 <article *ngFor="let variant of productVariants" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3 text-sm">
                   <div>
@@ -843,26 +843,50 @@
                   </div>
                 </article>
                 <div class="space-y-3 rounded-lg border bg-white p-3">
-                  <h4 class="font-bold">{{ editingVariantId == null ? 'Nova combinação' : 'Editar valores da variação' }}</h4>
+                  <h4 class="font-bold">{{ editingVariantId == null ? 'Cadastrar combinações' : 'Editar valores da variação' }}</h4>
                   <ng-container *ngIf="editingVariantId == null">
-                    <div *ngFor="let attribute of variantAttributes; let ai=index" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <label class="text-xs font-semibold">Atributo
-                        <input [(ngModel)]="attribute.name" maxlength="60" [readonly]="productVariants.length > 0"
+                    <p class="text-xs text-gray-600">Informe uma opção por linha. Por exemplo: P, M e G em linhas separadas.</p>
+                    <div *ngFor="let attribute of variantAttributes; let ai=index" class="space-y-2 rounded-lg border p-3">
+                      <label class="block text-xs font-semibold">Característica
+                        <input [(ngModel)]="attribute.name" (ngModelChange)="invalidateVariantCombinations()" maxlength="60"
+                          [readonly]="productVariants.length > 0" [disabled]="saving"
                           placeholder="Ex.: Tamanho" class="mt-1 w-full rounded-lg border px-3 py-2">
                       </label>
-                      <label class="text-xs font-semibold">Valor
-                        <input [(ngModel)]="attribute.value" maxlength="60" [attr.list]="'variant-values-'+product.id+'-'+ai"
-                          placeholder="Ex.: G" class="mt-1 w-full rounded-lg border px-3 py-2">
-                        <datalist [id]="'variant-values-'+product.id+'-'+ai">
-                          <option *ngFor="let value of knownVariantValues(attribute.name)" [value]="value"></option>
-                        </datalist>
+                      <label class="block text-xs font-semibold">Opções (uma por linha)
+                        <textarea [(ngModel)]="attribute.value" (ngModelChange)="invalidateVariantCombinations()" rows="3" maxlength="6100"
+                          [disabled]="saving" placeholder="Ex.: P&#10;M&#10;G" class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
                       </label>
+                      <div *ngIf="knownVariantValues(attribute.name).length" class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs text-gray-600">Reutilizar opções:</span>
+                        <button *ngFor="let value of knownVariantValues(attribute.name)" type="button" [disabled]="saving"
+                          (click)="addKnownVariantOption(attribute,value)" class="rounded-full border px-2 py-1 text-xs">+ {{ value }}</button>
+                      </div>
+                      <button *ngIf="!productVariants.length && variantAttributes.length > 1" type="button" [disabled]="saving"
+                        (click)="removeVariantAttribute(ai)" class="text-xs font-semibold text-red-700">Remover característica</button>
                     </div>
-                    <button *ngIf="!productVariants.length && variantAttributes.length < 8" type="button"
-                      (click)="addVariantAttribute()" class="text-xs font-semibold text-braPurple">+ Adicionar atributo</button>
-                    <button *ngIf="!productVariants.length && variantAttributes.length > 1" type="button"
-                      (click)="variantAttributes.pop()" class="ml-3 text-xs font-semibold text-red-700">Remover último atributo</button>
+                    <button *ngIf="!productVariants.length && variantAttributes.length < 8" type="button" [disabled]="saving"
+                      (click)="addVariantAttribute()" class="text-xs font-semibold text-braPurple">+ Adicionar característica</button>
+                    <button type="button" (click)="generateVariantCombinations()" [disabled]="saving"
+                      class="block rounded-lg border border-braPurple px-3 py-2 text-sm font-bold text-braPurple">Gerar combinações</button>
+                    <div *ngIf="variantCombinations.length" class="space-y-2 rounded-lg border p-3">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h5 class="text-sm font-bold">{{ selectedVariantCount }} de {{ variantCombinations.length }} selecionadas</h5>
+                        <div class="flex gap-2">
+                          <button type="button" [disabled]="saving" (click)="selectVariantCombinations(true)" class="text-xs font-semibold underline">Selecionar novas</button>
+                          <button type="button" [disabled]="saving" (click)="selectVariantCombinations(false)" class="text-xs font-semibold underline">Limpar seleção</button>
+                        </div>
+                      </div>
+                      <p class="text-xs text-gray-600">Desmarque as combinações que não comercializamos. As já cadastradas não serão alteradas.</p>
+                      <div class="max-h-64 space-y-1 overflow-y-auto">
+                        <label *ngFor="let row of variantCombinations" class="flex items-center gap-2 rounded border p-2 text-sm">
+                          <input type="checkbox" [(ngModel)]="row.selected" [disabled]="saving || row.existing">
+                          <span>{{ row.label }}</span>
+                          <span *ngIf="row.existing" class="ml-auto text-xs text-gray-500">Já cadastrada</span>
+                        </label>
+                      </div>
+                    </div>
                   </ng-container>
+                  <p *ngIf="editingVariantId == null" class="text-xs text-gray-600">Os valores abaixo se aplicam às novas combinações selecionadas; você pode editá-los individualmente depois.</p>
                   <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label class="text-xs font-semibold">Preço sugerido (opcional)
                       <input type="number" min="0" step=".01" [(ngModel)]="variantSuggestedPrice" placeholder="Herdar do produto"
@@ -873,8 +897,8 @@
                         class="mt-1 w-full rounded-lg border px-3 py-2">
                     </label>
                   </div>
-                  <button type="button" (click)="saveVariant(product)" [disabled]="saving || (!product.active && editingVariantId == null)"
-                    class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{{ editingVariantId == null ? 'Cadastrar variação' : 'Salvar valores' }}</button>
+                  <button type="button" (click)="saveVariant(product)" [disabled]="saving || (editingVariantId == null && (!product.active || !selectedVariantCount))"
+                    class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{{ editingVariantId == null ? 'Salvar combinações selecionadas' : 'Salvar valores' }}</button>
                   <button *ngIf="editingVariantId != null" type="button" (click)="resetVariantForm()" class="ml-2 text-xs font-semibold">Cancelar</button>
                 </div>
               </ng-container>
