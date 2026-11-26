@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 
 import { environment } from '../../../environments/environment';
 import { User } from '../../shared/models/user';
@@ -130,6 +130,64 @@ describe('authTokenInterceptor', () => {
     http.expectNone(`${environment.apiBaseUrl}/auth/refresh`);
     http.expectNone(`${environment.apiBaseUrl}/user`);
   });
+
+  it('recovers a CORS-masked network error and temporary gateway failure on a read', fakeAsync(() => {
+    login();
+    const url=`${environment.apiBaseUrl}/events/partner`;
+    let response: unknown;
+    client.get(url).subscribe(value=>response=value);
+    http.expectOne(url).error(new ProgressEvent('error'));
+    tick(1000);
+    http.expectOne(url).flush({}, {status:502,statusText:'Bad Gateway'});
+    tick(3000);
+    const recovered=http.expectOne(url);
+    expect(recovered.request.headers.get('Authorization')).toBe('Bearer access-1');
+    recovered.flush({ok:true});
+    expect(response).toEqual({ok:true});
+    http.expectNone(`${environment.apiBaseUrl}/auth/refresh`);
+  }));
+
+  it('does not repeat a write after an ambiguous network failure', fakeAsync(() => {
+    login();
+    const url=`${environment.apiBaseUrl}/events`;
+    let status=-1;
+    client.post(url,{}).subscribe({error:(error:HttpErrorResponse)=>status=error.status});
+    http.expectOne(url).error(new ProgressEvent('error'));
+    tick(5000);
+    expect(status).toBe(0);
+    http.expectNone(url);
+  }));
+
+  it('bounds read retries and does not silently treat an outage as an empty response', fakeAsync(() => {
+    login();
+    const url=`${environment.apiBaseUrl}/user/me/communities`;
+    let status=-1;
+    client.get(url).subscribe({error:(error:HttpErrorResponse)=>status=error.status});
+    http.expectOne(url).flush({}, {status:503,statusText:'Unavailable'});
+    tick(1000);
+    http.expectOne(url).flush({}, {status:503,statusText:'Unavailable'});
+    tick(3000);
+    http.expectOne(url).flush({}, {status:503,statusText:'Unavailable'});
+    tick(5000);
+    expect(status).toBe(503);
+    http.expectNone(url);
+  }));
+
+  it('does not retry a failed read using another login', fakeAsync(() => {
+    login();
+    const url=`${environment.apiBaseUrl}/user`;
+    let status=-1;
+    client.get(url).subscribe({error:(error:HttpErrorResponse)=>status=error.status});
+    http.expectOne(url).error(new ProgressEvent('error'));
+    userService.login('another@example.com','password',true).subscribe();
+    http.expectOne(`${environment.apiBaseUrl}/auth/login`).flush({
+      access_token:'different-access',refresh_token:'different-refresh',expires_in:900,user:{...user,id:6}
+    });
+    tick(1000);
+    expect(status).toBe(401);
+    http.expectNone(url);
+    http.expectNone(`${environment.apiBaseUrl}/auth/refresh`);
+  }));
 
   it('never tries to refresh authorization failures unrelated to expiration', () => {
     login();
