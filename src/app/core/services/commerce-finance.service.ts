@@ -11,6 +11,7 @@ export interface CommerceBatchForSale {
   sku: string;
   suggestedPrice: number;
   availableUnits: number;
+  variantId?: number | null; variantLabel?: string | null; variantRequired?: boolean;
 }
 export interface SaleLineInput {
   batchId: number;
@@ -41,9 +42,11 @@ export interface CommerceOrder {
 }
 export interface CommerceOrderProductChoice {
   id: number; name: string; suggestedPrice: number;
+  variantRequired?: boolean; variants?: {id: number; label: string; suggestedPrice: number; active: boolean}[];
 }
 export interface CommerceOrderLineInput {
   productId: number | null; label: string; size: string | null;
+  variantId?: number | null;
   quantity: number; unitPrice: number;
 }
 export interface CreateCommerceOrder {
@@ -54,7 +57,7 @@ export interface CreateCommerceOrder {
   items: CommerceOrderLineInput[];
 }
 export interface CommerceOrderItem extends CommerceOrderLineInput {
-  id: number; lineAmount: number;
+  id: number; lineAmount: number; variantLabel?: string | null;
 }
 export interface CommerceOrderPayment {
   id: number; eventKind: 'RECEIPT' | 'REVERSAL';
@@ -89,6 +92,7 @@ export interface CommerceSaleItem {
   id: number;
   productId: number;
   productName: string;
+  variantId?: number | null; variantLabel?: string | null;
   batchId: number;
   quantity: number;
   unitPrice: number;
