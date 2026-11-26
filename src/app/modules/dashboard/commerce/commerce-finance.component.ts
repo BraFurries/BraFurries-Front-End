@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { contractRoyaltyDetails } from './commerce-contract-labels';
-import { Observable, Subject, forkJoin, of, takeUntil, catchError } from 'rxjs';
+import { Observable, Subject, forkJoin, of, takeUntil, catchError, from, switchMap, mergeMap, map, toArray } from 'rxjs';
 import { PlatformAccess, PlatformAccessService, PlatformPermissionCode } from
   '../../../core/services/platform-access.service';
 import {
@@ -8,7 +8,7 @@ import {
   CommerceStatement, CommerceStatementItem, CommercePayment, CommerceSaleItem, SaleLineInput,
   CommerceCashMovement, CommerceCashSummary, CashMovementType, ContributionNature, ContributionSource,
   CommercePaymentMetadataRevision, CommerceCashMetadataRevision,
-  CommerceOrder, CommerceOrderItem, CommerceOrderLineInput, CommerceOrderPayment, CommerceOrderStatus,
+  CommerceOrder, CommerceOrderLineInput, CommerceOrderPayment, CommerceOrderStatus,
   CommerceOrderProductChoice
 } from '../../../core/services/commerce-finance.service';
 
@@ -63,7 +63,6 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   sales: CommercePhysicalSale[] = [];
   orders: CommerceOrder[] = [];
   orderProductChoices: CommerceOrderProductChoice[] = [];
-  orderItems: CommerceOrderItem[] = [];
   orderPayments: CommerceOrderPayment[] = [];
   selectedOrderId: number | null = null;
   @ViewChild('orderActionDialog') orderActionDialog?: ElementRef<HTMLDialogElement>;
@@ -353,7 +352,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     forkJoin({
       batches: this.safe(this.can('SALES_MANAGE') ? this.finance.availableBatches() : of([])),
       sales: this.safe(canReadSales ? this.finance.sales() : of([])),
-      orders: this.safe(this.can('SALES_MANAGE') ? this.finance.orders() : of([])),
+      orders: this.safe(this.can('SALES_MANAGE') ? this.loadOrdersWithItems() : of([])),
       orderChoices: this.safe(this.can('SALES_MANAGE') ? this.finance.orderProductChoices() : of([])),
       royalties: this.safe(this.can('FINANCE_VIEW') ?
         this.finance.royalties(this.periodYear,this.periodMonth) : of([])),
@@ -376,10 +375,8 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
         this.orderProductChoices = orderChoices;
         if (this.selectedOrderId != null && !orders.some(o => o.id === this.selectedOrderId)) {
           this.selectedOrderId = null;
-          this.orderItems = [];
           this.orderPayments = [];
         }
-        if (this.selectedOrderId != null) this.loadOrderDetails();
         this.royalties = royalties;
         this.statements = statements;
         this.cashMovements = cashMovements;
@@ -609,32 +606,27 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
 
   selectOrder(order: CommerceOrder): void {
     if (!this.can('SALES_MANAGE') || this.saving || this.orderAction) return;
-    if(this.selectedOrderId===order.id) {
-      this.selectedOrderId=null;
-      this.orderItems=[];
-      this.orderPayments=[];
-      return;
-    }
-    this.selectedOrderId=order.id;
-    this.orderItems=order.items||[];
-    this.orderPayments=[];
-    this.loadOrderDetails();
+    this.selectedOrderId=this.selectedOrderId===order.id ? null : order.id;
   }
 
-  private loadOrderDetails(): void {
-    if (!this.can('SALES_MANAGE') || this.selectedOrderId == null || this.orderAction) return;
-    const id=this.selectedOrderId;
-    const order=this.orders.find(o=>o.id===id);
-    this.orderItems=order?.items||[];
-    if(order?.items) return;
-    this.finance.orderItems(id).pipe(takeUntil(this.destroy$)).subscribe({
-      next:items=>{
-        if(this.selectedOrderId===id && !this.orderAction) this.orderItems=items;
-      },
-      error:()=>{
-        if(this.selectedOrderId===id && !this.orderAction) this.errorMessage='Falha ao carregar os itens da encomenda.';
-      }
-    });
+  /** Current API embeds item snapshots; older responses are hydrated automatically.
+   * Bound fallback concurrency and preserve the original list order.
+   * A failed item read must not hide the other orders or require expanding a card.
+   */
+  private loadOrdersWithItems(): Observable<CommerceOrder[]> {
+    return this.finance.orders().pipe(
+      switchMap(orders=>from(orders).pipe(
+        mergeMap((order,index)=>{
+          if(Array.isArray(order.items) && order.items.length>0) return of({index,order});
+          return this.finance.orderItems(order.id).pipe(
+            map(items=>({index,order:{...order,items}})),
+            catchError(()=>of({index,order:{...order,items:undefined}}))
+          );
+        },6),
+        toArray(),
+        map(rows=>rows.sort((a,b)=>a.index-b.index).map(row=>row.order))
+      ))
+    );
   }
 
   get orderActionTitle(): string {
