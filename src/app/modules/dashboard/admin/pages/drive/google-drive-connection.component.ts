@@ -3,11 +3,12 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
+import { GoogleDrivePickerBrowser, PickerConfig, isConfiguredRoot } from './google-drive-picker-browser';
 
 interface ConnectionStatus {
   configured: boolean; connected: boolean; accountEmail: string|null; reconnectRequired: boolean;
 }
-type RootStatus='ACCESSIBLE'|'NOT_AUTHORIZED'|'RECONNECT_REQUIRED'|'UNAVAILABLE';
+type RootStatus='ACCESSIBLE'|'NOT_AUTHORIZED'|'ACCESS_DENIED'|'NOT_FOLDER'|'TRASHED'|'NOT_OWNED'|'CANNOT_SHARE'|'RECONNECT_REQUIRED'|'UNAVAILABLE';
 
 export function readDriveCallback(fragment:string): {state:string;code:string}|null {
   const params=new URLSearchParams(fragment.replace(/^#/,''));
@@ -45,11 +46,14 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
           </span>
         </div>
         <div class="flex gap-2 flex-wrap">
-          <button type="button" (click)="connect()" [disabled]="busy" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">
+          <button type="button" (click)="connect()" [disabled]="busy || rootPickerOpen" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">
             {{ status?.connected ? 'Reconectar conta' : 'Conectar conta institucional' }}
           </button>
-          <button *ngIf="status?.connected" type="button" (click)="checkRoot()" [disabled]="busy" class="rounded-lg border px-4 py-2 font-semibold">Verificar acesso à pasta raiz</button>
-          <button *ngIf="status?.connected || status?.reconnectRequired" type="button" (click)="confirmDisconnect=true" [disabled]="busy" class="rounded-lg border px-4 py-2 font-semibold text-red-700">Desconectar</button>
+          <button *ngIf="status?.connected" type="button" (click)="authorizeRoot()" [disabled]="busy || rootPreparing || rootPickerOpen" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+            {{ rootPreparing ? 'Preparando seletor...' : 'Autorizar pasta raiz' }}
+          </button>
+          <button *ngIf="status?.connected" type="button" (click)="checkRoot()" [disabled]="busy || rootPickerOpen" class="rounded-lg border px-4 py-2 font-semibold">Verificar acesso à pasta raiz</button>
+          <button *ngIf="status?.connected || status?.reconnectRequired" type="button" (click)="confirmDisconnect=true" [disabled]="busy || rootPickerOpen" class="rounded-lg border px-4 py-2 font-semibold text-red-700">Desconectar</button>
         </div>
         <div *ngIf="confirmDisconnect" class="rounded-lg border p-3 space-y-2">
           <p class="text-sm">Remover a autorização armazenada na BraFurries? Para revogar a concessão no Google, acesse as conexões da conta institucional.</p>
@@ -57,7 +61,15 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
           <button type="button" (click)="confirmDisconnect=false" class="rounded-lg px-3 py-1">Cancelar</button>
         </div>
         <p *ngIf="rootStatus==='ACCESSIBLE'" role="status" class="rounded-lg bg-green-50 p-3 text-sm text-green-800">Pasta raiz acessível e compartilhável pela conta institucional.</p>
-        <p *ngIf="rootStatus==='NOT_AUTHORIZED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">A pasta não está autorizada para este aplicativo, não pertence à conta institucional ou não pode ser compartilhada. Nenhuma permissão foi alterada.</p>
+        <p *ngIf="status?.connected" class="text-xs text-gray-600">Selecione a pasta configurada usando a conta institucional. A API verificará o acesso com a autorização armazenada, não com o token do navegador.</p>
+        <a *ngIf="rootConfig" [href]="'https://drive.google.com/drive/folders/'+rootConfig.folderId" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-braPurple underline">Conferir pasta configurada no Google Drive</a>
+        <p *ngIf="rootError" role="alert" class="rounded-lg bg-amber-50 p-3 text-sm">{{ rootError }}</p>
+        <p *ngIf="rootStatus==='NOT_AUTHORIZED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">A pasta não está autorizada para este aplicativo ou não foi encontrada. Use Autorizar pasta raiz e confirme a pasta configurada.</p>
+        <p *ngIf="rootStatus==='ACCESS_DENIED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">O Google negou a consulta à pasta. Autorize a pasta raiz e verifique novamente.</p>
+        <p *ngIf="rootStatus==='NOT_FOLDER'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">O ID configurado não corresponde a uma pasta.</p>
+        <p *ngIf="rootStatus==='TRASHED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">A pasta configurada está na lixeira do Google Drive.</p>
+        <p *ngIf="rootStatus==='NOT_OWNED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">A pasta não pertence à conta institucional.</p>
+        <p *ngIf="rootStatus==='CANNOT_SHARE'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">O Google não permite que a conta institucional gerencie o compartilhamento desta pasta.</p>
         <p *ngIf="rootStatus==='RECONNECT_REQUIRED'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">A autorização não está mais utilizável. Reconecte a conta.</p>
         <p *ngIf="rootStatus==='UNAVAILABLE'" role="status" class="rounded-lg bg-amber-50 p-3 text-sm">Não foi possível consultar o Google. Tente novamente.</p>
       </ng-container>
@@ -73,7 +85,13 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
   busy=false;
   confirmDisconnect=false;
   error='';
-  constructor(private readonly http:HttpClient) {}
+  rootConfig:PickerConfig|null=null;
+  rootPreparing=false;
+  rootPickerOpen=false;
+  rootError='';
+  private rootGeneration=0;
+  private closeRootPicker:(()=>void)|null=null;
+  constructor(private readonly http:HttpClient,private readonly browser:GoogleDrivePickerBrowser) {}
 
   ngOnInit():void {
     const fragment=window.location.hash;
@@ -85,7 +103,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
       this.busy=true;
       this.http.post<ConnectionStatus>(this.endpoint+'/oauth/complete',callback)
         .pipe(takeUntil(this.destroyed$)).subscribe({
-          next:status=>{this.status=status;this.busy=false;},
+          next:status=>{this.status=status;this.busy=false;if(status.connected)this.prepareRoot();else this.resetRoot();},
           error:(error:HttpErrorResponse)=>{this.error=error.status===403?'Somente o proprietário pode concluir a conexão.':'Autorização não concluída. Inicie novamente com a conta institucional.';this.loadStatus();}
         });
     } else {
@@ -96,7 +114,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
   private loadStatus():void {
     this.busy=true;
     this.http.get<ConnectionStatus>(this.endpoint+'/connection').pipe(takeUntil(this.destroyed$)).subscribe({
-      next:status=>{this.status=status;this.busy=false;},
+      next:status=>{this.status=status;this.busy=false;if(status.connected)this.prepareRoot();else this.resetRoot();},
       error:()=>{this.busy=false;this.error='Não foi possível consultar a conexão institucional.';}
     });
   }
@@ -113,8 +131,48 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
         error:()=>{this.busy=false;this.error='Não foi possível iniciar a autorização.';}
       });
   }
+  private resetRoot():void {
+    this.rootGeneration++;
+    this.closeRootPicker?.();this.closeRootPicker=null;
+    this.rootConfig=null;this.rootPreparing=false;this.rootPickerOpen=false;this.rootError='';
+  }
+  prepareRoot():void {
+    if(!this.status?.connected||this.rootPreparing||this.rootConfig)return;
+    const attempt=++this.rootGeneration;
+    this.rootPreparing=true;this.rootError='';
+    this.http.get<PickerConfig>(this.endpoint+'/connection/root-picker')
+      .pipe(takeUntil(this.destroyed$)).subscribe({
+        next:async config=>{
+          try{
+            await this.browser.prepare();
+            if(attempt===this.rootGeneration)this.rootConfig=config;
+          }catch{if(attempt===this.rootGeneration)this.rootError='Não foi possível carregar o seletor. Clique em Autorizar pasta raiz para tentar novamente.';}
+          finally{if(attempt===this.rootGeneration)this.rootPreparing=false;}
+        },
+        error:()=>{if(attempt===this.rootGeneration){this.rootPreparing=false;this.rootError='Não foi possível consultar a configuração do seletor institucional. Tente novamente.';}}
+      });
+  }
+  authorizeRoot():void {
+    if(this.busy||this.rootPickerOpen||this.rootPreparing||!this.status?.connected)return;
+    const config=this.rootConfig;
+    if(!config){this.prepareRoot();return;}
+    const attempt=++this.rootGeneration;
+    this.rootStatus=null;this.rootError='';this.rootPickerOpen=true;
+    this.closeRootPicker=this.browser.open(config,'root',{
+      picked:file=>{
+        if(attempt!==this.rootGeneration)return;
+        this.rootPickerOpen=false;
+        if(!isConfiguredRoot(file,config.folderId)){
+          this.rootError='Selecione a pasta raiz configurada.';return;
+        }
+        this.checkRoot();
+      },
+      canceled:()=>{if(attempt===this.rootGeneration)this.rootPickerOpen=false;},
+      failed:message=>{if(attempt===this.rootGeneration){this.rootPickerOpen=false;this.rootError=message;}}
+    });
+  }
   checkRoot():void {
-    if(this.busy||!this.status?.connected) return;
+    if(this.busy||this.rootPickerOpen||!this.status?.connected) return;
     this.busy=true;this.error='';this.rootStatus=null;
     this.http.post<{status:RootStatus}>(this.endpoint+'/connection/check-root',{})
       .pipe(takeUntil(this.destroyed$)).subscribe({
@@ -124,11 +182,11 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
   }
   disconnect():void {
     if(this.busy||!this.confirmDisconnect) return;
-    this.busy=true;this.error='';this.rootStatus=null;
+    this.busy=true;this.error='';this.rootStatus=null;this.resetRoot();
     this.http.delete<void>(this.endpoint+'/connection').pipe(takeUntil(this.destroyed$)).subscribe({
       next:()=>{this.confirmDisconnect=false;this.loadStatus();},
       error:()=>{this.busy=false;this.error='Não foi possível desconectar a conta.';}
     });
   }
-  ngOnDestroy():void {this.destroyed$.next();this.destroyed$.complete();}
+  ngOnDestroy():void {this.resetRoot();this.destroyed$.next();this.destroyed$.complete();}
 }
