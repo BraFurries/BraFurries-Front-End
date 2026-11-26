@@ -36,6 +36,8 @@ describe('GoogleDrivePilotComponent',()=>{
   it('shows the linked account and private folder without loading Google scripts automatically',()=>{
     http.expectOne(url).flush(config);
     fixture.detectChanges();
+    http.expectOne(environment.apiBaseUrl+'/user/me/platform-drive/connection')
+      .flush({configured:true,connected:false,accountEmail:'owner@example.invalid',reconnectRequired:false});
     expect(fixture.nativeElement.textContent).toContain('owner@example.invalid');
     expect(fixture.nativeElement.querySelector('a[href*="drive.google.com"]').getAttribute('href'))
       .toBe('https://drive.google.com/drive/folders/private_test_folder');
