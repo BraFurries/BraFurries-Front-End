@@ -1,6 +1,6 @@
 import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, switchMap, throwError } from 'rxjs';
+import { catchError, defer, retry, switchMap, throwError, timer } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserService } from '../services/user.service';
 
@@ -37,7 +37,25 @@ export const authTokenInterceptor: HttpInterceptorFn = (request, next) => {
       }
       if (!credentials) return next(request);
 
-      return next(authorized(credentials)).pipe(
+      // Recover briefly interrupted reads (proxy restart, CORS-masked network
+      // errors). Never retry writes, refresh requests, or another login.
+      const sendRead = () => defer(() => {
+        const current=userService.getSessionCredentials();
+        return current && current.identity===credentials.identity
+          ? next(authorized(current))
+          : throwError(sessionChanged);
+      }).pipe(retry({
+        count:2,
+        delay:(error:unknown,attempt:number)=>{
+          if(!(error instanceof HttpErrorResponse) || ![0,502,503,504].includes(error.status)) {
+            return throwError(()=>error);
+          }
+          return timer(attempt===1 ? 1000 : 3000);
+        }
+      }));
+
+      const response = request.method==='GET' ? sendRead() : next(authorized(credentials));
+      return response.pipe(
         catchError((error: unknown) => {
           if (!(error instanceof HttpErrorResponse) || error.status !== 401) {
             return throwError(() => error);
