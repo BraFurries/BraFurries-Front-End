@@ -243,6 +243,10 @@ export class CommerceCatalogService {
     return this.http.post<{id: number}>(`${this.base}/products/${productId}/variants`,data);
   }
 
+  createVariants(productId: number, variants: {attributes: CommerceVariantAttribute[]; suggestedPrice: number | null; estimatedUnitCost: number | null}[]): Observable<{ids: number[]}> {
+    return this.http.post<{ids: number[]}>(`${this.base}/products/${productId}/variants/batch`,{variants});
+  }
+
   updateVariant(productId: number, variantId: number, data: {active: boolean; suggestedPrice: number | null; estimatedUnitCost: number | null}): Observable<void> {
     return this.http.put<void>(`${this.base}/products/${productId}/variants/${variantId}`,data);
   }
