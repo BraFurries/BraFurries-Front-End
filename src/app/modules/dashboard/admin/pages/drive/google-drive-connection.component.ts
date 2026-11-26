@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
+import { GoogleDriveFolderAccessComponent } from './google-drive-folder-access.component';
 import { environment } from '../../../../../../environments/environment';
 import { GoogleDrivePickerBrowser, PickerConfig, isConfiguredRoot } from './google-drive-picker-browser';
 
@@ -29,7 +30,7 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
 @Component({
   selector:'app-google-drive-connection',
   standalone:true,
-  imports:[CommonModule],
+  imports:[CommonModule,GoogleDriveFolderAccessComponent],
   template:`
     <section class="rounded-2xl border bg-white p-5 space-y-4 max-w-3xl">
       <div>
@@ -47,14 +48,14 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
           </span>
         </div>
         <div class="flex gap-2 flex-wrap">
-          <button type="button" (click)="connect()" [disabled]="busy || rootPickerOpen" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">
+          <button type="button" (click)="connect()" [disabled]="busy || rootPickerOpen || !!accessFolderId" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">
             {{ status?.connected ? 'Reconectar conta' : 'Conectar conta institucional' }}
           </button>
-          <button *ngIf="status?.connected" type="button" (click)="authorizeRoot()" [disabled]="busy || rootPreparing || rootPickerOpen" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
+          <button *ngIf="status?.connected" type="button" (click)="authorizeRoot()" [disabled]="busy || rootPreparing || rootPickerOpen || !!accessFolderId" class="rounded-lg bg-braPurple px-4 py-2 font-bold text-white disabled:opacity-50">
             {{ rootPreparing ? 'Preparando seletor...' : 'Autorizar pasta raiz' }}
           </button>
-          <button *ngIf="status?.connected" type="button" (click)="checkRoot()" [disabled]="busy || rootPickerOpen" class="rounded-lg border px-4 py-2 font-semibold">Verificar acesso à pasta raiz</button>
-          <button *ngIf="status?.connected || status?.reconnectRequired" type="button" (click)="confirmDisconnect=true" [disabled]="busy || rootPickerOpen" class="rounded-lg border px-4 py-2 font-semibold text-red-700">Desconectar</button>
+          <button *ngIf="status?.connected" type="button" (click)="checkRoot()" [disabled]="busy || rootPickerOpen || !!accessFolderId" class="rounded-lg border px-4 py-2 font-semibold">Verificar acesso à pasta raiz</button>
+          <button *ngIf="status?.connected || status?.reconnectRequired" type="button" (click)="confirmDisconnect=true" [disabled]="busy || rootPickerOpen || !!accessFolderId" class="rounded-lg border px-4 py-2 font-semibold text-red-700">Desconectar</button>
         </div>
         <div *ngIf="confirmDisconnect" class="rounded-lg border p-3 space-y-2">
           <p class="text-sm">Remover a autorização armazenada na BraFurries? Para revogar a concessão no Google, acesse as conexões da conta institucional.</p>
@@ -78,8 +79,8 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
         <h3 class="font-amaranth text-lg font-bold">Pastas gerenciadas</h3>
         <p class="text-sm text-gray-600">Selecione subpastas da raiz institucional. A API verifica a propriedade e o caminho no Google antes de cadastrar. Nenhum compartilhamento será alterado.</p>
         <div class="flex flex-wrap gap-2">
-          <button type="button" (click)="authorizeFolder()" [disabled]="busy || rootPreparing || rootPickerOpen" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">Cadastrar ou revalidar pasta</button>
-          <button type="button" (click)="loadFolders()" [disabled]="busy || rootPickerOpen" class="rounded-lg border px-4 py-2 font-semibold">Consultar pastas cadastradas</button>
+          <button type="button" (click)="authorizeFolder()" [disabled]="busy || rootPreparing || rootPickerOpen || !!accessFolderId" class="rounded-lg bg-braPurple px-4 py-2 text-white font-bold disabled:opacity-50">Cadastrar ou revalidar pasta</button>
+          <button type="button" (click)="loadFolders()" [disabled]="busy || rootPickerOpen || !!accessFolderId" class="rounded-lg border px-4 py-2 font-semibold">Consultar pastas cadastradas</button>
         </div>
         <p *ngIf="folderError" role="alert" class="rounded-lg bg-amber-50 p-3 text-sm">{{ folderError }}</p>
         <p *ngIf="folderNotice" role="status" class="rounded-lg bg-green-50 p-3 text-sm">{{ folderNotice }}</p>
@@ -87,9 +88,11 @@ export function safeDriveAuthorizationUrl(raw:string):string|null {
         <ul *ngIf="folders.length" class="divide-y rounded-lg border">
           <li *ngFor="let folder of folders" class="p-3 break-words">
             <a [href]="'https://drive.google.com/drive/folders/'+folder.folderId" target="_blank" rel="noopener noreferrer" class="font-semibold text-braPurple underline">{{ folder.name }}</a>
+            <button type="button" (click)="accessFolderId=folder.folderId" [disabled]="busy || rootPickerOpen || !!accessFolderId" class="ml-2 rounded border px-2 py-1 text-sm">Permissões</button>
             <p class="text-xs text-gray-600">Verificada em {{ folder.verifiedAt | date:'dd/MM/yyyy HH:mm':'UTC' }} UTC · não representa acesso atual</p>
           </li>
         </ul>
+        <app-google-drive-folder-access *ngIf="accessFolderId" [folderId]="accessFolderId" (closed)="accessFolderId=null"></app-google-drive-folder-access>
       </section>
       <p class="text-xs text-gray-500">Nesta etapa não há concessão automática de permissões. O Picker individual continua separado.</p>
     </section>
@@ -107,6 +110,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
   rootPreparing=false;
   rootPickerOpen=false;
   rootError='';
+  accessFolderId:string|null=null;
   folders:ManagedFolder[]=[];
   foldersLoaded=false;
   folderError='';
@@ -141,7 +145,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
     });
   }
   connect():void {
-    if(this.busy||!this.status?.configured) return;
+    if(this.busy||this.accessFolderId||!this.status?.configured) return;
     this.busy=true;this.error='';this.rootStatus=null;
     this.http.post<{authorizationUrl:string}>(this.endpoint+'/oauth/start',{})
       .pipe(takeUntil(this.destroyed$)).subscribe({
@@ -157,7 +161,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
     this.rootGeneration++;
     this.closeRootPicker?.();this.closeRootPicker=null;
     this.rootConfig=null;this.rootPreparing=false;this.rootPickerOpen=false;this.rootError='';
-    this.folders=[];this.foldersLoaded=false;this.folderError='';this.folderNotice='';
+    this.accessFolderId=null;this.folders=[];this.foldersLoaded=false;this.folderError='';this.folderNotice='';
   }
   prepareRoot():void {
     if(!this.status?.connected||this.rootPreparing||this.rootConfig)return;
@@ -176,7 +180,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
       });
   }
   authorizeRoot():void {
-    if(this.busy||this.rootPickerOpen||this.rootPreparing||!this.status?.connected)return;
+    if(this.busy||this.accessFolderId||this.rootPickerOpen||this.rootPreparing||!this.status?.connected)return;
     const config=this.rootConfig;
     if(!config){this.prepareRoot();return;}
     const attempt=++this.rootGeneration;
@@ -195,7 +199,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
     });
   }
   loadFolders():void {
-    if(this.busy||this.rootPickerOpen||!this.status?.connected)return;
+    if(this.busy||this.accessFolderId||this.rootPickerOpen||!this.status?.connected)return;
     this.busy=true;this.folderError='';this.folderNotice='';
     this.http.get<ManagedFolder[]>(this.endpoint+'/folders').pipe(takeUntil(this.destroyed$)).subscribe({
       next:folders=>{this.folders=folders;this.foldersLoaded=true;this.busy=false;},
@@ -203,7 +207,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
     });
   }
   authorizeFolder():void {
-    if(this.busy||this.rootPickerOpen||this.rootPreparing||!this.status?.connected)return;
+    if(this.busy||this.accessFolderId||this.rootPickerOpen||this.rootPreparing||!this.status?.connected)return;
     const config=this.rootConfig;
     if(!config){this.prepareRoot();return;}
     const attempt=++this.rootGeneration;
@@ -231,7 +235,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
     });
   }
   checkRoot():void {
-    if(this.busy||this.rootPickerOpen||!this.status?.connected) return;
+    if(this.busy||this.accessFolderId||this.rootPickerOpen||!this.status?.connected) return;
     this.busy=true;this.error='';this.rootStatus=null;
     this.http.post<{status:RootStatus}>(this.endpoint+'/connection/check-root',{})
       .pipe(takeUntil(this.destroyed$)).subscribe({
@@ -240,7 +244,7 @@ export class GoogleDriveConnectionComponent implements OnInit,OnDestroy {
       });
   }
   disconnect():void {
-    if(this.busy||!this.confirmDisconnect) return;
+    if(this.busy||this.accessFolderId||!this.confirmDisconnect) return;
     this.busy=true;this.error='';this.rootStatus=null;this.resetRoot();
     this.http.delete<void>(this.endpoint+'/connection').pipe(takeUntil(this.destroyed$)).subscribe({
       next:()=>{this.confirmDisconnect=false;this.loadStatus();},
