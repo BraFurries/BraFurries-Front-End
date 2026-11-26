@@ -112,6 +112,7 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   productVariants: CommerceProductVariant[] = [];
   variantsLoading = false;
   variantAttributes: CommerceVariantAttribute[] = [{name:'',value:''}];
+  variantCombinations: {attributes: CommerceVariantAttribute[]; label: string; selected: boolean; existing: boolean}[] = [];
   variantSuggestedPrice: number | null = null;
   variantEstimatedCost: number | null = null;
   editingVariantId: number | null = null;
@@ -726,15 +727,91 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       : [{name:'',value:''}];
     this.variantSuggestedPrice=null;
     this.variantEstimatedCost=null;
+    this.invalidateVariantCombinations();
   }
 
   knownVariantValues(name: string): string[] {
     return [...new Set(this.productVariants.flatMap(v=>v.attributes.filter(a=>a.name===name).map(a=>a.value)))];
   }
 
+  invalidateVariantCombinations(): void {
+    this.variantCombinations=[];
+  }
+
   addVariantAttribute(): void {
-    if(!this.productVariants.length && this.variantAttributes.length<8)
+    if(!this.productVariants.length && this.variantAttributes.length<8) {
       this.variantAttributes.push({name:'',value:''});
+      this.invalidateVariantCombinations();
+    }
+  }
+
+  removeVariantAttribute(index: number): void {
+    if(!this.productVariants.length && this.variantAttributes.length>1) {
+      this.variantAttributes.splice(index,1);
+      this.invalidateVariantCombinations();
+    }
+  }
+
+  private normalizeVariantText(value: string): string {
+    return value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+  }
+
+  private variantCombinationKey(attributes: CommerceVariantAttribute[]): string {
+    return JSON.stringify(attributes.map(a=>[this.normalizeVariantText(a.name),this.normalizeVariantText(a.value)])
+      .sort((a,b)=>a[0].localeCompare(b[0])));
+  }
+
+  addKnownVariantOption(attribute: CommerceVariantAttribute,value: string): void {
+    const options=attribute.value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+    if(!options.some(v=>this.normalizeVariantText(v)===this.normalizeVariantText(value))) {
+      attribute.value=[...options,value].join('\n');
+      this.invalidateVariantCombinations();
+    }
+  }
+
+  generateVariantCombinations(): void {
+    this.invalidateVariantCombinations();
+    this.errorMessage='';
+    const names=new Set<string>();
+    let combinations: CommerceVariantAttribute[][]=[[]];
+    for(const attribute of this.variantAttributes) {
+      const name=attribute.name.trim();
+      const normalized=this.normalizeVariantText(name);
+      const options=new Map<string,string>();
+      for(const raw of attribute.value.split(/\r?\n/)) {
+        const value=raw.trim();
+        if(value && !options.has(this.normalizeVariantText(value))) options.set(this.normalizeVariantText(value),value);
+      }
+      if(!name||name.length>60||names.has(normalized)||!options.size||[...options.values()].some(v=>v.length>60)) {
+        this.errorMessage='Informe características distintas e pelo menos uma opção por linha (até 60 caracteres).';
+        return;
+      }
+      names.add(normalized);
+      if(combinations.length*options.size>100) {
+        this.errorMessage='Gere até 100 combinações por vez. Divida as opções em lotes menores.';
+        return;
+      }
+      combinations=combinations.flatMap(previous=>[...options.values()].map(value=>[...previous,{name,value}]));
+    }
+    const existing=new Set(this.productVariants.map(v=>this.variantCombinationKey(v.attributes)));
+    const rows=combinations.map(attributes=>{
+      const label=attributes.map(a=>a.name+': '+a.value).join(' · ');
+      const already=existing.has(this.variantCombinationKey(attributes));
+      return {attributes,label,existing:already,selected:!already};
+    });
+    if(rows.some(row=>row.label.length>255)) {
+      this.errorMessage='Uma combinação ultrapassa 255 caracteres. Encurte as características ou opções.';
+      return;
+    }
+    this.variantCombinations=rows;
+  }
+
+  get selectedVariantCount(): number {
+    return this.variantCombinations.filter(row=>row.selected&&!row.existing).length;
+  }
+
+  selectVariantCombinations(selected: boolean): void {
+    for(const row of this.variantCombinations) row.selected=selected&&!row.existing;
   }
 
   editVariant(variant: CommerceProductVariant): void {
@@ -752,13 +829,14 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         'Valores da variação atualizados.',()=>this.loadVariants(product.id));
       return;
     }
-    const attributes=this.variantAttributes.map(a=>({name:a.name.trim(),value:a.value.trim()}));
-    if(attributes.some(a=>!a.name||!a.value)) {
-      this.errorMessage='Preencha as características e opções da variação.';
+    if(!product.active||!this.selectedVariantCount) {
+      this.errorMessage='Gere e selecione pelo menos uma nova combinação.';
       return;
     }
-    this.mutate(this.catalog.createVariant(product.id,{...prices,attributes}),
-      'Variação cadastrada.',()=>this.loadVariants(product.id));
+    const variants=this.variantCombinations.filter(row=>row.selected&&!row.existing)
+      .map(row=>({...prices,attributes:row.attributes}));
+    this.mutate(this.catalog.createVariants(product.id,variants),
+      variants.length+' variação(ões) cadastrada(s).',()=>this.loadVariants(product.id));
   }
 
   toggleVariantActive(product: CommerceProduct,variant: CommerceProductVariant): void {
