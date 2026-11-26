@@ -452,9 +452,9 @@ describe('CommerceCatalogComponent', () => {
   it('registers several active variants as one production lot with shared costs', async () => {
     await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
     component.products=[{...component.products[0],variantRequired:true,variants:[
-      {id:21,label:'Tamanho: P',active:true,suggestedPrice:60,estimatedUnitCost:20},
-      {id:22,label:'Tamanho: G',active:true,suggestedPrice:65,estimatedUnitCost:25},
-      {id:23,label:'Tamanho: GG',active:false,suggestedPrice:70,estimatedUnitCost:30}
+      {id:21,productId:3,label:'Tamanho: P',active:true,suggestedPrice:60,estimatedUnitCost:20},
+      {id:22,productId:3,label:'Tamanho: G',active:true,suggestedPrice:65,estimatedUnitCost:25},
+      {id:23,productId:3,label:'Tamanho: GG',active:false,suggestedPrice:70,estimatedUnitCost:30}
     ]}];
     component.productionForm.productId=3;
     component.productionForm.supplierId=8;
