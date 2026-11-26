@@ -495,6 +495,10 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Informe comprador, data e pelo menos um item.';
       return;
     }
+    if(this.orderDraftLines.some(line=>line.productId!=null && !!line.size?.trim())) {
+      this.errorMessage='Classifique a variação antiga ou confirme a remoção do texto antigo.';
+      return;
+    }
     if(this.orderDraftLines.some(line=>line.productId!=null && this.orderProduct(line)?.variantRequired &&
         !this.orderProduct(line)?.variants?.some(v=>v.id===line.variantId))) {
       this.errorMessage='Selecione uma variação ativa para cada produto com variações.';
