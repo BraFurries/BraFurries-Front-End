@@ -17,7 +17,7 @@ import {
   CommerceArtist, CommerceArtwork, CommerceArtworkFile, CommerceBatch, CommerceBatchRevision,
   CommerceCatalogService, CommerceContractTemplate, CommerceContractPreparation, CommerceProduct,
   CommerceProductArtwork, CommerceSignedAgreement, CommerceSupplier, CommerceSupplierOption,
-  CommerceProductVariant, CommerceVariantAttribute, CommerceVariantStatistics
+  CommerceProductVariant, CommerceVariantAttribute
 } from '../../../core/services/commerce-catalog.service';
 
 type CatalogTab = 'artworks' | 'artists' | 'files' | 'templates' | 'contracts' |
@@ -110,12 +110,6 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     suggestedPrice: 0, preferredSupplierId: null as number | null };
   expandedVariantProductId: number | null = null;
   productVariants: CommerceProductVariant[] = [];
-  variantStats: CommerceVariantStatistics[] = [];
-  variantStatsFrom = '';
-  variantStatsTo = '';
-  variantStatsLoading = false;
-  variantStatsError = '';
-  private variantStatsRequest=0;
   variantsLoading = false;
   variantAttributes: CommerceVariantAttribute[] = [{name:'',value:''}];
   variantSuggestedPrice: number | null = null;
@@ -699,22 +693,17 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     if (this.expandedVariantProductId === productId) {
       this.expandedVariantProductId=null;
       this.productVariants=[];
-      this.variantStats=[];
       this.variantsLoading=false;
       return;
     }
     this.expandedVariantProductId=productId;
-    this.variantStatsFrom='';
-    this.variantStatsTo='';
     this.productVariants=[];
-    this.variantStats=[];
     this.resetVariantForm();
     this.loadVariants(productId);
   }
 
   private loadVariants(productId: number): void {
     this.variantsLoading=true;
-    this.refreshVariantStats(productId);
     this.catalog.productVariants(productId).pipe(takeUntil(this.destroy$)).subscribe({
       next:variants=>{
         if(this.expandedVariantProductId!==productId) return;
@@ -728,31 +717,6 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
         this.errorMessage='Não foi possível carregar as variações.';
       }
     });
-  }
-
-  refreshVariantStats(productId: number): void {
-    if(!this.can('FINANCE_VIEW')||this.expandedVariantProductId!==productId) return;
-    if(this.variantStatsFrom && this.variantStatsTo && this.variantStatsFrom>this.variantStatsTo) {
-      this.variantStatsError='A data inicial deve ser anterior à final.';
-      return;
-    }
-    const request=++this.variantStatsRequest;
-    this.variantStatsLoading=true;
-    this.variantStatsError='';
-    this.variantStats=[];
-    this.catalog.variantStatistics(productId,this.variantStatsFrom,this.variantStatsTo)
-      .pipe(takeUntil(this.destroy$)).subscribe({
-        next:stats=>{
-          if(this.expandedVariantProductId!==productId||request!==this.variantStatsRequest) return;
-          this.variantStats=stats;
-          this.variantStatsLoading=false;
-        },
-        error:()=>{
-          if(this.expandedVariantProductId!==productId||request!==this.variantStatsRequest) return;
-          this.variantStatsLoading=false;
-          this.variantStatsError='Não foi possível consultar o período informado.';
-        }
-      });
   }
 
   resetVariantForm(): void {

@@ -396,6 +396,19 @@ describe('CommerceCatalogComponent', () => {
     });
   });
 
+  it('opens variant management without loading or showing performance even with finance access', async () => {
+    await create(['PRODUCTS_MANAGE','FINANCE_VIEW']);
+    component.activeTab='products';
+    component.screen='browse';
+    const product=component.products[0];
+    component.toggleVariants(product.id);
+    fixture.detectChanges();
+    expect(catalog.productVariants).toHaveBeenCalledWith(product.id);
+    expect(catalog.variantStatistics).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain('Desempenho por variação');
+    expect(fixture.nativeElement.textContent).toContain('Nova combinação');
+  });
+
   it('does not submit a production correction without justification', async () => {
     await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
     component.startEditBatch({
