@@ -27,7 +27,7 @@ describe('CommerceCatalogComponent', () => {
       'downloadPreparation','uploadSignedPreparation','cancelPreparation',
       'deleteUnsignedPreparation',
       'createArtwork','createTemplate',
-      'createSupplier','createProduct','linkArtwork','createProductionBatch',
+      'createSupplier','createProduct','linkArtwork','createProductionBatch','createProductionLot',
       'productVariants','createVariant','createVariants','updateVariant','variantStatistics',
       'correctProductionBatch','productionBatchHistory',
       'searchArtists','downloadContract','terminateContract',
@@ -47,6 +47,7 @@ describe('CommerceCatalogComponent', () => {
     catalog.deleteArtwork.and.returnValue(of(void 0));
     catalog.unlinkArtwork.and.returnValue(of(void 0));
     catalog.correctProductionBatch.and.returnValue(of(void 0));
+    catalog.createProductionLot.and.returnValue(of({lotGroupId:90,batchIds:[91,92]}));
     catalog.productionBatchHistory.and.returnValue(of([]));
     artists.issueInvitation.and.returnValue(of({
       id:62,token:'a'.repeat(64),confirmationCode:'ABCD1234EF56',
@@ -446,6 +447,52 @@ describe('CommerceCatalogComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Característica');
     expect(fixture.nativeElement.textContent).toContain('Opções (uma por linha)');
     expect(fixture.nativeElement.textContent).toContain('uma opção por linha');
+  });
+
+  it('registers several active variants as one production lot with shared costs', async () => {
+    await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
+    component.products=[{...component.products[0],variantRequired:true,variants:[
+      {id:21,productId:3,label:'Tamanho: P',active:true,suggestedPrice:60,estimatedUnitCost:20},
+      {id:22,productId:3,label:'Tamanho: G',active:true,suggestedPrice:65,estimatedUnitCost:25},
+      {id:23,productId:3,label:'Tamanho: GG',active:false,suggestedPrice:70,estimatedUnitCost:30}
+    ]}];
+    component.productionForm.productId=3;
+    component.productionForm.supplierId=8;
+    component.productionForm.producedOn='2026-11-03';
+    component.productionForm.reference='NF-1';
+    component.productionForm.additionalCost=10;
+    component.onProductionProductSelected();
+    component.addProductionLine();
+    component.addProductionLine();
+    expect(component.productionLines.length).toBe(2);
+    component.productionLines[0].quantity=3;
+    component.productionLines[1].quantity=7;
+    expect(component.productionLineQuantity).toBe(10);
+    expect(component.productionPreviewTotal).toBe(245);
+    component.createProduction();
+    expect(catalog.createProductionLot).toHaveBeenCalledWith({
+      productId:3,supplierId:8,producedOn:'2026-11-03',reference:'NF-1',additionalCost:10,
+      lines:[{variantId:21,quantity:3,unitCost:20},{variantId:22,quantity:7,unitCost:25}]
+    });
+    expect(catalog.createProductionBatch).not.toHaveBeenCalled();
+  });
+
+  it('groups variant stock without merging unrelated legacy lots with identical numeric IDs', async () => {
+    await create(['PRODUCTS_MANAGE','SUPPLIERS_MANAGE']);
+    const base={productId:3,productName:'Caneca',supplierId:8,supplierName:'Oficina',
+      producedOn:'2026-11-03',reference:'NF-1',unitCost:20,additionalCost:0};
+    component.batches=[
+      {...base,id:1,lotGroupId:3,variantId:21,variantLabel:'P',quantity:3,soldQuantity:1,totalCost:60},
+      {...base,id:2,lotGroupId:3,variantId:22,variantLabel:'G',quantity:7,soldQuantity:2,totalCost:140},
+      {...base,id:3,quantity:2,soldQuantity:0,totalCost:40}
+    ];
+    const groups=component.productionGroups;
+    expect(groups.length).toBe(2);
+    expect(groups[0].quantity).toBe(10);
+    expect(groups[0].sold).toBe(3);
+    expect(groups[0].total).toBe(200);
+    expect(groups[0].rows.map(r=>r.id)).toEqual([1,2]);
+    expect(groups[1].rows.map(r=>r.id)).toEqual([3]);
   });
 
   it('does not submit a production correction without justification', async () => {

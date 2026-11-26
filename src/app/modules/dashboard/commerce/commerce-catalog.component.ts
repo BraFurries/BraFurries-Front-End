@@ -116,6 +116,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
   variantSuggestedPrice: number | null = null;
   variantEstimatedCost: number | null = null;
   editingVariantId: number | null = null;
+  productionLines: {variantId: number | null; quantity: number; unitCost: number}[] = [];
+  editingLotGroupId: number | null = null;
   productionForm = {
     productId: null as number | null, supplierId: null as number | null, variantId: null as number | null,
     quantity: 1, unitCost: 0, additionalCost: 0,
@@ -850,10 +852,68 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     return this.products.find(p=>p.id===this.productionForm.productId);
   }
 
+  get mixedProduction(): boolean {
+    return this.editingBatchId==null && !!this.productionProduct?.variantRequired;
+  }
+
+  get productionGroups(): {key: string; groupId: number | null; rows: CommerceBatch[];
+      quantity: number; sold: number; total: number}[] {
+    const groups=new Map<string,{key: string; groupId: number | null; rows: CommerceBatch[];
+      quantity: number; sold: number; total: number}>();
+    for(const row of this.batches) {
+      const key=row.lotGroupId==null ? 'legacy-'+row.id : 'group-'+row.lotGroupId;
+      let group=groups.get(key);
+      if(!group) {
+        group={key,groupId:row.lotGroupId??null,rows:[],quantity:0,sold:0,total:0};
+        groups.set(key,group);
+      }
+      group.rows.push(row);
+      group.quantity+=Number(row.quantity);
+      group.sold+=Number(row.soldQuantity??0);
+      group.total+=Number(row.totalCost);
+    }
+    return [...groups.values()];
+  }
+
+  trackProductionGroup(_index: number, group: {key: string}): string { return group.key; }
+
+  get canAddProductionLine(): boolean {
+    return this.productionLines.length<100 && !!this.productionProduct?.variants?.some(v=>v.active && !this.productionLines.some(l=>l.variantId===v.id));
+  }
+
+  addProductionLine(): void {
+    if(this.productionLines.length>=100) return;
+    const available=this.productionProduct?.variants?.find(v=>v.active && !this.productionLines.some(l=>l.variantId===v.id));
+    if(!available) return;
+    this.productionLines.push({variantId:available.id,quantity:1,
+      unitCost:available.estimatedUnitCost??this.productionProduct?.estimatedUnitCost??0});
+  }
+
+  removeProductionLine(index: number): void {
+    if(this.productionLines.length>1) this.productionLines.splice(index,1);
+  }
+
+  selectProductionLineVariant(index: number): void {
+    const line=this.productionLines[index];
+    const variant=this.productionProduct?.variants?.find(v=>v.id===line.variantId);
+    line.unitCost=variant?.estimatedUnitCost??this.productionProduct?.estimatedUnitCost??0;
+  }
+
+  get productionLineQuantity(): number {
+    return this.productionLines.reduce((sum,l)=>sum+Number(l.quantity||0),0);
+  }
+
+  get productionPreviewTotal(): number {
+    return this.productionLines.reduce((sum,l)=>sum+Number(l.quantity||0)*Number(l.unitCost||0),0)
+      +Number(this.productionForm.additionalCost||0);
+  }
+
   onProductionProductSelected(): void {
     this.productionForm.variantId=null;
+    this.productionLines=[];
     const product=this.productionProduct;
     if(product) this.productionForm.unitCost=product.estimatedUnitCost;
+    if(this.mixedProduction) this.addProductionLine();
   }
 
   onProductionVariantSelected(): void {
@@ -866,6 +926,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
     this.activeTab='production';
     this.screen='form';
     this.editingBatchId=batch.id;
+    this.editingLotGroupId=batch.lotGroupId??null;
+    this.productionLines=[];
     this.productionForm={
       productId:batch.productId,supplierId:batch.supplierId,variantId:batch.variantId ?? null,quantity:batch.quantity,
       unitCost:batch.unitCost,additionalCost:batch.additionalCost,
@@ -877,6 +939,8 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
 
   cancelEditBatch(): void {
     this.editingBatchId=null;
+    this.editingLotGroupId=null;
+    this.productionLines=[];
     this.batchCorrectionReason='';
     this.productionForm={productId:null,supplierId:null,variantId:null,quantity:1,
       unitCost:0,additionalCost:0,
@@ -929,8 +993,23 @@ export class CommerceCatalogComponent implements OnInit, OnDestroy {
       this.errorMessage='Selecione o produto e o fornecedor do lote.';
       return;
     }
-    if(this.editingBatchId==null && this.productionProduct?.variantRequired && this.productionForm.variantId==null) {
-      this.errorMessage='Selecione a variação do produto.';
+    if(this.mixedProduction) {
+      const lines=this.productionLines;
+      const active=this.productionProduct?.variants?.filter(v=>v.active)||[];
+      if(!lines.length || lines.length>100 || lines.some(l=>l.variantId==null ||
+          !active.some(v=>v.id===l.variantId) || !Number.isInteger(l.quantity) ||
+          l.quantity<1 || !Number.isFinite(l.unitCost) || l.unitCost<0) ||
+          new Set(lines.map(l=>l.variantId)).size!==lines.length ||
+          this.productionLineQuantity>10000000) {
+        this.errorMessage='Selecione variações ativas, sem repetições, e informe quantidades e custos válidos.';
+        return;
+      }
+      this.mutate(this.catalog.createProductionLot({
+        productId:this.productionForm.productId,supplierId:this.productionForm.supplierId,
+        producedOn:this.productionForm.producedOn,reference:this.productionForm.reference.trim()||null,
+        additionalCost:this.productionForm.additionalCost,
+        lines:lines.map(l=>({variantId:l.variantId!,quantity:l.quantity,unitCost:l.unitCost}))
+      }),'Lote de produção registrado.',()=>this.cancelEditBatch());
       return;
     }
     const payload={

@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 export interface FinanceCreated { id: number; }
 export interface CommerceBatchForSale {
   batchId: number;
+  lotGroupId?: number | null;
   productId: number;
   productName: string;
   sku: string;
