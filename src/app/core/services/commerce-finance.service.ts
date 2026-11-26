@@ -31,13 +31,14 @@ export interface CreateCommerceSale {
   processingFeePercent?: number;
   processingFeeFixed?: number;
 }
-export type CommerceOrderStatus = 'OPEN' | 'READY' | 'DELIVERED' | 'CANCELLED';
+export type CommerceOrderStatus = 'OPEN' | 'IN_PRODUCTION' | 'READY' | 'DELIVERED' | 'CANCELLED';
 export interface CommerceOrder {
   id: number; buyerLabel: string; channel: string;
   externalReference: string | null; orderedOn: string;
   expectedDeliveryOn: string | null; status: CommerceOrderStatus;
   totalAmount: number; paidAmount: number;
   notes: string | null; readyAt: string | null;
+  productionRequestedAt?: string | null; items?: CommerceOrderItem[];
   deliveredOn: string | null; cancellationReason: string | null;
 }
 export interface CommerceOrderProductChoice {

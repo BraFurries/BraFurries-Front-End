@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { contractRoyaltyDetails } from './commerce-contract-labels';
 import { Observable, Subject, forkJoin, of, takeUntil, catchError } from 'rxjs';
 import { PlatformAccess, PlatformAccessService, PlatformPermissionCode } from
@@ -15,6 +15,8 @@ import {
 type FinanceTab = 'sales' | 'orders' | 'royalties' | 'statements' | 'cash';
 type FinanceForm = 'sale' | 'order' | 'order-receipt' | 'cash' |
   'statement' | 'payment' | 'cash-metadata' | 'payment-metadata';
+
+type OrderAction = 'production' | 'ready' | 'delivery' | 'cancel' | 'receipt' | 'reversal';
 
 interface SaleDraftLine {
   batchId: number | null;
@@ -64,6 +66,13 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   orderItems: CommerceOrderItem[] = [];
   orderPayments: CommerceOrderPayment[] = [];
   selectedOrderId: number | null = null;
+  @ViewChild('orderActionDialog') orderActionDialog?: ElementRef<HTMLDialogElement>;
+  orderAction: OrderAction | null = null;
+  orderActionOrderId: number | null = null;
+  orderActionLoading = false;
+  orderActionPaymentsError = false;
+  orderReversalSelectedId: number | null = null;
+  private orderActionRequest = 0;
   editingOrderId: number | null = null;
   orderRequestKey = '';
   orderBuyer = '';
@@ -214,7 +223,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   }
 
   get selectedOrder(): CommerceOrder | undefined {
-    return this.orders.find(o => o.id === this.selectedOrderId);
+    return this.orders.find(o => o.id === (this.orderActionOrderId ?? this.selectedOrderId));
   }
 
   get selectedSale(): CommercePhysicalSale | undefined {
@@ -222,6 +231,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   }
 
   selectTab(tab: FinanceTab): void {
+    if (this.orderAction) this.closeOrderAction();
     if (!this.visibleTabs().some(item => item.key === tab)) return;
     this.backToList();
     this.activeTab = tab;
@@ -243,10 +253,12 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     if (!allowed) return;
     const tab: FinanceTab =
       kind === 'sale' ? 'sales'
-        : kind === 'order' || kind === 'order-receipt' ? 'orders'
+        : kind === 'order' ? 'orders'
         : kind === 'cash' || kind === 'cash-metadata' ? 'cash' : 'statements';
-    if (kind === 'order-receipt' &&
-        (!this.selectedOrder || this.selectedOrder.status === 'CANCELLED')) return;
+    if (kind === 'order-receipt') {
+      if(this.selectedOrder) this.openOrderAction(this.selectedOrder,'receipt');
+      return;
+    }
     if ((kind === 'payment' || kind === 'payment-metadata') && !this.selectedStatement) return;
     if (kind === 'payment' && !['APPROVED', 'PARTIALLY_PAID'].includes(this.selectedStatement!.status)) return;
     if (kind === 'cash-metadata' && this.editingCashMetadataId == null) return;
@@ -596,48 +608,126 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
   }
 
   selectOrder(order: CommerceOrder): void {
-    if (!this.can('SALES_MANAGE')) return;
-    this.selectedOrderId = order.id;
-    this.orderReceiptKey = '';
-    this.orderReversalKey = '';
-    this.orderReversalDate = '';
-    this.orderReversalTargetId = null;
+    if (!this.can('SALES_MANAGE') || this.saving || this.orderAction) return;
+    if(this.selectedOrderId===order.id) {
+      this.selectedOrderId=null;
+      this.orderItems=[];
+      this.orderPayments=[];
+      return;
+    }
+    this.selectedOrderId=order.id;
+    this.orderItems=order.items||[];
+    this.orderPayments=[];
     this.loadOrderDetails();
   }
 
   private loadOrderDetails(): void {
-    if (!this.can('SALES_MANAGE') || this.selectedOrderId == null) return;
-    const id = this.selectedOrderId;
-    forkJoin({
-      items:this.finance.orderItems(id),
-      payments:this.finance.orderPayments(id)
-    }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({items,payments}) => {
-        if (this.selectedOrderId !== id) return;
-        this.orderItems = items;
-        this.orderPayments = payments;
+    if (!this.can('SALES_MANAGE') || this.selectedOrderId == null || this.orderAction) return;
+    const id=this.selectedOrderId;
+    const order=this.orders.find(o=>o.id===id);
+    this.orderItems=order?.items||[];
+    if(order?.items) return;
+    this.finance.orderItems(id).pipe(takeUntil(this.destroy$)).subscribe({
+      next:items=>{
+        if(this.selectedOrderId===id && !this.orderAction) this.orderItems=items;
       },
-      error: () => this.errorMessage = 'Falha ao carregar os detalhes da encomenda.'
+      error:()=>{
+        if(this.selectedOrderId===id && !this.orderAction) this.errorMessage='Falha ao carregar os itens da encomenda.';
+      }
     });
+  }
+
+  get orderActionTitle(): string {
+    const titles: Record<OrderAction,string>={
+      production:'Encaminhar à produção',ready:'Marcar encomenda pronta',delivery:'Registrar entrega',
+      cancel:'Cancelar encomenda',receipt:'Gerenciar recebimentos',reversal:'Estornar recebimento'
+    };
+    return this.orderAction ? titles[this.orderAction] : '';
+  }
+
+  get reversibleOrderPayments(): CommerceOrderPayment[] {
+    return this.orderPayments.filter(p=>p.eventKind==='RECEIPT'&&!this.hasOrderPaymentReversal(p.id));
+  }
+
+  openOrderAction(order: CommerceOrder,action: OrderAction): void {
+    if(!this.can('SALES_MANAGE')||this.saving||this.orderAction) return;
+    if(action==='production'&&order.status!=='OPEN'||
+       action==='ready'&&order.status!=='IN_PRODUCTION'||
+       action==='delivery'&&order.status!=='READY'||
+       action==='cancel'&&!['OPEN','IN_PRODUCTION','READY'].includes(order.status)) return;
+    this.orderActionOrderId=order.id;
+    this.orderAction=action;
+    this.errorMessage='';
+    this.orderCancellationReason='';
+    this.orderDeliveryDate=brazilToday();
+    this.orderReceiptKey='';
+    this.orderReceiptAmount=0;
+    this.orderReceiptDate=brazilToday();
+    this.orderReceiptMethod='PIX';
+    this.orderReceiptReference='';
+    this.orderReceiptNotes='';
+    this.orderReversalReason='';
+    this.orderReversalKey='';
+    this.orderReversalDate='';
+    this.orderReversalTargetId=null;
+    this.orderReversalSelectedId=null;
+    this.orderPayments=[];
+    this.orderActionLoading=false;
+    this.orderActionPaymentsError=false;
+    this.orderActionDialog?.nativeElement.showModal();
+    if(action==='receipt'||action==='reversal') {
+      const request=++this.orderActionRequest;
+      this.orderActionLoading=true;
+      this.finance.orderPayments(order.id).pipe(takeUntil(this.destroy$)).subscribe({
+        next:payments=>{
+          if(this.orderActionRequest!==request||this.orderActionOrderId!==order.id) return;
+          this.orderPayments=payments;
+          this.orderActionLoading=false;
+        },
+        error:()=>{
+          if(this.orderActionRequest!==request||this.orderActionOrderId!==order.id) return;
+          this.orderActionLoading=false;
+          this.orderActionPaymentsError=true;
+          this.errorMessage='Não foi possível carregar os recebimentos.';
+        }
+      });
+    }
+  }
+
+  closeOrderAction(): void {
+    if(this.saving) return;
+    this.orderActionRequest++;
+    this.orderAction=null;
+    this.orderActionOrderId=null;
+    this.orderActionLoading=false;
+    this.orderActionPaymentsError=false;
+    this.orderPayments=[];
+    this.orderActionDialog?.nativeElement.close();
+    this.errorMessage='';
+  }
+
+  confirmOrderReversal(): void {
+    const payment=this.reversibleOrderPayments.find(p=>p.id===this.orderReversalSelectedId);
+    if(payment) this.reverseOrderPayment(payment);
   }
 
   changeOrderStatus(status: CommerceOrderStatus): void {
     const order = this.selectedOrder;
-    if (!this.can('SALES_MANAGE') || !order) return;
+    if (!this.can('SALES_MANAGE') || !order || this.saving) return;
     const reason = status === 'CANCELLED' ? this.orderCancellationReason.trim() : null;
     if (status === 'CANCELLED' && (!reason || reason.length < 3)) {
       this.errorMessage = 'Informe um motivo de cancelamento.';
       return;
     }
-    if (!window.confirm('Confirmar a mudança de status? Esta ação fica no histórico de auditoria.')) return;
+    if (!this.orderAction && !window.confirm('Confirmar a mudança de status? Esta ação fica no histórico de auditoria.')) return;
     this.mutate(this.finance.transitionOrder(order.id,status,
       status === 'DELIVERED' ? this.orderDeliveryDate : null,reason),
-      'Status operacional da encomenda atualizado.');
+      'Status operacional da encomenda atualizado.',()=>{if(this.orderAction) this.closeOrderAction();});
   }
 
   receiveOrderPayment(): void {
     const order = this.selectedOrder;
-    if (!this.can('SALES_MANAGE') || !order || order.status === 'CANCELLED' ||
+    if (!this.can('SALES_MANAGE') || !order || this.orderActionLoading || this.orderActionPaymentsError || order.status === 'CANCELLED' ||
         !Number.isFinite(this.orderReceiptAmount) || this.orderReceiptAmount <= 0 ||
         this.orderReceiptAmount > order.totalAmount - order.paidAmount) {
       this.errorMessage = 'Informe recebimento positivo que não ultrapasse o saldo da encomenda.';
@@ -650,6 +740,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       externalReference:this.orderReceiptReference.trim() || null,
       notes:this.orderReceiptNotes.trim() || null
     }), 'Recebimento registrado apenas na encomenda (não no caixa).',() => {
+      if(this.orderAction) this.closeOrderAction();
       this.formKind = null;
       this.screen = 'browse';
       this.orderReceiptKey = '';
@@ -671,7 +762,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Informe motivo e selecione recebimento ainda não estornado.';
       return;
     }
-    if (!window.confirm('Estornar o recebimento na encomenda sem excluir o histórico?')) return;
+    if (!this.orderAction && !window.confirm('Estornar o recebimento na encomenda sem excluir o histórico?')) return;
     if (!this.orderReversalKey || this.orderReversalTargetId !== payment.id) {
       this.orderReversalKey = crypto.randomUUID();
       this.orderReversalDate = brazilToday();
@@ -680,6 +771,7 @@ export class CommerceFinanceComponent implements OnInit, OnDestroy {
     this.mutate(this.finance.reverseOrderPayment(order.id,payment.id,
       this.orderReversalKey,this.orderReversalDate,reason),
       'Estorno de recebimento registrado.',() => {
+        if(this.orderAction) this.closeOrderAction();
         this.orderReversalReason = '';
         this.orderReversalKey = '';
         this.orderReversalDate = '';
