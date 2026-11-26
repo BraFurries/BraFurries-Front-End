@@ -404,6 +404,70 @@ describe('CommerceFinanceComponent', () => {
     expect(finance.reverseArtistPayment).not.toHaveBeenCalled();
   });
 
+  it('shows item snapshots without expanding and toggles details closed', async () => {
+    await init(['SALES_MANAGE']);
+    component.selectTab('orders');
+    const order={
+      id:25,buyerLabel:'Zippo',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN' as const,
+      totalAmount:55,paidAmount:0,notes:'Nota interna',readyAt:null,deliveredOn:null,cancellationReason:null,
+      items:[{id:1,productId:5,label:'Camiseta',size:null,variantId:2,variantLabel:'Tamanho: G · Cor: Preta',quantity:1,unitPrice:55,lineAmount:55}]
+    };
+    component.orders=[order];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Tamanho: G · Cor: Preta');
+    expect(fixture.nativeElement.textContent).not.toContain('Nota interna');
+    expect(fixture.nativeElement.textContent).not.toContain('Marcar pronta');
+    component.selectOrder(order);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Ocultar detalhes');
+    expect(fixture.nativeElement.textContent).toContain('Nota interna');
+    component.selectOrder(order);
+    fixture.detectChanges();
+    expect(component.selectedOrderId).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Nota interna');
+    expect(finance.orderItems).not.toHaveBeenCalled();
+    expect(finance.orderPayments).not.toHaveBeenCalled();
+  });
+
+  it('opens only the chosen order action and gates readiness on production', async () => {
+    await init(['SALES_MANAGE']);
+    component.selectTab('orders');
+    const order={
+      id:25,buyerLabel:'Zippo',channel:'DIRECT',externalReference:null,
+      orderedOn:'2026-11-03',expectedDeliveryOn:null,status:'OPEN' as const,
+      totalAmount:55,paidAmount:0,notes:null,readyAt:null,deliveredOn:null,cancellationReason:null,items:[]
+    };
+    component.orders=[order];
+    fixture.detectChanges();
+    component.openOrderAction(order,'ready');
+    expect(component.orderAction).toBeNull();
+    component.openOrderAction(order,'cancel');
+    fixture.detectChanges();
+    const dialog: HTMLDialogElement=fixture.nativeElement.querySelector('dialog');
+    expect(dialog.open).toBeTrue();
+    expect(dialog.textContent).toContain('Motivo do cancelamento');
+    expect(dialog.textContent).not.toContain('Valor recebido');
+    expect(dialog.textContent).not.toContain('Motivo do estorno');
+    component.closeOrderAction();
+    fixture.detectChanges();
+    expect(dialog.open).toBeFalse();
+    component.openOrderAction(order,'receipt');
+    fixture.detectChanges();
+    expect(dialog.textContent).toContain('Valor recebido');
+    expect(dialog.textContent).not.toContain('Motivo do cancelamento');
+    expect(dialog.textContent).not.toContain('Motivo do estorno');
+    component.closeOrderAction();
+    const producing={...order,status:'IN_PRODUCTION' as const};
+    component.orders=[producing];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Marcar pronta');
+    component.openOrderAction(producing,'ready');
+    component.changeOrderStatus('READY');
+    expect(finance.transitionOrder).toHaveBeenCalledWith(25,'READY',null,null);
+    expect(component.orderAction).toBeNull();
+  });
+
   it('edits only unpaid open orders, without touching recorded payments', async () => {
     await init(['SALES_MANAGE']);
     const order = {
