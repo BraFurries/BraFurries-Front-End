@@ -175,50 +175,6 @@
         <button *ngIf="editingOrderId != null" type="button" (click)="backToList()"
           class="ml-2 rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar edição</button>
       </div>
-      <div *ngIf="screen === 'form' && formKind === 'order-receipt' && selectedOrder as order"
-        class="max-w-3xl space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 class="font-amaranth text-xl font-bold">Anotar recebimento · encomenda #{{ order.id }}</h2>
-        <p class="text-sm text-gray-600">Comprador: {{ order.buyerLabel }} · Saldo:
-          {{ order.totalAmount - order.paidAmount | currency:'BRL' }}
-        </p>
-        <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-          Recebimentos de encomendas não geram receita no caixa nem afetam estoque ou royalties.
-        </p>
-              <div *ngIf="selectedOrder && selectedOrder.status !== 'CANCELLED'" class="grid grid-cols-2 gap-2">
-                <label class="text-xs font-semibold">Valor recebido
-                  <input type="number" [(ngModel)]="orderReceiptAmount" min=".01" step=".01"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <label class="text-xs font-semibold">Data do recebimento
-                  <input type="date" [(ngModel)]="orderReceiptDate"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <label class="text-xs font-semibold">Meio
-                  <select [(ngModel)]="orderReceiptMethod"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                    <option value="PIX">Pix</option>
-                    <option value="CASH">Dinheiro</option>
-                    <option value="CARD_DEBIT">Cartão débito</option>
-                    <option value="CARD_CREDIT">Cartão crédito</option>
-                    <option value="BANK_TRANSFER">Transferência</option>
-                    <option value="BANK_SLIP">Boleto</option>
-                    <option value="OTHER">Outros</option>
-                  </select>
-                </label>
-                <label class="text-xs font-semibold">Referência (opcional)
-                  <input [(ngModel)]="orderReceiptReference" maxlength="120"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-              </div>
-              <button *ngIf="selectedOrder && selectedOrder.status !== 'CANCELLED'"
-                type="button" (click)="receiveOrderPayment()"
-                [disabled]="saving || orderReceiptAmount <= 0"
-                class="rounded-lg border border-braPurple px-3 py-2 text-xs font-bold text-braPurple disabled:opacity-50">
-                Anotar recebimento
-              </button>
-
-      </div>
-
       <div *ngIf="screen === 'browse'" class="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 class="font-amaranth text-xl font-bold">Acompanhar encomendas</h2>
         <p *ngIf="!orders.length" class="text-sm text-gray-500">Nenhuma encomenda cadastrada.</p>
@@ -237,87 +193,53 @@
               </p>
             </div>
             <span class="rounded-lg bg-gray-100 px-2 py-1 text-xs font-bold">
-              {{ order.status === 'OPEN' ? 'Aberta' :
+              {{ order.status === 'OPEN' ? 'Aguardando produção' :
+                 order.status === 'IN_PRODUCTION' ? 'Em produção' :
                  order.status === 'READY' ? 'Pronta' :
                  order.status === 'DELIVERED' ? 'Entregue' : 'Cancelada' }}
             </span>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <button type="button" (click)="selectOrder(order)"
-              class="rounded-lg border px-3 py-2 text-xs font-semibold">
-              {{ selectedOrderId === order.id ? 'Atualizar detalhes' : 'Ver detalhes' }}
-            </button>
-            <button *ngIf="order.status === 'OPEN'" type="button" [disabled]="saving"
-              (click)="editOpenOrder(order)"
-              class="rounded-lg border px-3 py-2 text-xs font-semibold">Corrigir encomenda</button>
-            <button *ngIf="order.status === 'OPEN'" type="button" [disabled]="saving"
-              (click)="deleteUnusedOrder(order)"
-              class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700">
-              Excluir se nunca recebeu pagamento</button>
+          <div class="space-y-1 rounded-lg bg-gray-50 p-3">
+            <p *ngFor="let item of order.items || (selectedOrderId === order.id ? orderItems : [])" class="text-sm">
+              <strong>{{ item.quantity }} × {{ item.label }}</strong>
+              <span *ngIf="item.variantLabel" class="text-gray-700"> · {{ item.variantLabel }}</span>
+              <span *ngIf="!item.variantLabel && item.size" class="text-gray-700"> · {{ item.size }} (legado/avulso)</span>
+              <span class="text-gray-600"> · {{ item.lineAmount | currency:'BRL' }}</span>
+            </p>
+            <p *ngIf="!order.items && selectedOrderId !== order.id" class="text-xs text-gray-500">Abra os detalhes para consultar os itens.</p>
           </div>
-          <div *ngIf="selectedOrderId === order.id" class="space-y-3 rounded-lg bg-gray-50 p-3">
-            <div>
-              <h4 class="font-semibold text-sm">Itens</h4>
-              <p *ngFor="let item of orderItems" class="text-sm">
-                {{ item.quantity }} × {{ item.label }}
-                <span *ngIf="item.variantLabel">({{ item.variantLabel }})</span><span *ngIf="!item.variantLabel && item.size">({{ item.size }} · legado/avulso)</span> ·
-                {{ item.lineAmount | currency:'BRL' }}
-              </p>
-            </div>
-            <div class="space-y-2" *ngIf="order.status === 'OPEN' || order.status === 'READY'">
-              <h4 class="font-semibold text-sm">Situação</h4>
-              <button *ngIf="order.status === 'OPEN'" type="button" (click)="changeOrderStatus('READY')"
-                [disabled]="saving" class="rounded-lg border px-3 py-2 text-xs font-semibold">
-                Marcar pronta
-              </button>
-              <div *ngIf="order.status === 'READY'" class="space-y-2">
-                <label class="block text-xs font-semibold">Data efetiva de entrega
-                  <input type="date" [(ngModel)]="orderDeliveryDate"
-                    class="mt-1 w-full rounded-lg border px-3 py-2">
-                </label>
-                <button type="button" (click)="changeOrderStatus('DELIVERED')"
-                  [disabled]="saving" class="rounded-lg border px-3 py-2 text-xs font-semibold">
-                  Marcar entregue
-                </button>
-              </div>
-              <label class="block text-xs font-semibold">Motivo do cancelamento
-                <input [(ngModel)]="orderCancellationReason" maxlength="500"
-                  class="mt-1 w-full rounded-lg border px-3 py-2">
-              </label>
-              <p *ngIf="order.paidAmount > 0" class="text-xs text-amber-800">
-                Estorne todos os recebimentos registrados antes de cancelar esta encomenda.
-              </p>
-              <button type="button" (click)="changeOrderStatus('CANCELLED')"
-                [disabled]="saving || order.paidAmount > 0"
-                class="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">
-                Cancelar encomenda
-              </button>
-            </div>
-            <div class="space-y-2 rounded-lg border bg-white p-3">
-              <h4 class="font-semibold text-sm">Recebimentos anotados</h4>
-              <p class="text-xs text-gray-600">
-                Registro operacional apenas, sem lançamento financeiro automático.
-              </p>
-              <p *ngFor="let payment of orderPayments" class="text-sm">
-                {{ payment.eventKind === 'RECEIPT' ? 'Recebido' : 'Estornado' }}:
-                {{ payment.amount | currency:'BRL' }} · {{ payment.receivedOn }}
-              </p>
-              <button *ngIf="order.status !== 'CANCELLED'" type="button"
-                (click)="openForm('order-receipt')"
-                class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">
-                + Anotar recebimento
-              </button>
-              <label class="block text-xs font-semibold">Motivo de estorno
-                <input [(ngModel)]="orderReversalReason" maxlength="500"
-                  class="mt-1 w-full rounded-lg border px-3 py-2">
-              </label>
-              <div *ngFor="let receipt of orderPayments">
-                <button *ngIf="receipt.eventKind === 'RECEIPT' && !hasOrderPaymentReversal(receipt.id)"
-                  type="button" (click)="reverseOrderPayment(receipt)" [disabled]="saving"
-                  class="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-                  Estornar recebimento #{{ receipt.id }}
-                </button>
-              </div>
+          <div class="flex flex-wrap gap-2">
+            <button *ngIf="order.status === 'OPEN'" type="button" [disabled]="saving" (click)="openOrderAction(order,'production')"
+              class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">Encaminhar à produção</button>
+            <button *ngIf="order.status === 'IN_PRODUCTION'" type="button" [disabled]="saving" (click)="openOrderAction(order,'ready')"
+              class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">Marcar pronta</button>
+            <button *ngIf="order.status === 'READY'" type="button" [disabled]="saving" (click)="openOrderAction(order,'delivery')"
+              class="rounded-lg bg-braPurple px-3 py-2 text-xs font-bold text-white">Marcar entregue</button>
+            <button type="button" [disabled]="saving" (click)="openOrderAction(order,'receipt')"
+              class="rounded-lg border px-3 py-2 text-xs font-semibold">Recebimentos</button>
+            <button *ngIf="order.paidAmount > 0" type="button" [disabled]="saving" (click)="openOrderAction(order,'reversal')"
+              class="rounded-lg border px-3 py-2 text-xs font-semibold">Estornar recebimento</button>
+            <button *ngIf="order.status === 'OPEN' || order.status === 'IN_PRODUCTION' || order.status === 'READY'" type="button"
+              [disabled]="saving" (click)="openOrderAction(order,'cancel')"
+              class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700">Cancelar encomenda</button>
+            <button type="button" (click)="selectOrder(order)" [attr.aria-expanded]="selectedOrderId === order.id"
+              [attr.aria-controls]="'order-details-'+order.id" [disabled]="saving"
+              class="rounded-lg border px-3 py-2 text-xs font-semibold">
+              {{ selectedOrderId === order.id ? 'Ocultar detalhes' : 'Ver detalhes' }}
+            </button>
+          </div>
+          <div *ngIf="selectedOrderId === order.id" [id]="'order-details-'+order.id" class="space-y-2 rounded-lg bg-gray-50 p-3 text-sm">
+            <p>Canal: {{ order.channel === 'EVENT' ? 'Evento' : order.channel === 'ONLINE' ? 'Online' : order.channel === 'DIRECT' ? 'Direto' : 'Outros' }}</p>
+            <p *ngIf="order.notes" class="whitespace-pre-wrap">Observações: {{ order.notes }}</p>
+            <p *ngIf="order.productionRequestedAt">Produção solicitada em: {{ order.productionRequestedAt | date:'dd/MM/yyyy HH:mm' }}</p>
+            <p *ngIf="order.readyAt">Pronta desde: {{ order.readyAt | date:'dd/MM/yyyy HH:mm' }}</p>
+            <p *ngIf="order.deliveredOn">Entrega: {{ order.deliveredOn }}</p>
+            <p *ngIf="order.cancellationReason">Motivo do cancelamento: {{ order.cancellationReason }}</p>
+            <div *ngIf="order.status === 'OPEN'" class="flex flex-wrap gap-2">
+              <button type="button" [disabled]="saving" (click)="editOpenOrder(order)"
+                class="rounded-lg border px-3 py-2 text-xs font-semibold">Corrigir encomenda</button>
+              <button type="button" [disabled]="saving" (click)="deleteUnusedOrder(order)"
+                class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700">Excluir se nunca recebeu pagamento</button>
             </div>
           </div>
         </article>
@@ -1049,4 +971,104 @@
       </div>
     </section>
   </ng-container>
+  <dialog #orderActionDialog aria-labelledby="order-action-title" (cancel)="$event.preventDefault(); closeOrderAction()"
+    class="max-h-[90vh] w-11/12 max-w-xl overflow-y-auto rounded-2xl border bg-white p-5 text-braDark shadow-xl backdrop:bg-black/50">
+    <ng-container *ngIf="orderAction && selectedOrder as order">
+      <div class="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 id="order-action-title" class="font-amaranth text-xl font-bold">{{ orderActionTitle }}</h2>
+          <p class="text-sm text-gray-600">#{{ order.id }} · {{ order.buyerLabel }}</p>
+        </div>
+        <button type="button" aria-label="Fechar janela" (click)="closeOrderAction()" [disabled]="saving" class="rounded-lg border px-3 py-2 text-sm">Fechar</button>
+      </div>
+      <p *ngIf="errorMessage" role="alert" class="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ errorMessage }}</p>
+      <ng-container [ngSwitch]="orderAction">
+        <div *ngSwitchCase="'production'" class="space-y-3">
+          <p class="text-sm">Confirme somente quando os itens desta encomenda tiverem sido solicitados ao fornecedor ou encaminhados à produção. O registro não envia um pedido ao fornecedor nem altera estoque ou caixa.</p>
+          <button type="button" (click)="changeOrderStatus('IN_PRODUCTION')" [disabled]="saving"
+            class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">Confirmar encaminhamento</button>
+        </div>
+        <div *ngSwitchCase="'ready'" class="space-y-3">
+          <p class="text-sm">Confirme que todos os itens da encomenda estão disponíveis para entrega.</p>
+          <button type="button" (click)="changeOrderStatus('READY')" [disabled]="saving"
+            class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">Confirmar encomenda pronta</button>
+        </div>
+        <div *ngSwitchCase="'delivery'" class="space-y-3">
+          <label class="block text-sm font-semibold">Data efetiva de entrega
+            <input type="date" [(ngModel)]="orderDeliveryDate" [min]="order.orderedOn" class="mt-1 w-full rounded-lg border px-3 py-2">
+          </label>
+          <button type="button" (click)="changeOrderStatus('DELIVERED')" [disabled]="saving || !orderDeliveryDate"
+            class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white">Confirmar entrega</button>
+        </div>
+        <div *ngSwitchCase="'cancel'" class="space-y-3">
+          <p *ngIf="order.paidAmount > 0" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Estorne os recebimentos registrados antes de cancelar esta encomenda.</p>
+          <label class="block text-sm font-semibold">Motivo do cancelamento
+            <textarea [(ngModel)]="orderCancellationReason" maxlength="500" rows="3" class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+          </label>
+          <button type="button" (click)="changeOrderStatus('CANCELLED')" [disabled]="saving || order.paidAmount > 0 || orderCancellationReason.trim().length < 3"
+            class="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Confirmar cancelamento</button>
+        </div>
+        <div *ngSwitchCase="'receipt'" class="space-y-3">
+          <p class="text-sm">Total: {{ order.totalAmount | currency:'BRL' }} · Recebido: {{ order.paidAmount | currency:'BRL' }}</p>
+          <p class="text-sm font-semibold">Saldo: {{ order.totalAmount - order.paidAmount | currency:'BRL' }}</p>
+          <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Registro operacional: não gera receita no caixa nem altera estoque ou royalties.</p>
+          <p *ngIf="orderActionLoading" role="status" class="text-sm">Carregando recebimentos...</p>
+          <ng-container *ngIf="!orderActionLoading && !orderActionPaymentsError">
+            <div class="space-y-1 rounded-lg border p-3">
+              <h3 class="text-sm font-semibold">Histórico de recebimentos</h3>
+              <p *ngIf="!orderPayments.length" class="text-sm text-gray-500">Nenhum recebimento anotado.</p>
+              <p *ngFor="let payment of orderPayments" class="text-sm">
+                {{ payment.eventKind === 'RECEIPT' ? 'Recebido' : 'Estornado' }}: {{ payment.amount | currency:'BRL' }} · {{ payment.receivedOn }}
+              </p>
+            </div>
+            <ng-container *ngIf="order.status !== 'CANCELLED' && order.totalAmount > order.paidAmount">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label class="text-sm font-semibold">Valor recebido
+                  <input type="number" [(ngModel)]="orderReceiptAmount" min=".01" step=".01" [max]="order.totalAmount-order.paidAmount" class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+                <label class="text-sm font-semibold">Data do recebimento
+                  <input type="date" [(ngModel)]="orderReceiptDate" class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+                <label class="text-sm font-semibold">Meio
+                  <select [(ngModel)]="orderReceiptMethod" class="mt-1 w-full rounded-lg border px-3 py-2">
+                    <option value="PIX">Pix</option><option value="CASH">Dinheiro</option><option value="CARD_DEBIT">Cartão débito</option>
+                    <option value="CARD_CREDIT">Cartão crédito</option><option value="BANK_TRANSFER">Transferência</option>
+                    <option value="BANK_SLIP">Boleto</option><option value="OTHER">Outros</option>
+                  </select>
+                </label>
+                <label class="text-sm font-semibold">Referência (opcional)
+                  <input [(ngModel)]="orderReceiptReference" maxlength="120" class="mt-1 w-full rounded-lg border px-3 py-2">
+                </label>
+              </div>
+              <label class="block text-sm font-semibold">Observações (opcional)
+                <textarea [(ngModel)]="orderReceiptNotes" maxlength="500" rows="2" class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+              </label>
+              <button type="button" (click)="receiveOrderPayment()" [disabled]="saving || orderReceiptAmount <= 0 || orderReceiptAmount > order.totalAmount-order.paidAmount || !orderReceiptDate"
+                class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Anotar recebimento</button>
+            </ng-container>
+          </ng-container>
+        </div>
+        <div *ngSwitchCase="'reversal'" class="space-y-3">
+          <p class="text-sm">O estorno registra um evento compensatório sem excluir o histórico nem movimentar o caixa automaticamente.</p>
+          <p *ngIf="orderActionLoading" role="status" class="text-sm">Carregando recebimentos...</p>
+          <ng-container *ngIf="!orderActionLoading && !orderActionPaymentsError">
+            <p *ngIf="!reversibleOrderPayments.length" class="text-sm text-gray-500">Nenhum recebimento disponível para estorno.</p>
+            <ng-container *ngIf="reversibleOrderPayments.length">
+              <label class="block text-sm font-semibold">Recebimento a estornar
+                <select [(ngModel)]="orderReversalSelectedId" class="mt-1 w-full rounded-lg border px-3 py-2">
+                  <option [ngValue]="null">Selecione</option>
+                  <option *ngFor="let payment of reversibleOrderPayments" [ngValue]="payment.id">#{{ payment.id }} · {{ payment.amount | currency:'BRL' }} · {{ payment.receivedOn }}</option>
+                </select>
+              </label>
+              <label class="block text-sm font-semibold">Motivo do estorno
+                <textarea [(ngModel)]="orderReversalReason" maxlength="500" rows="3" class="mt-1 w-full rounded-lg border px-3 py-2"></textarea>
+              </label>
+              <button type="button" (click)="confirmOrderReversal()" [disabled]="saving || orderReversalSelectedId == null || orderReversalReason.trim().length < 3"
+                class="rounded-lg bg-braPurple px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Confirmar estorno</button>
+            </ng-container>
+          </ng-container>
+        </div>
+      </ng-container>
+    </ng-container>
+  </dialog>
 </section>
