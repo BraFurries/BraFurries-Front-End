@@ -8,6 +8,7 @@ import {
   CommunityScopedFeature
 } from '../../../services/community-context.service';
 import { CommunitySummary } from '../../../services/community-access.service';
+import { GoogleDriveBrowserService } from '../../../services/google-drive-browser.service';
 import { PlatformAccessService } from '../../../services/platform-access.service';
 import { CommerceArtistService } from '../../../services/commerce-artist.service';
 import { CreatorStudioService } from '../../../services/creator-studio.service';
@@ -25,6 +26,7 @@ import { User } from '../../../../shared/models/user';
 export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   activePath = '';
   showAdminMenu = false;
+  showFilesMenu = false;
   showCommerceMenu = false;
   showPermissionsMenu = false;
   showPartnersMenu = false;
@@ -58,6 +60,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   private partnerPublicationsRequestId = 0;
   private artistAccessRequestId = 0;
   private studioAccessRequestId = 0;
+  private filesRequestId = 0;
   private readonly destroy$ = new Subject<void>();
   private readonly failedCommunityImageUrls = new Set<string>();
 
@@ -72,6 +75,7 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     private readonly partnerDiscord: PartnerDiscordService,
     private readonly commerceArtists: CommerceArtistService,
     private readonly creatorStudio: CreatorStudioService,
+    private readonly driveBrowser: GoogleDriveBrowserService,
     private readonly router: Router
   ) {
     this.activePath = window.location.pathname;
@@ -115,9 +119,21 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
         this.studioAccessRequestId++;
         this.showCreatorStudio = false;
         this.showCreatorStudioData = false;
+        this.showFilesMenu = false;
+        const filesRequestId = ++this.filesRequestId;
         this.showCommerceMenu = false;
         this.showPermissionsMenu = false;
         if (userId == null) return;
+        this.driveBrowser.mounts().pipe(takeUntil(this.destroy$)).subscribe({
+          next: mounts => {
+            if (this.lastCommerceUserId === userId && filesRequestId === this.filesRequestId)
+              this.showFilesMenu = mounts.length > 0;
+          },
+          error: () => {
+            if (this.lastCommerceUserId === userId && filesRequestId === this.filesRequestId)
+              this.showFilesMenu = false;
+          }
+        });
 
         // Creator Studio is independent of Community and commercial roles.
         // Navigation is only a convenience; API gates every Pro operation.
@@ -342,6 +358,8 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
     this.studioAccessRequestId++;
     this.showCreatorStudio = false;
     this.showCreatorStudioData = false;
+    this.filesRequestId++;
+    this.showFilesMenu = false;
     this.isLoggingOut = true;
 
     setTimeout(() => {
