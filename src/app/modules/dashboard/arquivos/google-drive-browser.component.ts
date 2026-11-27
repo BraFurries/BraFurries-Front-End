@@ -63,7 +63,7 @@ import { UserService } from '../../../core/services/user.service';
             </div>
             <p *ngIf="transferMessage" role="status" class="text-sm">{{transferMessage}}</p>
           </section>
-          <section *ngIf="canCreateFolder && !renameEntry && !replacementTarget && !transferBusy && !dragging" class="rounded-xl border p-3 space-y-2">
+          <section *ngIf="canCreateFolder && !renameEntry && !replacementTarget && !transferBusy" class="rounded-xl border p-3 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
               <input #folderInput type="text" maxlength="255" aria-label="Nome da nova pasta" placeholder="Nome da nova pasta" class="rounded border px-3 py-2 flex-1 min-w-0" [value]="folderName" [disabled]="folderBusy || uploadActive || folderUncertain" (input)="setFolderName(folderInput.value)">
               <button type="button" [disabled]="folderBusy || uploadActive || !folderName.trim()" (click)="createFolder()" class="rounded border px-3 py-2 text-sm">{{folderBusy ? 'Criando...' : folderUncertain ? 'Verificar criação' : 'Nova pasta'}}</button>
@@ -71,7 +71,7 @@ import { UserService } from '../../../core/services/user.service';
             </div>
             <p *ngIf="folderMessage" role="status" class="text-sm">{{folderMessage}}</p>
           </section>
-          <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry && !replacementTarget && !transferBusy && !dragging" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
+          <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry && !replacementTarget && !transferBusy" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
             (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
           <section *ngIf="replacementTarget" class="space-y-2">
             <app-google-drive-upload [anchor]="trail[0].id" [destination]="trail[trail.length-1].id" [replacement]="replacementTarget"
@@ -110,7 +110,7 @@ import { UserService } from '../../../core/services/user.service';
           <p *ngIf="!entries.length" class="text-sm text-gray-600">Nenhum item acessível nesta página.</p>
           <ul *ngIf="entries.length" class="rounded-xl border divide-y">
             <li *ngFor="let item of entries" class="p-3" cdkDrag [cdkDragDisabled]="!canDrag(item)"
-                (cdkDragStarted)="dragging=true" (cdkDragEnded)="finishDrag($event,item)"
+                (cdkDragStarted)="startDrag(item)" (cdkDragEnded)="finishDrag($event,item)"
                 [attr.data-transfer-anchor]="item.folder ? trail[0].id : null" [attr.data-transfer-folder]="item.folder ? item.id : null"
                 [class.ring-1]="dragging && item.folder" [class.ring-braPurple]="dragging && item.folder">
               <button *ngIf="item.canMove || item.canCopy" cdkDragHandle type="button" aria-label="Arrastar item" title="Arrastar item" [disabled]="!canDrag(item) && !dragging" class="float-right rounded border px-3 py-2 cursor-grab active:cursor-grabbing touch-none select-none">⠿</button>
@@ -169,6 +169,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   transferMode:DriveTransferAction='MOVE';
   transferBusy=false;dragging=false;transferMessage='';
   targetsOpen=false;targetsBusy=false;targetsError='';targetTrail:DriveMount[]=[];targetFolders:DriveMount[]=[];targetNext:string|null=null;
+  private dragContext:{actor:number;anchor:string;parent:string;file:string;version:string;mode:DriveTransferAction}|null=null;
   private transferGeneration=0;private readonly transferCancel$=new Subject<void>();
   private targetsGeneration=0;private readonly targetsCancel$=new Subject<void>();
   historyEntry:DriveEntry|null=null;
@@ -268,7 +269,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       !!item.version&&(this.transferMode==='MOVE'?item.canMove===true:item.canCopy===true);
   }
   private resetTransfers():void {
-    ++this.transferGeneration;this.transferCancel$.next();this.transferBusy=false;this.dragging=false;this.transferMessage='';
+    ++this.transferGeneration;this.transferCancel$.next();this.transferBusy=false;this.dragging=false;this.dragContext=null;this.transferMessage='';
     ++this.targetsGeneration;this.targetsCancel$.next();this.targetsOpen=false;this.targetsBusy=false;this.targetsError='';
     this.targetTrail=[];this.targetFolders=[];this.targetNext=null;
   }
@@ -305,13 +306,20 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
         error:()=>{if(generation===this.targetsGeneration){this.targetsBusy=false;this.targetsError='Destino indisponível.';}}
       });
   }
+  startDrag(item:DriveEntry):void {
+    if(!this.canDrag(item)||this.activeUser===null||!this.trail.length||!item.version)return;
+    this.dragContext={actor:this.activeUser,anchor:this.trail[0].id,parent:this.trail[this.trail.length-1].id,file:item.id,version:item.version,mode:this.transferMode};
+    this.dragging=true;
+  }
   finishDrag(event:CdkDragEnd,item:DriveEntry):void {
-    event.source.reset();this.dragging=false;
-    if(!this.canDrag(item)||!this.trail.length||!item.version||this.activeUser===null||
+    const context=this.dragContext;this.dragContext=null;event.source.reset();this.dragging=false;
+    if(!context||context.actor!==this.activeUser||context.anchor!==this.trail[0]?.id||context.parent!==this.trail[this.trail.length-1]?.id||
+       context.file!==item.id||context.version!==item.version||context.mode!==this.transferMode||
+       !this.canDrag(item)||!this.trail.length||!item.version||this.activeUser===null||
        !this.entries.some(e=>e.id===item.id&&e.version===item.version))return;
-    const pointer=event.event instanceof MouseEvent?event.event:event.event.changedTouches[0];
+    const pointer=event.event instanceof MouseEvent?event.event:event.event.changedTouches?.[0];
     if(!pointer)return;
-    const zone=document.elementFromPoint(pointer.clientX,pointer.clientY)?.closest<HTMLElement>('[data-transfer-anchor][data-transfer-folder]');
+    const zone=this.host.nativeElement.ownerDocument.elementFromPoint(pointer.clientX,pointer.clientY)?.closest<HTMLElement>('[data-transfer-anchor][data-transfer-folder]');
     if(!zone||!this.host.nativeElement.contains(zone))return;
     const anchor=zone.dataset['transferAnchor'],destination=zone.dataset['transferFolder'];
     const parent=this.trail[this.trail.length-1].id;
@@ -369,7 +377,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       });
   }
   startRename(item:DriveEntry):void {
-    if(this.busy||this.uploadActive||this.folderBusy||this.renameEntry||this.replacementTarget||this.contentBusy||
+    if(this.busy||this.transferBusy||this.dragging||this.uploadActive||this.folderBusy||this.renameEntry||this.replacementTarget||this.contentBusy||
        !item.canRename||!item.version||!this.entries.some(e=>e.id===item.id&&e.version===item.version&&e.canRename))return;
     this.closePreview();this.renameEntry=item;this.renameName=item.name;
   }
