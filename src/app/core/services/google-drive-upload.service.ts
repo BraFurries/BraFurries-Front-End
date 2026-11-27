@@ -4,7 +4,7 @@ import { environment } from '../../../environments/environment';
 
 export interface UploadCapability {enabled:boolean;maxBytes:number;}
 export interface UploadStart {sessionId:string;uploadUri:string;}
-export interface UploadStatus {sessionId:string;status:string;expired:boolean;}
+export interface UploadStatus {sessionId:string;status:string;expired:boolean;resumeAllowed:boolean;}
 export interface UploadResult {sessionId:string;status:string;}
 
 @Injectable({providedIn:'root'})
