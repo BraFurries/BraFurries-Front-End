@@ -41,4 +41,30 @@ describe('GoogleDriveUploadComponent',()=>{
     expect(api.publish).not.toHaveBeenCalled();
     expect(fixture.componentInstance.sessionId).toBe('id');
   });
+
+  it('rejects another format before creating a replacement session',()=>{
+    fixture.componentInstance.replacement={id:'file_123',name:'art.png',version:'12',mimeType:'image/png'};
+    select(new File(['hello'],'file.txt',{type:'text/plain'}));
+    expect(api.begin).not.toHaveBeenCalled();
+  });
+  it('requires confirmation and sends the original version in replacement mode',()=>{
+    const target={id:'file_123',name:'art.png',version:'12',mimeType:'image/png'};
+    fixture.componentInstance.replacement=target;
+    const confirm=spyOn(window,'confirm').and.returnValues(false,true);
+    api.begin.and.returnValue(new Subject<UploadStart>());
+    const file=new File(['hello'],'new.png',{type:'image/png'});
+    select(file);expect(api.begin).not.toHaveBeenCalled();
+    select(file);expect(confirm).toHaveBeenCalledTimes(2);
+    expect(api.begin).toHaveBeenCalledWith('anchor_folder','child_folder',file,target);
+  });
+  it('checks status rather than replaying an in-progress replacement',()=>{
+    const c=fixture.componentInstance;
+    c.replacement={id:'file_123',name:'art.png',version:'12',mimeType:'image/png'};
+    c.sessionId='session';c.phase='confirm';
+    api.status.and.returnValue(of({sessionId:'session',status:'PUBLISHING',expired:false,resumeAllowed:false}));
+    c.confirmPublication();
+    expect(api.status).toHaveBeenCalledWith('session',true);
+    expect(api.publish).not.toHaveBeenCalled();
+    expect(c.phase).toBe('confirm');
+  });
 });
