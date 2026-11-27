@@ -2,11 +2,14 @@
 export const CHUNK_BYTES=8*1024*1024;
 export function validateUploadUri(value:string):string {
   const url=new URL(value);
+  let invalidQuery=false;
+  url.searchParams.forEach((_value,key)=>{
+    if(!['uploadType','upload_id','upload_protocol'].includes(key)||url.searchParams.getAll(key).length!==1)invalidQuery=true;
+  });
   if(url.origin!=='https://www.googleapis.com'||url.username||url.password||url.hash||
      url.pathname!=='/upload/drive/v3/files'||url.searchParams.get('uploadType')!=='resumable'||
      !/^[A-Za-z0-9_-]{1,4096}$/.test(url.searchParams.get('upload_id')||'')||
-     Array.from(url.searchParams.keys()).some(k=>!['uploadType','upload_id','upload_protocol'].includes(k)||
-       url.searchParams.getAll(k).length!==1)||
+     invalidQuery||
      (url.searchParams.has('upload_protocol')&&url.searchParams.get('upload_protocol')!=='resumable'))
     throw new Error('Sessão do Google inválida.');
   return url.href;
