@@ -162,6 +162,14 @@
 
 
 
+            <a *ngIf="showFilesMenu" routerLink="/painel/arquivos"
+                class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
+                [ngClass]="activePath.startsWith('/painel/arquivos')
+                ? 'bg-braPurple text-white shadow-lg shadow-braPurple/30'
+                : 'text-gray-300 hover:bg-braPurple/30 hover:text-white hover:ring-1 hover:ring-braPurple/40'">
+                <span class="mr-3">📁</span> Arquivos
+            </a>
+
             <a *ngIf="showCreatorStudio" routerLink="/painel/creators"
                 class="flex items-center px-4 py-3 rounded-xl font-amaranth font-bold transition"
                 [ngClass]="activePath.startsWith('/painel/creators')
