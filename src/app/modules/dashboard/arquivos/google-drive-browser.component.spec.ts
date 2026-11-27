@@ -12,7 +12,7 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder']);
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -81,5 +81,30 @@ describe('GoogleDriveBrowserComponent',()=>{
     pending.next(new Blob([new Uint8Array([1])],{type:'image/png'}));
     expect(c.previewUrl).toBeNull();
     expect(c.contentBusy).toBeFalse();
+  });
+
+  it('sends native downloads without requesting the entire file as a Blob',()=>{
+    const file={...child,id:'file_id',name:'video.mp4',folder:false,mimeType:'video/mp4'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:true,canStreamDownload:true,streamMaxBytes:5368709120}));
+    drive.downloadTicket.and.returnValue(of({ticket:'test-ticket'}));
+    const c=fixture.componentInstance;c.openMount(mount);c.read(file,false);
+    expect(drive.downloadTicket).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_id');
+    expect(drive.redeemDownload).toHaveBeenCalledWith('test-ticket');
+    expect(drive.content).not.toHaveBeenCalled();
+  });
+  it('does not redeem a delayed download after switching account',()=>{
+    const file={...child,id:'file_id',name:'video.mp4',folder:false,mimeType:'video/mp4'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:true,canStreamDownload:true}));
+    const pending=new Subject<{ticket:string}>();drive.downloadTicket.and.returnValue(pending);
+    const c=fixture.componentInstance;c.openMount(mount);c.read(file,false);
+    users.next({id:2});pending.next({ticket:'old'});
+    expect(drive.redeemDownload).not.toHaveBeenCalled();
+  });
+  it('reuses the same folder operation after an ambiguous result',()=>{
+    drive.list.and.returnValue(of({entries:[],nextPageToken:null,canCreateFolder:true}));
+    drive.createFolder.and.returnValue(throwError(()=>({status:503})));
+    const c=fixture.componentInstance;c.openMount(mount);c.setFolderName('Nova pasta');c.createFolder();c.createFolder();
+    expect(drive.createFolder).toHaveBeenCalledTimes(2);
+    expect(drive.createFolder.calls.argsFor(0)).toEqual(drive.createFolder.calls.argsFor(1));
   });
 });
