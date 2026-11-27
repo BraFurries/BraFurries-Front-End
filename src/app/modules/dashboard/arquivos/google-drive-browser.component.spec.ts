@@ -1,3 +1,4 @@
+import { CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { GoogleDriveBrowserComponent } from './google-drive-browser.component';
@@ -12,7 +13,7 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history','transfer']);
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -141,5 +142,30 @@ describe('GoogleDriveBrowserComponent',()=>{
     const c=fixture.componentInstance;c.openMount(mount);c.openHistory(file);users.next({id:2});
     pending.next({revisions:[{id:'rev_1',modifiedTime:'2026-11-27T10:00:00Z',size:'100',kept:true,current:false}],nextPageToken:null});
     expect(c.revisions).toEqual([]);expect(c.historyEntry).toBeNull();
+  });
+
+  it('only transfers after a real drop on a destination in the explorer',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canMove:true,canCopy:true};
+    drive.list.and.returnValue(of({entries:[file,child],nextPageToken:null}));
+    drive.transfer.and.returnValue(of({id:'file_123',name:'art.png'}));
+    const c=fixture.componentInstance;c.openMount(mount);fixture.detectChanges();
+    const zone=fixture.nativeElement.querySelector('[data-transfer-folder="child_folder"]') as HTMLElement;
+    const point=spyOn(document,'elementFromPoint').and.returnValue(zone);
+    const event={source:{reset:jasmine.createSpy('reset')},event:new MouseEvent('mouseup',{clientX:5,clientY:5})} as unknown as CdkDragEnd;
+    c.finishDrag(event,file);expect(drive.transfer).not.toHaveBeenCalled();
+    c.startDrag(file);c.finishDrag(event,file);
+    expect(drive.transfer).toHaveBeenCalledWith(jasmine.objectContaining({action:'MOVE',file:'file_123',destination:'child_folder',version:'12'}));
+    expect(point).toHaveBeenCalled();
+  });
+  it('copy mode changes no files until dropped and drops are invalidated on account switch',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canCopy:true};
+    drive.list.and.returnValue(of({entries:[file,child],nextPageToken:null}));
+    const c=fixture.componentInstance;c.openMount(mount);fixture.detectChanges();
+    const zone=fixture.nativeElement.querySelector('[data-transfer-folder="child_folder"]') as HTMLElement;
+    spyOn(document,'elementFromPoint').and.returnValue(zone);
+    const event={source:{reset:jasmine.createSpy('reset')},event:new MouseEvent('mouseup')} as unknown as CdkDragEnd;
+    c.setTransferMode('COPY');expect(drive.transfer).not.toHaveBeenCalled();
+    c.startDrag(file);users.next({id:2});c.openMount(mount);
+    c.finishDrag(event,file);expect(drive.transfer).not.toHaveBeenCalled();
   });
 });
