@@ -4,9 +4,12 @@ import { environment } from '../../../environments/environment';
 
 export interface DriveMount {id:string;name:string;}
 export interface DriveEntry extends DriveMount {
-  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;
+  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;
 }
 export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;}
+
+export interface DriveRevision {id:string;modifiedTime:string;size:string;kept:boolean;current:boolean;}
+export interface DriveHistory {revisions:DriveRevision[];nextPageToken:string|null;}
 
 @Injectable({providedIn:'root'})
 export class GoogleDriveBrowserService {
@@ -52,5 +55,11 @@ export class GoogleDriveBrowserService {
   rename(anchor:string,parent:string,file:string,version:string,name:string,operationId:string){
     return this.http.post<{id:string;name:string;version:string}>(environment.apiBaseUrl+'/user/me/platform-drive/rename-operations',
       {anchor,parent,file,version,name,operationId});
+  }
+
+  history(anchor:string,folder:string,file:string,pageToken?:string){
+    const params=pageToken?new HttpParams().set('pageToken',pageToken):new HttpParams();
+    return this.http.get<DriveHistory>(this.endpoint+'/mounts/'+encodeURIComponent(anchor)+'/folders/'+encodeURIComponent(folder)
+      +'/files/'+encodeURIComponent(file)+'/revisions',{params});
   }
 }
