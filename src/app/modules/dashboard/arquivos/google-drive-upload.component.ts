@@ -134,6 +134,9 @@ export class GoogleDriveUploadComponent implements OnInit,OnDestroy {
     this.api.cancel(this.sessionId,!!this.replacement).pipe(takeUntil(this.stopped$)).subscribe({
       next:r=>{
         if(g!==this.generation)return;
+        if(this.replacement&&r.status==='PUBLISHING'){
+          this.phase='confirm';this.message='Substituição em andamento. Não foi cancelada. Verifique novamente.';return;
+        }
         const published=r.status==='PUBLISHED';
         this.reset();
         this.message=published?'Arquivo já publicado.':r.status==='CANCELED'||r.status==='CLEANUP_PENDING'||r.status==='CLEANED'||r.status==='EXPIRED'?
