@@ -112,10 +112,10 @@ import { UserService } from '../../../core/services/user.service';
           </section>
           <p *ngIf="!entries.length" class="text-sm text-gray-600">Nenhum item acessível nesta página.</p>
           <ul *ngIf="entries.length" class="rounded-xl border divide-y">
-            <li *ngFor="let item of entries" class="p-3" cdkDrag [cdkDragDisabled]="!canDrag(item)"
+            <li *ngFor="let item of entries" class="p-3" tabindex="0" cdkDrag [cdkDragDisabled]="!canDrag(item)"
                 (cdkDragStarted)="startDrag(item)" (cdkDragEnded)="finishDrag($event,item)"
                 [attr.data-transfer-anchor]="item.folder ? trail[0].id : null" [attr.data-transfer-folder]="item.folder ? item.id : null"
-                [class.bg-gray-100]="selectedFile?.id===item.id" (contextmenu)="openCopyMenu($event,item)" (click)="selectFile(item)" [class.ring-1]="dragging && item.folder" [class.ring-braPurple]="dragging && item.folder">
+                [class.bg-gray-100]="selectedFile?.id===item.id" (contextmenu)="openCopyMenu($event,item)" (click)="selectFile(item)" (focusin)="selectFile(item)" [class.ring-1]="dragging && item.folder" [class.ring-braPurple]="dragging && item.folder">
               <button *ngIf="item.canMove" cdkDragHandle type="button" aria-label="Arrastar item" title="Arrastar item" [disabled]="!canDrag(item) && !dragging" class="float-right rounded border px-3 py-2 cursor-grab active:cursor-grabbing touch-none select-none">⠿</button>
               <button *ngIf="item.folder; else file" type="button" [disabled]="uploadActive || renameBusy" (click)="openChild(item)" class="flex items-center gap-3 w-full text-left">
                 <span aria-hidden="true" class="text-2xl">📁</span><span class="font-semibold break-all">{{item.name}}</span>
