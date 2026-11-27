@@ -13,10 +13,10 @@ import { UserService } from '../../../core/services/user.service';
     <main class="max-w-6xl mx-auto space-y-4 p-4 sm:p-6">
       <header class="flex flex-wrap items-center justify-between gap-3">
         <div><h1 class="font-amaranth text-2xl font-bold">Arquivos</h1><p class="text-sm text-gray-600">Explore as pastas da BraFurries disponíveis para sua conta.</p></div>
-        <button type="button" class="rounded-lg border px-3 py-2 text-sm" [disabled]="busy || uploadActive" (click)="home()">Atualizar pastas</button>
+        <button type="button" class="rounded-lg border px-3 py-2 text-sm" [disabled]="busy || uploadActive || folderBusy" (click)="home()">Atualizar pastas</button>
       </header>
       <nav aria-label="Caminho da pasta" class="flex flex-wrap items-center gap-2 text-sm">
-        <button type="button" (click)="home()" [disabled]="uploadActive" class="font-bold text-braPurple">Minhas pastas</button>
+        <button type="button" (click)="home()" [disabled]="uploadActive || folderBusy" class="font-bold text-braPurple">Minhas pastas</button>
         <ng-container *ngFor="let item of trail; let i=index">
           <span aria-hidden="true">/</span>
           <button type="button" (click)="openTrail(i)" [disabled]="busy || uploadActive" class="text-braPurple break-all">{{item.name}}</button>
@@ -32,7 +32,15 @@ import { UserService } from '../../../core/services/user.service';
           <p *ngIf="!mounts.length" class="text-sm text-gray-600">Nenhuma pasta disponível para sua conta.</p>
         </div>
         <ng-container *ngIf="trail.length">
-          <app-google-drive-upload *ngIf="canUpload" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
+          <section *ngIf="canCreateFolder" class="rounded-xl border p-3 space-y-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <input #folderInput type="text" maxlength="255" aria-label="Nome da nova pasta" placeholder="Nome da nova pasta" class="rounded border px-3 py-2 flex-1 min-w-0" [value]="folderName" [disabled]="folderBusy || uploadActive || folderUncertain" (input)="setFolderName(folderInput.value)">
+              <button type="button" [disabled]="folderBusy || uploadActive || !folderName.trim()" (click)="createFolder()" class="rounded border px-3 py-2 text-sm">{{folderBusy ? 'Criando...' : folderUncertain ? 'Verificar criação' : 'Nova pasta'}}</button>
+              <button *ngIf="folderUncertain" type="button" [disabled]="folderBusy" (click)="resetFolderDraft()" class="rounded border px-3 py-2 text-sm">Descartar tentativa</button>
+            </div>
+            <p *ngIf="folderMessage" role="status" class="text-sm">{{folderMessage}}</p>
+          </section>
+          <app-google-drive-upload *ngIf="canUpload && !folderBusy" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
             (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
           <p *ngIf="uploadNotice" role="status" class="text-sm text-green-700">{{uploadNotice}}</p>
           <p *ngIf="contentError" role="alert" class="rounded-xl bg-amber-50 p-3 text-sm">{{contentError}}</p>
@@ -58,8 +66,8 @@ import { UserService } from '../../../core/services/user.service';
                   <div class="min-w-0"><p class="font-semibold break-all">{{item.name}}</p><p class="text-xs text-gray-600 break-all">{{item.mimeType}}<ng-container *ngIf="item.modifiedTime"> · {{item.modifiedTime | date:'dd/MM/yyyy HH:mm'}}</ng-container></p></div>
                 </div>
                 <div class="flex gap-2 flex-wrap mt-2">
-                  <button *ngIf="supportsPreview(item)" type="button" [disabled]="contentBusy || uploadActive" (click)="read(item,true)" class="rounded border px-3 py-1 text-sm">Visualizar</button>
-                  <button *ngIf="canDownload && supportsDownload(item)" type="button" [disabled]="contentBusy" (click)="read(item,false)" class="rounded border px-3 py-1 text-sm">Baixar</button>
+                  <button *ngIf="supportsPreview(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy" (click)="read(item,true)" class="rounded border px-3 py-1 text-sm">Visualizar</button>
+                  <button *ngIf="canDownload && supportsDownload(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy" (click)="read(item,false)" class="rounded border px-3 py-1 text-sm">Baixar</button>
                 </div>
               </ng-template>
             </li>
@@ -70,7 +78,7 @@ import { UserService } from '../../../core/services/user.service';
           </div>
         </ng-container>
       </ng-container>
-      <p class="text-xs text-gray-500">Prévias de imagens e texto; documentos e planilhas Google têm prévia textual. Downloads de até 10 MiB. A edição externa será disponibilizada separadamente.</p>
+      <p class="text-xs text-gray-500">Prévias de imagens e texto; documentos e planilhas Google têm prévia textual. Downloads comuns {{canStreamDownload ? 'de até ' + (streamMaxBytes / 1073741824 | number:'1.0-2') + ' GiB' : 'de até 10 MiB'}}. Exportações Google limitadas a 10 MB. A edição externa será disponibilizada separadamente.</p>
     </main>
   `
 })
@@ -84,6 +92,16 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   busy=false;
   canDownload=false;
   canUpload=false;
+  canStreamDownload=false;
+  streamMaxBytes=0;
+  canCreateFolder=false;
+  folderBusy=false;
+  folderName='';
+  folderMessage='';
+  folderUncertain=false;
+  private folderOperation:string|null=null;
+  private folderGeneration=0;
+  private readonly folderCancel$=new Subject<void>();
   uploadActive=false;
   uploadNotice='';
   @ViewChild(GoogleDriveUploadComponent) private uploadPanel?:GoogleDriveUploadComponent;
@@ -103,13 +121,13 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   ngOnInit():void {
     this.users.user$.pipe(map(user=>user?.id??null),distinctUntilChanged(),takeUntil(this.destroyed$)).subscribe(id=>{
       if(this.uploadPanel){this.uploadPanel.enabled=false;this.uploadPanel.reset();}
-      this.uploadActive=false;this.uploadNotice='';
+      this.uploadActive=false;this.uploadNotice='';this.resetFolderDraft();
       this.activeUser=id;
       this.home();
     });
   }
   home():void {
-    if(this.uploadActive)return;
+    if(this.uploadActive||this.folderBusy)return;
     this.uploadNotice='';this.cancel$.next();
     this.trail=[];this.mounts=[];this.clearPage();this.error='';this.busy=false;
     if(this.activeUser===null)return;
@@ -120,33 +138,33 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     });
   }
   openMount(mount:DriveMount):void {
-    if(this.busy||this.uploadActive||!this.mounts.some(m=>m.id===mount.id))return;
+    if(this.busy||this.uploadActive||this.folderBusy||!this.mounts.some(m=>m.id===mount.id))return;
     this.trail=[mount];this.clearPage();this.load();
   }
   openChild(entry:DriveEntry):void {
-    if(this.busy||this.uploadActive||!entry.folder||!this.entries.some(e=>e.id===entry.id&&e.folder))return;
+    if(this.busy||this.uploadActive||this.folderBusy||!entry.folder||!this.entries.some(e=>e.id===entry.id&&e.folder))return;
     this.trail=[...this.trail,{id:entry.id,name:entry.name}];this.clearPage();this.load();
   }
   openTrail(index:number):void {
-    if(this.busy||this.uploadActive||index<0||index>=this.trail.length)return;
+    if(this.busy||this.uploadActive||this.folderBusy||index<0||index>=this.trail.length)return;
     this.trail=this.trail.slice(0,index+1);this.clearPage();this.load();
   }
   next():void {
-    if(this.busy||this.uploadActive||!this.nextToken)return;
+    if(this.busy||this.uploadActive||this.folderBusy||!this.nextToken)return;
     this.tokens=this.tokens.slice(0,this.pageIndex+1);
     this.tokens.push(this.nextToken);this.pageIndex++;this.load();
   }
   previous():void {
-    if(this.busy||this.uploadActive||this.pageIndex===0)return;
+    if(this.busy||this.uploadActive||this.folderBusy||this.pageIndex===0)return;
     this.pageIndex--;this.load();
   }
-  private clearPage():void {this.closePreview();this.canDownload=false;this.canUpload=false;this.contentError='';this.entries=[];this.nextToken=null;this.tokens=[undefined];this.pageIndex=0;}
+  private clearPage():void {this.closePreview();this.canDownload=false;this.canUpload=false;this.canStreamDownload=false;this.streamMaxBytes=0;this.canCreateFolder=false;this.resetFolderDraft();this.contentError='';this.entries=[];this.nextToken=null;this.tokens=[undefined];this.pageIndex=0;}
   private load():void {
     if(this.activeUser===null||!this.trail.length)return;
     this.cancel$.next();this.closePreview();this.canDownload=false;this.canUpload=false;this.contentError='';this.entries=[];this.nextToken=null;this.error='';this.busy=true;
     this.drive.list(this.trail[0].id,this.trail[this.trail.length-1].id,this.tokens[this.pageIndex])
       .pipe(takeUntil(this.cancel$)).subscribe({
-        next:page=>{this.entries=page.entries;this.canDownload=page.canDownload===true;this.canUpload=page.canUpload===true;this.nextToken=page.nextPageToken;this.busy=false;},
+        next:page=>{this.entries=page.entries;this.canDownload=page.canDownload===true;this.canUpload=page.canUpload===true;this.canCreateFolder=page.canCreateFolder===true;this.canStreamDownload=page.canStreamDownload===true;this.streamMaxBytes=page.streamMaxBytes??0;this.nextToken=page.nextPageToken;this.busy=false;},
         error:()=>{this.busy=false;this.mounts=[];this.trail=[];this.clearPage();this.error='Pasta indisponível ou sem acesso. Atualize suas pastas para continuar.';}
       });
   }
@@ -156,6 +174,35 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   }
   refreshAfterUpload():void {
     this.uploadActive=false;this.clearPage();this.uploadNotice='Arquivo publicado com sucesso.';this.load();
+  }
+  setFolderName(name:string):void {
+    if(this.folderBusy||this.folderUncertain)return;
+    this.folderName=name;this.folderOperation=null;this.folderMessage='';
+  }
+  resetFolderDraft():void {
+    this.folderGeneration++;this.folderCancel$.next();this.folderBusy=false;
+    this.folderName='';this.folderOperation=null;this.folderMessage='';this.folderUncertain=false;
+  }
+  createFolder():void {
+    if(this.busy||this.folderBusy||this.uploadActive||!this.canCreateFolder||this.activeUser===null||!this.trail.length)return;
+    const name=this.folderName.trim();
+    if(!name)return;
+    this.closePreview();
+    this.folderOperation??=crypto.randomUUID();
+    const generation=++this.folderGeneration;
+    this.folderBusy=true;this.folderMessage='';
+    this.drive.createFolder(this.trail[0].id,this.trail[this.trail.length-1].id,name,this.folderOperation)
+      .pipe(takeUntil(this.folderCancel$)).subscribe({
+        next:()=>{
+          if(generation!==this.folderGeneration)return;
+          this.resetFolderDraft();this.clearPage();this.uploadNotice='Pasta criada com sucesso.';this.load();
+        },
+        error:()=>{
+          if(generation!==this.folderGeneration)return;
+          this.folderBusy=false;this.folderUncertain=true;
+          this.folderMessage='Criação não confirmada. Verifique novamente com a mesma operação; não crie outra pasta sem conferir.';
+        }
+      });
   }
   supportsPreview(entry:DriveEntry):boolean {
     return !entry.folder && ['image/png','image/jpeg','image/gif','image/webp','text/plain','text/csv',
@@ -171,11 +218,24 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     this.previewUrl=null;this.previewName='';this.previewText=null;this.previewNote='';
   }
   read(item:DriveEntry,preview:boolean):void {
-    if(this.busy||this.uploadActive||this.contentBusy||this.activeUser===null||!this.trail.length||
+    if(this.busy||this.uploadActive||this.folderBusy||this.contentBusy||this.activeUser===null||!this.trail.length||
         !this.entries.some(e=>e.id===item.id&&!e.folder)||
         (preview?!this.supportsPreview(item):!this.canDownload||!this.supportsDownload(item)))return;
     this.closePreview();this.contentError='';this.contentBusy=true;
     const generation=this.contentGeneration;
+    if(!preview&&this.canStreamDownload&&!item.mimeType.startsWith('application/vnd.google-apps.')){
+      this.drive.downloadTicket(this.trail[0].id,this.trail[this.trail.length-1].id,item.id)
+        .pipe(takeUntil(this.contentCancel$)).subscribe({
+          next:r=>{
+            if(generation!==this.contentGeneration)return;
+            this.contentBusy=false;
+            try{this.drive.redeemDownload(r.ticket);this.uploadNotice='Solicitação enviada ao gerenciador de downloads do navegador.';}
+            catch{this.contentError='Não foi possível iniciar o download.';}
+          },
+          error:()=>{if(generation===this.contentGeneration){this.contentBusy=false;this.contentError='Download indisponível, sem acesso ou acima do limite.';}}
+        });
+      return;
+    }
     this.drive.content(this.trail[0].id,this.trail[this.trail.length-1].id,item.id,preview)
       .pipe(takeUntil(this.contentCancel$)).subscribe({
         next:async blob=>{
@@ -215,6 +275,6 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       });
   }
   ngOnDestroy():void {
-    this.uploadPanel?.reset(false);this.closePreview();this.contentCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
+    this.uploadPanel?.reset(false);this.resetFolderDraft();this.folderCancel$.complete();this.closePreview();this.contentCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
   }
 }
