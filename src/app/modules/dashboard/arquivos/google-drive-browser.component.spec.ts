@@ -13,7 +13,8 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history','transfer','trashList','trashFile','restoreTrash']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history','transfer','trashList','trashFile','restoreTrash','searchCapability','search']);
+    drive.searchCapability.and.returnValue(of({enabled:true}));
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -206,5 +207,31 @@ describe('GoogleDriveBrowserComponent',()=>{
     const c=fixture.componentInstance;c.openMount(mount);c.openTrash();users.next({id:2});
     pending.next({items:[{operationId:'op',name:'private.png',mimeType:'image/png',version:'13',trashedAt:null,canRestore:true}],nextCursor:null});
     expect(c.trashOpen).toBeFalse();expect(c.trashItems).toEqual([]);
+  });
+
+  it('searches from home and opens an authorized result folder',()=>{
+    const hit={id:'file_123',name:'Arte.png',mimeType:'image/png',folder:false,modifiedTime:null,trail:[mount,{id:'child_folder',name:'Materiais'}]};
+    drive.search.and.returnValue(of({entries:[hit],nextCursor:null}));
+    const c=fixture.componentInstance;c.searchQuery='arte';c.startSearch();
+    expect(drive.search).toHaveBeenCalledWith('arte',undefined);
+    expect(c.searchHits).toEqual([hit]);
+    c.openSearchHit(hit);
+    expect(c.searchOpen).toBeFalse();
+    expect(drive.list).toHaveBeenCalledWith('anchor_folder','child_folder',undefined);
+  });
+  it('uses the submitted query for pagination and ignores late results on account change',()=>{
+    const pending=new Subject<{entries:[],nextCursor:null}>();
+    drive.search.and.returnValues(of({entries:[],nextCursor:'opaque-cursor'}),pending);
+    const c=fixture.componentInstance;c.searchQuery='arte';c.startSearch();
+    c.searchQuery='outro';c.moreSearch();
+    expect(drive.search).toHaveBeenCalledWith('arte','opaque-cursor');
+    users.next({id:2});pending.next({entries:[],nextCursor:null});
+    expect(c.searchOpen).toBeFalse();expect(c.searchHits).toEqual([]);
+  });
+  it('rejects a result outside the current mount list',()=>{
+    const hit={id:'other_file',name:'Arte.png',mimeType:'image/png',folder:false,modifiedTime:null,trail:[{id:'other_anchor',name:'Outra área'}]};
+    drive.search.and.returnValue(of({entries:[hit],nextCursor:null}));
+    const c=fixture.componentInstance;c.searchQuery='arte';c.startSearch();c.openSearchHit(hit);
+    expect(drive.list).not.toHaveBeenCalled();
   });
 });
