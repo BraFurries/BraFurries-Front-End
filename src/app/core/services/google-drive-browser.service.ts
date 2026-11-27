@@ -4,12 +4,14 @@ import { environment } from '../../../environments/environment';
 
 export interface DriveMount {id:string;name:string;}
 export interface DriveEntry extends DriveMount {
-  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;canReplace?:boolean;canMove?:boolean;canCopy?:boolean;
+  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;canReplace?:boolean;canMove?:boolean;canCopy?:boolean;canTrash?:boolean;
 }
 export type DriveTransferAction='MOVE'|'COPY';
 export interface DriveTransferRequest {sourceAnchor:string;parent:string;file:string;version:string;destinationAnchor:string;destination:string;action:DriveTransferAction;operationId:string;}
-export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;}
+export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;canViewTrash?:boolean;}
 
+export interface DriveTrashItem {operationId:string;name:string;mimeType:string;version:string;trashedAt:string|null;canRestore:boolean;}
+export interface DriveTrashPage {items:DriveTrashItem[];nextCursor:string|null;}
 export interface DriveRevision {id:string;modifiedTime:string;size:string;kept:boolean;current:boolean;}
 export interface DriveHistory {revisions:DriveRevision[];nextPageToken:string|null;}
 
@@ -67,5 +69,18 @@ export class GoogleDriveBrowserService {
 
   transfer(request:DriveTransferRequest){
     return this.http.post<{id:string;name:string}>(environment.apiBaseUrl+'/user/me/platform-drive/transfer-operations',request);
+  }
+
+  private readonly trashEndpoint=environment.apiBaseUrl+'/user/me/platform-drive/trash';
+  trashList(anchor:string,cursor?:string){
+    let params=new HttpParams().set('anchor',anchor);
+    if(cursor)params=params.set('cursor',cursor);
+    return this.http.get<DriveTrashPage>(this.trashEndpoint,{params});
+  }
+  trashFile(anchor:string,parent:string,file:string,version:string,operationId:string){
+    return this.http.post<{operationId:string;status:string}>(this.trashEndpoint,{anchor,parent,file,version,operationId});
+  }
+  restoreTrash(anchor:string,id:string,version:string){
+    return this.http.post<{operationId:string;status:string}>(this.trashEndpoint+'/'+encodeURIComponent(id)+'/restore',{anchor,version});
   }
 }
