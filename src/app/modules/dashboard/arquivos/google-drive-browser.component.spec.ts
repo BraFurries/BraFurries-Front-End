@@ -13,7 +13,7 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history','transfer']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history','transfer','trashList','trashFile','restoreTrash']);
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -177,5 +177,34 @@ describe('GoogleDriveBrowserComponent',()=>{
     const c=fixture.componentInstance;c.openMount(mount);c.copyToClipboard(file);c.openChild(child);
     expect(drive.transfer).not.toHaveBeenCalled();c.pasteCopy();
     expect(drive.transfer).toHaveBeenCalledWith(jasmine.objectContaining({action:'COPY',file:'file_123',parent:'anchor_folder',destination:'child_folder'}));
+  });
+
+  it('confirms moving a file to trash and sends its expected version',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canTrash:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canViewTrash:true}));
+    drive.trashFile.and.returnValue(of({operationId:'op',status:'TRASHED'}));
+    const confirm=spyOn(window,'confirm').and.returnValues(false,true);
+    const c=fixture.componentInstance;c.openMount(mount);c.trashFile(file);
+    expect(drive.trashFile).not.toHaveBeenCalled();
+    c.trashFile(file);expect(confirm).toHaveBeenCalledTimes(2);
+    expect(drive.trashFile).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_123','12',jasmine.any(String));
+  });
+  it('restores from the scoped trash and refreshes only after confirmation',()=>{
+    const item={operationId:'op',name:'art.png',mimeType:'image/png',version:'13',trashedAt:null,canRestore:true};
+    drive.list.and.returnValue(of({entries:[],nextPageToken:null,canViewTrash:true}));
+    drive.trashList.and.returnValues(of({items:[item],nextCursor:null}),of({items:[],nextCursor:null}));
+    drive.restoreTrash.and.returnValue(of({operationId:'op',status:'RESTORED'}));
+    spyOn(window,'confirm').and.returnValue(true);
+    const c=fixture.componentInstance;c.openMount(mount);c.openTrash();c.restoreItem(item);
+    expect(drive.restoreTrash).toHaveBeenCalledWith('anchor_folder','op','13');
+    expect(c.trashItems).toEqual([]);expect(c.trashMessage).toContain('restaurado');
+  });
+  it('drops delayed trash metadata on account change',()=>{
+    const pending=new Subject<{items:{operationId:string;name:string;mimeType:string;version:string;trashedAt:null;canRestore:boolean}[];nextCursor:null}>();
+    drive.list.and.returnValue(of({entries:[],nextPageToken:null,canViewTrash:true}));
+    drive.trashList.and.returnValue(pending);
+    const c=fixture.componentInstance;c.openMount(mount);c.openTrash();users.next({id:2});
+    pending.next({items:[{operationId:'op',name:'private.png',mimeType:'image/png',version:'13',trashedAt:null,canRestore:true}],nextCursor:null});
+    expect(c.trashOpen).toBeFalse();expect(c.trashItems).toEqual([]);
   });
 });
