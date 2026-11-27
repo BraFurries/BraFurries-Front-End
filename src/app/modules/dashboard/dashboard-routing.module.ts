@@ -30,6 +30,7 @@ const routes: Routes = [
     children: [
       { path: '', component: InicioComponent },
       { path: 'perfil', component: PerfilComponent },
+      { path: 'arquivos', loadComponent: () => import('./arquivos/google-drive-browser.component').then(m => m.GoogleDriveBrowserComponent) },
       { path: 'minhas-artes', component: CommerceArtistPortalComponent },
       { path: 'creators', component: CreatorStudioComponent },
       // Existing deep link becomes a quiet overview, with focused child pages.
