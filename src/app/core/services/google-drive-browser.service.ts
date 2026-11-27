@@ -4,7 +4,7 @@ import { environment } from '../../../environments/environment';
 
 export interface DriveMount {id:string;name:string;}
 export interface DriveEntry extends DriveMount {
-  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;
+  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;
 }
 export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;}
 
@@ -47,5 +47,10 @@ export class GoogleDriveBrowserService {
   createFolder(anchor:string,parent:string,name:string,operationId:string){
     return this.http.post<{id:string;name:string}>(environment.apiBaseUrl+'/user/me/platform-drive/folder-operations',
       {anchor,parent,name,operationId});
+  }
+
+  rename(anchor:string,parent:string,file:string,version:string,name:string,operationId:string){
+    return this.http.post<{id:string;name:string;version:string}>(environment.apiBaseUrl+'/user/me/platform-drive/rename-operations',
+      {anchor,parent,file,version,name,operationId});
   }
 }
