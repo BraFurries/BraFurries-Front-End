@@ -86,7 +86,7 @@ export class GoogleDrivePickerBrowser {
   prepare():Promise<void>{return loadGoogle();}
 
   /** Call synchronously from a click after prepare() has completed. */
-  open(config:PickerConfig,mode:'files'|'root',callbacks:PickerCallbacks):()=>void{
+  open(config:PickerConfig,mode:'files'|'root'|'managed-folder',callbacks:PickerCallbacks):()=>void{
     const google=(window as GoogleWindow).google;
     let active=true;
     let picker:PickerInstance|null=null;
@@ -122,18 +122,18 @@ export class GoogleDrivePickerBrowser {
         if(!active)return;
         clear();
         if(identity.sub!==config.googleSubject||identity.email_verified!==true){
-          fail(mode==='root'?'Selecione a conta Google institucional.':'Selecione a conta Google vinculada ao seu perfil.');return;
+          fail(mode!=='files'?'Selecione a conta Google institucional.':'Selecione a conta Google vinculada ao seu perfil.');return;
         }
-        const view=new google.picker.DocsView(mode==='root'?google.picker.ViewId.FOLDERS:google.picker.ViewId.DOCS)
+        const view=new google.picker.DocsView(mode!=='files'?google.picker.ViewId.FOLDERS:google.picker.ViewId.DOCS)
           .setIncludeFolders(true).setMode(google.picker.DocsViewMode.LIST)
-          .setSelectFolderEnabled(mode==='root');
+          .setSelectFolderEnabled(mode!=='files');
         // Root itself must be selectable, not just its children.
         if(mode==='root')view.setMimeTypes(FOLDER_MIME).setFileIds(config.folderId);
-        else view.setParent(config.folderId);
+        else {view.setParent(config.folderId);if(mode==='managed-folder')view.setMimeTypes(FOLDER_MIME);}
         const builder=new google.picker.PickerBuilder().addView(view)
           .setOAuthToken(response.access_token).setDeveloperKey(config.apiKey)
           .setAppId(config.projectNumber).setOrigin(window.location.origin);
-        if(mode==='root')builder.setSelectableMimeTypes(FOLDER_MIME);
+        if(mode!=='files')builder.setSelectableMimeTypes(FOLDER_MIME);
         picker=builder.setCallback(result=>this.zone.run(()=>{
           if(!active)return;
           if(result.action===google.picker.Action.PICKED){
@@ -142,6 +142,9 @@ export class GoogleDrivePickerBrowser {
               fail('Selecione exatamente a pasta raiz configurada na plataforma.');return;
             }
             if(!file){fail('Nenhum arquivo foi selecionado.');return;}
+            if(mode==='managed-folder'&&(file.mimeType!==FOLDER_MIME||!file.id||file.id===config.folderId)){
+              fail('Selecione uma subpasta institucional.');return;
+            }
             close();callbacks.picked(file);
           }else if(result.action===google.picker.Action.CANCEL){
             close();callbacks.canceled();
