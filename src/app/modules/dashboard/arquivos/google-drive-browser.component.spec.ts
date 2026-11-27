@@ -12,7 +12,7 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename']);
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -106,5 +106,20 @@ describe('GoogleDriveBrowserComponent',()=>{
     const c=fixture.componentInstance;c.openMount(mount);c.setFolderName('Nova pasta');c.createFolder();c.createFolder();
     expect(drive.createFolder).toHaveBeenCalledTimes(2);
     expect(drive.createFolder.calls.argsFor(0)).toEqual(drive.createFolder.calls.argsFor(1));
+  });
+
+  it('sends expected version and preserves rename operation key after failure',()=>{
+    const file={...child,id:'file_id',name:'old.png',folder:false,mimeType:'image/png',version:'12',canRename:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null}));
+    drive.rename.and.returnValue(throwError(()=>({status:503})));
+    const c=fixture.componentInstance;c.openMount(mount);c.startRename(file);c.setRenameName('new.png');c.saveRename();c.saveRename();
+    expect(drive.rename).toHaveBeenCalledTimes(2);
+    expect(drive.rename.calls.argsFor(0).slice(0,5)).toEqual(['anchor_folder','anchor_folder','file_id','12','new.png']);
+    expect(drive.rename.calls.argsFor(0)).toEqual(drive.rename.calls.argsFor(1));
+  });
+  it('does not offer rename for entries lacking the server permission',()=>{
+    const c=fixture.componentInstance;c.openMount(mount);c.startRename(child);
+    expect(c.renameEntry).toBeNull();
+    expect(drive.rename).not.toHaveBeenCalled();
   });
 });
