@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { distinctUntilChanged, map, Subject, takeUntil } from 'rxjs';
-import { DriveEntry, DriveMount, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
+import { DriveEntry, DriveMount, DriveRevision, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
 import { GoogleDriveUploadComponent } from './google-drive-upload.component';
 import { UserService } from '../../../core/services/user.service';
 
@@ -43,6 +43,23 @@ import { UserService } from '../../../core/services/user.service';
           <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
             (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
           <p *ngIf="uploadNotice" role="status" class="text-sm text-green-700">{{uploadNotice}}</p>
+          <section *ngIf="historyEntry" class="rounded-xl border p-4 space-y-3">
+            <div class="flex justify-between gap-2 items-center">
+              <h2 class="font-bold break-all">Histórico · {{historyEntry.name}}</h2>
+              <button type="button" class="rounded border px-3 py-2 text-sm" (click)="closeHistory()">Fechar</button>
+            </div>
+            <p class="text-xs text-gray-600">Versões disponíveis no Google. Revisões não fixadas podem expirar. A recuperação ainda não está disponível.</p>
+            <p *ngIf="historyBusy" role="status" class="text-sm">Consultando versões...</p>
+            <p *ngIf="historyError" role="alert" class="text-sm">{{historyError}}</p>
+            <ul *ngIf="revisions.length" class="divide-y">
+              <li *ngFor="let revision of revisions" class="py-2 flex flex-wrap justify-between gap-2">
+                <div class="text-sm">{{revision.modifiedTime | date:'dd/MM/yyyy HH:mm'}} · {{revision.size}} bytes</div>
+                <span class="text-xs">{{revision.current ? 'Versão atual' : revision.kept ? 'Preservada' : 'Retenção do Google'}}</span>
+              </li>
+            </ul>
+            <p *ngIf="!historyBusy && !historyError && !revisions.length" class="text-sm">Nenhuma revisão nesta página.</p>
+            <button *ngIf="historyNext" [disabled]="historyBusy" type="button" class="rounded border px-3 py-2 text-sm" (click)="nextHistory()">Próxima página</button>
+          </section>
           <p *ngIf="contentError" role="alert" class="rounded-xl bg-amber-50 p-3 text-sm">{{contentError}}</p>
           <p *ngIf="contentBusy" role="status" class="text-sm">Obtendo conteúdo...</p>
           <section *ngIf="previewName" class="rounded-xl border p-4 space-y-3">
@@ -66,6 +83,7 @@ import { UserService } from '../../../core/services/user.service';
                   <div class="min-w-0"><p class="font-semibold break-all">{{item.name}}</p><p class="text-xs text-gray-600 break-all">{{item.mimeType}}<ng-container *ngIf="item.modifiedTime"> · {{item.modifiedTime | date:'dd/MM/yyyy HH:mm'}}</ng-container></p></div>
                 </div>
                 <div class="flex gap-2 flex-wrap mt-2">
+                  <button *ngIf="item.canViewHistory" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="openHistory(item)" class="rounded border px-3 py-1 text-sm">Versões</button>
                   <button *ngIf="supportsPreview(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="read(item,true)" class="rounded border px-3 py-1 text-sm">Visualizar</button>
                   <button *ngIf="canDownload && supportsDownload(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="read(item,false)" class="rounded border px-3 py-1 text-sm">Baixar</button>
                 </div>
@@ -107,6 +125,10 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   streamMaxBytes=0;
   canCreateFolder=false;
   folderBusy=false;
+  historyEntry:DriveEntry|null=null;
+  revisions:DriveRevision[]=[];historyBusy=false;historyError='';historyNext:string|null=null;
+  private historyGeneration=0;
+  private readonly historyCancel$=new Subject<void>();
   renameEntry:DriveEntry|null=null;
   renameName='';renameMessage='';renameBusy=false;renameUncertain=false;
   private renameOperation:string|null=null;
@@ -267,7 +289,27 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     return !entry.folder && (!entry.mimeType.startsWith('application/vnd.google-apps.') ||
       ['application/vnd.google-apps.document','application/vnd.google-apps.spreadsheet','application/vnd.google-apps.presentation'].includes(entry.mimeType));
   }
+  closeHistory():void {
+    ++this.historyGeneration;this.historyCancel$.next();this.historyEntry=null;this.revisions=[];this.historyBusy=false;this.historyError='';this.historyNext=null;
+  }
+  openHistory(item:DriveEntry):void {
+    if(this.busy||this.uploadActive||this.folderBusy||this.renameBusy||this.contentBusy||!this.trail.length||this.activeUser===null||
+       !this.entries.some(e=>e.id===item.id&&e.canViewHistory===true&&!e.folder))return;
+    this.closePreview();this.historyEntry=item;this.loadHistory();
+  }
+  nextHistory():void {
+    if(this.historyNext&&!this.historyBusy)this.loadHistory(this.historyNext);
+  }
+  private loadHistory(token?:string):void {
+    const item=this.historyEntry;if(!item||!this.trail.length)return;
+    const generation=++this.historyGeneration;this.historyCancel$.next();this.historyBusy=true;this.historyError='';this.revisions=[];this.historyNext=null;
+    this.drive.history(this.trail[0].id,this.trail[this.trail.length-1].id,item.id,token).pipe(takeUntil(this.historyCancel$)).subscribe({
+      next:r=>{if(generation===this.historyGeneration){this.revisions=r.revisions;this.historyNext=r.nextPageToken;this.historyBusy=false;}},
+      error:()=>{if(generation===this.historyGeneration){this.historyBusy=false;this.historyError='Histórico indisponível ou sem acesso.';}}
+    });
+  }
   closePreview():void {
+    this.closeHistory();
     this.contentGeneration++;this.contentCancel$.next();this.contentBusy=false;
     if(this.previewUrl)URL.revokeObjectURL(this.previewUrl);
     this.previewUrl=null;this.previewName='';this.previewText=null;this.previewNote='';
@@ -330,6 +372,6 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       });
   }
   ngOnDestroy():void {
-    this.uploadPanel?.reset(false);this.resetRename();this.renameCancel$.complete();this.resetFolderDraft();this.folderCancel$.complete();this.closePreview();this.contentCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
+    this.uploadPanel?.reset(false);this.resetRename();this.renameCancel$.complete();this.resetFolderDraft();this.folderCancel$.complete();this.closePreview();this.contentCancel$.complete();this.historyCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
   }
 }
