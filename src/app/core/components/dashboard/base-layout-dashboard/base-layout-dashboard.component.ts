@@ -120,20 +120,11 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
         this.showCreatorStudio = false;
         this.showCreatorStudioData = false;
         this.showFilesMenu = false;
-        const filesRequestId = ++this.filesRequestId;
+        this.filesRequestId++;
         this.showCommerceMenu = false;
         this.showPermissionsMenu = false;
         if (userId == null) return;
-        this.driveBrowser.mounts().pipe(takeUntil(this.destroy$)).subscribe({
-          next: mounts => {
-            if (this.lastCommerceUserId === userId && filesRequestId === this.filesRequestId)
-              this.showFilesMenu = mounts.length > 0;
-          },
-          error: () => {
-            if (this.lastCommerceUserId === userId && filesRequestId === this.filesRequestId)
-              this.showFilesMenu = false;
-          }
-        });
+        this.refreshFilesMenu();
 
         // Creator Studio is independent of Community and commercial roles.
         // Navigation is only a convenience; API gates every Pro operation.
@@ -238,6 +229,26 @@ export class BaseLayoutDashboardComponent implements OnInit, OnDestroy {
   manageCommunities(): void {
     this.isCommunityMenuOpen = false;
     this.router.navigate(['/painel/comunidades']);
+  }
+
+  @HostListener('window:focus')
+  refreshFilesMenu(): void {
+    const userId = this.currentUser?.id;
+    const requestId = ++this.filesRequestId;
+    if (userId == null || this.isLoggingOut) {
+      this.showFilesMenu = false;
+      return;
+    }
+    this.driveBrowser.mounts().pipe(takeUntil(this.destroy$)).subscribe({
+      next: mounts => {
+        if (this.currentUser?.id === userId && requestId === this.filesRequestId)
+          this.showFilesMenu = mounts.length > 0;
+      },
+      error: () => {
+        if (this.currentUser?.id === userId && requestId === this.filesRequestId)
+          this.showFilesMenu = false;
+      }
+    });
   }
 
   @HostListener('document:click', ['$event'])
