@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CdkDrag, CdkDragEnd, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { distinctUntilChanged, map, Subject, takeUntil } from 'rxjs';
-import { DriveEntry, DriveMount, DriveRevision, DriveTransferAction, DriveTransferRequest, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
+import { DriveEntry, DriveMount, DriveRevision, DriveTransferRequest, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
 import { ReplacementTarget } from '../../../core/services/google-drive-upload.service';
 import { GoogleDriveUploadComponent } from './google-drive-upload.component';
 import { UserService } from '../../../core/services/user.service';
@@ -34,14 +34,12 @@ import { UserService } from '../../../core/services/user.service';
           <p *ngIf="!mounts.length" class="text-sm text-gray-600">Nenhuma pasta disponível para sua conta.</p>
         </div>
         <ng-container *ngIf="trail.length">
-          <section *ngIf="hasTransfer || transferBusy || transferMessage" class="rounded-xl border p-3 space-y-3" [class.ring-2]="dragging" [class.ring-braPurple]="dragging">
+          <section *ngIf="hasTransfer || clipboard || transferBusy || transferMessage" class="rounded-xl border p-3 space-y-3" [class.ring-2]="dragging" [class.ring-braPurple]="dragging">
             <div class="flex items-center flex-wrap gap-2">
               <span class="font-semibold text-sm">Arrastar e soltar</span>
-              <button type="button" [disabled]="transferBusy || dragging" [attr.aria-pressed]="transferMode==='MOVE'" (click)="setTransferMode('MOVE')" class="rounded border px-3 py-1 text-sm" [class.font-bold]="transferMode==='MOVE'">Mover</button>
-              <button type="button" [disabled]="transferBusy || dragging" [attr.aria-pressed]="transferMode==='COPY'" (click)="setTransferMode('COPY')" class="rounded border px-3 py-1 text-sm" [class.font-bold]="transferMode==='COPY'">Copiar</button>
               <button type="button" [disabled]="transferBusy || dragging" (click)="toggleTargets()" class="rounded border px-3 py-1 text-sm">{{targetsOpen ? 'Fechar destinos' : 'Outras pastas'}}</button>
             </div>
-            <p class="text-xs text-gray-600">Segure a alça do item e solte sobre uma pasta ou sobre o destino abaixo. Escolha Copiar para manter o original.</p>
+            <p class="text-xs text-gray-600">Arraste um item para uma pasta para movê-lo. Para duplicar arquivos, use o menu de opções ou Ctrl+C e Ctrl+V.</p>
             <div class="rounded-lg border-2 border-dashed p-3 text-sm break-all" [class.border-braPurple]="dragging"
                 [attr.data-transfer-anchor]="targetTrail[0]?.id || trail[0].id"
                 [attr.data-transfer-folder]="targetTrail[targetTrail.length-1]?.id || trail[trail.length-1].id">
@@ -60,6 +58,11 @@ import { UserService } from '../../../core/services/user.service';
                     [attr.data-transfer-anchor]="targetTrail[0]?.id || t.id" [attr.data-transfer-folder]="t.id" class="rounded border px-2 py-2 text-sm break-all">📁 {{t.name}}</button>
               </div>
               <button *ngIf="targetNext" type="button" [disabled]="dragging || transferBusy || targetsBusy" (click)="moreTargets()" class="text-xs underline">Mais pastas</button>
+            </div>
+            <div *ngIf="clipboard" class="flex flex-wrap items-center gap-2 text-sm">
+              <span class="break-all">Copiado: {{clipboard.name}}</span>
+              <button type="button" [disabled]="!canPaste()" (click)="pasteCopy()" class="rounded border px-3 py-1">Colar aqui</button>
+              <button type="button" [disabled]="transferBusy" (click)="clipboard=null" class="text-xs underline">Limpar</button>
             </div>
             <p *ngIf="transferMessage" role="status" class="text-sm">{{transferMessage}}</p>
           </section>
@@ -112,8 +115,8 @@ import { UserService } from '../../../core/services/user.service';
             <li *ngFor="let item of entries" class="p-3" cdkDrag [cdkDragDisabled]="!canDrag(item)"
                 (cdkDragStarted)="startDrag(item)" (cdkDragEnded)="finishDrag($event,item)"
                 [attr.data-transfer-anchor]="item.folder ? trail[0].id : null" [attr.data-transfer-folder]="item.folder ? item.id : null"
-                [class.ring-1]="dragging && item.folder" [class.ring-braPurple]="dragging && item.folder">
-              <button *ngIf="item.canMove || item.canCopy" cdkDragHandle type="button" aria-label="Arrastar item" title="Arrastar item" [disabled]="!canDrag(item) && !dragging" class="float-right rounded border px-3 py-2 cursor-grab active:cursor-grabbing touch-none select-none">⠿</button>
+                [class.bg-gray-100]="selectedFile?.id===item.id" (contextmenu)="openCopyMenu($event,item)" (click)="selectFile(item)" [class.ring-1]="dragging && item.folder" [class.ring-braPurple]="dragging && item.folder">
+              <button *ngIf="item.canMove" cdkDragHandle type="button" aria-label="Arrastar item" title="Arrastar item" [disabled]="!canDrag(item) && !dragging" class="float-right rounded border px-3 py-2 cursor-grab active:cursor-grabbing touch-none select-none">⠿</button>
               <button *ngIf="item.folder; else file" type="button" [disabled]="uploadActive || renameBusy" (click)="openChild(item)" class="flex items-center gap-3 w-full text-left">
                 <span aria-hidden="true" class="text-2xl">📁</span><span class="font-semibold break-all">{{item.name}}</span>
               </button>
@@ -129,6 +132,11 @@ import { UserService } from '../../../core/services/user.service';
                   <button *ngIf="canDownload && supportsDownload(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="read(item,false)" class="rounded border px-3 py-1 text-sm">Baixar</button>
                 </div>
               </ng-template>
+              <button *ngIf="item.canCopy && !item.folder" type="button" aria-label="Opções de cópia" class="rounded border px-3 py-1 text-sm mt-2" [disabled]="transferBusy || dragging || uploadActive || folderBusy || renameBusy || !!replacementTarget" (click)="toggleCopyMenu($event,item)">⋮</button>
+              <div *ngIf="copyMenu===item.id" class="flex flex-wrap gap-2 mt-2">
+                <button type="button" class="rounded border px-3 py-1 text-sm" [disabled]="!canUpload || transferBusy || dragging || uploadActive || folderBusy || renameBusy" (click)="duplicate(item)">Fazer uma cópia</button>
+                <button type="button" class="rounded border px-3 py-1 text-sm" [disabled]="transferBusy || dragging" (click)="copyToClipboard(item)">Copiar</button>
+              </div>
               <button *ngIf="item.canRename && !renameEntry && !replacementTarget" type="button" [disabled]="uploadActive || folderBusy || contentBusy" (click)="startRename(item)" class="rounded border px-3 py-1 text-sm mt-2">Renomear</button>
               <section *ngIf="renameEntry?.id===item.id" class="rounded border p-3 mt-2 space-y-2">
                 <label class="block text-sm font-medium">Novo nome
@@ -166,10 +174,11 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   streamMaxBytes=0;
   canCreateFolder=false;
   folderBusy=false;
-  transferMode:DriveTransferAction='MOVE';
+  selectedFile:DriveEntry|null=null;copyMenu:string|null=null;
+  clipboard:{actor:number;anchor:string;parent:string;id:string;name:string;version:string}|null=null;
   transferBusy=false;dragging=false;transferMessage='';
   targetsOpen=false;targetsBusy=false;targetsError='';targetTrail:DriveMount[]=[];targetFolders:DriveMount[]=[];targetNext:string|null=null;
-  private dragContext:{actor:number;anchor:string;parent:string;file:string;version:string;mode:DriveTransferAction}|null=null;
+  private dragContext:{actor:number;anchor:string;parent:string;file:string;version:string}|null=null;
   private transferGeneration=0;private readonly transferCancel$=new Subject<void>();
   private targetsGeneration=0;private readonly targetsCancel$=new Subject<void>();
   historyEntry:DriveEntry|null=null;
@@ -207,7 +216,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   ngOnInit():void {
     this.users.user$.pipe(map(user=>user?.id??null),distinctUntilChanged(),takeUntil(this.destroyed$)).subscribe(id=>{
       if(this.uploadPanel){this.uploadPanel.enabled=false;this.uploadPanel.reset();}
-      this.uploadActive=false;this.uploadNotice='';this.resetFolderDraft();this.resetRename();this.resetTransfers();
+      this.uploadActive=false;this.uploadNotice='';this.resetFolderDraft();this.resetRename();this.resetTransfers();this.clipboard=null;
       this.activeUser=id;
       this.home();
     });
@@ -263,13 +272,12 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     this.uploadActive=false;this.clearPage();this.uploadNotice=replaced?'Arquivo substituído com sucesso.':'Arquivo publicado com sucesso.';this.load();
   }
   get hasTransfer():boolean {return this.entries.some(e=>e.canMove||e.canCopy);}
-  setTransferMode(mode:DriveTransferAction):void {if(!this.transferBusy&&!this.dragging)this.transferMode=mode;}
   canDrag(item:DriveEntry):boolean {
     return !this.busy&&!this.transferBusy&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget&&!this.contentBusy&&
-      !!item.version&&(this.transferMode==='MOVE'?item.canMove===true:item.canCopy===true);
+      !!item.version&&item.canMove===true;
   }
   private resetTransfers():void {
-    ++this.transferGeneration;this.transferCancel$.next();this.transferBusy=false;this.dragging=false;this.dragContext=null;this.transferMessage='';
+    ++this.transferGeneration;this.transferCancel$.next();this.transferBusy=false;this.dragging=false;this.dragContext=null;this.selectedFile=null;this.copyMenu=null;this.transferMessage='';
     ++this.targetsGeneration;this.targetsCancel$.next();this.targetsOpen=false;this.targetsBusy=false;this.targetsError='';
     this.targetTrail=[];this.targetFolders=[];this.targetNext=null;
   }
@@ -308,13 +316,13 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   }
   startDrag(item:DriveEntry):void {
     if(!this.canDrag(item)||this.activeUser===null||!this.trail.length||!item.version)return;
-    this.dragContext={actor:this.activeUser,anchor:this.trail[0].id,parent:this.trail[this.trail.length-1].id,file:item.id,version:item.version,mode:this.transferMode};
+    this.dragContext={actor:this.activeUser,anchor:this.trail[0].id,parent:this.trail[this.trail.length-1].id,file:item.id,version:item.version};
     this.dragging=true;
   }
   finishDrag(event:CdkDragEnd,item:DriveEntry):void {
     const context=this.dragContext;this.dragContext=null;event.source.reset();this.dragging=false;
     if(!context||context.actor!==this.activeUser||context.anchor!==this.trail[0]?.id||context.parent!==this.trail[this.trail.length-1]?.id||
-       context.file!==item.id||context.version!==item.version||context.mode!==this.transferMode||
+       context.file!==item.id||context.version!==item.version||
        !this.canDrag(item)||!this.trail.length||!item.version||this.activeUser===null||
        !this.entries.some(e=>e.id===item.id&&e.version===item.version))return;
     const pointer=event.event instanceof MouseEvent?event.event:event.event.changedTouches?.[0];
@@ -323,10 +331,13 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     if(!zone||!this.host.nativeElement.contains(zone))return;
     const anchor=zone.dataset['transferAnchor'],destination=zone.dataset['transferFolder'];
     const parent=this.trail[this.trail.length-1].id;
-    if(!anchor||!destination||destination===item.id||(this.transferMode==='MOVE'&&destination===parent))return;
+    if(!anchor||!destination||destination===item.id||destination===parent)return;
     const request:DriveTransferRequest={sourceAnchor:this.trail[0].id,parent,file:item.id,version:item.version,
-      destinationAnchor:anchor,destination,action:this.transferMode,operationId:crypto.randomUUID()};
-    const generation=++this.transferGeneration;this.transferBusy=true;this.transferMessage='';this.closePreview();
+      destinationAnchor:anchor,destination,action:'MOVE',operationId:crypto.randomUUID()};
+    this.executeTransfer(request);
+  }
+  private executeTransfer(request:DriveTransferRequest):void {
+    const generation=++this.transferGeneration;this.transferBusy=true;this.transferMessage='';this.copyMenu=null;this.closePreview();
     this.drive.transfer(request).pipe(takeUntil(this.transferCancel$)).subscribe({
       next:()=>{
         if(generation!==this.transferGeneration)return;
@@ -339,6 +350,55 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
         this.transferMessage='Operação não confirmada. Confira a pasta de destino antes de tentar novamente.';
       }
     });
+  }
+  selectFile(item:DriveEntry):void {
+    if(!this.dragging&&!this.transferBusy)this.selectedFile=item;
+  }
+  private eligibleCopy(item:DriveEntry):boolean {
+    return !this.busy&&!this.transferBusy&&!this.dragging&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget&&
+      !item.folder&&!!item.version&&item.canCopy===true&&this.activeUser!==null&&this.trail.length>0&&
+      this.entries.some(e=>e.id===item.id&&e.version===item.version&&e.canCopy===true);
+  }
+  openCopyMenu(event:MouseEvent,item:DriveEntry):void {
+    if(!this.eligibleCopy(item))return;
+    event.preventDefault();event.stopPropagation();this.selectedFile=item;this.copyMenu=item.id;
+  }
+  toggleCopyMenu(event:MouseEvent,item:DriveEntry):void {
+    event.stopPropagation();
+    if(this.copyMenu===item.id){this.copyMenu=null;return;}
+    if(this.eligibleCopy(item)){this.selectedFile=item;this.copyMenu=item.id;}
+  }
+  copyToClipboard(item:DriveEntry):void {
+    if(!this.eligibleCopy(item)||this.activeUser===null||!item.version)return;
+    this.clipboard={actor:this.activeUser,anchor:this.trail[0].id,parent:this.trail[this.trail.length-1].id,
+      id:item.id,name:item.name,version:item.version};
+    this.copyMenu=null;
+  }
+  canPaste():boolean {
+    return !!this.clipboard&&this.clipboard.actor===this.activeUser&&this.canUpload&&this.trail.length>0&&
+      !this.busy&&!this.transferBusy&&!this.dragging&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget;
+  }
+  pasteCopy():void {
+    const source=this.clipboard;if(!source||!this.canPaste())return;
+    this.executeTransfer({sourceAnchor:source.anchor,parent:source.parent,file:source.id,version:source.version,
+      destinationAnchor:this.trail[0].id,destination:this.trail[this.trail.length-1].id,action:'COPY',operationId:crypto.randomUUID()});
+  }
+  duplicate(item:DriveEntry):void {
+    if(!this.eligibleCopy(item)||!this.canUpload||!item.version)return;
+    const anchor=this.trail[0].id,parent=this.trail[this.trail.length-1].id;
+    this.executeTransfer({sourceAnchor:anchor,parent,file:item.id,version:item.version,destinationAnchor:anchor,destination:parent,
+      action:'COPY',operationId:crypto.randomUUID()});
+  }
+  @HostListener('document:keydown',['$event'])
+  keyboardCopy(event:KeyboardEvent):void {
+    if(!(event.ctrlKey||event.metaKey)||event.altKey||event.shiftKey||event.repeat||event.defaultPrevented)return;
+    const target=event.target as HTMLElement|null;
+    if(!target||!this.host.nativeElement.contains(target)||target.closest('input,textarea,select,[contenteditable="true"]'))return;
+    if(event.key.toLowerCase()==='c'&&this.selectedFile&&this.eligibleCopy(this.selectedFile)){
+      event.preventDefault();this.copyToClipboard(this.selectedFile);
+    }else if(event.key.toLowerCase()==='v'&&this.canPaste()){
+      event.preventDefault();this.pasteCopy();
+    }
   }
   startReplacement(item:DriveEntry):void {
     if(this.busy||this.transferBusy||this.dragging||this.uploadActive||this.folderBusy||this.renameEntry||this.replacementTarget||this.contentBusy||
