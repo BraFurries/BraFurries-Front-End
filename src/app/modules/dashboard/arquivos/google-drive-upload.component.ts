@@ -99,7 +99,7 @@ export class GoogleDriveUploadComponent implements OnInit,OnDestroy {
     this.api.status(this.sessionId).pipe(takeUntil(this.stopped$)).subscribe({
       next:s=>{
         if(g!==this.generation)return;
-        if(s.status==='OPEN'&&!s.expired){void this.transfer(true);return;}
+        if(s.status==='OPEN'&&!s.expired&&s.resumeAllowed===true){void this.transfer(true);return;}
         this.uri=null;this.phase='confirm';this.message='Sessão não está mais aberta. Verifique a publicação ou cancele.';
       },
       error:()=>{if(g===this.generation){this.phase='paused';this.message='Não foi possível consultar a sessão. Tente novamente.';}}
@@ -133,12 +133,12 @@ export class GoogleDriveUploadComponent implements OnInit,OnDestroy {
       error:()=>{if(g===this.generation){this.phase='confirm';this.message='Cancelamento não confirmado. Tente novamente.';}}
     });
   }
-  reset():void {
+  reset(notify=true):void {
     ++this.generation;this.abort?.abort();this.abort=null;this.stopped$.next();
     this.uri=null;this.sessionId=null;this.file=null;this.confirmed=0;this.phase='idle';this.message='';
-    this.activeChange.emit(false);
+    if(notify)this.activeChange.emit(false);
   }
   ngOnDestroy():void {
-    this.reset();this.destroyed$.next();this.destroyed$.complete();this.stopped$.complete();
+    this.reset(false);this.destroyed$.next();this.destroyed$.complete();this.stopped$.complete();
   }
 }
