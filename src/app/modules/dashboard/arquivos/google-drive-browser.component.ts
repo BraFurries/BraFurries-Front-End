@@ -33,7 +33,7 @@ import { UserService } from '../../../core/services/user.service';
         </div>
         <ng-container *ngIf="trail.length">
           <app-google-drive-upload *ngIf="canUpload" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
-            (activeChange)="uploadActive=$event" (published)="refreshAfterUpload()"></app-google-drive-upload>
+            (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
           <p *ngIf="uploadNotice" role="status" class="text-sm text-green-700">{{uploadNotice}}</p>
           <p *ngIf="contentError" role="alert" class="rounded-xl bg-amber-50 p-3 text-sm">{{contentError}}</p>
           <p *ngIf="contentBusy" role="status" class="text-sm">Obtendo conteúdo...</p>
@@ -150,6 +150,10 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
         error:()=>{this.busy=false;this.mounts=[];this.trail=[];this.clearPage();this.error='Pasta indisponível ou sem acesso. Atualize suas pastas para continuar.';}
       });
   }
+  onUploadActive(active:boolean):void {
+    this.uploadActive=active;
+    if(active){this.closePreview();this.contentError='';this.uploadNotice='';}
+  }
   refreshAfterUpload():void {
     this.uploadActive=false;this.clearPage();this.uploadNotice='Arquivo publicado com sucesso.';this.load();
   }
@@ -211,6 +215,6 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       });
   }
   ngOnDestroy():void {
-    this.uploadPanel?.reset();this.closePreview();this.contentCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
+    this.uploadPanel?.reset(false);this.closePreview();this.contentCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
   }
 }
