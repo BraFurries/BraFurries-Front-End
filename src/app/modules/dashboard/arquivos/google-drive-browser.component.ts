@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { distinctUntilChanged, map, Subject, takeUntil } from 'rxjs';
 import { DriveEntry, DriveMount, DriveRevision, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
+import { ReplacementTarget } from '../../../core/services/google-drive-upload.service';
 import { GoogleDriveUploadComponent } from './google-drive-upload.component';
 import { UserService } from '../../../core/services/user.service';
 
@@ -32,7 +33,7 @@ import { UserService } from '../../../core/services/user.service';
           <p *ngIf="!mounts.length" class="text-sm text-gray-600">Nenhuma pasta disponível para sua conta.</p>
         </div>
         <ng-container *ngIf="trail.length">
-          <section *ngIf="canCreateFolder && !renameEntry" class="rounded-xl border p-3 space-y-2">
+          <section *ngIf="canCreateFolder && !renameEntry && !replacementTarget" class="rounded-xl border p-3 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
               <input #folderInput type="text" maxlength="255" aria-label="Nome da nova pasta" placeholder="Nome da nova pasta" class="rounded border px-3 py-2 flex-1 min-w-0" [value]="folderName" [disabled]="folderBusy || uploadActive || folderUncertain" (input)="setFolderName(folderInput.value)">
               <button type="button" [disabled]="folderBusy || uploadActive || !folderName.trim()" (click)="createFolder()" class="rounded border px-3 py-2 text-sm">{{folderBusy ? 'Criando...' : folderUncertain ? 'Verificar criação' : 'Nova pasta'}}</button>
@@ -40,15 +41,20 @@ import { UserService } from '../../../core/services/user.service';
             </div>
             <p *ngIf="folderMessage" role="status" class="text-sm">{{folderMessage}}</p>
           </section>
-          <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
+          <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry && !replacementTarget" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
             (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
+          <section *ngIf="replacementTarget" class="space-y-2">
+            <app-google-drive-upload [anchor]="trail[0].id" [destination]="trail[trail.length-1].id" [replacement]="replacementTarget"
+              (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
+            <button type="button" [disabled]="uploadActive" (click)="closeReplacement()" class="rounded border px-3 py-2 text-sm">Fechar substituição</button>
+          </section>
           <p *ngIf="uploadNotice" role="status" class="text-sm text-green-700">{{uploadNotice}}</p>
           <section *ngIf="historyEntry" class="rounded-xl border p-4 space-y-3">
             <div class="flex justify-between gap-2 items-center">
               <h2 class="font-bold break-all">Histórico · {{historyEntry.name}}</h2>
               <button type="button" class="rounded border px-3 py-2 text-sm" (click)="closeHistory()">Fechar</button>
             </div>
-            <p class="text-xs text-gray-600">Versões disponíveis no Google. Revisões não fixadas podem expirar. A recuperação ainda não está disponível.</p>
+            <p class="text-xs text-gray-600">Versões disponíveis conforme a retenção do Google.</p>
             <p *ngIf="historyBusy" role="status" class="text-sm">Consultando versões...</p>
             <p *ngIf="historyError" role="alert" class="text-sm">{{historyError}}</p>
             <ul *ngIf="revisions.length" class="divide-y">
@@ -83,12 +89,13 @@ import { UserService } from '../../../core/services/user.service';
                   <div class="min-w-0"><p class="font-semibold break-all">{{item.name}}</p><p class="text-xs text-gray-600 break-all">{{item.mimeType}}<ng-container *ngIf="item.modifiedTime"> · {{item.modifiedTime | date:'dd/MM/yyyy HH:mm'}}</ng-container></p></div>
                 </div>
                 <div class="flex gap-2 flex-wrap mt-2">
+                  <button *ngIf="item.canReplace && !replacementTarget && !renameEntry" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="startReplacement(item)" class="rounded border px-3 py-1 text-sm">Substituir arquivo</button>
                   <button *ngIf="item.canViewHistory" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="openHistory(item)" class="rounded border px-3 py-1 text-sm">Versões</button>
                   <button *ngIf="supportsPreview(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="read(item,true)" class="rounded border px-3 py-1 text-sm">Visualizar</button>
                   <button *ngIf="canDownload && supportsDownload(item)" type="button" [disabled]="contentBusy || uploadActive || folderBusy || renameBusy" (click)="read(item,false)" class="rounded border px-3 py-1 text-sm">Baixar</button>
                 </div>
               </ng-template>
-              <button *ngIf="item.canRename && !renameEntry" type="button" [disabled]="uploadActive || folderBusy || contentBusy" (click)="startRename(item)" class="rounded border px-3 py-1 text-sm mt-2">Renomear</button>
+              <button *ngIf="item.canRename && !renameEntry && !replacementTarget" type="button" [disabled]="uploadActive || folderBusy || contentBusy" (click)="startRename(item)" class="rounded border px-3 py-1 text-sm mt-2">Renomear</button>
               <section *ngIf="renameEntry?.id===item.id" class="rounded border p-3 mt-2 space-y-2">
                 <label class="block text-sm font-medium">Novo nome
                   <input #renameInput type="text" maxlength="255" class="block w-full rounded border px-3 py-2" [value]="renameName" [disabled]="renameBusy || renameUncertain" (input)="setRenameName(renameInput.value)">
@@ -140,6 +147,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   private folderOperation:string|null=null;
   private folderGeneration=0;
   private readonly folderCancel$=new Subject<void>();
+  replacementTarget:ReplacementTarget|null=null;
   uploadActive=false;
   uploadNotice='';
   @ViewChild(GoogleDriveUploadComponent) private uploadPanel?:GoogleDriveUploadComponent;
@@ -196,10 +204,10 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     if(this.busy||this.uploadActive||this.folderBusy||this.renameBusy||this.pageIndex===0)return;
     this.pageIndex--;this.load();
   }
-  private clearPage():void {this.closePreview();this.canDownload=false;this.canUpload=false;this.canStreamDownload=false;this.streamMaxBytes=0;this.canCreateFolder=false;this.resetFolderDraft();this.resetRename();this.contentError='';this.entries=[];this.nextToken=null;this.tokens=[undefined];this.pageIndex=0;}
+  private clearPage():void {this.replacementTarget=null;this.closePreview();this.canDownload=false;this.canUpload=false;this.canStreamDownload=false;this.streamMaxBytes=0;this.canCreateFolder=false;this.resetFolderDraft();this.resetRename();this.contentError='';this.entries=[];this.nextToken=null;this.tokens=[undefined];this.pageIndex=0;}
   private load():void {
     if(this.activeUser===null||!this.trail.length)return;
-    this.cancel$.next();this.resetRename();this.closePreview();this.canDownload=false;this.canUpload=false;this.contentError='';this.entries=[];this.nextToken=null;this.error='';this.busy=true;
+    this.cancel$.next();this.replacementTarget=null;this.resetRename();this.closePreview();this.canDownload=false;this.canUpload=false;this.contentError='';this.entries=[];this.nextToken=null;this.error='';this.busy=true;
     this.drive.list(this.trail[0].id,this.trail[this.trail.length-1].id,this.tokens[this.pageIndex])
       .pipe(takeUntil(this.cancel$)).subscribe({
         next:page=>{this.entries=page.entries;this.canDownload=page.canDownload===true;this.canUpload=page.canUpload===true;this.canCreateFolder=page.canCreateFolder===true;this.canStreamDownload=page.canStreamDownload===true;this.streamMaxBytes=page.streamMaxBytes??0;this.nextToken=page.nextPageToken;this.busy=false;},
@@ -211,8 +219,16 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     if(active){this.closePreview();this.contentError='';this.uploadNotice='';}
   }
   refreshAfterUpload():void {
-    this.uploadActive=false;this.clearPage();this.uploadNotice='Arquivo publicado com sucesso.';this.load();
+    const replaced=!!this.replacementTarget;
+    this.uploadActive=false;this.clearPage();this.uploadNotice=replaced?'Arquivo substituído com sucesso.':'Arquivo publicado com sucesso.';this.load();
   }
+  startReplacement(item:DriveEntry):void {
+    if(this.busy||this.uploadActive||this.folderBusy||this.renameEntry||this.replacementTarget||this.contentBusy||
+       !item.canReplace||item.folder||!item.version||!this.entries.some(e=>e.id===item.id&&e.version===item.version&&e.canReplace&&!e.folder))return;
+    this.closePreview();this.uploadNotice='';
+    this.replacementTarget={id:item.id,name:item.name,version:item.version,mimeType:item.mimeType};
+  }
+  closeReplacement():void {if(!this.uploadActive)this.replacementTarget=null;}
   setFolderName(name:string):void {
     if(this.folderBusy||this.folderUncertain)return;
     this.folderName=name;this.folderOperation=null;this.folderMessage='';
@@ -243,7 +259,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       });
   }
   startRename(item:DriveEntry):void {
-    if(this.busy||this.uploadActive||this.folderBusy||this.renameEntry||this.contentBusy||
+    if(this.busy||this.uploadActive||this.folderBusy||this.renameEntry||this.replacementTarget||this.contentBusy||
        !item.canRename||!item.version||!this.entries.some(e=>e.id===item.id&&e.version===item.version&&e.canRename))return;
     this.closePreview();this.renameEntry=item;this.renameName=item.name;
   }
