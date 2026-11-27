@@ -9,6 +9,7 @@ import {
   CommunityContextState
 } from '../../../services/community-context.service';
 import { UserPermissionsService } from '../../../services/user-permissions.service';
+import { GoogleDriveBrowserService } from '../../../services/google-drive-browser.service';
 import { PlatformAccessService } from '../../../services/platform-access.service';
 import { CommerceArtistService } from '../../../services/commerce-artist.service';
 import { CreatorStudioService } from '../../../services/creator-studio.service';
@@ -27,6 +28,7 @@ describe('BaseLayoutDashboardComponent', () => {
   let context$: BehaviorSubject<CommunityContextState>;
   let context: jasmine.SpyObj<CommunityContextService>;
   let commerce: jasmine.SpyObj<PlatformAccessService>;
+  let files: jasmine.SpyObj<GoogleDriveBrowserService>;
   let partners: jasmine.SpyObj<PartnerDiscordService>;
   let artists: jasmine.SpyObj<CommerceArtistService>;
   let creators: jasmine.SpyObj<CreatorStudioService>;
@@ -85,6 +87,8 @@ describe('BaseLayoutDashboardComponent', () => {
       ['initialize', 'selectCommunity', 'scopedLocation', 'communityImageUrl', 'canAccessFeature'],
       { state$: context$.asObservable() }
     );
+    files = jasmine.createSpyObj<GoogleDriveBrowserService>('GoogleDriveBrowserService', ['mounts']);
+    files.mounts.and.returnValue(of([]));
     commerce = jasmine.createSpyObj<PlatformAccessService>('PlatformAccessService', ['myAccess']);
     partners = jasmine.createSpyObj<PartnerDiscordService>('PartnerDiscordService', ['getMyPublications']);
     partners.getMyPublications.and.returnValue(of([]));
@@ -107,6 +111,7 @@ describe('BaseLayoutDashboardComponent', () => {
         { provide: UserService, useValue: { user$: user$.asObservable(), logout: () => of(true) } },
         { provide: CommunityContextService, useValue: context },
         { provide: PlatformAccessService, useValue: commerce },
+        { provide: GoogleDriveBrowserService, useValue: files },
         { provide: PartnerDiscordService, useValue: partners },
         { provide: CommerceArtistService, useValue: artists },
         { provide: CreatorStudioService, useValue: creators }
@@ -197,6 +202,18 @@ describe('BaseLayoutDashboardComponent', () => {
     fixture.detectChanges();
     expect(component.showMyPartnerPublications).toBeFalse();
     expect(fixture.nativeElement.querySelector('a[href="/painel/minhas-parcerias"]')).toBeNull();
+  });
+
+  it('only shows Arquivos for an account with an authorized mount and clears it on logout', () => {
+    expect(component.showFilesMenu).toBeFalse();
+    files.mounts.and.returnValue(of([{id:'folder_id',name:'Eventos'}]));
+    user$.next({ ...user, id: 2 });
+    fixture.detectChanges();
+    expect(component.showFilesMenu).toBeTrue();
+    expect(fixture.nativeElement.querySelector('a[href="/painel/arquivos"]')).toBeTruthy();
+    user$.next(null);
+    fixture.detectChanges();
+    expect(component.showFilesMenu).toBeFalse();
   });
 
   it('hides the Studio menu from people without explicit Pro authorization', () => {

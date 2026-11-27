@@ -1,0 +1,237 @@
+import { CdkDragEnd } from '@angular/cdk/drag-drop';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { GoogleDriveBrowserComponent } from './google-drive-browser.component';
+import { DrivePage, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
+import { UserService } from '../../../core/services/user.service';
+
+describe('GoogleDriveBrowserComponent',()=>{
+  let fixture:ComponentFixture<GoogleDriveBrowserComponent>;
+  let drive:jasmine.SpyObj<GoogleDriveBrowserService>;
+  let users:BehaviorSubject<{id:number}|null>;
+  const mount={id:'anchor_folder',name:'Eventos'};
+  const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
+  beforeEach(async()=>{
+    users=new BehaviorSubject<{id:number}|null>({id:1});
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history','transfer','trashList','trashFile','restoreTrash','searchCapability','search']);
+    drive.searchCapability.and.returnValue(of({enabled:true}));
+    drive.mounts.and.returnValue(of([mount]));
+    drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
+    await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
+      {provide:GoogleDriveBrowserService,useValue:drive},{provide:UserService,useValue:{user$:users.asObservable()}}
+    ]}).compileComponents();
+    fixture=TestBed.createComponent(GoogleDriveBrowserComponent);
+    fixture.detectChanges();
+  });
+  afterEach(()=>fixture.destroy());
+  it('navigates from an authorized mount and pages without any Google identity',()=>{
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    expect(drive.list).toHaveBeenCalledWith('anchor_folder','anchor_folder',undefined);
+    c.openChild(child);
+    expect(drive.list).toHaveBeenCalledWith('anchor_folder','child_folder',undefined);
+    c.next();
+    expect(drive.list).toHaveBeenCalledWith('anchor_folder','child_folder','next');
+    c.openTrail(0);
+    expect(c.trail).toEqual([mount]);
+  });
+  it('clears old metadata after switching accounts and ignores late responses',()=>{
+    const pending=new Subject<DrivePage>();
+    drive.list.and.returnValue(pending.asObservable());
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    drive.mounts.and.returnValue(of([]));
+    users.next({id:2});
+    pending.next({entries:[child],nextPageToken:null});
+    expect(c.entries).toEqual([]);
+    expect(c.trail).toEqual([]);
+    expect(c.mounts).toEqual([]);
+  });
+  it('clears inaccessible paths when access is revoked',()=>{
+    drive.list.and.returnValue(throwError(()=>({status:404})));
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    expect(c.entries).toEqual([]);
+    expect(c.trail).toEqual([]);
+    expect(c.mounts).toEqual([]);
+    expect(c.error).toContain('sem acesso');
+  });
+
+  it('allows preview without download and rejects download locally',()=>{
+    const file={...child,id:'file_id',name:'Imagem.png',folder:false,mimeType:'image/png'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:false}));
+    drive.content.and.returnValue(of(new Blob([new Uint8Array([1])],{type:'image/png'})));
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    c.read(file,false);
+    expect(drive.content).not.toHaveBeenCalled();
+    c.read(file,true);
+    expect(drive.content).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_id',true);
+    expect(c.previewUrl).toBeTruthy();
+    c.closePreview();
+    expect(c.previewUrl).toBeNull();
+  });
+  it('discards pending file content on user change',()=>{
+    const file={...child,id:'file_id',name:'Imagem.png',folder:false,mimeType:'image/png'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:true}));
+    const pending=new Subject<Blob>();
+    drive.content.and.returnValue(pending);
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    c.read(file,true);
+    users.next({id:2});
+    pending.next(new Blob([new Uint8Array([1])],{type:'image/png'}));
+    expect(c.previewUrl).toBeNull();
+    expect(c.contentBusy).toBeFalse();
+  });
+
+  it('sends native downloads without requesting the entire file as a Blob',()=>{
+    const file={...child,id:'file_id',name:'video.mp4',folder:false,mimeType:'video/mp4'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:true,canStreamDownload:true,streamMaxBytes:5368709120}));
+    drive.downloadTicket.and.returnValue(of({ticket:'test-ticket'}));
+    const c=fixture.componentInstance;c.openMount(mount);c.read(file,false);
+    expect(drive.downloadTicket).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_id');
+    expect(drive.redeemDownload).toHaveBeenCalledWith('test-ticket');
+    expect(drive.content).not.toHaveBeenCalled();
+  });
+  it('does not redeem a delayed download after switching account',()=>{
+    const file={...child,id:'file_id',name:'video.mp4',folder:false,mimeType:'video/mp4'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:true,canStreamDownload:true}));
+    const pending=new Subject<{ticket:string}>();drive.downloadTicket.and.returnValue(pending);
+    const c=fixture.componentInstance;c.openMount(mount);c.read(file,false);
+    users.next({id:2});pending.next({ticket:'old'});
+    expect(drive.redeemDownload).not.toHaveBeenCalled();
+  });
+  it('reuses the same folder operation after an ambiguous result',()=>{
+    drive.list.and.returnValue(of({entries:[],nextPageToken:null,canCreateFolder:true}));
+    drive.createFolder.and.returnValue(throwError(()=>({status:503})));
+    const c=fixture.componentInstance;c.openMount(mount);c.setFolderName('Nova pasta');c.createFolder();c.createFolder();
+    expect(drive.createFolder).toHaveBeenCalledTimes(2);
+    expect(drive.createFolder.calls.argsFor(0)).toEqual(drive.createFolder.calls.argsFor(1));
+  });
+
+  it('sends expected version and preserves rename operation key after failure',()=>{
+    const file={...child,id:'file_id',name:'old.png',folder:false,mimeType:'image/png',version:'12',canRename:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null}));
+    drive.rename.and.returnValue(throwError(()=>({status:503})));
+    const c=fixture.componentInstance;c.openMount(mount);c.startRename(file);c.setRenameName('new.png');c.saveRename();c.saveRename();
+    expect(drive.rename).toHaveBeenCalledTimes(2);
+    expect(drive.rename.calls.argsFor(0).slice(0,5)).toEqual(['anchor_folder','anchor_folder','file_id','12','new.png']);
+    expect(drive.rename.calls.argsFor(0)).toEqual(drive.rename.calls.argsFor(1));
+  });
+  it('does not offer rename for entries lacking the server permission',()=>{
+    const c=fixture.componentInstance;c.openMount(mount);c.startRename(child);
+    expect(c.renameEntry).toBeNull();
+    expect(drive.rename).not.toHaveBeenCalled();
+  });
+
+  it('lists revision metadata only for an eligible file and paginates',()=>{
+    const file={...child,id:'file_id',name:'art.png',folder:false,mimeType:'image/png',canViewHistory:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null}));
+    const revision={id:'rev_1',modifiedTime:'2026-11-27T10:00:00Z',size:'100',kept:true,current:false};
+    drive.history.and.returnValues(of({revisions:[revision],nextPageToken:'next'}),of({revisions:[],nextPageToken:null}));
+    const c=fixture.componentInstance;c.openMount(mount);c.openHistory(file);
+    expect(c.revisions).toEqual([revision]);c.nextHistory();
+    expect(drive.history).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_id','next');
+    expect(drive.content).not.toHaveBeenCalled();
+  });
+  it('ignores late revision metadata after switching account',()=>{
+    const file={...child,id:'file_id',name:'art.png',folder:false,mimeType:'image/png',canViewHistory:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null}));
+    const pending=new Subject<{revisions:{id:string;modifiedTime:string;size:string;kept:boolean;current:boolean}[];nextPageToken:string|null}>();
+    drive.history.and.returnValue(pending);
+    const c=fixture.componentInstance;c.openMount(mount);c.openHistory(file);users.next({id:2});
+    pending.next({revisions:[{id:'rev_1',modifiedTime:'2026-11-27T10:00:00Z',size:'100',kept:true,current:false}],nextPageToken:null});
+    expect(c.revisions).toEqual([]);expect(c.historyEntry).toBeNull();
+  });
+
+  it('only transfers after a real drop on a destination in the explorer',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canMove:true,canCopy:true};
+    drive.list.and.returnValue(of({entries:[file,child],nextPageToken:null}));
+    drive.transfer.and.returnValue(of({id:'file_123',name:'art.png'}));
+    const c=fixture.componentInstance;c.openMount(mount);fixture.detectChanges();
+    const zone=fixture.nativeElement.querySelector('[data-transfer-folder="child_folder"]') as HTMLElement;
+    const point=spyOn(document,'elementFromPoint').and.returnValue(zone);
+    const event={source:{reset:jasmine.createSpy('reset')},event:new MouseEvent('mouseup',{clientX:5,clientY:5})} as unknown as CdkDragEnd;
+    c.finishDrag(event,file);expect(drive.transfer).not.toHaveBeenCalled();
+    c.startDrag(file);c.finishDrag(event,file);
+    expect(drive.transfer).toHaveBeenCalledWith(jasmine.objectContaining({action:'MOVE',file:'file_123',destination:'child_folder',version:'12'}));
+    expect(point).toHaveBeenCalled();
+  });
+  it('copy clipboard changes no files and is invalidated on account switch',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canCopy:true};
+    drive.list.and.returnValue(of({entries:[file,child],nextPageToken:null}));
+    const c=fixture.componentInstance;c.openMount(mount);fixture.detectChanges();
+    const zone=fixture.nativeElement.querySelector('[data-transfer-folder="child_folder"]') as HTMLElement;
+    spyOn(document,'elementFromPoint').and.returnValue(zone);
+    const event={source:{reset:jasmine.createSpy('reset')},event:new MouseEvent('mouseup')} as unknown as CdkDragEnd;
+    c.copyToClipboard(file);expect(c.clipboard?.id).toBe('file_123');expect(drive.transfer).not.toHaveBeenCalled();
+    users.next({id:2});c.openMount(mount);c.pasteCopy();
+    c.finishDrag(event,file);expect(c.clipboard).toBeNull();expect(drive.transfer).not.toHaveBeenCalled();
+  });
+
+  it('copies into a different folder only when pasted',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canCopy:true};
+    drive.list.and.returnValues(of({entries:[file,child],nextPageToken:null,canUpload:true}),
+      of({entries:[],nextPageToken:null,canUpload:true}),of({entries:[],nextPageToken:null,canUpload:true}));
+    drive.transfer.and.returnValue(of({id:'copy_file',name:'art.png'}));
+    const c=fixture.componentInstance;c.openMount(mount);c.copyToClipboard(file);c.openChild(child);
+    expect(drive.transfer).not.toHaveBeenCalled();c.pasteCopy();
+    expect(drive.transfer).toHaveBeenCalledWith(jasmine.objectContaining({action:'COPY',file:'file_123',parent:'anchor_folder',destination:'child_folder'}));
+  });
+
+  it('confirms moving a file to trash and sends its expected version',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canTrash:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canViewTrash:true}));
+    drive.trashFile.and.returnValue(of({operationId:'op',status:'TRASHED'}));
+    const confirm=spyOn(window,'confirm').and.returnValues(false,true);
+    const c=fixture.componentInstance;c.openMount(mount);c.trashFile(file);
+    expect(drive.trashFile).not.toHaveBeenCalled();
+    c.trashFile(file);expect(confirm).toHaveBeenCalledTimes(2);
+    expect(drive.trashFile).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_123','12',jasmine.any(String));
+  });
+  it('restores from the scoped trash and refreshes only after confirmation',()=>{
+    const item={operationId:'op',name:'art.png',mimeType:'image/png',version:'13',trashedAt:null,canRestore:true};
+    drive.list.and.returnValue(of({entries:[],nextPageToken:null,canViewTrash:true}));
+    drive.trashList.and.returnValues(of({items:[item],nextCursor:null}),of({items:[],nextCursor:null}));
+    drive.restoreTrash.and.returnValue(of({operationId:'op',status:'RESTORED'}));
+    spyOn(window,'confirm').and.returnValue(true);
+    const c=fixture.componentInstance;c.openMount(mount);c.openTrash();c.restoreItem(item);
+    expect(drive.restoreTrash).toHaveBeenCalledWith('anchor_folder','op','13');
+    expect(c.trashItems).toEqual([]);expect(c.trashMessage).toContain('restaurado');
+  });
+  it('drops delayed trash metadata on account change',()=>{
+    const pending=new Subject<{items:{operationId:string;name:string;mimeType:string;version:string;trashedAt:null;canRestore:boolean}[];nextCursor:null}>();
+    drive.list.and.returnValue(of({entries:[],nextPageToken:null,canViewTrash:true}));
+    drive.trashList.and.returnValue(pending);
+    const c=fixture.componentInstance;c.openMount(mount);c.openTrash();users.next({id:2});
+    pending.next({items:[{operationId:'op',name:'private.png',mimeType:'image/png',version:'13',trashedAt:null,canRestore:true}],nextCursor:null});
+    expect(c.trashOpen).toBeFalse();expect(c.trashItems).toEqual([]);
+  });
+
+  it('searches from home and opens an authorized result folder',()=>{
+    const hit={id:'file_123',name:'Arte.png',mimeType:'image/png',folder:false,modifiedTime:null,trail:[mount,{id:'child_folder',name:'Materiais'}]};
+    drive.search.and.returnValue(of({entries:[hit],nextCursor:null}));
+    const c=fixture.componentInstance;c.searchQuery='arte';c.startSearch();
+    expect(drive.search).toHaveBeenCalledWith('arte',undefined);
+    expect(c.searchHits).toEqual([hit]);
+    c.openSearchHit(hit);
+    expect(c.searchOpen).toBeFalse();
+    expect(drive.list).toHaveBeenCalledWith('anchor_folder','child_folder',undefined);
+  });
+  it('uses the submitted query for pagination and ignores late results on account change',()=>{
+    const pending=new Subject<{entries:[],nextCursor:null}>();
+    drive.search.and.returnValues(of({entries:[],nextCursor:'opaque-cursor'}),pending);
+    const c=fixture.componentInstance;c.searchQuery='arte';c.startSearch();
+    c.searchQuery='outro';c.moreSearch();
+    expect(drive.search).toHaveBeenCalledWith('arte','opaque-cursor');
+    users.next({id:2});pending.next({entries:[],nextCursor:null});
+    expect(c.searchOpen).toBeFalse();expect(c.searchHits).toEqual([]);
+  });
+  it('rejects a result outside the current mount list',()=>{
+    const hit={id:'other_file',name:'Arte.png',mimeType:'image/png',folder:false,modifiedTime:null,trail:[{id:'other_anchor',name:'Outra área'}]};
+    drive.search.and.returnValue(of({entries:[hit],nextCursor:null}));
+    const c=fixture.componentInstance;c.searchQuery='arte';c.startSearch();c.openSearchHit(hit);
+    expect(drive.list).not.toHaveBeenCalled();
+  });
+});
