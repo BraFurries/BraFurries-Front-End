@@ -15,13 +15,13 @@ import { UserService } from '../../../core/services/user.service';
     <main class="max-w-6xl mx-auto space-y-4 p-4 sm:p-6">
       <header class="flex flex-wrap items-center justify-between gap-3">
         <div><h1 class="font-amaranth text-2xl font-bold">Arquivos</h1><p class="text-sm text-gray-600">Explore as pastas da BraFurries disponíveis para sua conta.</p></div>
-        <button type="button" class="rounded-lg border px-3 py-2 text-sm" [disabled]="busy || uploadActive || folderBusy || renameBusy" (click)="home()">Atualizar pastas</button>
+        <button type="button" class="rounded-lg border px-3 py-2 text-sm" [disabled]="busy || uploadActive || folderBusy || renameBusy || trashBusy" (click)="home()">Atualizar pastas</button>
       </header>
       <nav aria-label="Caminho da pasta" class="flex flex-wrap items-center gap-2 text-sm">
-        <button type="button" (click)="home()" [disabled]="uploadActive || folderBusy || renameBusy" class="font-bold text-braPurple">Minhas pastas</button>
+        <button type="button" (click)="home()" [disabled]="uploadActive || folderBusy || renameBusy || trashBusy" class="font-bold text-braPurple">Minhas pastas</button>
         <ng-container *ngFor="let item of trail; let i=index">
           <span aria-hidden="true">/</span>
-          <button type="button" (click)="openTrail(i)" [disabled]="busy || uploadActive || renameBusy" class="text-braPurple break-all" [attr.data-transfer-anchor]="trail[0].id" [attr.data-transfer-folder]="item.id">{{item.name}}</button>
+          <button type="button" (click)="openTrail(i)" [disabled]="busy || uploadActive || renameBusy || trashBusy" class="text-braPurple break-all" [attr.data-transfer-anchor]="trail[0].id" [attr.data-transfer-folder]="item.id">{{item.name}}</button>
         </ng-container>
       </nav>
       <p *ngIf="busy" role="status" class="rounded-xl border p-4 text-sm">Consultando arquivos...</p>
@@ -95,7 +95,7 @@ import { UserService } from '../../../core/services/user.service';
             </div>
             <p *ngIf="folderMessage" role="status" class="text-sm">{{folderMessage}}</p>
           </section>
-          <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry && !replacementTarget && !transferBusy" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
+          <app-google-drive-upload *ngIf="canUpload && !folderBusy && !renameEntry && !replacementTarget && !transferBusy && !trashBusy" [anchor]="trail[0].id" [destination]="trail[trail.length-1].id"
             (activeChange)="onUploadActive($event)" (published)="refreshAfterUpload()"></app-google-drive-upload>
           <section *ngIf="replacementTarget" class="space-y-2">
             <app-google-drive-upload [anchor]="trail[0].id" [destination]="trail[trail.length-1].id" [replacement]="replacementTarget"
@@ -304,7 +304,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   openTrash():void {
     if(!this.canViewTrash||this.busy||this.trashBusy||this.uploadActive||this.folderBusy||this.renameBusy||this.transferBusy||this.dragging||
        this.renameEntry||this.replacementTarget||!this.trail.length||this.activeUser===null)return;
-    this.closePreview();this.trashOpen=true;this.trashMessage='';this.loadTrash();
+    this.closePreview();this.selectedFile=null;this.copyMenu=null;this.trashOpen=true;this.trashMessage='';this.loadTrash();
   }
   closeTrash():void {
     if(this.trashBusy)return;
@@ -350,7 +350,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   }
   get hasTransfer():boolean {return this.entries.some(e=>e.canMove||e.canCopy);}
   canDrag(item:DriveEntry):boolean {
-    return !this.busy&&!this.trashBusy&&!this.transferBusy&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget&&!this.contentBusy&&
+    return !this.trashOpen&&!this.busy&&!this.trashBusy&&!this.transferBusy&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget&&!this.contentBusy&&
       !!item.version&&item.canMove===true;
   }
   private resetTransfers():void {
@@ -432,7 +432,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     if(!this.dragging&&!this.transferBusy)this.selectedFile=item;
   }
   private eligibleCopy(item:DriveEntry):boolean {
-    return !this.busy&&!this.trashBusy&&!this.transferBusy&&!this.dragging&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget&&
+    return !this.trashOpen&&!this.busy&&!this.trashBusy&&!this.transferBusy&&!this.dragging&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget&&
       !item.folder&&!!item.version&&item.canCopy===true&&this.activeUser!==null&&this.trail.length>0&&
       this.entries.some(e=>e.id===item.id&&e.version===item.version&&e.canCopy===true);
   }
@@ -453,7 +453,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   }
   canPaste():boolean {
     return !!this.clipboard&&this.clipboard.actor===this.activeUser&&this.canUpload&&this.trail.length>0&&
-      !this.busy&&!this.trashBusy&&!this.transferBusy&&!this.dragging&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget;
+      !this.trashOpen&&!this.busy&&!this.trashBusy&&!this.transferBusy&&!this.dragging&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&!this.replacementTarget;
   }
   pasteCopy():void {
     const source=this.clipboard;if(!source||!this.canPaste())return;
@@ -468,6 +468,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   }
   @HostListener('document:keydown',['$event'])
   keyboardCopy(event:KeyboardEvent):void {
+    if(this.trashOpen||this.trashBusy)return;
     if(!(event.ctrlKey||event.metaKey)||event.altKey||event.shiftKey||event.repeat||event.defaultPrevented)return;
     const target=event.target as HTMLElement|null;
     if(!target||!this.host.nativeElement.contains(target)||target.closest('input,textarea,select,[contenteditable="true"]'))return;
