@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CdkDrag, CdkDragEnd, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { distinctUntilChanged, map, Subject, takeUntil } from 'rxjs';
-import { DriveEntry, DriveMount, DriveRevision, DriveTrashItem, DriveTransferRequest, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
+import { DriveEntry, DriveMount, DriveRevision, DriveSearchHit, DriveTrashItem, DriveTransferRequest, GoogleDriveBrowserService } from '../../../core/services/google-drive-browser.service';
 import { ReplacementTarget } from '../../../core/services/google-drive-upload.service';
 import { GoogleDriveUploadComponent } from './google-drive-upload.component';
 import { UserService } from '../../../core/services/user.service';
@@ -17,6 +17,34 @@ import { UserService } from '../../../core/services/user.service';
         <div><h1 class="font-amaranth text-2xl font-bold">Arquivos</h1><p class="text-sm text-gray-600">Explore as pastas da BraFurries disponíveis para sua conta.</p></div>
         <button type="button" class="rounded-lg border px-3 py-2 text-sm" [disabled]="busy || uploadActive || folderBusy || renameBusy || trashBusy" (click)="home()">Atualizar pastas</button>
       </header>
+      <section *ngIf="searchEnabled" class="space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <input #searchInput type="search" maxlength="100" aria-label="Pesquisar arquivos e pastas" placeholder="Pesquisar no Drive da BraFurries"
+            class="rounded-lg border px-3 py-2 flex-1 min-w-0" [value]="searchQuery"
+            [disabled]="!canSearch()" (input)="searchQuery=searchInput.value" (keyup.enter)="startSearch()">
+          <button type="button" class="rounded-lg border px-3 py-2 text-sm" [disabled]="!canSearch() || searchQuery.trim().length<2" (click)="startSearch()">Pesquisar</button>
+          <button *ngIf="searchOpen" type="button" class="rounded-lg border px-3 py-2 text-sm" (click)="resetSearch()">Fechar pesquisa</button>
+        </div>
+      </section>
+      <section *ngIf="searchOpen" class="rounded-xl border p-4 space-y-3">
+        <h2 class="font-bold">Resultados para “{{submittedQuery}}”</h2>
+        <p *ngIf="searchBusy" role="status" class="text-sm">Pesquisando...</p>
+        <p *ngIf="searchError" role="alert" class="text-sm">{{searchError}}</p>
+        <p *ngIf="!searchBusy && !searchError && !searchHits.length" class="text-sm text-gray-600">{{searchNext ? 'Nenhum resultado acessível nesta página. Você pode consultar mais resultados.' : 'Nenhum resultado acessível encontrado.'}}</p>
+        <ul *ngIf="searchHits.length" class="divide-y">
+          <li *ngFor="let hit of searchHits" class="py-3 flex items-center gap-3">
+            <span aria-hidden="true" class="text-2xl">{{hit.folder ? '📁' : '📄'}}</span>
+            <div class="min-w-0 flex-1">
+              <p class="font-semibold break-all">{{hit.name}}</p>
+              <p class="text-xs text-gray-600 break-all">{{searchLocation(hit)}}</p>
+              <p *ngIf="hit.modifiedTime" class="text-xs text-gray-500">{{hit.modifiedTime | date:'dd/MM/yyyy HH:mm'}}</p>
+            </div>
+            <button type="button" class="rounded border px-3 py-2 text-sm" [disabled]="searchBusy" (click)="openSearchHit(hit)">{{hit.folder ? 'Abrir' : 'Abrir pasta'}}</button>
+          </li>
+        </ul>
+        <button *ngIf="searchNext" type="button" class="rounded border px-3 py-2 text-sm" [disabled]="searchBusy" (click)="moreSearch()">Mais resultados</button>
+      </section>
+      <ng-container *ngIf="!searchOpen">
       <nav aria-label="Caminho da pasta" class="flex flex-wrap items-center gap-2 text-sm">
         <button type="button" (click)="home()" [disabled]="uploadActive || folderBusy || renameBusy || trashBusy" class="font-bold text-braPurple">Minhas pastas</button>
         <ng-container *ngFor="let item of trail; let i=index">
@@ -180,6 +208,7 @@ import { UserService } from '../../../core/services/user.service';
           </ng-container>
         </ng-container>
       </ng-container>
+      </ng-container>
       <p class="text-xs text-gray-500">Prévias de imagens e texto; documentos e planilhas Google têm prévia textual. Downloads comuns {{canStreamDownload ? 'de até ' + (streamMaxBytes / 1073741824 | number:'1.0-2') + ' GiB' : 'de até 10 MiB'}}. Exportações Google limitadas a 10 MB. A edição externa será disponibilizada separadamente.</p>
     </main>
   `
@@ -198,6 +227,8 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   streamMaxBytes=0;
   canCreateFolder=false;
   folderBusy=false;
+  searchEnabled=false;searchOpen=false;searchBusy=false;searchQuery='';submittedQuery='';searchError='';searchHits:DriveSearchHit[]=[];searchNext:string|null=null;
+  private searchGeneration=0;private readonly searchCancel$=new Subject<void>();private readonly searchAccount$=new Subject<void>();
   canViewTrash=false;trashOpen=false;trashBusy=false;trashMessage='';trashItems:DriveTrashItem[]=[];trashNext:string|null=null;
   private trashGeneration=0;private readonly trashCancel$=new Subject<void>();
   selectedFile:DriveEntry|null=null;copyMenu:string|null=null;
@@ -244,6 +275,10 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       if(this.uploadPanel){this.uploadPanel.enabled=false;this.uploadPanel.reset();}
       this.uploadActive=false;this.uploadNotice='';this.resetFolderDraft();this.resetRename();this.resetTransfers();this.resetTrash();this.clipboard=null;
       this.activeUser=id;
+      this.searchAccount$.next();this.searchEnabled=false;this.resetSearch();
+      if(id!==null)this.drive.searchCapability().pipe(takeUntil(this.searchAccount$),takeUntil(this.destroyed$)).subscribe({
+        next:c=>{if(this.activeUser===id)this.searchEnabled=c.enabled===true;},error:()=>{if(this.activeUser===id)this.searchEnabled=false;}
+      });
       this.home();
     });
   }
@@ -279,10 +314,10 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
     if(this.busy||this.uploadActive||this.folderBusy||this.renameBusy||this.trashBusy||this.transferBusy||this.dragging||this.pageIndex===0)return;
     this.pageIndex--;this.load();
   }
-  private clearPage():void {this.resetTrash();this.resetTransfers();this.replacementTarget=null;this.closePreview();this.canDownload=false;this.canUpload=false;this.canStreamDownload=false;this.streamMaxBytes=0;this.canCreateFolder=false;this.resetFolderDraft();this.resetRename();this.contentError='';this.entries=[];this.nextToken=null;this.tokens=[undefined];this.pageIndex=0;}
+  private clearPage():void {this.resetSearch();this.resetTrash();this.resetTransfers();this.replacementTarget=null;this.closePreview();this.canDownload=false;this.canUpload=false;this.canStreamDownload=false;this.streamMaxBytes=0;this.canCreateFolder=false;this.resetFolderDraft();this.resetRename();this.contentError='';this.entries=[];this.nextToken=null;this.tokens=[undefined];this.pageIndex=0;}
   private load():void {
     if(this.activeUser===null||!this.trail.length)return;
-    this.cancel$.next();this.resetTrash();this.resetTransfers();this.replacementTarget=null;this.resetRename();this.closePreview();this.canDownload=false;this.canUpload=false;this.contentError='';this.entries=[];this.nextToken=null;this.error='';this.busy=true;
+    this.cancel$.next();this.resetSearch();this.resetTrash();this.resetTransfers();this.replacementTarget=null;this.resetRename();this.closePreview();this.canDownload=false;this.canUpload=false;this.contentError='';this.entries=[];this.nextToken=null;this.error='';this.busy=true;
     this.drive.list(this.trail[0].id,this.trail[this.trail.length-1].id,this.tokens[this.pageIndex])
       .pipe(takeUntil(this.cancel$)).subscribe({
         next:page=>{this.entries=page.entries;this.canDownload=page.canDownload===true;this.canUpload=page.canUpload===true;this.canCreateFolder=page.canCreateFolder===true;this.canViewTrash=page.canViewTrash===true;this.canStreamDownload=page.canStreamDownload===true;this.streamMaxBytes=page.streamMaxBytes??0;this.nextToken=page.nextPageToken;this.busy=false;},
@@ -296,6 +331,37 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   refreshAfterUpload():void {
     const replaced=!!this.replacementTarget;
     this.uploadActive=false;this.clearPage();this.uploadNotice=replaced?'Arquivo substituído com sucesso.':'Arquivo publicado com sucesso.';this.load();
+  }
+  canSearch():boolean {
+    return this.searchEnabled&&this.activeUser!==null&&!this.busy&&!this.uploadActive&&!this.folderBusy&&!this.renameEntry&&
+      !this.replacementTarget&&!this.transferBusy&&!this.dragging&&!this.trashBusy&&!this.trashOpen&&!this.contentBusy;
+  }
+  resetSearch():void {
+    ++this.searchGeneration;this.searchCancel$.next();this.searchOpen=false;this.searchBusy=false;
+    this.searchQuery='';this.submittedQuery='';this.searchError='';this.searchHits=[];this.searchNext=null;
+  }
+  startSearch():void {
+    const q=this.searchQuery.trim();
+    if(!this.canSearch()||Array.from(q).length<2||Array.from(q).length>100)return;
+    this.closePreview();this.selectedFile=null;this.copyMenu=null;
+    this.searchOpen=true;this.submittedQuery=q;this.loadSearch();
+  }
+  moreSearch():void {
+    if(this.searchOpen&&!this.searchBusy&&this.searchNext)this.loadSearch(this.searchNext);
+  }
+  private loadSearch(cursor?:string):void {
+    const generation=++this.searchGeneration;this.searchCancel$.next();
+    this.searchBusy=true;this.searchError='';this.searchNext=null;this.searchHits=[];
+    this.drive.search(this.submittedQuery,cursor).pipe(takeUntil(this.searchCancel$)).subscribe({
+      next:page=>{if(generation===this.searchGeneration){this.searchHits=page.entries;this.searchNext=page.nextCursor;this.searchBusy=false;}},
+      error:()=>{if(generation===this.searchGeneration){this.searchBusy=false;this.searchError='Pesquisa indisponível ou expirada. Tente pesquisar novamente.';}}
+    });
+  }
+  searchLocation(hit:DriveSearchHit):string {return hit.trail.map(t=>t.name).join(' / ');}
+  openSearchHit(hit:DriveSearchHit):void {
+    if(!this.searchOpen||this.searchBusy||!this.canSearch()||!this.searchHits.includes(hit)||!hit.trail.length||
+      !this.mounts.some(m=>m.id===hit.trail[0].id))return;
+    this.trail=hit.trail.map(t=>({...t}));this.clearPage();this.load();
   }
   private resetTrash():void {
     ++this.trashGeneration;this.trashCancel$.next();this.trashBusy=false;this.trashOpen=false;this.canViewTrash=false;
@@ -468,7 +534,7 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
   }
   @HostListener('document:keydown',['$event'])
   keyboardCopy(event:KeyboardEvent):void {
-    if(this.trashOpen||this.trashBusy)return;
+    if(this.searchOpen||this.trashOpen||this.trashBusy)return;
     if(!(event.ctrlKey||event.metaKey)||event.altKey||event.shiftKey||event.repeat||event.defaultPrevented)return;
     const target=event.target as HTMLElement|null;
     if(!target||!this.host.nativeElement.contains(target)||target.closest('input,textarea,select,[contenteditable="true"]'))return;
@@ -644,6 +710,6 @@ export class GoogleDriveBrowserComponent implements OnInit,OnDestroy {
       });
   }
   ngOnDestroy():void {
-    this.uploadPanel?.reset(false);this.resetTrash();this.trashCancel$.complete();this.resetTransfers();this.transferCancel$.complete();this.targetsCancel$.complete();this.resetRename();this.renameCancel$.complete();this.resetFolderDraft();this.folderCancel$.complete();this.closePreview();this.contentCancel$.complete();this.historyCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
+    this.uploadPanel?.reset(false);this.resetSearch();this.searchCancel$.complete();this.searchAccount$.next();this.searchAccount$.complete();this.resetTrash();this.trashCancel$.complete();this.resetTransfers();this.transferCancel$.complete();this.targetsCancel$.complete();this.resetRename();this.renameCancel$.complete();this.resetFolderDraft();this.folderCancel$.complete();this.closePreview();this.contentCancel$.complete();this.historyCancel$.complete();this.cancel$.next();this.cancel$.complete();this.destroyed$.next();this.destroyed$.complete();
   }
 }
