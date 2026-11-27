@@ -12,7 +12,7 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content','downloadTicket','redeemDownload','createFolder','rename','history']);
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -121,5 +121,25 @@ describe('GoogleDriveBrowserComponent',()=>{
     const c=fixture.componentInstance;c.openMount(mount);c.startRename(child);
     expect(c.renameEntry).toBeNull();
     expect(drive.rename).not.toHaveBeenCalled();
+  });
+
+  it('lists revision metadata only for an eligible file and paginates',()=>{
+    const file={...child,id:'file_id',name:'art.png',folder:false,mimeType:'image/png',canViewHistory:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null}));
+    const revision={id:'rev_1',modifiedTime:'2026-11-27T10:00:00Z',size:'100',kept:true,current:false};
+    drive.history.and.returnValues(of({revisions:[revision],nextPageToken:'next'}),of({revisions:[],nextPageToken:null}));
+    const c=fixture.componentInstance;c.openMount(mount);c.openHistory(file);
+    expect(c.revisions).toEqual([revision]);c.nextHistory();
+    expect(drive.history).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_id','next');
+    expect(drive.content).not.toHaveBeenCalled();
+  });
+  it('ignores late revision metadata after switching account',()=>{
+    const file={...child,id:'file_id',name:'art.png',folder:false,mimeType:'image/png',canViewHistory:true};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null}));
+    const pending=new Subject<{revisions:{id:string;modifiedTime:string;size:string;kept:boolean;current:boolean}[];nextPageToken:string|null}>();
+    drive.history.and.returnValue(pending);
+    const c=fixture.componentInstance;c.openMount(mount);c.openHistory(file);users.next({id:2});
+    pending.next({revisions:[{id:'rev_1',modifiedTime:'2026-11-27T10:00:00Z',size:'100',kept:true,current:false}],nextPageToken:null});
+    expect(c.revisions).toEqual([]);expect(c.historyEntry).toBeNull();
   });
 });
