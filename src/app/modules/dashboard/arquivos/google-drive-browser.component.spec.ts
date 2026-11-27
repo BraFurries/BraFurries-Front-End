@@ -12,7 +12,7 @@ describe('GoogleDriveBrowserComponent',()=>{
   const child={id:'child_folder',name:'Materiais',mimeType:'application/vnd.google-apps.folder',folder:true,size:null,modifiedTime:null};
   beforeEach(async()=>{
     users=new BehaviorSubject<{id:number}|null>({id:1});
-    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list']);
+    drive=jasmine.createSpyObj('GoogleDriveBrowserService',['mounts','list','content']);
     drive.mounts.and.returnValue(of([mount]));
     drive.list.and.returnValue(of({entries:[child],nextPageToken:'next'}));
     await TestBed.configureTestingModule({imports:[GoogleDriveBrowserComponent],providers:[
@@ -53,5 +53,33 @@ describe('GoogleDriveBrowserComponent',()=>{
     expect(c.trail).toEqual([]);
     expect(c.mounts).toEqual([]);
     expect(c.error).toContain('sem acesso');
+  });
+
+  it('allows preview without download and rejects download locally',()=>{
+    const file={...child,id:'file_id',name:'Imagem.png',folder:false,mimeType:'image/png'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:false}));
+    drive.content.and.returnValue(of(new Blob([new Uint8Array([1])],{type:'image/png'})));
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    c.read(file,false);
+    expect(drive.content).not.toHaveBeenCalled();
+    c.read(file,true);
+    expect(drive.content).toHaveBeenCalledWith('anchor_folder','anchor_folder','file_id',true);
+    expect(c.previewUrl).toBeTruthy();
+    c.closePreview();
+    expect(c.previewUrl).toBeNull();
+  });
+  it('discards pending file content on user change',()=>{
+    const file={...child,id:'file_id',name:'Imagem.png',folder:false,mimeType:'image/png'};
+    drive.list.and.returnValue(of({entries:[file],nextPageToken:null,canDownload:true}));
+    const pending=new Subject<Blob>();
+    drive.content.and.returnValue(pending);
+    const c=fixture.componentInstance;
+    c.openMount(mount);
+    c.read(file,true);
+    users.next({id:2});
+    pending.next(new Blob([new Uint8Array([1])],{type:'image/png'}));
+    expect(c.previewUrl).toBeNull();
+    expect(c.contentBusy).toBeFalse();
   });
 });
