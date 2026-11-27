@@ -6,7 +6,7 @@ export interface DriveMount {id:string;name:string;}
 export interface DriveEntry extends DriveMount {
   mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;
 }
-export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;}
+export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;}
 
 @Injectable({providedIn:'root'})
 export class GoogleDriveBrowserService {
