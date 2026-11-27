@@ -157,15 +157,25 @@ describe('GoogleDriveBrowserComponent',()=>{
     expect(drive.transfer).toHaveBeenCalledWith(jasmine.objectContaining({action:'MOVE',file:'file_123',destination:'child_folder',version:'12'}));
     expect(point).toHaveBeenCalled();
   });
-  it('copy mode changes no files until dropped and drops are invalidated on account switch',()=>{
+  it('copy clipboard changes no files and is invalidated on account switch',()=>{
     const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canCopy:true};
     drive.list.and.returnValue(of({entries:[file,child],nextPageToken:null}));
     const c=fixture.componentInstance;c.openMount(mount);fixture.detectChanges();
     const zone=fixture.nativeElement.querySelector('[data-transfer-folder="child_folder"]') as HTMLElement;
     spyOn(document,'elementFromPoint').and.returnValue(zone);
     const event={source:{reset:jasmine.createSpy('reset')},event:new MouseEvent('mouseup')} as unknown as CdkDragEnd;
-    c.setTransferMode('COPY');expect(drive.transfer).not.toHaveBeenCalled();
-    c.startDrag(file);users.next({id:2});c.openMount(mount);
-    c.finishDrag(event,file);expect(drive.transfer).not.toHaveBeenCalled();
+    c.copyToClipboard(file);expect(c.clipboard?.id).toBe('file_123');expect(drive.transfer).not.toHaveBeenCalled();
+    users.next({id:2});c.openMount(mount);c.pasteCopy();
+    c.finishDrag(event,file);expect(c.clipboard).toBeNull();expect(drive.transfer).not.toHaveBeenCalled();
+  });
+
+  it('copies into a different folder only when pasted',()=>{
+    const file={...child,id:'file_123',name:'art.png',folder:false,mimeType:'image/png',version:'12',canCopy:true};
+    drive.list.and.returnValues(of({entries:[file,child],nextPageToken:null,canUpload:true}),
+      of({entries:[],nextPageToken:null,canUpload:true}),of({entries:[],nextPageToken:null,canUpload:true}));
+    drive.transfer.and.returnValue(of({id:'copy_file',name:'art.png'}));
+    const c=fixture.componentInstance;c.openMount(mount);c.copyToClipboard(file);c.openChild(child);
+    expect(drive.transfer).not.toHaveBeenCalled();c.pasteCopy();
+    expect(drive.transfer).toHaveBeenCalledWith(jasmine.objectContaining({action:'COPY',file:'file_123',parent:'anchor_folder',destination:'child_folder'}));
   });
 });
