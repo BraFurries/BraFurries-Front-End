@@ -10,6 +10,8 @@ export type DriveTransferAction='MOVE'|'COPY';
 export interface DriveTransferRequest {sourceAnchor:string;parent:string;file:string;version:string;destinationAnchor:string;destination:string;action:DriveTransferAction;operationId:string;}
 export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;canViewTrash?:boolean;}
 
+export interface DriveSearchHit {id:string;name:string;mimeType:string;folder:boolean;modifiedTime:string|null;trail:DriveMount[];}
+export interface DriveSearchPage {entries:DriveSearchHit[];nextCursor:string|null;}
 export interface DriveTrashItem {operationId:string;name:string;mimeType:string;version:string;trashedAt:string|null;canRestore:boolean;}
 export interface DriveTrashPage {items:DriveTrashItem[];nextCursor:string|null;}
 export interface DriveRevision {id:string;modifiedTime:string;size:string;kept:boolean;current:boolean;}
@@ -82,5 +84,12 @@ export class GoogleDriveBrowserService {
   }
   restoreTrash(anchor:string,id:string,version:string){
     return this.http.post<{operationId:string;status:string}>(this.trashEndpoint+'/'+encodeURIComponent(id)+'/restore',{anchor,version});
+  }
+
+  searchCapability(){return this.http.get<{enabled:boolean}>(this.endpoint+'/search/capability');}
+  search(q:string,cursor?:string){
+    let params=new HttpParams().set('q',q);
+    if(cursor)params=params.set('cursor',cursor);
+    return this.http.get<DriveSearchPage>(this.endpoint+'/search',{params});
   }
 }
