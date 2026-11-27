@@ -4,8 +4,10 @@ import { environment } from '../../../environments/environment';
 
 export interface DriveMount {id:string;name:string;}
 export interface DriveEntry extends DriveMount {
-  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;canReplace?:boolean;
+  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;canReplace?:boolean;canMove?:boolean;canCopy?:boolean;
 }
+export type DriveTransferAction='MOVE'|'COPY';
+export interface DriveTransferRequest {sourceAnchor:string;parent:string;file:string;version:string;destinationAnchor:string;destination:string;action:DriveTransferAction;operationId:string;}
 export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;}
 
 export interface DriveRevision {id:string;modifiedTime:string;size:string;kept:boolean;current:boolean;}
@@ -61,5 +63,9 @@ export class GoogleDriveBrowserService {
     const params=pageToken?new HttpParams().set('pageToken',pageToken):new HttpParams();
     return this.http.get<DriveHistory>(this.endpoint+'/mounts/'+encodeURIComponent(anchor)+'/folders/'+encodeURIComponent(folder)
       +'/files/'+encodeURIComponent(file)+'/revisions',{params});
+  }
+
+  transfer(request:DriveTransferRequest){
+    return this.http.post<{id:string;name:string}>(environment.apiBaseUrl+'/user/me/platform-drive/transfer-operations',request);
   }
 }
