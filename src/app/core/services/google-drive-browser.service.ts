@@ -4,7 +4,7 @@ import { environment } from '../../../environments/environment';
 
 export interface DriveMount {id:string;name:string;}
 export interface DriveEntry extends DriveMount {
-  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;
+  mimeType:string;folder:boolean;size:string|null;modifiedTime:string|null;version?:string|null;canRename?:boolean;canViewHistory?:boolean;canReplace?:boolean;
 }
 export interface DrivePage {entries:DriveEntry[];nextPageToken:string|null;canDownload?:boolean;canUpload?:boolean;canCreateFolder?:boolean;canStreamDownload?:boolean;streamMaxBytes?:number;}
 
